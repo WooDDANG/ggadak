@@ -49,10 +49,17 @@ export class DecisionTrackerBot {
   }
 
   private setupListeners() {
-    this.client.on('ready', () => {
+    this.client.on('ready', async () => {
       logger.info(`Discord Gateway connected! Logged in as ${this.client.user?.tag} (ID: ${this.client.user?.id})`);
       logger.info(`Backend AI API target: ${this.backendUrl}`);
       logger.info(`Autonomous monitoring enabled (Keywords, Reactions >= ${REACTION_THRESHOLD}, and '${this.triggerEmoji}' Override)`);
+
+      // Execute Initial Channel Backfill Scan for all joined channels
+      try {
+        await this.scanAllChannels(50);
+      } catch (err: any) {
+        logger.error(`[Initial Scan] Error during startup scan: ${err.message}`, { stack: err.stack });
+      }
     });
 
     // 1. Passive Stream Monitoring: messageCreate (Keyword Trigger Detection)
@@ -382,6 +389,102 @@ export class DecisionTrackerBot {
 
     await channel.send({ embeds: [embed], components: [row] });
     logger.info(`[Conflict] Sent conflict prompt for [${newDecision.id}] vs [${oldDecision.id}] in channel`);
+  }
+
+  async scanAllChannels(limit: number = 50): Promise<void> {
+    logger.info(`[Initial Scan] Beginning initial channel scan across all guilds (limit=${limit})...`);
+
+    for (const guild of this.client.guilds.cache.values()) {
+      try {
+        const channels = await guild.channels.fetch();
+        for (const channel of channels.values()) {
+          if (!channel || !channel.isTextBased()) continue;
+
+          const channelId = channel.id;
+          const channelName = channel.name || channelId;
+
+          try {
+            // Check if checkpoint already exists
+            const cpRes = await fetch(`${this.backendUrl}/api/channels/${channelId}/checkpoint`);
+            if (cpRes.ok) {
+              const cpData = await cpRes.json() as any;
+              if (cpData.lastMessageId) {
+                logger.info(`[Initial Scan] Channel #${channelName} already has checkpoint [${cpData.lastMessageId}]. Skipping initial backfill.`);
+                continue;
+              }
+            }
+
+            logger.info(`[Initial Scan] Scanning uninitialized channel #${channelName}...`);
+            const fetched = await channel.messages.fetch({ limit });
+            if (fetched.size === 0) {
+              continue;
+            }
+
+            const msgs = Array.from(fetched.values()).reverse();
+            const newestMsg = msgs[msgs.length - 1];
+
+            const rawMessages = msgs.map(m => ({
+              author: m.author.username,
+              content: m.content,
+              createdAt: m.createdAt.toISOString(),
+              replyingTo: m.reference?.messageId
+            }));
+
+            const res = await fetch(`${this.backendUrl}/api/discussions/analyze`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                rawMessages,
+                guildId: guild.id,
+                channelId: channel.id,
+                channelName: channelName,
+                triggerMessageId: newestMsg.id,
+                messageUrl: newestMsg.url
+              })
+            });
+
+            if (res.ok) {
+              const result = await res.json() as any;
+              if (result.found && result.decisions && result.decisions.length > 0) {
+                logger.info(`[Initial Scan] Found ${result.decisions.length} decisions in #${channelName}! Posting embeds...`);
+                await this.addReactionSafely(newestMsg, '📝');
+
+                if ('send' in channel) {
+                  for (const decision of result.decisions) {
+                    const actionItemsText = decision.actionItems && decision.actionItems.length > 0
+                      ? `\n\n**📋 후속 조치:**\n` + decision.actionItems.map((a: any) => `• ${a.task} ${a.assignee ? `(@${a.assignee})` : ''}`).join('\n')
+                      : '';
+
+                    const embed = new EmbedBuilder()
+                      .setTitle(`📝 [초기 스캔] 의사결정 기록: [${decision.topic}]`)
+                      .setDescription(`**🎯 결정:** ${decision.decision}\n**💡 근거:** ${decision.rationale}${actionItemsText}`)
+                      .setFooter({ text: `ID: ${decision.id} | 상태: ${decision.state}` })
+                      .setColor(0x10b981);
+
+                    await channel.send({ embeds: [embed] });
+                  }
+                }
+              } else {
+                // Advance checkpoint so we don't re-scan next time
+                await fetch(`${this.backendUrl}/api/channels/${channelId}/checkpoint`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ lastMessageId: newestMsg.id })
+                });
+              }
+            }
+
+            // Polite throttle between channels to respect Discord rate limits
+            await new Promise(r => setTimeout(r, 400));
+          } catch (err: any) {
+            logger.warn(`[Initial Scan] Failed to scan channel #${channelName}: ${err.message}`);
+          }
+        }
+      } catch (err: any) {
+        logger.warn(`[Initial Scan] Failed to fetch channels for guild ${guild.name}: ${err.message}`);
+      }
+    }
+    logger.info(`[Initial Scan] Completed initial channel scan.`);
   }
 
   async start(token?: string) {
