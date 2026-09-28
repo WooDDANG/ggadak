@@ -4,9 +4,9 @@
 
 **Blocked by:** 06 — Bot Reliable Webhook Egress, 07 — FE Decision Timeline Dashboard
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Configure root `package.json` scripts with concurrent/filter execution
-- [ ] Create `.env.example` with clear documentation for Discord token, LLM keys, and Webhook URLs
-- [ ] Implement an automated E2E integration test exercising the full pipeline
-- [ ] Validate full test suite passes with `pnpm test`
+- [x] Configure root `package.json` scripts with concurrent/filter execution
+- [x] Create `.env.example` with clear documentation for Discord token, LLM keys, and Webhook URLs
+- [x] Implement an automated E2E integration test exercising the full pipeline
+- [x] Validate full test suite passes with `npm test`

@@ -4,10 +4,10 @@
 
 **Blocked by:** 02 — BE Webhook Ingestion and Storage
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Create React/Vite web application in `apps/fe`
-- [ ] Build Decision Timeline view grouping by topic and channel
-- [ ] Render Decision Cards displaying decision, rationale, action items, and state badge
-- [ ] Implement search/filter bar by keyword and decision state
-- [ ] Add component tests for timeline and card interactions
+- [x] Create React/Vite web application in `apps/fe`
+- [x] Build Decision Timeline view grouping by topic and channel
+- [x] Render Decision Cards displaying decision, rationale, action items, and state badge
+- [x] Implement search/filter bar by keyword and decision state
+- [x] Add component tests for timeline and card interactions

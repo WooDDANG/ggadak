@@ -4,9 +4,9 @@
 
 **Blocked by:** 02 — BE Webhook Ingestion and Storage, 05 — Bot Interactive Conflict Resolution
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Create local SQLite `egress_queue` table in `apps/bot`
-- [ ] Enqueue confirmed decisions upon resolution
-- [ ] Implement background dispatcher worker with backoff retry
-- [ ] Add integration tests verifying at-least-once delivery during simulated downtime
+- [x] Create local SQLite `egress_queue` table in `apps/bot`
+- [x] Enqueue confirmed decisions upon resolution
+- [x] Implement background dispatcher worker with backoff retry
+- [x] Add integration tests verifying at-least-once delivery during simulated downtime

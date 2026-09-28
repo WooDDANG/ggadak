@@ -4,10 +4,10 @@
 
 **Blocked by:** 01 — Shared Domain Schemas
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Setup `discord.js` Client with necessary Gateway Intents
-- [ ] Implement `messageReactionAdd` listener for configured emoji (📌)
-- [ ] Implement `/decision scan` slash command
-- [ ] Build `DiscussionContextBuilder` to construct transcript with timestamps and reply metadata
-- [ ] Add unit tests for transcript formatter
+- [x] Setup `discord.js` Client with necessary Gateway Intents
+- [x] Implement `messageReactionAdd` listener for configured emoji (📌)
+- [x] Implement `/decision scan` slash command
+- [x] Build `DiscussionContextBuilder` to construct transcript with timestamps and reply metadata
+- [x] Add unit tests for transcript formatter

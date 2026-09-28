@@ -9,11 +9,11 @@
     "dev:bot": "npm run dev --workspace=@ggaddak/bot",
     "dev:be": "npm run dev --workspace=@ggaddak/be",
     "dev:fe": "npm run dev --workspace=@ggaddak/fe",
-    "test": "npm run test --workspaces --if-present",
-    "build": "npm run build --workspaces --if-present"
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm run build && npm run test --workspaces --if-present && tsc -p tsconfig.test.json && node --test dist-test/e2e.test.js"
   },
   "devDependencies": {
-    "@types/node": "^26.6.3",
-    "typescript": "^5.4.5"
+    "typescript": "^5.4.5",
+    "@types/node": "^22.0.0"
   }
 }

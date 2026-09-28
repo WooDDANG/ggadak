@@ -4,9 +4,9 @@
 
 **Blocked by:** 04 — Bot LLM Extraction Engine
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Implement semantic/topic conflict checker against recent decisions
-- [ ] Build Discord embed and action row with "Supersede Existing" and "Create Independent" buttons
-- [ ] Handle button interaction events and transition decision states accordingly
-- [ ] Add tests for conflict detection and interaction state changes
+- [x] Implement semantic/topic conflict checker against recent decisions
+- [x] Build Discord embed and action row with "Supersede Existing" and "Create Independent" buttons
+- [x] Handle button interaction events and transition decision states accordingly
+- [x] Add tests for conflict detection and interaction state changes
