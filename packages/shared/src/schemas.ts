@@ -13,6 +13,13 @@ export const ActionItemSchema = z.object({
   dueDate: z.string().optional()
 });
 
+export const RawMessageEntrySchema = z.object({
+  author: z.string(),
+  content: z.string(),
+  createdAt: z.string(),
+  replyingTo: z.string().optional()
+});
+
 export const DiscordSourceSchema = z.object({
   guildId: z.string(),
   channelId: z.string(),
@@ -20,7 +27,8 @@ export const DiscordSourceSchema = z.object({
   threadId: z.string().optional(),
   triggerMessageId: z.string(),
   messageUrl: z.string().url().optional(),
-  participants: z.array(z.string()).default([])
+  participants: z.array(z.string()).default([]),
+  rawMessages: z.array(RawMessageEntrySchema).default([])
 });
 
 export const DecisionSchema = z.object({
@@ -31,6 +39,7 @@ export const DecisionSchema = z.object({
   actionItems: z.array(ActionItemSchema).default([]),
   state: DecisionStateSchema.default('Decided'),
   supersedesId: z.string().nullable().default(null),
+  rawTranscript: z.string().optional(),
   source: DiscordSourceSchema,
   createdAt: z.string().datetime()
 });

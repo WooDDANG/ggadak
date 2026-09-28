@@ -28,6 +28,10 @@ _Avoid_: Status, Phase, Stage, Condition
 The bounded, structured window of Discord messages (preserving author, timestamp, and reply relationships) sent to the LLM to extract a Decision and its Rationale.
 _Avoid_: Chat Log, History, Transcript, Raw Messages
 
+**Embedded Transcript**:
+The full raw discussion transcript and message entries attached directly to a Decision entity, allowing users to inspect the authentic conversation directly within the Web interface.
+_Avoid_: Chat History, Raw Dump, Log Attachment
+
 **Decision Conflict**:
 A situation where a newly captured Decision modifies, contradicts, or replaces an existing Decision, triggering an interactive confirmation in Discord.
 _Avoid_: Collision, Override, Overwrite, Duplicate
@@ -37,7 +41,7 @@ The external web API or endpoint that receives structured Decision payloads via 
 _Avoid_: Dashboard, Frontend, Portal, Viewer
 
 **Decision Payload**:
-The standardized JSON contract sent to the Web Consumer containing the Decision, Rationale, Action Items, source references, and metadata.
+The standardized JSON contract sent to the Web Consumer containing the Decision, Rationale, Action Items, Embedded Transcript, source references, and metadata.
 _Avoid_: Webhook Body, Message Data, Export Object
 
 **Egress Queue**:

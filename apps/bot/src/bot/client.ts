@@ -136,13 +136,20 @@ export class DecisionTrackerBot {
       actionItems: extracted.actionItems,
       state: 'Decided',
       supersedesId: null,
+      rawTranscript: transcript,
       source: {
         guildId: message.guildId || 'dm',
         channelId: message.channelId,
         channelName: channelName,
         triggerMessageId: message.id,
         messageUrl: message.url,
-        participants
+        participants,
+        rawMessages: rawMessages.map(m => ({
+          author: m.authorName,
+          content: m.content,
+          createdAt: m.createdAt.toISOString(),
+          replyingTo: m.referenceAuthorName
+        }))
       },
       createdAt: new Date().toISOString()
     };

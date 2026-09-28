@@ -1,5 +1,5 @@
 import { DatabaseSync } from 'node:sqlite';
-import { Decision, DecisionPayload } from '@ggaddak/shared';
+import { Decision } from '@ggaddak/shared';
 
 export class DecisionRepository {
   private db: DatabaseSync;
@@ -19,6 +19,7 @@ export class DecisionRepository {
         action_items TEXT NOT NULL,
         state TEXT NOT NULL,
         supersedes_id TEXT,
+        raw_transcript TEXT,
         source TEXT NOT NULL,
         created_at TEXT NOT NULL
       );
@@ -37,8 +38,8 @@ export class DecisionRepository {
 
     const insertStmt = this.db.prepare(`
       INSERT OR REPLACE INTO decisions (
-        id, topic, decision, rationale, action_items, state, supersedes_id, source, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        id, topic, decision, rationale, action_items, state, supersedes_id, raw_transcript, source, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     insertStmt.run(
@@ -49,6 +50,7 @@ export class DecisionRepository {
       JSON.stringify(decision.actionItems),
       decision.state,
       decision.supersedesId ?? null,
+      decision.rawTranscript ?? null,
       JSON.stringify(decision.source),
       decision.createdAt
     );
@@ -84,6 +86,7 @@ export class DecisionRepository {
       actionItems: JSON.parse(row.action_items),
       state: row.state,
       supersedesId: row.supersedes_id,
+      rawTranscript: row.raw_transcript,
       source: JSON.parse(row.source),
       createdAt: row.created_at
     }));
@@ -102,6 +105,7 @@ export class DecisionRepository {
       actionItems: JSON.parse(row.action_items),
       state: row.state,
       supersedesId: row.supersedes_id,
+      rawTranscript: row.raw_transcript,
       source: JSON.parse(row.source),
       createdAt: row.created_at
     };

@@ -17,6 +17,8 @@
       --amber: #f59e0b;
       --red: #ef4444;
       --purple: #a855f7;
+      --chat-bg: #0d1322;
+      --chat-border: #1e293b;
     }
 
     * {
@@ -199,6 +201,7 @@
 
     .action-items-list {
       margin-top: 10px;
+      margin-bottom: 14px;
       display: flex;
       flex-direction: column;
       gap: 6px;
@@ -213,6 +216,79 @@
       background: #182239;
       padding: 6px 10px;
       border-radius: 6px;
+    }
+
+    /* Expandable Transcript Accordion */
+    .transcript-accordion {
+      background: var(--chat-bg);
+      border: 1px solid var(--chat-border);
+      border-radius: 8px;
+      margin-top: 12px;
+      overflow: hidden;
+    }
+
+    .transcript-summary {
+      padding: 10px 14px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #38bdf8;
+      cursor: pointer;
+      user-select: none;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .transcript-summary:hover {
+      background: rgba(56, 189, 248, 0.05);
+    }
+
+    .transcript-body {
+      padding: 12px 14px;
+      border-top: 1px solid var(--chat-border);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      max-height: 280px;
+      overflow-y: auto;
+    }
+
+    .chat-bubble {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      background: #141c2e;
+      padding: 8px 12px;
+      border-radius: 6px;
+      border-left: 2px solid #3b82f6;
+    }
+
+    .chat-bubble-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.75rem;
+    }
+
+    .chat-author {
+      font-weight: 700;
+      color: #38bdf8;
+    }
+
+    .chat-reply-tag {
+      color: var(--text-muted);
+      font-size: 0.72rem;
+    }
+
+    .chat-time {
+      margin-left: auto;
+      color: #64748b;
+      font-size: 0.7rem;
+    }
+
+    .chat-text {
+      font-size: 0.84rem;
+      color: #e2e8f0;
     }
 
     .card-footer {
@@ -257,7 +333,7 @@
   </header>
 
   <div class="controls">
-    <input type="text" id="search-input" class="search-input" placeholder="안건, 결정 내용 또는 근거 검색...">
+    <input type="text" id="search-input" class="search-input" placeholder="안건, 결정 내용, 근거 또는 대화 원문 검색...">
     <select id="state-filter" class="filter-select">
       <option value="">모든 상태 (전체)</option>
       <option value="Decided">확정됨 (Decided)</option>
@@ -296,7 +372,8 @@
       const matchesSearch = 
         d.topic.toLowerCase().includes(query) ||
         d.decision.toLowerCase().includes(query) ||
-        d.rationale.toLowerCase().includes(query);
+        d.rationale.toLowerCase().includes(query) ||
+        (d.rawTranscript && d.rawTranscript.toLowerCase().includes(query));
       const matchesState = !stateFilter || d.state === stateFilter;
       return matchesSearch && matchesState;
     });
@@ -328,6 +405,45 @@
         </div>
       ` : '';
 
+      // Render raw messages or plain transcript
+      const rawMessages = d.source?.rawMessages || [];
+      let transcriptHtml = '';
+
+      if (rawMessages.length > 0) {
+        transcriptHtml = `
+          <details class="transcript-accordion">
+            <summary class="transcript-summary">
+              <span>💬 대화 원문 보기 (${rawMessages.length}개 메시지)</span>
+              <span>▼</span>
+            </summary>
+            <div class="transcript-body">
+              ${rawMessages.map(m => `
+                <div class="chat-bubble">
+                  <div class="chat-bubble-header">
+                    <span class="chat-author">${m.author}</span>
+                    ${m.replyingTo ? `<span class="chat-reply-tag">↪ @${m.replyingTo}에게 답장</span>` : ''}
+                    <span class="chat-time">${m.createdAt ? new Date(m.createdAt).toLocaleTimeString('ko-KR') : ''}</span>
+                  </div>
+                  <div class="chat-text">${m.content}</div>
+                </div>
+              `).join('')}
+            </div>
+          </details>
+        `;
+      } else if (d.rawTranscript) {
+        transcriptHtml = `
+          <details class="transcript-accordion">
+            <summary class="transcript-summary">
+              <span>💬 대화 원문 보기</span>
+              <span>▼</span>
+            </summary>
+            <div class="transcript-body" style="white-space: pre-wrap; font-family: monospace; font-size: 0.8rem;">
+              ${d.rawTranscript}
+            </div>
+          </details>
+        `;
+      }
+
       return `
         <div class="timeline-node">
           <div class="timeline-dot ${dotClass}"></div>
@@ -347,10 +463,11 @@
             </div>
 
             ${actionItemsHtml}
+            ${transcriptHtml}
 
             <div class="card-footer">
               <span>📅 ${dateStr} ${d.source.channelName ? `· #${d.source.channelName}` : ''}</span>
-              ${d.source.messageUrl ? `<a href="${d.source.messageUrl}" target="_blank" class="discord-link">💬 디스코드 원문 보기 ➔</a>` : ''}
+              ${d.source.messageUrl ? `<a href="${d.source.messageUrl}" target="_blank" class="discord-link">💬 디스코드 스레드로 바로가기 ➔</a>` : ''}
             </div>
           </div>
         </div>

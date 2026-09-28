@@ -10,7 +10,7 @@ import { EgressQueue } from '../apps/bot/dist/egress/queue.js';
 import { DecisionPayload } from '@ggaddak/shared';
 
 describe('E2E Full Pipeline: Discord Event ➔ LLM ➔ Egress ➔ BE ➔ Query', () => {
-  it('runs complete end-to-end decision extraction and delivery', async () => {
+  it('runs complete end-to-end decision extraction and delivery with embedded transcript', async () => {
     // 1. Start Backend Server
     const repo = new DecisionRepository(':memory:');
     const beServer = createServer(repo);
@@ -45,7 +45,7 @@ describe('E2E Full Pipeline: Discord Event ➔ LLM ➔ Egress ➔ BE ➔ Query',
     const extracted = await extractor.extract(transcript);
     assert.ok(extracted);
 
-    // 4. Build Decision Entity
+    // 4. Build Decision Entity with embedded transcript
     const decision = {
       id: 'DEC-E2E-001',
       topic: extracted.topic,
@@ -54,13 +54,20 @@ describe('E2E Full Pipeline: Discord Event ➔ LLM ➔ Egress ➔ BE ➔ Query',
       actionItems: extracted.actionItems,
       state: 'Decided' as const,
       supersedesId: null,
+      rawTranscript: transcript,
       source: {
         guildId: 'guild-demo',
         channelId: 'chan-demo',
         channelName: 'dev-general',
         triggerMessageId: 'msg-102',
         messageUrl: 'https://discord.com/channels/guild-demo/chan-demo/msg-102',
-        participants: ['wooddang', 'alex']
+        participants: ['wooddang', 'alex'],
+        rawMessages: discordMessages.map(m => ({
+          author: m.authorName,
+          content: m.content,
+          createdAt: m.createdAt.toISOString(),
+          replyingTo: m.referenceAuthorName
+        }))
       },
       createdAt: new Date().toISOString()
     };
@@ -87,6 +94,8 @@ describe('E2E Full Pipeline: Discord Event ➔ LLM ➔ Egress ➔ BE ➔ Query',
     assert.strictEqual(saved.id, 'DEC-E2E-001');
     assert.strictEqual(saved.source.channelName, 'dev-general');
     assert.deepStrictEqual(saved.source.participants, ['wooddang', 'alex']);
+    assert.ok(saved.rawTranscript.includes('Supabase Auth'));
+    assert.strictEqual(saved.source.rawMessages.length, 2);
 
     // Cleanup
     beServer.close();
