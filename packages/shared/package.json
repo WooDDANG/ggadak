@@ -8,10 +8,11 @@
     "test": "node --test dist/**/*.test.js"
   },
   "dependencies": {
-    "zod": "^3.23.8"
+    "zod": "^3.23.8",
+    "winston": "^3.13.0"
   },
   "devDependencies": {
     "typescript": "^5.4.5",
-    "@types/node": "^20.12.7"
+    "@types/node": "^22.0.0"
   }
 }

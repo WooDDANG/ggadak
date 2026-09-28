@@ -11,7 +11,7 @@ import {
   ComponentType,
   Message
 } from 'discord.js';
-import { Decision, DecisionPayload } from '@ggaddak/shared';
+import { Decision, DecisionPayload, createLogger } from '@ggaddak/shared';
 import { DiscussionContextBuilder, RawMessageData } from '../context/builder.js';
 import { DecisionExtractor } from '../extractor/engine.js';
 import { ConflictDetector } from '../conflict/detector.js';
@@ -22,6 +22,8 @@ export interface BotConfig {
   webhookUrl: string;
   triggerEmoji?: string;
 }
+
+const logger = createLogger('BOT');
 
 export class DecisionTrackerBot {
   public client: Client;
@@ -57,24 +59,34 @@ export class DecisionTrackerBot {
   }
 
   private setupListeners() {
+    this.client.on('ready', () => {
+      logger.info(`Discord Gateway connected! Logged in as ${this.client.user?.tag} (ID: ${this.client.user?.id})`);
+      logger.info(`Monitoring trigger emoji '${this.triggerEmoji}' across all joined channels`);
+    });
+
     this.client.on('messageReactionAdd', async (reaction, user) => {
       if (user.bot) return;
       if (reaction.emoji.name !== this.triggerEmoji) return;
+
+      logger.info(`[Reaction] '${reaction.emoji.name}' added by @${user.username} on msg ${reaction.message.id}`);
 
       try {
         if (reaction.partial) await reaction.fetch();
         if (reaction.message.partial) await reaction.message.fetch();
 
-        await this.handleReactionTrigger(reaction.message as Message);
-      } catch (err) {
-        console.error('[Bot] Error handling reaction trigger:', err);
+        await this.handleReactionTrigger(reaction.message as Message, user.username || undefined);
+      } catch (err: any) {
+        logger.error(`[Reaction] Error processing reaction trigger: ${err.message}`, { stack: err.stack });
       }
     });
   }
 
-  async handleReactionTrigger(message: Message): Promise<Decision | null> {
+  async handleReactionTrigger(message: Message, triggeredBy?: string): Promise<Decision | null> {
     const channel = message.channel;
     if (!channel.isTextBased()) return null;
+
+    const channelName = 'name' in channel ? (channel.name as string) : 'dm';
+    logger.info(`[Context] Fetching surrounding message history for #${channelName}...`);
 
     // Fetch surrounding messages
     const fetched = await channel.messages.fetch({ limit: 30, before: message.id });
@@ -96,15 +108,21 @@ export class DecisionTrackerBot {
       }
     ];
 
+    logger.info(`[Context] Built transcript with ${rawMessages.length} messages in #${channelName}`);
     const transcript = DiscussionContextBuilder.buildTranscript(rawMessages);
+    
+    logger.info(`[LLM] Requesting Decision and Rationale extraction...`);
     const extracted = await this.extractor.extract(transcript);
 
     if (!extracted) {
+      logger.warn(`[LLM] No decision consensus found in discussion context of #${channelName}`);
       if ('send' in channel) {
         await channel.send('💡 이 대화 맥락에서 명확한 의사결정 사항을 발견하지 못했습니다.');
       }
       return null;
     }
+
+    logger.info(`[LLM] Extraction success! Topic="[${extracted.topic}]" Decision="[${extracted.decision}]"`);
 
     const participants = DiscussionContextBuilder.extractParticipantHandles(rawMessages);
     const conflict = this.conflictDetector.checkConflict(extracted.topic);
@@ -121,7 +139,7 @@ export class DecisionTrackerBot {
       source: {
         guildId: message.guildId || 'dm',
         channelId: message.channelId,
-        channelName: 'name' in channel ? (channel.name as string) : undefined,
+        channelName: channelName,
         triggerMessageId: message.id,
         messageUrl: message.url,
         participants
@@ -130,6 +148,7 @@ export class DecisionTrackerBot {
     };
 
     if (conflict.hasConflict && conflict.conflictingDecision && 'send' in channel) {
+      logger.warn(`[Conflict] Detected decision conflict with [${conflict.conflictingDecision.id}]. Prompting Discord confirmation...`);
       return this.promptConflictResolution(channel as any, newDecision, conflict.conflictingDecision);
     } else {
       return this.finalizeDecision(newDecision, channel);
@@ -172,12 +191,14 @@ export class DecisionTrackerBot {
 
       if (interaction.customId === 'supersede') {
         newDecision.supersedesId = oldDecision.id;
+        logger.info(`[Conflict] User chose to supersede previous decision [${oldDecision.id}]`);
         await interaction.update({
           content: `✅ 기존 결정 **[${oldDecision.id}]**을 대체하고 새 결정을 기록했습니다.`,
           embeds: [],
           components: []
         });
       } else {
+        logger.info(`[Conflict] User chose to keep both decisions independently`);
         await interaction.update({
           content: `✅ 독립된 별도 결정으로 함께 기록했습니다.`,
           embeds: [],
@@ -185,7 +206,7 @@ export class DecisionTrackerBot {
         });
       }
     } catch {
-      // Timeout default: keep independent
+      logger.warn(`[Conflict] Interactive prompt timed out (30s). Keeping decision independent by default.`);
       await promptMsg.edit({ components: [] });
     }
 
@@ -202,7 +223,14 @@ export class DecisionTrackerBot {
     };
 
     this.queue.enqueue(payload);
-    await this.queue.dispatchPending(this.webhookUrl);
+    logger.info(`[Egress] Decision [${decision.id}] enqueued. Dispatching to Webhook (${this.webhookUrl})...`);
+
+    const result = await this.queue.dispatchPending(this.webhookUrl);
+    if (result.sent > 0) {
+      logger.info(`[Egress] Successfully dispatched decision [${decision.id}] to Backend (200 OK)`);
+    } else {
+      logger.warn(`[Egress] Failed to dispatch decision [${decision.id}] to Backend. Kept in SQLite retry queue.`);
+    }
 
     if (channel && 'send' in channel) {
       const embed = new EmbedBuilder()
@@ -222,7 +250,7 @@ export class DecisionTrackerBot {
     if (!botToken) {
       throw new Error('DISCORD_BOT_TOKEN is required to start the bot');
     }
+    logger.info('Authenticating Discord client with token...');
     await this.client.login(botToken);
-    console.log(`[Bot] Logged in as ${this.client.user?.tag}`);
   }
 }

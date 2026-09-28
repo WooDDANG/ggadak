@@ -41,5 +41,9 @@ The standardized JSON contract sent to the Web Consumer containing the Decision,
 _Avoid_: Webhook Body, Message Data, Export Object
 
 **Egress Queue**:
-The persistent local SQLite queue ensuring at-least-once delivery of Decision Payloads to the Web Consumer despite network or server outages.
+The persistent local SQLite queue ensuring at-least-once delivery of Decision Payloads to the Web Consumer despite network outages.
 _Avoid_: Outbox, Message Queue, Task Buffer
+
+**Service Logger**:
+The standardized, structured Winston logger instance providing formatted console output and rotating file storage across all monorepo services.
+_Avoid_: Console Log, Print Statement, System Out
