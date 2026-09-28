@@ -7,82 +7,97 @@ const node_test_1 = require("node:test");
 const node_assert_1 = __importDefault(require("node:assert"));
 const server_js_1 = require("../apps/be/dist/server.js");
 const db_js_1 = require("../apps/be/dist/db.js");
-const builder_js_1 = require("../apps/bot/dist/context/builder.js");
-const engine_js_1 = require("../apps/bot/dist/extractor/engine.js");
-const queue_js_1 = require("../apps/bot/dist/egress/queue.js");
-(0, node_test_1.describe)('E2E Full Pipeline: Discord Event ➔ LLM ➔ Egress ➔ BE ➔ Query', () => {
-    (0, node_test_1.it)('runs complete end-to-end decision extraction and delivery', async () => {
-        // 1. Start Backend Server
+const engine_js_1 = require("../apps/be/dist/extractor/engine.js");
+(0, node_test_1.describe)('E2E Full Pipeline: Discord Messages ➔ Backend AI Core ➔ DB ➔ Query', () => {
+    (0, node_test_1.it)('extracts multi-decisions via POST /api/discussions/analyze and queries them', async () => {
+        // 1. Start Backend Server with Mock AI Engine
         const repo = new db_js_1.DecisionRepository(':memory:');
-        const beServer = (0, server_js_1.createServer)(repo);
-        await new Promise(resolve => beServer.listen(0, resolve));
-        const bePort = beServer.address().port;
-        const webhookUrl = `http://localhost:${bePort}/api/webhooks/decisions`;
-        // 2. Simulate Discord Context Ingestion
-        const discordMessages = [
+        const extractor = new engine_js_1.BackendExtractionEngine();
+        const server = (0, server_js_1.createServer)(repo, extractor);
+        await new Promise(resolve => server.listen(0, resolve));
+        const port = server.address().port;
+        // 2. Simulate raw Discord discussion messages
+        const rawMessages = [
             {
-                id: 'msg-101',
-                authorId: 'u1',
-                authorName: 'wooddang',
-                content: '인증 시스템으로 어떤 솔루션을 쓸까요?',
-                createdAt: new Date('2026-09-28T14:30:00Z')
+                author: 'wooddang',
+                content: '메인 데이터베이스랑 백엔드 프레임워크 결정합시다.',
+                createdAt: '2026-09-28T14:30:00Z'
             },
             {
-                id: 'msg-102',
-                authorId: 'u2',
-                authorName: 'alex',
-                content: '확장성과 보안을 고려해서 NextAuth(Auth.js) 대신 Supabase Auth로 결정합시다.',
-                createdAt: new Date('2026-09-28T14:31:00Z'),
-                referenceAuthorName: 'wooddang'
+                author: 'alex',
+                content: '트랜잭션 때문에 DB는 PostgreSQL로 가고, 서버 프레임워크는 Fastify로 가시죠.',
+                createdAt: '2026-09-28T14:31:00Z',
+                replyingTo: 'wooddang'
+            },
+            {
+                author: 'wooddang',
+                content: '좋습니다! PostgreSQL + Fastify 조합으로 확정하겠습니다.',
+                createdAt: '2026-09-28T14:32:00Z'
             }
         ];
-        const transcript = builder_js_1.DiscussionContextBuilder.buildTranscript(discordMessages);
-        node_assert_1.default.ok(transcript.includes('Supabase Auth'));
-        // 3. LLM Extraction
-        const extractor = new engine_js_1.DecisionExtractor();
-        const extracted = await extractor.extract(transcript);
-        node_assert_1.default.ok(extracted);
-        // 4. Build Decision Entity
-        const decision = {
-            id: 'DEC-E2E-001',
-            topic: extracted.topic,
-            decision: extracted.decision,
-            rationale: extracted.rationale,
-            actionItems: extracted.actionItems,
-            state: 'Decided',
-            supersedesId: null,
-            source: {
+        // 3. Call Backend AI Analysis Endpoint
+        const analyzeRes = await fetch(`http://localhost:${port}/api/discussions/analyze`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                rawMessages,
                 guildId: 'guild-demo',
-                channelId: 'chan-demo',
-                channelName: 'dev-general',
-                triggerMessageId: 'msg-102',
-                messageUrl: 'https://discord.com/channels/guild-demo/chan-demo/msg-102',
-                participants: ['wooddang', 'alex']
-            },
-            createdAt: new Date().toISOString()
-        };
-        // 5. Bot Egress Dispatch
-        const queue = new queue_js_1.EgressQueue(':memory:');
-        const payload = {
-            event: 'decision.recorded',
-            version: '1.0.0',
-            payload: decision
-        };
-        queue.enqueue(payload);
-        const dispatchResult = await queue.dispatchPending(webhookUrl);
-        node_assert_1.default.strictEqual(dispatchResult.sent, 1);
-        // 6. Query Backend API
-        const queryRes = await fetch(`http://localhost:${bePort}/api/decisions`);
+                channelId: 'chan-arch',
+                channelName: 'dev-architecture',
+                triggerMessageId: 'msg-103',
+                messageUrl: 'https://discord.com/channels/guild-demo/chan-arch/msg-103'
+            })
+        });
+        node_assert_1.default.strictEqual(analyzeRes.status, 200);
+        const analyzeData = await analyzeRes.json();
+        node_assert_1.default.strictEqual(analyzeData.found, true);
+        node_assert_1.default.strictEqual(analyzeData.decisions.length, 2); // Multi-decision extraction (Postgres + Fastify)
+        const postgresDec = analyzeData.decisions.find((d) => d.topic === 'Database Selection');
+        const fastifyDec = analyzeData.decisions.find((d) => d.topic === 'Backend Framework');
+        node_assert_1.default.ok(postgresDec);
+        node_assert_1.default.ok(fastifyDec);
+        node_assert_1.default.ok(postgresDec.rawTranscript.includes('PostgreSQL'));
+        node_assert_1.default.strictEqual(postgresDec.source.rawMessages.length, 3);
+        // 4. Query Decisions via GET /api/decisions
+        const queryRes = await fetch(`http://localhost:${port}/api/decisions`);
         node_assert_1.default.strictEqual(queryRes.status, 200);
         const queryData = await queryRes.json();
-        node_assert_1.default.strictEqual(queryData.decisions.length, 1);
-        const saved = queryData.decisions[0];
-        node_assert_1.default.strictEqual(saved.id, 'DEC-E2E-001');
-        node_assert_1.default.strictEqual(saved.source.channelName, 'dev-general');
-        node_assert_1.default.deepStrictEqual(saved.source.participants, ['wooddang', 'alex']);
-        // Cleanup
-        beServer.close();
+        node_assert_1.default.strictEqual(queryData.decisions.length, 2);
+        // 5. Test Conflict Resolution: Supersede
+        const resolveRes = await fetch(`http://localhost:${port}/api/decisions/resolve-conflict`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                decisionId: fastifyDec.id,
+                conflictingId: postgresDec.id,
+                resolution: 'supersede'
+            })
+        });
+        node_assert_1.default.strictEqual(resolveRes.status, 200);
+        const updatedPostgres = repo.getDecisionById(postgresDec.id);
+        node_assert_1.default.strictEqual(updatedPostgres?.state, 'Superseded');
+        server.close();
         repo.close();
-        queue.close();
+    });
+    (0, node_test_1.it)('handles casual chatter with no decisions', async () => {
+        const repo = new db_js_1.DecisionRepository(':memory:');
+        const server = (0, server_js_1.createServer)(repo, new engine_js_1.BackendExtractionEngine());
+        await new Promise(resolve => server.listen(0, resolve));
+        const port = server.address().port;
+        const res = await fetch(`http://localhost:${port}/api/discussions/analyze`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                rawMessages: [
+                    { author: 'wooddang', content: '오늘 점심 뭐 먹을까요?', createdAt: '2026-09-28T12:00:00Z' }
+                ]
+            })
+        });
+        node_assert_1.default.strictEqual(res.status, 200);
+        const data = await res.json();
+        node_assert_1.default.strictEqual(data.found, false);
+        node_assert_1.default.strictEqual(data.decisions.length, 0);
+        server.close();
+        repo.close();
     });
 });

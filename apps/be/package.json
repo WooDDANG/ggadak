@@ -11,8 +11,12 @@
   },
   "dependencies": {
     "@ggaddak/shared": "*",
+    "ai": "^3.1.10",
+    "@ai-sdk/google": "^0.0.15",
+    "@ai-sdk/openai": "^0.0.15",
     "dotenv": "^16.4.5",
-    "morgan": "^1.10.0"
+    "morgan": "^1.10.0",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
     "typescript": "^5.4.5",

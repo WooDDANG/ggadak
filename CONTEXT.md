@@ -51,3 +51,7 @@ _Avoid_: Outbox, Message Queue, Task Buffer
 **Service Logger**:
 The standardized, structured Winston logger instance providing formatted console output and rotating file storage across all monorepo services.
 _Avoid_: Console Log, Print Statement, System Out
+
+**Extraction Engine**:
+The backend AI intelligence pipeline in `apps/be` parsing raw discussion transcripts into structured multi-decision records using Vercel AI SDK with Korean few-shot examples and strict consensus verification.
+_Avoid_: AI Bot, Parser Script, Text Analyzer

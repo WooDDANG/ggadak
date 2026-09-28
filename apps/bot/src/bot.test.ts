@@ -63,7 +63,8 @@ describe('Bot Core Modules', () => {
         guildId: 'g1',
         channelId: 'c1',
         triggerMessageId: 'm1',
-        participants: []
+        participants: [],
+        rawMessages: []
       },
       createdAt: new Date().toISOString()
     };
@@ -110,7 +111,8 @@ describe('Bot Core Modules', () => {
           guildId: 'g1',
           channelId: 'c1',
           triggerMessageId: 'm1',
-          participants: []
+          participants: [],
+          rawMessages: []
         },
         createdAt: new Date().toISOString()
       }

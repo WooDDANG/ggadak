@@ -2,8 +2,6 @@ import {
   Client,
   GatewayIntentBits,
   Partials,
-  MessageReaction,
-  User,
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
@@ -11,15 +9,12 @@ import {
   ComponentType,
   Message
 } from 'discord.js';
-import { Decision, DecisionPayload, createLogger } from '@ggaddak/shared';
-import { DiscussionContextBuilder, RawMessageData } from '../context/builder.js';
-import { DecisionExtractor } from '../extractor/engine.js';
-import { ConflictDetector } from '../conflict/detector.js';
-import { EgressQueue } from '../egress/queue.js';
+import { Decision, createLogger } from '@ggaddak/shared';
+import { RawMessageData } from '../context/builder.js';
 
 export interface BotConfig {
   token?: string;
-  webhookUrl: string;
+  backendUrl: string;
   triggerEmoji?: string;
 }
 
@@ -27,23 +22,12 @@ const logger = createLogger('BOT');
 
 export class DecisionTrackerBot {
   public client: Client;
-  private extractor: DecisionExtractor;
-  private conflictDetector: ConflictDetector;
-  private queue: EgressQueue;
-  private webhookUrl: string;
+  private backendUrl: string;
   private triggerEmoji: string;
 
-  constructor(
-    config: BotConfig,
-    extractor = new DecisionExtractor(),
-    conflictDetector = new ConflictDetector(),
-    queue = new EgressQueue(':memory:')
-  ) {
-    this.webhookUrl = config.webhookUrl;
+  constructor(config: BotConfig) {
+    this.backendUrl = config.backendUrl.replace(/\/+$/, '');
     this.triggerEmoji = config.triggerEmoji || '📌';
-    this.extractor = extractor;
-    this.conflictDetector = conflictDetector;
-    this.queue = queue;
 
     this.client = new Client({
       intents: [
@@ -61,6 +45,7 @@ export class DecisionTrackerBot {
   private setupListeners() {
     this.client.on('ready', () => {
       logger.info(`Discord Gateway connected! Logged in as ${this.client.user?.tag} (ID: ${this.client.user?.id})`);
+      logger.info(`Backend AI API target: ${this.backendUrl}`);
       logger.info(`Monitoring trigger emoji '${this.triggerEmoji}' across all joined channels`);
     });
 
@@ -81,14 +66,14 @@ export class DecisionTrackerBot {
     });
   }
 
-  async handleReactionTrigger(message: Message, triggeredBy?: string): Promise<Decision | null> {
+  async handleReactionTrigger(message: Message, triggeredBy?: string): Promise<Decision[] | null> {
     const channel = message.channel;
     if (!channel.isTextBased()) return null;
 
     const channelName = 'name' in channel ? (channel.name as string) : 'dm';
     logger.info(`[Context] Fetching surrounding message history for #${channelName}...`);
 
-    // Fetch surrounding messages
+    // 1. Fetch surrounding messages
     const fetched = await channel.messages.fetch({ limit: 30, before: message.id });
     const rawMessages: RawMessageData[] = [
       ...Array.from(fetched.values()).map(m => ({
@@ -108,57 +93,70 @@ export class DecisionTrackerBot {
       }
     ];
 
-    logger.info(`[Context] Built transcript with ${rawMessages.length} messages in #${channelName}`);
-    const transcript = DiscussionContextBuilder.buildTranscript(rawMessages);
-    
-    logger.info(`[LLM] Requesting Decision and Rationale extraction...`);
-    const extracted = await this.extractor.extract(transcript);
+    logger.info(`[Context] Harvested ${rawMessages.length} messages. Sending to Backend AI (${this.backendUrl}/api/discussions/analyze)...`);
 
-    if (!extracted) {
-      logger.warn(`[LLM] No decision consensus found in discussion context of #${channelName}`);
-      if ('send' in channel) {
-        await channel.send('💡 이 대화 맥락에서 명확한 의사결정 사항을 발견하지 못했습니다.');
+    // 2. Delegate analysis to Backend AI Core
+    try {
+      const res = await fetch(`${this.backendUrl}/api/discussions/analyze`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          rawMessages: rawMessages.map(m => ({
+            author: m.authorName,
+            content: m.content,
+            createdAt: m.createdAt.toISOString(),
+            replyingTo: m.referenceAuthorName
+          })),
+          guildId: message.guildId || 'dm',
+          channelId: message.channelId,
+          channelName: channelName,
+          triggerMessageId: message.id,
+          messageUrl: message.url
+        })
+      });
+
+      if (!res.ok) {
+        logger.error(`[Backend] Analysis request failed with status: ${res.status}`);
+        return null;
       }
+
+      const result = await res.json() as any;
+
+      if (!result.found || !result.decisions || result.decisions.length === 0) {
+        logger.info(`[Backend] No decision consensus identified in #${channelName}`);
+        if ('send' in channel) {
+          await channel.send('💡 이 대화 맥락에서 명확한 의사결정 사항을 발견하지 못했습니다.');
+        }
+        return null;
+      }
+
+      logger.info(`[Backend] Extracted ${result.decisions.length} decisions from discussion!`);
+
+      // 3. Handle conflict if detected
+      if (result.hasConflict && result.conflictingDecision && 'send' in channel) {
+        const primaryDecision = result.decisions[0];
+        await this.promptConflictResolution(channel as any, primaryDecision, result.conflictingDecision);
+      } else if ('send' in channel) {
+        // 4. Render confirmation embed in Discord channel
+        for (const decision of result.decisions) {
+          const actionItemsText = decision.actionItems && decision.actionItems.length > 0
+            ? `\n\n**📋 후속 조치:**\n` + decision.actionItems.map((a: any) => `• ${a.task} ${a.assignee ? `(@${a.assignee})` : ''}`).join('\n')
+            : '';
+
+          const embed = new EmbedBuilder()
+            .setTitle(`📝 의사결정 기록 완료: [${decision.topic}]`)
+            .setDescription(`**🎯 결정:** ${decision.decision}\n**💡 근거:** ${decision.rationale}${actionItemsText}`)
+            .setFooter({ text: `ID: ${decision.id} | 상태: ${decision.state}` })
+            .setColor(0x10b981);
+
+          await channel.send({ embeds: [embed] });
+        }
+      }
+
+      return result.decisions;
+    } catch (err: any) {
+      logger.error(`[Backend] Network or analysis error: ${err.message}`, { stack: err.stack });
       return null;
-    }
-
-    logger.info(`[LLM] Extraction success! Topic="[${extracted.topic}]" Decision="[${extracted.decision}]"`);
-
-    const participants = DiscussionContextBuilder.extractParticipantHandles(rawMessages);
-    const conflict = this.conflictDetector.checkConflict(extracted.topic);
-
-    const decisionId = `DEC-${Date.now().toString().slice(-6)}`;
-    const newDecision: Decision = {
-      id: decisionId,
-      topic: extracted.topic,
-      decision: extracted.decision,
-      rationale: extracted.rationale,
-      actionItems: extracted.actionItems,
-      state: 'Decided',
-      supersedesId: null,
-      rawTranscript: transcript,
-      source: {
-        guildId: message.guildId || 'dm',
-        channelId: message.channelId,
-        channelName: channelName,
-        triggerMessageId: message.id,
-        messageUrl: message.url,
-        participants,
-        rawMessages: rawMessages.map(m => ({
-          author: m.authorName,
-          content: m.content,
-          createdAt: m.createdAt.toISOString(),
-          replyingTo: m.referenceAuthorName
-        }))
-      },
-      createdAt: new Date().toISOString()
-    };
-
-    if (conflict.hasConflict && conflict.conflictingDecision && 'send' in channel) {
-      logger.warn(`[Conflict] Detected decision conflict with [${conflict.conflictingDecision.id}]. Prompting Discord confirmation...`);
-      return this.promptConflictResolution(channel as any, newDecision, conflict.conflictingDecision);
-    } else {
-      return this.finalizeDecision(newDecision, channel);
     }
   }
 
@@ -166,7 +164,7 @@ export class DecisionTrackerBot {
     channel: { send: Function },
     newDecision: Decision,
     oldDecision: Decision
-  ): Promise<Decision> {
+  ): Promise<void> {
     const embed = new EmbedBuilder()
       .setTitle('⚠️ 의사결정 충돌/변경 감지')
       .setDescription(
@@ -196,16 +194,28 @@ export class DecisionTrackerBot {
         time: 30000
       });
 
-      if (interaction.customId === 'supersede') {
-        newDecision.supersedesId = oldDecision.id;
-        logger.info(`[Conflict] User chose to supersede previous decision [${oldDecision.id}]`);
+      const resolution = interaction.customId === 'supersede' ? 'supersede' : 'independent';
+
+      // Notify Backend of conflict resolution
+      await fetch(`${this.backendUrl}/api/decisions/resolve-conflict`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          decisionId: newDecision.id,
+          conflictingId: oldDecision.id,
+          resolution
+        })
+      });
+
+      if (resolution === 'supersede') {
+        logger.info(`[Conflict] User confirmed superseding [${oldDecision.id}]`);
         await interaction.update({
           content: `✅ 기존 결정 **[${oldDecision.id}]**을 대체하고 새 결정을 기록했습니다.`,
           embeds: [],
           components: []
         });
       } else {
-        logger.info(`[Conflict] User chose to keep both decisions independently`);
+        logger.info(`[Conflict] User kept decisions independent`);
         await interaction.update({
           content: `✅ 독립된 별도 결정으로 함께 기록했습니다.`,
           embeds: [],
@@ -213,43 +223,9 @@ export class DecisionTrackerBot {
         });
       }
     } catch {
-      logger.warn(`[Conflict] Interactive prompt timed out (30s). Keeping decision independent by default.`);
+      logger.warn(`[Conflict] Interactive prompt timed out (30s). Keeping independent by default.`);
       await promptMsg.edit({ components: [] });
     }
-
-    return this.finalizeDecision(newDecision, channel);
-  }
-
-  private async finalizeDecision(decision: Decision, channel?: any): Promise<Decision> {
-    this.conflictDetector.registerDecision(decision);
-
-    const payload: DecisionPayload = {
-      event: 'decision.recorded',
-      version: '1.0.0',
-      payload: decision
-    };
-
-    this.queue.enqueue(payload);
-    logger.info(`[Egress] Decision [${decision.id}] enqueued. Dispatching to Webhook (${this.webhookUrl})...`);
-
-    const result = await this.queue.dispatchPending(this.webhookUrl);
-    if (result.sent > 0) {
-      logger.info(`[Egress] Successfully dispatched decision [${decision.id}] to Backend (200 OK)`);
-    } else {
-      logger.warn(`[Egress] Failed to dispatch decision [${decision.id}] to Backend. Kept in SQLite retry queue.`);
-    }
-
-    if (channel && 'send' in channel) {
-      const embed = new EmbedBuilder()
-        .setTitle(`📝 의사결정 기록 완료: [${decision.topic}]`)
-        .setDescription(`**결정:** ${decision.decision}\n**근거:** ${decision.rationale}`)
-        .setFooter({ text: `ID: ${decision.id} | 상태: ${decision.state}` })
-        .setColor(0x10b981);
-
-      await channel.send({ embeds: [embed] });
-    }
-
-    return decision;
   }
 
   async start(token?: string) {

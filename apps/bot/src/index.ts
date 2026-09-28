@@ -21,11 +21,11 @@ for (const envPath of potentialEnvPaths) {
 
 import { DecisionTrackerBot } from './bot/client.js';
 
-const WEBHOOK_URL = process.env.BE_WEBHOOK_URL || 'http://localhost:3001/api/webhooks/decisions';
+const BACKEND_URL = process.env.BE_URL || 'http://localhost:3001';
 const TRIGGER_EMOJI = process.env.TRIGGER_EMOJI || '📌';
 
 const bot = new DecisionTrackerBot({
-  webhookUrl: WEBHOOK_URL,
+  backendUrl: BACKEND_URL,
   triggerEmoji: TRIGGER_EMOJI
 });
 
