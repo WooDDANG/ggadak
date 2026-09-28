@@ -59,3 +59,16 @@ _Avoid_: AI Bot, Parser Script, Text Analyzer
 **Interaction Dispatcher**:
 The non-blocking global Discord interaction router in `apps/bot` that immediately defers component updates to prevent 3-second gateway timeouts and executes asynchronous conflict resolution without stalling event loops.
 _Avoid_: Button Collector, Blocking Awaiter, Dialog Handler
+
+**Analysis Checkpoint**:
+The persistent watermark record (`channel_id`, `last_message_id`, `analyzed_at`) stored in SQLite ensuring incremental, non-overlapping message stream processing across bot restarts.
+_Avoid_: Watermark Offset, Cursor Index, Scan Pointer
+
+**Trigger Condition**:
+The composite rule set (linguistic consensus patterns e.g., `~합시다`, `~결정` OR reaction count threshold >= 3) that signals the bot to harvest an incremental context window.
+_Avoid_: Event Hook, Keyword Filter, Catch Rule
+
+**Reaction Feedback**:
+The visual Discord emoji lifecycle (`👀` during active AI analysis ➔ `📝` on recorded Decision or removal on casual chatter) providing transparent user feedback without channel pollution.
+_Avoid_: Status Emoji, Processing Icon, Bot Reaction
+

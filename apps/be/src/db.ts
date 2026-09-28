@@ -38,6 +38,29 @@ export class DecisionRepository {
     } catch (_) {
       // Column already exists
     }
+
+    // Checkpoint table for incremental channel analysis
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS channel_checkpoints (
+        channel_id TEXT PRIMARY KEY,
+        last_message_id TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+    `);
+  }
+
+  getCheckpoint(channelId: string): string | null {
+    const stmt = this.db.prepare('SELECT last_message_id FROM channel_checkpoints WHERE channel_id = ?');
+    const row = stmt.get(channelId) as { last_message_id: string } | undefined;
+    return row ? row.last_message_id : null;
+  }
+
+  saveCheckpoint(channelId: string, lastMessageId: string): void {
+    const stmt = this.db.prepare(`
+      INSERT OR REPLACE INTO channel_checkpoints (channel_id, last_message_id, updated_at)
+      VALUES (?, ?, ?)
+    `);
+    stmt.run(channelId, lastMessageId, new Date().toISOString());
   }
 
   saveDecision(decision: Decision): void {

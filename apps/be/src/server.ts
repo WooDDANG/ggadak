@@ -121,6 +121,11 @@ export function createServer(repo: DecisionRepository, extractor = new BackendEx
               logger.info(`[Analyze] Saved Decision [${newDecision.id}] Topic="${newDecision.topic}" DecisionsCount=${savedDecisions.length}`);
             }
 
+            // Update checkpoint for channel
+            if (channelId && triggerMessageId) {
+              repo.saveCheckpoint(channelId, triggerMessageId);
+            }
+
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({
               found: true,
@@ -138,7 +143,42 @@ export function createServer(repo: DecisionRepository, extractor = new BackendEx
         return;
       }
 
-      // 2. Resolve Conflict: POST /api/decisions/resolve-conflict
+      // 2. Channel Checkpoints: GET & POST /api/channels/:channelId/checkpoint
+      const checkpointMatch = url.pathname.match(/^\/api\/channels\/([^/]+)\/checkpoint$/);
+      if (checkpointMatch) {
+        const channelId = checkpointMatch[1];
+
+        if (req.method === 'GET') {
+          const lastMessageId = repo.getCheckpoint(channelId);
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ channelId, lastMessageId }));
+          return;
+        }
+
+        if (req.method === 'POST') {
+          let body = '';
+          req.on('data', chunk => body += chunk);
+          req.on('end', () => {
+            try {
+              const { lastMessageId } = JSON.parse(body);
+              if (!lastMessageId) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'lastMessageId is required' }));
+                return;
+              }
+              repo.saveCheckpoint(channelId, lastMessageId);
+              res.writeHead(200, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ status: 'ok', channelId, lastMessageId }));
+            } catch (err: any) {
+              res.writeHead(400, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ error: err.message }));
+            }
+          });
+          return;
+        }
+      }
+
+      // 3. Resolve Conflict: POST /api/decisions/resolve-conflict
       if (req.method === 'POST' && url.pathname === '/api/decisions/resolve-conflict') {
         let body = '';
         req.on('data', chunk => body += chunk);
@@ -163,7 +203,7 @@ export function createServer(repo: DecisionRepository, extractor = new BackendEx
         return;
       }
 
-      // 3. Webhook ingestion: POST /api/webhooks/decisions (backward compatibility)
+      // 4. Webhook ingestion: POST /api/webhooks/decisions (backward compatibility)
       if (req.method === 'POST' && url.pathname === '/api/webhooks/decisions') {
         let body = '';
         req.on('data', chunk => body += chunk);
@@ -194,7 +234,7 @@ export function createServer(repo: DecisionRepository, extractor = new BackendEx
         return;
       }
 
-      // 4. Query decisions: GET /api/decisions
+      // 5. Query decisions: GET /api/decisions
       if (req.method === 'GET' && url.pathname === '/api/decisions') {
         const topic = url.searchParams.get('topic') || undefined;
         const state = url.searchParams.get('state') || undefined;

@@ -16,25 +16,28 @@ A refined 3-tier monorepo architecture where:
 
 ## User Stories
 
-1. As a team member, I want to react with 📌 to an agreed Discord message, so that the bot captures the preceding discussion context.
-2. As a team member, I want the bot to remain fast and resilient without crashing on AI API timeouts or prompt errors.
-3. As a developer, I want the LLM extraction engine to live inside the backend API server, so that I can switch or tune AI models (Gemini, Claude, OpenAI) in one place without restarting the Discord bot.
-4. As a developer, I want the backend `POST /api/discussions/analyze` endpoint to accept raw conversation messages from any source (Discord, Slack, manual web paste), so that our organization uses a single decision extraction pipeline.
-5. As a team member in Discord, I want the bot to detect when a new decision conflicts with an existing active decision and present "Supersede" vs "Keep Independent" buttons in the channel.
-6. As a team member, I want to see a confirmation embed in Discord summarizing the extracted Topic, Decision, Rationale, and Action Items.
-7. As a web user, I want to view a chronological timeline of all organizational decisions on the web dashboard.
-8. As a web user, I want to click an expandable accordion on any decision card to read the complete authentic Discord chat transcript with author names, timestamps, and reply tags.
-9. As an engineer, I want all HTTP requests and bot lifecycle events logged with structured Winston/Morgan timestamps and saved to `logs/combined.log` and `logs/error.log`.
-10. As a team lead, I want to search decisions on the web by topic, keyword, rationale, or raw transcript text.
-11. As a project manager, I want action items to display assignees so responsibility is transparent.
-12. As a developer, I want all contracts shared via `@ggaddak/shared` so schema drift between bot, backend, and frontend is eliminated.
+1. As a team member, I want the bot to automatically detect consensus statements (e.g., `~합시다`, `~결정`, `~확정`) or messages with multiple reactions, without needing to manually pin every time.
+2. As a team member, I want to see an immediate `👀` reaction when the bot starts analyzing a discussion, and a `📝` reaction when an agreed decision is saved.
+3. As a team member, I want the bot to clean up the `👀` reaction silently if the conversation was only casual chat.
+4. As a team member, I want to manually react with 📌 to immediately force decision analysis, bypassing automatic debouncing.
+5. As an operator, I want the bot to persist channel analysis checkpoints so that reboots do not duplicate previous analysis or skip unprocessed messages.
+6. As a developer, I want the LLM extraction engine to live inside the backend API server, so that I can switch or tune AI models (Gemini, Claude, OpenAI) in one place without restarting the Discord bot.
+7. As a developer, I want the backend `POST /api/discussions/analyze` endpoint to accept raw conversation messages from any source (Discord, Slack, manual web paste), so that our organization uses a single decision extraction pipeline.
+8. As a team member in Discord, I want the bot to detect when a new decision conflicts with an existing active decision and present "Supersede" vs "Keep Independent" buttons in the channel.
+9. As a team member, I want to see a confirmation embed in Discord summarizing the extracted Topic, Decision, Rationale, and Action Items.
+10. As a web user, I want to view a chronological timeline of all organizational decisions on the web dashboard.
+11. As a web user, I want to click an expandable accordion on any decision card to read the complete authentic Discord chat transcript with author names, timestamps, and reply tags.
+12. As an engineer, I want all HTTP requests and bot lifecycle events logged with structured Winston/Morgan timestamps and saved to `logs/combined.log` and `logs/error.log`.
+13. As a developer, I want all contracts shared via `@ggaddak/shared` so schema drift between bot, backend, and frontend is eliminated.
 
 ## Implementation Decisions
 
 ### 1. Ingestion Adapter (`apps/bot`)
-- **Message Harvester**: Listens for `messageReactionAdd` (📌) and `/decision scan`. Fetches 20–30 surrounding messages preserving `author`, `content`, `createdAt`, and `referenceAuthorName`.
-- **Backend Dispatcher**: Sends raw messages payload to backend `POST /api/discussions/analyze`.
-- **Interactive UI Component**: Renders conflict resolution embeds with action buttons based on the backend analysis response, and relays user resolution choices back to `POST /api/decisions/resolve-conflict`.
+- **Trigger Detector**: Evaluates incoming `messageCreate` and `messageReactionAdd` events against consensus keyword regex (`~합시다`, `~결정`, `~확정`, `~합의`, `~채택`, `~가시죠`, `~진행할게요` 등) and reaction count threshold (>= 3).
+- **Debounce & In-Flight Lock Queue**: Buffers trigger events for 15s per channel and manages an in-flight lock to prevent duplicate parallel extraction requests.
+- **Reaction Feedback**: Adds `👀` to trigger messages during extraction and replaces with `📝` on successful Decision creation or removes `👀` on casual chatter.
+- **Manual 📌 Override**: Immediate priority execution on 📌 reaction without debouncing.
+- **Message Harvester & Checkpoint Sync**: Harvests incremental message windows since the last checkpoint, and syncs updated checkpoint back to Backend.
 
 ### 2. Backend Intelligence Core (`apps/be`)
 - **Extraction API (`POST /api/discussions/analyze`)**:

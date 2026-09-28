@@ -129,4 +129,19 @@ describe('Bot Core Modules', () => {
     server.close();
     queue.close();
   });
+
+  it('CONSENSUS_REGEX accurately matches agreement phrases and ignores casual talk', async () => {
+    const { CONSENSUS_REGEX } = await import('./bot/client.js');
+
+    assert.ok(CONSENSUS_REGEX.test('그럼 PostgreSQL로 합시다!'));
+    assert.ok(CONSENSUS_REGEX.test('Fastify로 결정되었습니다.'));
+    assert.ok(CONSENSUS_REGEX.test('Supabase Auth 도입 확정'));
+    assert.ok(CONSENSUS_REGEX.test('오늘 스택 픽스하시죠'));
+    assert.ok(CONSENSUS_REGEX.test('이 방향으로 진행할게요'));
+    assert.ok(CONSENSUS_REGEX.test('다들 agree 하시나요?'));
+
+    assert.strictEqual(CONSENSUS_REGEX.test('오늘 점심 뭐 드실래요?'), false);
+    assert.strictEqual(CONSENSUS_REGEX.test('날씨가 너무 춥네요'), false);
+    assert.strictEqual(CONSENSUS_REGEX.test('안녕하세요 반갑습니다'), false);
+  });
 });

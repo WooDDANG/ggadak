@@ -121,4 +121,27 @@ describe('BE Server & Ingestion API', () => {
     });
     assert.strictEqual(res.status, 400);
   });
+
+  it('manages channel checkpoints via GET and POST /api/channels/:channelId/checkpoint', async () => {
+    // 1. Initial GET should return null for lastMessageId
+    const res1 = await fetch(`http://localhost:${port}/api/channels/test-chan-1/checkpoint`);
+    assert.strictEqual(res1.status, 200);
+    const data1 = await res1.json() as any;
+    assert.strictEqual(data1.channelId, 'test-chan-1');
+    assert.strictEqual(data1.lastMessageId, null);
+
+    // 2. POST to save checkpoint
+    const res2 = await fetch(`http://localhost:${port}/api/channels/test-chan-1/checkpoint`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lastMessageId: 'msg-999' })
+    });
+    assert.strictEqual(res2.status, 200);
+
+    // 3. GET should return updated lastMessageId
+    const res3 = await fetch(`http://localhost:${port}/api/channels/test-chan-1/checkpoint`);
+    assert.strictEqual(res3.status, 200);
+    const data3 = await res3.json() as any;
+    assert.strictEqual(data3.lastMessageId, 'msg-999');
+  });
 });

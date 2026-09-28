@@ -20,10 +20,16 @@ export interface BotConfig {
 
 const logger = createLogger('BOT');
 
+export const CONSENSUS_REGEX = /(~?합시다|~?결정|~?확정|~?합의|~?채택|~?가시죠|~?진행할게요|~?완료|픽스|fix|agree)/i;
+export const REACTION_THRESHOLD = 3;
+export const DEBOUNCE_MS = 15000;
+
 export class DecisionTrackerBot {
   public client: Client;
   private backendUrl: string;
   private triggerEmoji: string;
+  private debounceTimers = new Map<string, NodeJS.Timeout>();
+  private inFlightChannels = new Set<string>();
 
   constructor(config: BotConfig) {
     this.backendUrl = config.backendUrl.replace(/\/+$/, '');
@@ -46,30 +52,53 @@ export class DecisionTrackerBot {
     this.client.on('ready', () => {
       logger.info(`Discord Gateway connected! Logged in as ${this.client.user?.tag} (ID: ${this.client.user?.id})`);
       logger.info(`Backend AI API target: ${this.backendUrl}`);
-      logger.info(`Monitoring trigger emoji '${this.triggerEmoji}' across all joined channels`);
+      logger.info(`Autonomous monitoring enabled (Keywords, Reactions >= ${REACTION_THRESHOLD}, and '${this.triggerEmoji}' Override)`);
     });
 
-    // 1. Non-blocking Reaction Trigger Listener
+    // 1. Passive Stream Monitoring: messageCreate (Keyword Trigger Detection)
+    this.client.on('messageCreate', async (message) => {
+      if (message.author.bot) return;
+
+      if (CONSENSUS_REGEX.test(message.content)) {
+        logger.info(`[Trigger] Consensus keyword matched in #${('name' in message.channel ? message.channel.name : message.channelId)}: "${message.content.slice(0, 30)}..."`);
+        await this.addReactionSafely(message, '👀');
+        this.enqueueChannelTrigger(message, false);
+      }
+    });
+
+    // 2. Passive Stream Monitoring: messageReactionAdd (Reaction Threshold & Manual 📌 Override)
     this.client.on('messageReactionAdd', async (reaction, user) => {
       if (user.bot) return;
-      if (reaction.emoji.name !== this.triggerEmoji) return;
 
-      logger.info(`[Reaction] '${reaction.emoji.name}' added by @${user.username} on msg ${reaction.message.id}`);
-
-      // Run asynchronously in background without blocking future reaction events
       (async () => {
         try {
           if (reaction.partial) await reaction.fetch();
           if (reaction.message.partial) await reaction.message.fetch();
 
-          await this.handleReactionTrigger(reaction.message as Message, user.username || undefined);
+          const message = reaction.message as Message;
+          const isManualOverride = reaction.emoji.name === this.triggerEmoji;
+
+          if (isManualOverride) {
+            logger.info(`[Override] Manual trigger '${this.triggerEmoji}' added by @${user.username} on msg ${message.id}`);
+            await this.addReactionSafely(message, '👀');
+            await this.executeAnalysis(message, true);
+            return;
+          }
+
+          // Count total reactions across all emojis on this message
+          const totalReactions = message.reactions.cache.reduce((sum, r) => sum + r.count, 0);
+          if (totalReactions >= REACTION_THRESHOLD) {
+            logger.info(`[Trigger] Reaction threshold (${totalReactions} >= ${REACTION_THRESHOLD}) reached on msg ${message.id}`);
+            await this.addReactionSafely(message, '👀');
+            this.enqueueChannelTrigger(message, false);
+          }
         } catch (err: any) {
-          logger.error(`[Reaction] Error processing reaction trigger: ${err.message}`, { stack: err.stack });
+          logger.error(`[Reaction] Error handling reaction add: ${err.message}`, { stack: err.stack });
         }
       })();
     });
 
-    // 2. Global Non-blocking Button Interaction Listener (Eliminates 3-second timeout)
+    // 3. Global Non-blocking Button Interaction Listener (Eliminates 3-second timeout)
     this.client.on('interactionCreate', async (interaction) => {
       if (!interaction.isButton()) return;
 
@@ -80,12 +109,57 @@ export class DecisionTrackerBot {
     });
   }
 
+  private enqueueChannelTrigger(message: Message, isManualOverride: boolean) {
+    const channelId = message.channelId;
+
+    if (isManualOverride) {
+      const existing = this.debounceTimers.get(channelId);
+      if (existing) {
+        clearTimeout(existing);
+        this.debounceTimers.delete(channelId);
+      }
+      this.executeAnalysis(message, true);
+      return;
+    }
+
+    if (this.debounceTimers.has(channelId)) {
+      clearTimeout(this.debounceTimers.get(channelId)!);
+    }
+
+    const timer = setTimeout(async () => {
+      this.debounceTimers.delete(channelId);
+      await this.executeAnalysis(message, false);
+    }, DEBOUNCE_MS);
+
+    this.debounceTimers.set(channelId, timer);
+    logger.info(`[Debounce] Scheduled analysis for #${channelId} in ${DEBOUNCE_MS / 1000}s`);
+  }
+
+  private async addReactionSafely(message: Message, emoji: string) {
+    try {
+      await message.react(emoji);
+    } catch (err: any) {
+      logger.warn(`[Reaction] Failed to add '${emoji}' reaction: ${err.message}`);
+    }
+  }
+
+  private async removeReactionSafely(message: Message, emoji: string) {
+    try {
+      const botId = this.client.user?.id;
+      const existing = message.reactions.cache.find(r => r.emoji.name === emoji);
+      if (existing && botId) {
+        await existing.users.remove(botId);
+      }
+    } catch (err: any) {
+      logger.warn(`[Reaction] Failed to remove '${emoji}' reaction: ${err.message}`);
+    }
+  }
+
   private async handleConflictButtonInteraction(interaction: ButtonInteraction) {
-    // 1. Immediately defer update to prevent Discord's 3-second timeout error
     try {
       await interaction.deferUpdate();
     } catch (err: any) {
-      logger.warn(`[Interaction] Failed to defer update (might have already expired): ${err.message}`);
+      logger.warn(`[Interaction] Failed to defer update: ${err.message}`);
       return;
     }
 
@@ -93,7 +167,6 @@ export class DecisionTrackerBot {
     logger.info(`[Interaction] Button clicked by @${interaction.user.username}: resolution=${resolution}, new=${newDecisionId}, conflicting=${conflictingId}`);
 
     try {
-      // 2. Notify Backend of conflict resolution
       const res = await fetch(`${this.backendUrl}/api/decisions/resolve-conflict`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -108,7 +181,6 @@ export class DecisionTrackerBot {
         throw new Error(`Backend returned status ${res.status}`);
       }
 
-      // 3. Update message and remove buttons to prevent duplicate clicks
       const isSupersede = resolution === 'supersede';
       const embed = new EmbedBuilder()
         .setTitle(isSupersede ? '✅ 기존 결정 대체 완료 (Superseded)' : '✅ 독립 결정으로 보존 완료')
@@ -122,7 +194,7 @@ export class DecisionTrackerBot {
 
       await interaction.editReply({
         embeds: [embed],
-        components: [] // Clear action buttons
+        components: []
       });
 
       logger.info(`[Interaction] Successfully finalized conflict resolution on Discord`);
@@ -137,37 +209,74 @@ export class DecisionTrackerBot {
     }
   }
 
-  async handleReactionTrigger(message: Message, triggeredBy?: string): Promise<Decision[] | null> {
+  async executeAnalysis(message: Message, isManualOverride: boolean = false): Promise<Decision[] | null> {
     const channel = message.channel;
     if (!channel.isTextBased()) return null;
 
+    const channelId = channel.id;
+    if (this.inFlightChannels.has(channelId) && !isManualOverride) {
+      logger.info(`[Lock] Channel #${channelId} is already in-flight. Skipping duplicate trigger.`);
+      return null;
+    }
+
+    this.inFlightChannels.add(channelId);
     const channelName = 'name' in channel ? (channel.name as string) : 'dm';
-    logger.info(`[Context] Fetching surrounding message history for #${channelName}...`);
 
-    // 1. Fetch surrounding messages
-    const fetched = await channel.messages.fetch({ limit: 30, before: message.id });
-    const rawMessages: RawMessageData[] = [
-      ...Array.from(fetched.values()).map(m => ({
-        id: m.id,
-        authorId: m.author.id,
-        authorName: m.author.username,
-        content: m.content,
-        createdAt: m.createdAt,
-        referenceMessageId: m.reference?.messageId,
-      })),
-      {
-        id: message.id,
-        authorId: message.author.id,
-        authorName: message.author.username,
-        content: message.content,
-        createdAt: message.createdAt
-      }
-    ];
-
-    logger.info(`[Context] Harvested ${rawMessages.length} messages. Sending to Backend AI (${this.backendUrl}/api/discussions/analyze)...`);
-
-    // 2. Delegate analysis to Backend AI Core
     try {
+      // 1. Fetch channel checkpoint from Backend
+      let lastMessageId: string | null = null;
+      try {
+        const cpRes = await fetch(`${this.backendUrl}/api/channels/${channelId}/checkpoint`);
+        if (cpRes.ok) {
+          const cpData = await cpRes.json() as any;
+          lastMessageId = cpData.lastMessageId || null;
+        }
+      } catch (err: any) {
+        logger.warn(`[Checkpoint] Failed to fetch checkpoint for #${channelId}: ${err.message}`);
+      }
+
+      // 2. Fetch context window
+      let rawMessages: RawMessageData[] = [];
+      if (lastMessageId) {
+        const fetchedAfter = await channel.messages.fetch({ limit: 50, after: lastMessageId });
+        const msgs = Array.from(fetchedAfter.values()).reverse();
+        rawMessages = msgs.map(m => ({
+          id: m.id,
+          authorId: m.author.id,
+          authorName: m.author.username,
+          content: m.content,
+          createdAt: m.createdAt,
+          referenceMessageId: m.reference?.messageId
+        }));
+      }
+
+      // Fallback or Initial scan
+      if (rawMessages.length < 2) {
+        const fetchedBefore = await channel.messages.fetch({ limit: 30, before: message.id });
+        const beforeMsgs = Array.from(fetchedBefore.values()).reverse().map(m => ({
+          id: m.id,
+          authorId: m.author.id,
+          authorName: m.author.username,
+          content: m.content,
+          createdAt: m.createdAt,
+          referenceMessageId: m.reference?.messageId
+        }));
+
+        rawMessages = [
+          ...beforeMsgs,
+          {
+            id: message.id,
+            authorId: message.author.id,
+            authorName: message.author.username,
+            content: message.content,
+            createdAt: message.createdAt
+          }
+        ];
+      }
+
+      logger.info(`[Context] Harvested ${rawMessages.length} messages for #${channelName}. Sending to Backend AI...`);
+
+      // 3. Delegate analysis to Backend AI Core
       const res = await fetch(`${this.backendUrl}/api/discussions/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -188,6 +297,7 @@ export class DecisionTrackerBot {
 
       if (!res.ok) {
         logger.error(`[Backend] Analysis request failed with status: ${res.status}`);
+        await this.removeReactionSafely(message, '👀');
         return null;
       }
 
@@ -195,20 +305,24 @@ export class DecisionTrackerBot {
 
       if (!result.found || !result.decisions || result.decisions.length === 0) {
         logger.info(`[Backend] No decision consensus identified in #${channelName}`);
-        if ('send' in channel) {
+        await this.removeReactionSafely(message, '👀');
+        if (isManualOverride && 'send' in channel) {
           await channel.send('💡 이 대화 맥락에서 명확한 의사결정 사항을 발견하지 못했습니다.');
         }
         return null;
       }
 
-      logger.info(`[Backend] Extracted ${result.decisions.length} decisions from discussion!`);
+      logger.info(`[Backend] Extracted ${result.decisions.length} decisions! Updating Reaction Feedback (📝)...`);
 
-      // 3. Handle conflict if detected (Send embed with encoded button custom IDs)
+      // Update reaction feedback
+      await this.removeReactionSafely(message, '👀');
+      await this.addReactionSafely(message, '📝');
+
+      // 4. Handle conflict or render decision embeds
       if (result.hasConflict && result.conflictingDecision && 'send' in channel) {
         const primaryDecision = result.decisions[0];
         await this.sendConflictPrompt(channel as any, primaryDecision, result.conflictingDecision);
       } else if ('send' in channel) {
-        // 4. Render confirmation embed in Discord channel
         for (const decision of result.decisions) {
           const actionItemsText = decision.actionItems && decision.actionItems.length > 0
             ? `\n\n**📋 후속 조치:**\n` + decision.actionItems.map((a: any) => `• ${a.task} ${a.assignee ? `(@${a.assignee})` : ''}`).join('\n')
@@ -226,9 +340,17 @@ export class DecisionTrackerBot {
 
       return result.decisions;
     } catch (err: any) {
-      logger.error(`[Backend] Network or analysis error: ${err.message}`, { stack: err.stack });
+      logger.error(`[Execution] Error during analysis: ${err.message}`, { stack: err.stack });
+      await this.removeReactionSafely(message, '👀');
       return null;
+    } finally {
+      this.inFlightChannels.delete(channelId);
     }
+  }
+
+  // Backward-compatible alias
+  async handleReactionTrigger(message: Message, triggeredBy?: string): Promise<Decision[] | null> {
+    return this.executeAnalysis(message, true);
   }
 
   private async sendConflictPrompt(

@@ -49,3 +49,10 @@ export const DecisionPayloadSchema = z.object({
   version: z.literal('1.0.0'),
   payload: DecisionSchema
 });
+
+export const ChannelCheckpointSchema = z.object({
+  channelId: z.string(),
+  lastMessageId: z.string(),
+  updatedAt: z.string()
+});
+
