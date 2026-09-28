@@ -6,8 +6,8 @@ import {
   ButtonBuilder,
   ButtonStyle,
   EmbedBuilder,
-  ComponentType,
-  Message
+  Message,
+  ButtonInteraction
 } from 'discord.js';
 import { Decision, createLogger } from '@ggaddak/shared';
 import { RawMessageData } from '../context/builder.js';
@@ -49,21 +49,92 @@ export class DecisionTrackerBot {
       logger.info(`Monitoring trigger emoji '${this.triggerEmoji}' across all joined channels`);
     });
 
+    // 1. Non-blocking Reaction Trigger Listener
     this.client.on('messageReactionAdd', async (reaction, user) => {
       if (user.bot) return;
       if (reaction.emoji.name !== this.triggerEmoji) return;
 
       logger.info(`[Reaction] '${reaction.emoji.name}' added by @${user.username} on msg ${reaction.message.id}`);
 
-      try {
-        if (reaction.partial) await reaction.fetch();
-        if (reaction.message.partial) await reaction.message.fetch();
+      // Run asynchronously in background without blocking future reaction events
+      (async () => {
+        try {
+          if (reaction.partial) await reaction.fetch();
+          if (reaction.message.partial) await reaction.message.fetch();
 
-        await this.handleReactionTrigger(reaction.message as Message, user.username || undefined);
-      } catch (err: any) {
-        logger.error(`[Reaction] Error processing reaction trigger: ${err.message}`, { stack: err.stack });
+          await this.handleReactionTrigger(reaction.message as Message, user.username || undefined);
+        } catch (err: any) {
+          logger.error(`[Reaction] Error processing reaction trigger: ${err.message}`, { stack: err.stack });
+        }
+      })();
+    });
+
+    // 2. Global Non-blocking Button Interaction Listener (Eliminates 3-second timeout)
+    this.client.on('interactionCreate', async (interaction) => {
+      if (!interaction.isButton()) return;
+
+      const customId = interaction.customId;
+      if (customId.startsWith('conflict:')) {
+        await this.handleConflictButtonInteraction(interaction);
       }
     });
+  }
+
+  private async handleConflictButtonInteraction(interaction: ButtonInteraction) {
+    // 1. Immediately defer update to prevent Discord's 3-second timeout error
+    try {
+      await interaction.deferUpdate();
+    } catch (err: any) {
+      logger.warn(`[Interaction] Failed to defer update (might have already expired): ${err.message}`);
+      return;
+    }
+
+    const [, resolution, newDecisionId, conflictingId] = interaction.customId.split(':');
+    logger.info(`[Interaction] Button clicked by @${interaction.user.username}: resolution=${resolution}, new=${newDecisionId}, conflicting=${conflictingId}`);
+
+    try {
+      // 2. Notify Backend of conflict resolution
+      const res = await fetch(`${this.backendUrl}/api/decisions/resolve-conflict`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          decisionId: newDecisionId,
+          conflictingId: conflictingId,
+          resolution
+        })
+      });
+
+      if (!res.ok) {
+        throw new Error(`Backend returned status ${res.status}`);
+      }
+
+      // 3. Update message and remove buttons to prevent duplicate clicks
+      const isSupersede = resolution === 'supersede';
+      const embed = new EmbedBuilder()
+        .setTitle(isSupersede ? '✅ 기존 결정 대체 완료 (Superseded)' : '✅ 독립 결정으로 보존 완료')
+        .setDescription(
+          isSupersede
+            ? `기존 결정 **[${conflictingId}]**을 대체하고 새 결정 **[${newDecisionId}]**으로 확정했습니다.`
+            : `기존 결정 **[${conflictingId}]**과 새 결정 **[${newDecisionId}]**을 모두 독립적으로 유지합니다.`
+        )
+        .setColor(isSupersede ? 0x10b981 : 0x3b82f6)
+        .setFooter({ text: `처리 완료 (@${interaction.user.username}) | ID: ${newDecisionId}` });
+
+      await interaction.editReply({
+        embeds: [embed],
+        components: [] // Clear action buttons
+      });
+
+      logger.info(`[Interaction] Successfully finalized conflict resolution on Discord`);
+    } catch (err: any) {
+      logger.error(`[Interaction] Failed to process conflict resolution: ${err.message}`, { stack: err.stack });
+      try {
+        await interaction.editReply({
+          content: '⚠️ 충돌 해결 처리 중 오류가 발생했습니다. 백엔드 연결 상태를 확인해주세요.',
+          components: []
+        });
+      } catch {}
+    }
   }
 
   async handleReactionTrigger(message: Message, triggeredBy?: string): Promise<Decision[] | null> {
@@ -132,10 +203,10 @@ export class DecisionTrackerBot {
 
       logger.info(`[Backend] Extracted ${result.decisions.length} decisions from discussion!`);
 
-      // 3. Handle conflict if detected
+      // 3. Handle conflict if detected (Send embed with encoded button custom IDs)
       if (result.hasConflict && result.conflictingDecision && 'send' in channel) {
         const primaryDecision = result.decisions[0];
-        await this.promptConflictResolution(channel as any, primaryDecision, result.conflictingDecision);
+        await this.sendConflictPrompt(channel as any, primaryDecision, result.conflictingDecision);
       } else if ('send' in channel) {
         // 4. Render confirmation embed in Discord channel
         for (const decision of result.decisions) {
@@ -160,7 +231,7 @@ export class DecisionTrackerBot {
     }
   }
 
-  private async promptConflictResolution(
+  private async sendConflictPrompt(
     channel: { send: Function },
     newDecision: Decision,
     oldDecision: Decision
@@ -173,59 +244,22 @@ export class DecisionTrackerBot {
         `**[새로운 결정]**: ${newDecision.decision}\n\n` +
         `어떻게 처리할까요?`
       )
-      .setColor(0xf59e0b);
+      .setColor(0xf59e0b)
+      .setFooter({ text: `선택 시 즉시 상태가 반영됩니다.` });
 
     const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
       new ButtonBuilder()
-        .setCustomId('supersede')
+        .setCustomId(`conflict:supersede:${newDecision.id}:${oldDecision.id}`)
         .setLabel('기존 결정 대체 (Supersede)')
         .setStyle(ButtonStyle.Primary),
       new ButtonBuilder()
-        .setCustomId('independent')
+        .setCustomId(`conflict:independent:${newDecision.id}:${oldDecision.id}`)
         .setLabel('독립 결정으로 유지')
         .setStyle(ButtonStyle.Secondary)
     );
 
-    const promptMsg = await channel.send({ embeds: [embed], components: [row] });
-
-    try {
-      const interaction = await promptMsg.awaitMessageComponent({
-        componentType: ComponentType.Button,
-        time: 30000
-      });
-
-      const resolution = interaction.customId === 'supersede' ? 'supersede' : 'independent';
-
-      // Notify Backend of conflict resolution
-      await fetch(`${this.backendUrl}/api/decisions/resolve-conflict`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          decisionId: newDecision.id,
-          conflictingId: oldDecision.id,
-          resolution
-        })
-      });
-
-      if (resolution === 'supersede') {
-        logger.info(`[Conflict] User confirmed superseding [${oldDecision.id}]`);
-        await interaction.update({
-          content: `✅ 기존 결정 **[${oldDecision.id}]**을 대체하고 새 결정을 기록했습니다.`,
-          embeds: [],
-          components: []
-        });
-      } else {
-        logger.info(`[Conflict] User kept decisions independent`);
-        await interaction.update({
-          content: `✅ 독립된 별도 결정으로 함께 기록했습니다.`,
-          embeds: [],
-          components: []
-        });
-      }
-    } catch {
-      logger.warn(`[Conflict] Interactive prompt timed out (30s). Keeping independent by default.`);
-      await promptMsg.edit({ components: [] });
-    }
+    await channel.send({ embeds: [embed], components: [row] });
+    logger.info(`[Conflict] Sent conflict prompt for [${newDecision.id}] vs [${oldDecision.id}] in channel`);
   }
 
   async start(token?: string) {

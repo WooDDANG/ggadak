@@ -55,3 +55,7 @@ _Avoid_: Console Log, Print Statement, System Out
 **Extraction Engine**:
 The backend AI intelligence pipeline in `apps/be` parsing raw discussion transcripts into structured multi-decision records using Vercel AI SDK with Korean few-shot examples and strict consensus verification.
 _Avoid_: AI Bot, Parser Script, Text Analyzer
+
+**Interaction Dispatcher**:
+The non-blocking global Discord interaction router in `apps/bot` that immediately defers component updates to prevent 3-second gateway timeouts and executes asynchronous conflict resolution without stalling event loops.
+_Avoid_: Button Collector, Blocking Awaiter, Dialog Handler
