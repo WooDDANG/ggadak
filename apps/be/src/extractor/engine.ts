@@ -18,13 +18,41 @@ export class BackendExtractionEngine {
     if (provider === 'gemini' && process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
       try {
         logger.info('Calling Google Gemini 1.5 Flash for decision extraction...');
-        const result = await generateObject({
-          model: google('models/gemini-1.5-flash-latest') as any,
-          system: EXTRACTION_SYSTEM_PROMPT,
-          prompt: `다음 디스코드 대화록을 읽고 합의된 의사결정과 근거, 실행 과제를 추출하십시오:\n\n${transcript}`,
-          schema: ExtractionResultSchema
+        const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            system_instruction: {
+              parts: [{ text: EXTRACTION_SYSTEM_PROMPT }]
+            },
+            contents: [
+              {
+                role: 'user',
+                parts: [{ text: `다음 디스코드 대화록을 읽고 합의된 의사결정과 근거, 실행 과제를 JSON 형식으로 추출하십시오:\n\n${transcript}` }]
+              }
+            ],
+            generationConfig: {
+              responseMimeType: 'application/json'
+            }
+          })
         });
-        return result.object;
+
+        if (res.ok) {
+          const data = await res.json() as any;
+          const candidateText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (candidateText) {
+            const parsed = JSON.parse(candidateText);
+            const validated = ExtractionResultSchema.safeParse(parsed);
+            if (validated.success) {
+              logger.info(`Gemini extraction succeeded: found=${validated.data.found}, decisions=${validated.data.decisions.length}`);
+              return validated.data;
+            }
+          }
+        } else {
+          const errorBody = await res.text();
+          logger.warn(`Gemini API returned status ${res.status}: ${errorBody.slice(0, 200)}. Falling back to deterministic parser.`);
+        }
       } catch (err: any) {
         logger.error(`Gemini API call failed: ${err.message}. Falling back to deterministic parser.`);
       }
@@ -98,23 +126,28 @@ export class BackendExtractionEngine {
       };
     }
 
-    // If no keywords matched and conversation is very short or casual
-    if (lower.includes('점심') || lower.includes('날씨') || transcript.length < 50) {
+    // If casual chat
+    if (lower.includes('점심') || lower.includes('날씨') || lower.includes('밥 먹') || lower.includes('배고파')) {
       return {
         found: false,
-        summary: '단순 잡담 또는 의사결정 없음',
+        summary: '단순 잡담 또는 일상 대화 (의사결정 없음)',
         decisions: []
       };
     }
 
+    // Clean up content from transcript
+    const lines = transcript.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+    const contentLines = lines.map(l => l.replace(/^\[.*?\]\s*[^:]+:\s*/, '')).filter(l => l.length > 0);
+    const firstContent = contentLines[contentLines.length - 1] || transcript;
+
     return {
       found: true,
-      summary: '대화 맥락에서 의사결정 합의 추출 완료',
+      summary: `의사결정/공지 사항 도출`,
       decisions: [
         {
-          topic: 'General Agreement',
-          decision: '대화 맥락에서 도출된 팀 합의 사항',
-          rationale: '대화 참여자 간 상호 동의 발화 확인됨',
+          topic: firstContent.length > 20 ? firstContent.slice(0, 20) + '...' : firstContent,
+          decision: firstContent,
+          rationale: '채널 핀(📌) 트리거로 기록된 팀 합의 및 결정 사항',
           actionItems: []
         }
       ]

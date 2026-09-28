@@ -26,6 +26,18 @@ export class DecisionRepository {
       CREATE INDEX IF NOT EXISTS idx_decisions_state ON decisions(state);
       CREATE INDEX IF NOT EXISTS idx_decisions_created_at ON decisions(created_at);
     `);
+
+    // Ensure raw_transcript and source columns exist for existing databases
+    try {
+      this.db.exec(`ALTER TABLE decisions ADD COLUMN raw_transcript TEXT;`);
+    } catch (_) {
+      // Column already exists
+    }
+    try {
+      this.db.exec(`ALTER TABLE decisions ADD COLUMN source TEXT NOT NULL DEFAULT '{}';`);
+    } catch (_) {
+      // Column already exists
+    }
   }
 
   saveDecision(decision: Decision): void {
