@@ -24,6 +24,7 @@ export interface AnalyzeDiscussionRequestDto {
   channelName?: string;
   triggerMessageId?: string;
   messageUrl?: string;
+  isManualOverride?: boolean;
 }
 
 export const AnalyzeDiscussionRequestDtoSchema = z.object({
@@ -33,6 +34,7 @@ export const AnalyzeDiscussionRequestDtoSchema = z.object({
   channelName: z.string().optional(),
   triggerMessageId: z.string().optional(),
   messageUrl: z.string().optional(),
+  isManualOverride: z.boolean().optional(),
 });
 
 export interface AnalyzeDiscussionResponseDto {

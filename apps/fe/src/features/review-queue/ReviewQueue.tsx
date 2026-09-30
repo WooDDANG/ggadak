@@ -147,8 +147,8 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({ decisions, onReview, i
                 <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
                 <div>
                   <span className="font-bold">
-                    거버넌스 평가 (점수: {dec.governanceScore ?? 'N/A'}/100) —{' '}
-                    {dec.governancePassed ? '적합' : '주의 필요'}:
+                    거버넌스 합의 평가 (점수: {typeof dec.governanceScore === 'number' ? dec.governanceScore.toFixed(1) : 'N/A'}/4.0) —{' '}
+                    {dec.governancePassed ? '합의 통과' : '주의/검토 필요'}:
                   </span>{' '}
                   {dec.governanceReason}
                 </div>

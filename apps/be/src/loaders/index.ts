@@ -8,6 +8,7 @@ import { CheckpointService } from '../services/checkpoint.service.js';
 import { FeedbackService } from '../services/feedback.service.js';
 import { DecisionService } from '../services/decision.service.js';
 import { DiscussionService } from '../services/discussion.service.js';
+import { DecisionExtractorCore } from '../engine/extractor-core.js';
 import { PolicyController } from '../api/controllers/policy.controller.js';
 import { CheckpointController } from '../api/controllers/checkpoint.controller.js';
 import { FeedbackController } from '../api/controllers/feedback.controller.js';
@@ -43,12 +44,14 @@ export async function initLoaders({
   Container.set(AiAdapter, aiAdapter);
 
   // 4. Service Layer Binding
+  const core = new DecisionExtractorCore();
   const policyService = new PolicyService();
   const checkpointService = new CheckpointService(repo);
   const feedbackService = new FeedbackService(repo);
   const decisionService = new DecisionService(repo);
-  const discussionService = new DiscussionService(repo, aiAdapter as AiAdapter);
+  const discussionService = new DiscussionService(repo, aiAdapter as AiAdapter, core);
 
+  Container.set(DecisionExtractorCore, core);
   Container.set(PolicyService, policyService);
   Container.set(CheckpointService, checkpointService);
   Container.set(FeedbackService, feedbackService);

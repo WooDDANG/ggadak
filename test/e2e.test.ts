@@ -71,6 +71,7 @@ describe('E2E Full Pipeline: Discord Messages ➔ Backend AI Core ➔ Review Que
     assert.ok(fastifyDec);
     assert.strictEqual(postgresDec.state, 'Draft'); // Initial state is Draft (PM policy)
     assert.strictEqual(postgresDec.categoryTag, '기술');
+    assert.ok(typeof postgresDec.governanceScore === 'number');
     assert.ok(postgresDec.alternatives.length > 0);
     assert.ok(postgresDec.rawTranscript.includes('PostgreSQL'));
     assert.strictEqual(postgresDec.source.rawMessages.length, 3);
@@ -110,7 +111,7 @@ describe('E2E Full Pipeline: Discord Messages ➔ Backend AI Core ➔ Review Que
     );
     assert.strictEqual(rejectRes.status, 200);
 
-    // Re-analyzing the same messages should be skipped by anti-recreation hash
+    // Re-analyzing the same messages passively should be skipped by anti-recreation hash
     const reAnalyzeRes = await fetch(`http://localhost:${port}/api/discussions/analyze`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -119,10 +120,27 @@ describe('E2E Full Pipeline: Discord Messages ➔ Backend AI Core ➔ Review Que
         guildId: 'guild-demo',
         channelId: 'chan-arch',
         triggerMessageId: 'msg-103',
+        isManualOverride: false,
       }),
     });
     const reAnalyzeData = (await reAnalyzeRes.json()) as any;
     assert.strictEqual(reAnalyzeData.found, false);
+
+    // But with isManualOverride: true (e.g. 📌 pin added), re-analysis is permitted!
+    const manualOverrideRes = await fetch(`http://localhost:${port}/api/discussions/analyze`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        rawMessages,
+        guildId: 'guild-demo',
+        channelId: 'chan-arch',
+        triggerMessageId: 'msg-103',
+        isManualOverride: true,
+      }),
+    });
+    const manualOverrideData = (await manualOverrideRes.json()) as any;
+    assert.strictEqual(manualOverrideData.found, true);
+    assert.ok(manualOverrideData.decisions.length > 0);
 
     server.close();
     repo.close();

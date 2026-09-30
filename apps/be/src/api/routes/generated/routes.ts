@@ -166,6 +166,7 @@ const models: TsoaRoute.Models = {
             "channelName": {"dataType":"string"},
             "triggerMessageId": {"dataType":"string"},
             "messageUrl": {"dataType":"string"},
+            "isManualOverride": {"dataType":"boolean"},
         },
         "additionalProperties": false,
     },

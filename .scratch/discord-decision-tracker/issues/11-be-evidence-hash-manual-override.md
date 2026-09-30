@@ -7,7 +7,7 @@
 
 **Status:** ready-for-agent
 
-- [ ] 백엔드 `POST /api/discussions/analyze` 요청 DTO 및 스키마에 `isManualOverride` 불리언 필드 지원
-- [ ] `DiscussionService`에서 이미 반려된 `evidenceHash` 조회 시, `isManualOverride === false`이면 분석을 스킵하고 사유를 반환
-- [ ] `isManualOverride === true`인 경우 반려 해시 제한을 우회하여 재분석 및 새 결정 후보 등록 수행
-- [ ] 수동 오버라이드 및 자동 차단 동작을 검증하는 통합 단위 테스트 작성
+- [x] 백엔드 `POST /api/discussions/analyze` 요청 DTO 및 스키마에 `isManualOverride` 불리언 필드 지원
+- [x] `DiscussionService`에서 이미 반려된 `evidenceHash` 조회 시, `isManualOverride === false`이면 분석을 스킵하고 사유를 반환
+- [x] `isManualOverride === true`인 경우 반려 해시 제한을 우회하여 재분석 및 새 결정 후보 등록 수행
+- [x] 수동 오버라이드 및 자동 차단 동작을 검증하는 통합 단위 테스트 작성

@@ -67,6 +67,7 @@ const engine_js_1 = require("../apps/be/dist/extractor/engine.js");
         node_assert_1.default.ok(fastifyDec);
         node_assert_1.default.strictEqual(postgresDec.state, 'Draft'); // Initial state is Draft (PM policy)
         node_assert_1.default.strictEqual(postgresDec.categoryTag, '기술');
+        node_assert_1.default.ok(typeof postgresDec.governanceScore === 'number');
         node_assert_1.default.ok(postgresDec.alternatives.length > 0);
         node_assert_1.default.ok(postgresDec.rawTranscript.includes('PostgreSQL'));
         node_assert_1.default.strictEqual(postgresDec.source.rawMessages.length, 3);
@@ -96,7 +97,7 @@ const engine_js_1 = require("../apps/be/dist/extractor/engine.js");
             body: JSON.stringify({ action: 'reject' }),
         });
         node_assert_1.default.strictEqual(rejectRes.status, 200);
-        // Re-analyzing the same messages should be skipped by anti-recreation hash
+        // Re-analyzing the same messages passively should be skipped by anti-recreation hash
         const reAnalyzeRes = await fetch(`http://localhost:${port}/api/discussions/analyze`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -105,10 +106,26 @@ const engine_js_1 = require("../apps/be/dist/extractor/engine.js");
                 guildId: 'guild-demo',
                 channelId: 'chan-arch',
                 triggerMessageId: 'msg-103',
+                isManualOverride: false,
             }),
         });
         const reAnalyzeData = (await reAnalyzeRes.json());
         node_assert_1.default.strictEqual(reAnalyzeData.found, false);
+        // But with isManualOverride: true (e.g. 📌 pin added), re-analysis is permitted!
+        const manualOverrideRes = await fetch(`http://localhost:${port}/api/discussions/analyze`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                rawMessages,
+                guildId: 'guild-demo',
+                channelId: 'chan-arch',
+                triggerMessageId: 'msg-103',
+                isManualOverride: true,
+            }),
+        });
+        const manualOverrideData = (await manualOverrideRes.json());
+        node_assert_1.default.strictEqual(manualOverrideData.found, true);
+        node_assert_1.default.ok(manualOverrideData.decisions.length > 0);
         server.close();
         repo.close();
     });
