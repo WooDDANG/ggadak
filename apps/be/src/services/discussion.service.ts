@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import { Decision, createLogger } from '@ggaddak/shared';
-import { DecisionRepository } from '../db.js';
-import { BackendExtractionEngine } from '../extractor/engine.js';
+import { DecisionRepository } from '../repositories/decision.repository.js';
+import { IAiAdapter } from '../adapters/ai.adapter.js';
 
 const logger = createLogger('BE-DISCUSSION-SERVICE');
 
@@ -25,7 +25,7 @@ export interface AnalyzeDiscussionResult {
 export class DiscussionService {
   constructor(
     private repo: DecisionRepository,
-    private extractor: BackendExtractionEngine,
+    private extractor: IAiAdapter,
   ) {}
 
   async analyzeDiscussion(params: AnalyzeDiscussionParams): Promise<AnalyzeDiscussionResult> {

@@ -1,7 +1,7 @@
-import dotenv from 'dotenv';
 import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import dotenv from 'dotenv';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -19,24 +19,21 @@ for (const envPath of potentialEnvPaths) {
   }
 }
 
-import { createLogger } from '@ggaddak/shared';
+import { config } from './config/index.js';
+import { appLogger } from './loaders/logger.js';
 import { createServer } from './server.js';
-import { DecisionRepository } from './db.js';
+import { DecisionRepository } from './repositories/decision.repository.js';
 
-const logger = createLogger('BE');
-const PORT =
-  process.env.BE_PORT || process.env.PORT
-    ? parseInt((process.env.BE_PORT || process.env.PORT)!, 10)
-    : 3001;
 const DB_PATH = process.env.DATABASE_PATH || './decisions.sqlite';
-
 const repo = new DecisionRepository(DB_PATH);
 const server = createServer(repo);
 
-server.listen(PORT, () => {
-  logger.info(`Decision Tracker Backend API listening on http://localhost:${PORT}`);
-  logger.info(`Database connected at: ${DB_PATH}`);
-  logger.info(
-    `AI Provider: ${process.env.AI_PROVIDER || 'gemini'} (API Key loaded: ${Boolean(process.env.GOOGLE_GENERATIVE_AI_API_KEY)})`,
-  );
+server.listen(config.port, () => {
+  appLogger.info(`
+  ################################################
+  🛡️  GGADDAK Decision Tracker API: ${config.port} 🛡️
+  📦  Database: ${DB_PATH}
+  🤖  AI Provider: ${config.ai.provider}
+  ################################################
+  `);
 });
