@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Decision } from '@ggaddak/shared';
 import { CheckCircle2, AlertCircle, Archive, XCircle, Clock, ExternalLink } from 'lucide-react';
 import { Badge } from '../../components/Badge';
+import { DiscordTranscriptViewer } from '../../components/DiscordTranscriptViewer';
 
 interface DecisionTimelineProps {
   decisions: Decision[];
@@ -196,6 +197,9 @@ export const DecisionTimeline: React.FC<DecisionTimelineProps> = ({ decisions, i
                     </div>
                   </div>
                 )}
+
+                {/* Discord Conversation Transcript */}
+                <DiscordTranscriptViewer source={dec.source} rawTranscript={dec.rawTranscript} />
 
                 <div className="flex items-center justify-between text-xs text-slate-400 pt-2 border-t border-slate-700/40">
                   <div className="flex items-center space-x-3">

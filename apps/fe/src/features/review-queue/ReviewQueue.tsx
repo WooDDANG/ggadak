@@ -2,6 +2,7 @@ import React from 'react';
 import { Decision, ReviewAction } from '@ggaddak/shared';
 import { Check, Clock, X, MessageSquare, AlertTriangle, ExternalLink } from 'lucide-react';
 import { Badge } from '../../components/Badge';
+import { DiscordTranscriptViewer } from '../../components/DiscordTranscriptViewer';
 
 interface ReviewQueueProps {
   decisions: Decision[];
@@ -154,6 +155,9 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({ decisions, onReview, i
                 </div>
               </div>
             )}
+
+            {/* Discord Conversation Transcript */}
+            <DiscordTranscriptViewer source={dec.source} rawTranscript={dec.rawTranscript} />
 
             {/* Footer Metadata */}
             <div className="mt-4 pt-3 border-t border-slate-700/50 flex items-center justify-between text-xs text-slate-400">
