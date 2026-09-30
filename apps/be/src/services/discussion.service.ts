@@ -15,6 +15,9 @@ export interface AnalyzeDiscussionParams {
   triggerMessageId?: string;
   messageUrl?: string;
   isManualOverride?: boolean;
+  score?: number;
+  participantCount?: number;
+  reactionsCount?: number;
 }
 
 export interface AnalyzeDiscussionResult {
@@ -120,6 +123,8 @@ export class DiscussionService {
           };
         }
 
+        const finalScore = params.score !== undefined ? params.score : govResult.score;
+
         const newDecision: Decision = {
           id: decisionId,
           topic: item.topic,
@@ -162,16 +167,16 @@ export class DiscussionService {
           messageCreatedAt:
             sessionMessages[sessionMessages.length - 1]?.createdAt || new Date().toISOString(),
           createdAt: new Date().toISOString(),
-          governanceScore: govResult.score,
+          governanceScore: finalScore,
           governanceReason: govResult.reason,
-          governancePassed: govResult.passed,
+          governancePassed: finalScore >= 3.0,
         };
 
         this.repo.saveDecision(newDecision);
         allExtractedDecisions.push(newDecision);
 
         logger.info(
-          `[Analyze] Saved DRAFT Candidate [${newDecision.id}] Score=${govResult.score} (${govResult.strength}) Title="${newDecision.title}"`,
+          `[Analyze] Saved DRAFT Candidate [${newDecision.id}] Score=${finalScore} (${govResult.strength}) Title="${newDecision.title}"`,
         );
       }
     }

@@ -61,4 +61,48 @@ describe('Shared Domain Schemas', () => {
       DecisionStateSchema.parse('InvalidState');
     });
   });
+
+  it('calculates discussion consensus scores across tiers', async () => {
+    const { calculateDiscussionScore } = await import('./score.js');
+
+    // 4.0 Strong: 2+ participants, 2+ reactions, 3+ msgs
+    const strong = calculateDiscussionScore({
+      participantCount: 3,
+      reactionsCount: 4,
+      messageCount: 5,
+      hasConsensusKeyword: true,
+    });
+    assert.strictEqual(strong.score, 4.0);
+    assert.strictEqual(strong.tier, 'Strong');
+
+    // 3.0 Standard: 2 participants, 0 reactions
+    const standard = calculateDiscussionScore({
+      participantCount: 2,
+      reactionsCount: 0,
+      messageCount: 2,
+      hasConsensusKeyword: false,
+    });
+    assert.strictEqual(standard.score, 3.0);
+    assert.strictEqual(standard.tier, 'Standard');
+
+    // 2.0 Weak: 1 participant with consensus keyword
+    const weak = calculateDiscussionScore({
+      participantCount: 1,
+      reactionsCount: 0,
+      messageCount: 1,
+      hasConsensusKeyword: true,
+    });
+    assert.strictEqual(weak.score, 2.0);
+    assert.strictEqual(weak.tier, 'Weak');
+
+    // 1.0 Incomplete
+    const incomplete = calculateDiscussionScore({
+      participantCount: 1,
+      reactionsCount: 0,
+      messageCount: 1,
+      hasConsensusKeyword: false,
+    });
+    assert.strictEqual(incomplete.score, 1.0);
+    assert.strictEqual(incomplete.tier, 'Incomplete');
+  });
 });

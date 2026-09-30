@@ -42,6 +42,9 @@ export class BackendApiService {
     triggerMessageId?: string;
     messageUrl?: string;
     isManualOverride?: boolean;
+    score?: number;
+    participantCount?: number;
+    reactionsCount?: number;
   }): Promise<any> {
     const res = await fetch(`${this.backendUrl}/api/discussions/analyze`, {
       method: 'POST',

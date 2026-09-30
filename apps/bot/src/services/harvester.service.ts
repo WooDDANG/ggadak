@@ -1,5 +1,5 @@
 import { Client, Message, TextChannel } from 'discord.js';
-import { Decision, HarvestingPolicyConfig, createLogger } from '@ggaddak/shared';
+import { Decision, HarvestingPolicyConfig, createLogger, calculateDiscussionScore } from '@ggaddak/shared';
 import { BotEmbedView } from '../views/embed.view.js';
 import { BackendApiService } from './backend-api.service.js';
 import { CONSENSUS_REGEX } from '../handlers/message.handler.js';
@@ -164,9 +164,19 @@ export class DiscussionHarvester {
 
     try {
       const rawMessages = await this.harvestContextMessages(message, policy);
+      const participants = Array.from(new Set(rawMessages.map(m => m.authorName)));
+      const totalReactions = rawMessages.reduce((sum, m) => sum + (m.reactionCount || 0), 0);
+      const hasConsensusKeyword = rawMessages.some(m => CONSENSUS_REGEX.test(m.content));
+
+      const scoreResult = calculateDiscussionScore({
+        participantCount: participants.length,
+        reactionsCount: totalReactions,
+        messageCount: rawMessages.length,
+        hasConsensusKeyword,
+      });
 
       logger.info(
-        `[Context] Harvested ${rawMessages.length} messages for #${channelName}. Sending to Backend AI...`,
+        `[Context] Harvested ${rawMessages.length} msgs for #${channelName}. Bot calculated score: ${scoreResult.score}/4.0 (${scoreResult.tier})`,
       );
 
       const result = await this.backendApi.analyzeDiscussion({
@@ -185,6 +195,9 @@ export class DiscussionHarvester {
         channelName,
         triggerMessageId: message.id,
         messageUrl: message.url,
+        score: scoreResult.score,
+        participantCount: participants.length,
+        reactionsCount: totalReactions,
       });
 
       if (!result.found || !result.decisions || result.decisions.length === 0) {
@@ -293,6 +306,19 @@ export class DiscussionHarvester {
     logger.info(`[Scan] Scanning ${fetchedMessages.length} messages in #${channelName}...`);
     let decisionsFound = 0;
     const newestMessage = fetchedMessages[fetchedMessages.length - 1];
+    const participants = Array.from(new Set(fetchedMessages.map(m => m.author?.username || 'unknown')));
+    const totalReactions = fetchedMessages.reduce((sum, m) => {
+      const rx = this.extractReactions(m);
+      return sum + rx.reactionCount;
+    }, 0);
+    const hasConsensusKeyword = fetchedMessages.some(m => CONSENSUS_REGEX.test(m.content || ''));
+
+    const scoreResult = calculateDiscussionScore({
+      participantCount: participants.length,
+      reactionsCount: totalReactions,
+      messageCount: fetchedMessages.length,
+      hasConsensusKeyword,
+    });
 
     try {
       const result = await this.backendApi.analyzeDiscussion({
@@ -315,6 +341,9 @@ export class DiscussionHarvester {
         triggerMessageId: newestMessage.id,
         messageUrl: newestMessage.url,
         isManualOverride: true,
+        score: scoreResult.score,
+        participantCount: participants.length,
+        reactionsCount: totalReactions,
       });
 
       if (result.found && result.decisions && result.decisions.length > 0) {

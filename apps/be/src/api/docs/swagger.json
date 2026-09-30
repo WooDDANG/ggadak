@@ -415,6 +415,18 @@
 					},
 					"isManualOverride": {
 						"type": "boolean"
+					},
+					"score": {
+						"type": "number",
+						"format": "double"
+					},
+					"participantCount": {
+						"type": "number",
+						"format": "double"
+					},
+					"reactionsCount": {
+						"type": "number",
+						"format": "double"
 					}
 				},
 				"required": [
