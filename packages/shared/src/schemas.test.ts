@@ -106,26 +106,33 @@ describe('Shared Domain Schemas', () => {
     assert.strictEqual(incomplete.tier, 'Incomplete');
   });
 
-  it('evaluates semantic decision similarity for natural Korean & English agreement phrases', async () => {
-    const { evaluateSemanticDecision } = await import('./semantic-scorer.js');
+  it('evaluates semantic decision similarity for natural Korean & English agreement phrases with >= 0.70 threshold', async () => {
+    const { evaluateDenseMultiAnchorSimilarity, evaluateSemanticDecision } = await import('./semantic-scorer.js');
 
-    // 1. Natural phrasing with semantic alignment
-    const r1 = evaluateSemanticDecision('우리 메인 DB는 PostgreSQL 도입으로 결정하시죠');
+    // 1. Natural phrasing with semantic alignment (>= 0.70)
+    const r1 = evaluateDenseMultiAnchorSimilarity('우리 메인 DB는 PostgreSQL 도입으로 결정하시죠');
     assert.ok(r1.isCandidate, `Expected candidate, got sim=${r1.similarity}`);
-    assert.ok(r1.similarity >= 0.35);
+    assert.ok(r1.similarity >= 0.70, `Expected >= 0.70, got ${r1.similarity}`);
 
-    const r2 = evaluateSemanticDecision('서버 프레임워크는 Fastify로 확정하고 개발 진행하겠습니다');
+    const r2 = evaluateDenseMultiAnchorSimilarity('서버 프레임워크는 Fastify로 확정하고 개발 진행하겠습니다');
     assert.ok(r2.isCandidate);
+    assert.ok(r2.similarity >= 0.70);
 
-    const r3 = evaluateSemanticDecision('We decided to adopt PostgreSQL as primary DB');
+    const r3 = evaluateDenseMultiAnchorSimilarity('이쪽 아키텍처 방향으로 가닥 잡고 진행합시다');
     assert.ok(r3.isCandidate);
+    assert.ok(r3.similarity >= 0.70);
 
-    // 2. Casual talk / irrelevant chatter should have low similarity and not be candidate
-    const casual1 = evaluateSemanticDecision('오늘 점심 메뉴 돈까스 어때요?');
+    const r4 = evaluateSemanticDecision('We decided to adopt PostgreSQL as primary database');
+    assert.ok(r4.isCandidate);
+    assert.ok(r4.similarity >= 0.70);
+
+    // 2. Casual talk / irrelevant chatter should strictly score < 0.40 and not be candidate
+    const casual1 = evaluateDenseMultiAnchorSimilarity('오늘 점심 메뉴 돈까스 어때요?');
     assert.strictEqual(casual1.isCandidate, false);
-    assert.ok(casual1.similarity < 0.20);
+    assert.ok(casual1.similarity < 0.40, `Expected < 0.40, got ${casual1.similarity}`);
 
-    const casual2 = evaluateSemanticDecision('주말에 영화 보러 가실 분 있나요');
+    const casual2 = evaluateDenseMultiAnchorSimilarity('주말에 영화 보러 가실 분 있나요');
     assert.strictEqual(casual2.isCandidate, false);
+    assert.ok(casual2.similarity < 0.40, `Expected < 0.40, got ${casual2.similarity}`);
   });
 });
