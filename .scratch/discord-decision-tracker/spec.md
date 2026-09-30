@@ -1,36 +1,50 @@
-# Spec: Decision Candidate Extraction Policy, Review Queue & Centralized Config
+# Spec: Decision Candidate Extraction Policy, Review Queue, Centralized Config & Modular MVC Architecture
 
 Status: `ready-for-agent`
 
 ## Problem Statement
 
-When engineering and product teams collaborate in Discord, critical decisions on project scope, architecture, product targets, and features are easily lost in high-velocity chat streams. However, allowing an AI bot to autonomously mark conclusions as confirmed decisions without human review introduces significant risks of false positives, incomplete rationale, and team miscommunication. 
+When engineering and product teams collaborate on Discord, critical conclusions regarding project scope, software architecture, target audience, feature sets, and business models are frequently lost in high-velocity chat streams. 
 
-Furthermore, tuning harvesting thresholds (such as lookback window sizes, debounce durations, and reaction triggers) requires editing scattered code constants rather than managing them centrally. When users reject or delete an inaccurate candidate, naive re-scans can repeatedly re-generate the same discarded decision card. Lastly, teams lack structured tracking for rejected alternatives, pivot relationships against existing decisions, and external mentor/professor feedback.
+However, allowing an autonomous AI bot to directly record discussions as confirmed decisions without human supervision creates significant risks:
+1. **False Positives**: Casual chatter, routine standup updates, meeting scheduling, and directionless brainstorming can be misclassified as project decisions.
+2. **Lack of Human Governance**: Teams lose control over what is officially recorded as an agreed decision versus an exploratory idea.
+3. **Repeated False Candidates (Re-generation Loop)**: When a reviewer rejects an inaccurate candidate, subsequent channel scans naive to previous rejections repeatedly re-create the same unwanted proposal.
+4. **Scattered Configuration**: Harvesting thresholds (context window sizes, debounce timeouts, reaction thresholds) scattered across arbitrary constants make system tuning brittle.
+5. **Architectural Clutter**: Monolithic script layouts mix HTTP routing, AI inference, Discord gateway handlers, and database queries in single files, hindering maintainability and testability.
 
 ## Solution
 
-A human-in-the-loop decision capture and governance pipeline:
-1. **Centralized Policy Configuration**: A single source of truth for all harvesting thresholds (initial scan limits, asymmetric context windows, debounce timeouts, reaction thresholds, and agreement counts) managed centrally and exposed via runtime configuration APIs.
-2. **Draft Candidates & Review Queue**: All AI-extracted decisions are initially saved in a `draft` status and routed to a dedicated web review queue where team members inspect, edit, confirm, defer, or reject them.
+An end-to-end, human-in-the-loop decision capture and governance pipeline organized around a clean modular MVC and Event-Driven architecture:
+
+1. **Centralized Policy Configuration**: A single source of truth for all harvesting thresholds (initial scan limits, asymmetric context windows, debounce timeouts, reaction thresholds, and agreement counts) managed centrally and exposed via runtime configuration REST endpoints.
+2. **Draft Candidates & Review Queue**: All AI-extracted decisions are saved in a `Draft` state and routed to a dedicated web review queue where team members inspect, edit, confirm (`Decided`), defer (`Deferred`), or reject (`Rejected`) them.
 3. **Thread-First & Asymmetric Window Ingestion**: The Discord bot prioritizes native Discord Threads as primary discussion units and captures asymmetric context windows (15 messages preceding a trigger, 5 messages following) while merging overlapping discussion intervals into a unified context block (up to 40 messages).
-4. **Rich Decision Metadata**: Captures discarded alternatives and rationale (`alternatives[]`), functional domain tags (`category_tag`), pivot detection (`is_pivot`), and authentic Discord evidence links (`raw_evidence[]`).
-5. **External Feedback Integration (`/피드백입력`)**: Stores mentor, judge, and professor advice as external reference context to inform subsequent team discussion analysis without falsely recording the advice itself as a team decision.
-6. **Anti-Recreation Memory**: Hashes the evidence message IDs of deleted or rejected draft candidates to prevent repetitive re-generation of discarded proposals unless new conversational evidence is introduced.
+4. **Rich Decision Metadata**: Captures discarded alternatives and rationale (`alternatives[]`), functional domain tags (`categoryTag`), pivot detection (`isPivot`), and authentic Discord evidence links (`rawEvidence[]`).
+5. **5-Branch Existing Decision Comparison**:
+   - **New Decision**: Creates a fresh `Draft` card.
+   - **Draft Refinement / Modification**: Updates existing `Draft` card.
+   - **Continuation of Existing Discussion**: Appends new evidence and transcript links to existing card.
+   - **Confirmed Decision Change / Pivot**: Creates new `Draft` with `isPivot: true` and `supersedesId` pointing to previous decision.
+   - **Casual Re-affirmation / Mention**: Silently skips creating duplicate cards.
+6. **External Feedback Integration (`/피드백입력`)**: Stores mentor, judge, and professor advice as external reference context to inform subsequent team discussion analysis without falsely recording the advice itself as a team decision.
+7. **Anti-Recreation Memory**: Hashes the evidence message IDs of deleted or rejected draft candidates to prevent repetitive re-generation of discarded proposals unless new conversational evidence is introduced.
+8. **Express MVC Backend Architecture**: Clear separation of concerns with Controllers, Services, Repositories, and Routers utilizing standard Express middlewares (CORS, JSON parser, Morgan logging).
+9. **Layered Bot Architecture**: Clear separation between Discord Event Handlers, External API Services, Harvester Services, and Discord Embed Presentation Views.
 
 ## User Stories
 
 1. As a team member, I want the bot to automatically detect discussion signals (linguistic consensus patterns, Discord threads, and reaction thresholds) and submit candidate proposals to a review queue, so that decisions are captured without polluting active project records.
-2. As a product manager, I want all AI-generated decision candidates created in a `draft` state, so that a human must review and confirm them before they become official decisions.
+2. As a product manager, I want all AI-generated decision candidates created in a `Draft` state, so that a human must review and confirm them before they become official decisions.
 3. As a team reviewer, I want to approve, edit, defer, or reject decision candidates in a web review queue, so that our team maintains complete governance over project records.
-4. As a reviewer confirming a decision, I want the system to record my user handle as `approved_by` and set `decision_confirmed_date` to the approval timestamp, so that ownership and timeline accuracy are preserved.
+4. As a reviewer confirming a decision, I want the system to record my user handle as `approvedBy` and set `decisionConfirmedDate` to the approval timestamp, so that ownership and timeline accuracy are preserved.
 5. As an engineer, I want all harvesting parameters (window sizes, limits, debounce times, reaction thresholds) managed centrally in a shared configuration module and overridable via environment variables or backend endpoints, so that we can tune policies without code rewrites.
 6. As a team member discussing an issue inside a Discord Thread, I want the bot to bundle the entire thread as the primary discussion context, so that threaded conversations are analyzed as a cohesive unit.
 7. As a team member chatting in a main channel, I want the bot to harvest an asymmetric context window (15 messages before, 5 messages after) when a signal is detected, so that the preceding debate and concluding remarks are both included.
 8. As a developer, I want overlapping context windows from multiple nearby trigger signals merged into a single consolidated batch (up to 40 messages), so that the AI receives non-fragmented transcripts.
 9. As a team lead, I want decision cards to record discarded alternatives and their explicit reasons for rejection (`alternatives[]`), so that the team remembers why other options were not selected.
 10. As a project manager, I want decision cards categorized by domain tag (`타깃`, `문제정의`, `기능`, `기술`, `BM`, `기타`), so that our decision backlog is organized.
-11. As a developer, I want the backend AI to compare new candidates against active confirmed decisions to detect pivots (`is_pivot: true`), so that shifts in project direction are highlighted.
+11. As a developer, I want the backend AI to compare new candidates against active confirmed decisions to detect pivots (`isPivot: true`), so that shifts in project direction are highlighted.
 12. As a team member receiving feedback from professors or judges, I want to use `/피드백입력` to store external advice, so that it serves as reference context for future team discussions without being misclassified as a decision.
 13. As a reviewer rejecting a candidate card, I want the system to remember the rejected evidence message IDs, so that the bot does not repeatedly re-create the same rejected candidate on subsequent scans.
 14. As an operator, I want initial channel scans on bot startup to backfill past messages up to a configurable limit (e.g. 50 messages), so that existing channel history is evaluated.
@@ -39,6 +53,9 @@ A human-in-the-loop decision capture and governance pipeline:
 17. As a web user, I want an expandable accordion on every decision card to view the authentic Discord chat transcript with author handles, timestamps, and reply tags.
 18. As an SRE, I want all HTTP and daemon operations logged with structured Winston/Morgan logging in rotating log files.
 19. As a monorepo developer, I want shared schemas, types, and configuration contracts shared across bot, backend, and frontend packages.
+20. As a backend developer, I want the backend structured in a standard Express MVC architecture (Controllers, Services, Repositories, Routers) with middleware support, so that adding new API capabilities is seamless and idiomatic.
+21. As a bot developer, I want Discord bot logic separated into Event Handlers, API Services, Harvester Services, and Embed Views, so that Discord client interactions remain clean and maintainable.
+22. As a frontend user, I want filter tabs for Review Queue vs Confirmed Decision Timeline, category tag badges, and one-click action buttons with instant UI updates.
 
 ## Implementation Decisions
 
@@ -72,48 +89,70 @@ A human-in-the-loop decision capture and governance pipeline:
   - `approvedBy`: Handle of reviewer who approved the card.
   - `evidenceHash`: SHA-256 hash of `rawEvidence` message IDs used for anti-recreation filtering.
 
-### 3. Stream Ingestion, Thread Prioritization & Merging (`apps/bot`)
-- **Thread Prioritization**: Senses `message.thread` or `channel.isThread()`; fetches the thread discussion history directly as the primary analysis context.
-- **Asymmetric Context Harvesting**: Fetches `contextWindowBefore` (15) and `contextWindowAfter` (5) messages around non-threaded trigger messages.
-- **Interval Merging**: Combines overlapping harvested message sequences up to `maxMergedWindow` (40) before dispatching to the backend.
-- **Reaction Feedback Lifecycle**: Places `👀` during analysis; adds `📝` upon successful candidate generation; removes `👀` on casual chatter.
-- **Manual 📌 Override**: Direct 📌 reaction bypasses debounce timers and immediately initiates analysis.
+### 3. Backend Express MVC Architecture (`apps/be`)
+- **Controllers (`src/controllers/`)**:
+  - `DecisionController`: List query, webhook ingestion, review transitions (`Confirm`, `Defer`, `Reject`), conflict resolution.
+  - `DiscussionController`: Handles `POST /api/discussions/analyze`.
+  - `FeedbackController`: CRUD for external feedback.
+  - `CheckpointController`: Channel watermark management.
+  - `PolicyController`: Exposes `GET /api/config/policy`.
+- **Services (`src/services/`)**:
+  - `DiscussionService`: Evidence hashing, anti-recreation check, transcript builder, AI extractor invocation, DRAFT creation, pivot detection.
+  - `DecisionService`: Review state transitions, query filtering, conflict supersede.
+  - `FeedbackService`: External feedback management.
+  - `CheckpointService`: Channel checkpoint storage.
+  - `PolicyService`: Environment/Default policy resolution.
+- **Repositories (`src/db.ts`)**:
+  - SQLite persistent storage with automatic column migrations, checkpoint tables, external feedback tables, and rejected evidence hash tables.
+- **Router (`src/routes/router.ts`)**:
+  - Express `Router` declaring clean RESTful routes.
+- **Server (`src/server.ts`)**:
+  - `createApp()` providing configured Express app with CORS, JSON parser, Morgan logging, and `/api` router mount.
 
-### 4. AI Candidate Extraction & Pivot Detection (`apps/be`)
-- **Exclusion Filters**: System prompt strictly excludes casual chatter, simple scheduling, pure questions, simple file sharing, routine status reports ("개발 완료했습니다"), code typos, and directionless brainstorming.
-- **Convergence Detection**: Identifies consensus when multiple participants support a proposal with no unresolved objections.
-- **Pivot & Deduplication Engine**: Compares candidates against confirmed decisions in the database to detect reversals (`is_pivot: true`) and skips generation if the `evidenceHash` matches a previously rejected proposal.
+### 4. Bot Layered & Event-Driven Architecture (`apps/bot`)
+- **Views (`src/views/embed.view.ts`)**:
+  - `renderCandidateEmbed()`: Rich Embeds with color-coding for pivots, alternatives list, action items, category tag, and decision details.
+  - `renderConflictEmbed()` & `renderConflictActionRow()`: Conflict prompt and action buttons.
+- **Services (`src/services/`)**:
+  - `BackendApiService`: HTTP communication layer with backend AI, review, feedback, checkpoint, and policy endpoints.
+  - `HarvesterService`: Thread prioritization, asymmetric before/after window slicing, interval merging.
+- **Handlers (`src/handlers/`)**:
+  - `MessageHandler`: Message event parsing, consensus regex testing, per-channel debounce timers.
+  - `ReactionHandler`: Reaction event parsing, 📌 manual override, threshold counting.
+  - `InteractionHandler`: Button clicks (supersede/coexist) and slash commands (`/피드백입력`, `/스캔`).
+- **Orchestrator (`src/bot/client.ts`)**:
+  - Slim gateway listener connecting events to handlers and services.
 
-### 5. External Feedback Ingestion (`apps/bot` & `apps/be`)
-- **Slash Command**: Implements `/피드백입력` with modal options (Source: 교수/심사위원/팀원/인터뷰이, Content).
-- **Backend Storage**: Stores entries in `external_feedbacks` table.
-- **Context Injection**: Injects recent external feedback entries into the prompt context when analyzing subsequent team discussions in the same channel.
-
-### 6. Web Dashboard Review Queue (`apps/fe`)
-- **Review Queue View**: Dedicated interface displaying `Draft` candidates awaiting verification.
-- **Review Actions**: Provides one-click buttons for "Confirm (승인)", "Edit (수정)", "Defer (보류)", and "Reject (삭제)".
-- **Rejection Memory**: Transmits rejected `evidenceHash` to backend to prevent unwanted candidate re-generation.
+### 5. Web Dashboard Review Queue (`apps/fe`)
+- **Review Queue Tab**: Displays all `Draft` candidates awaiting review.
+- **One-Click Actions**:
+  - **Confirm (승인)**: Sets state to `Decided`, records `approvedBy`, assigns `decisionConfirmedDate`.
+  - **Defer (보류)**: Sets state to `Deferred`.
+  - **Reject (기각/삭제)**: Sets state to `Rejected`, registers evidence hash to anti-recreation storage.
+- **Rich Card Presentation**: Category badges, Pivot tags, Alternatives accordion, Raw Discord transcript preview.
 
 ## Testing Decisions
 
 ### What Makes a Good Test
-- Tests must verify observable system behavior through external API boundaries (HTTP REST, Discord events, SQLite query outputs) rather than internal private variables.
-- Deterministic extraction must be verified against simulated conversation scenarios to guarantee test reproducibility without external API flakiness.
-- All tests must run autonomously in automated test runners.
+- Tests verify observable external system behavior at high architectural seams (HTTP REST endpoints, Discord event handling, SQLite query outputs) rather than private implementation details.
 
-### Test Coverage & Seams
-1. **Shared Schemas & Config (`packages/shared`)**: Tests `HarvestingPolicyConfig`, rich `DecisionSchema` validation, and state machine transitions.
-2. **BE Server & Checkpoint/Feedback APIs (`apps/be`)**: Tests candidate review actions (`confirm`, `defer`, `reject`), policy endpoint, and external feedback storage against in-memory SQLite.
-3. **Bot Context Builder & Merger (`apps/bot`)**: Tests thread isolation, asymmetric window slicing, interval merging, and consensus regex accuracy.
-4. **Primary Seam (E2E Full Pipeline `test/e2e.test.ts`)**: End-to-end integration verifying stream signal capture -> BE AI candidate extraction (`draft`) -> human review approval -> confirmed timeline persistence and query.
+### Testing Seams & Test Suites
+1. **Shared Domain Unit Tests (`packages/shared/src/schemas.test.ts`)**:
+   - Schema validation for `Decision`, `DecisionPayload`, `HarvestingPolicyConfig`, `ExternalFeedback`, and `ReviewAction`.
+2. **Backend Server Integration Tests (`apps/be/src/server.test.ts`)**:
+   - Tests `POST /api/webhooks/decisions`, `GET /api/decisions`, `POST /api/decisions/:id/review`, `GET /api/config/policy`, `POST /api/feedbacks`, `GET/POST /api/channels/:id/checkpoint`.
+3. **Bot Core Unit Tests (`apps/bot/src/bot.test.ts`)**:
+   - Tests `DiscussionContextBuilder`, `DecisionExtractor`, `ConflictDetector`, `EgressQueue`, `CONSENSUS_REGEX`.
+4. **End-to-End Pipeline Tests (`test/e2e.test.ts`)**:
+   - Full flow testing from raw Discord message ingestion -> Backend AI candidate extraction (`Draft`) -> Web review confirmation/rejection -> Anti-recreation rejection memory check -> Confirmed timeline querying.
 
 ## Out of Scope
 
-- Real-time voice channel audio speech-to-text transcription.
-- Multi-tenant cloud SaaS billing integration.
-- Custom machine learning model fine-tuning.
+- Multi-tenant Discord bot authentication with OAuth2 token refreshes (Single bot token in `.env` for MVP).
+- Real-time WebSocket synchronization across web dashboard clients (REST polling on review queue for MVP).
+- Vector embeddings / Semantic search for past decisions (Keyword & topic-based querying for MVP).
 
 ## Further Notes
 
-- Built as a TypeScript monorepo with npm/pnpm workspaces.
-- Conforms to [CONTEXT.md](file:///Users/wooddang-mac/Desktop/code/5.%20toy/GGADDAK/CONTEXT.md), [CONTEXT-MAP.md](file:///Users/wooddang-mac/Desktop/code/5.%20toy/GGADDAK/CONTEXT-MAP.md), and ADRs 0001 through 0016.
+- Monorepo code quality is enforced via unified ESLint Flat Config (`eslint.config.mjs`) and Prettier (`.prettierrc`).
+- All changes are continuously validated via `npm run lint && npm test`.
