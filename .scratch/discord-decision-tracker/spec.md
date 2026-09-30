@@ -89,8 +89,27 @@ An end-to-end, human-in-the-loop decision capture and governance pipeline organi
   - `approvedBy`: Handle of reviewer who approved the card.
   - `evidenceHash`: SHA-256 hash of `rawEvidence` message IDs used for anti-recreation filtering.
 
-### 3. Backend Express MVC Architecture (`apps/be`)
-- **Controllers (`src/controllers/`)**:
+### 3. Backend Express MVC & Layered Architecture (`apps/be`)
+- **Loaders (`src/loaders/`)**:
+  - `database.loader.ts`: Database connection and schema migrations.
+  - `express.loader.ts`: Middleware stack (CORS, Helmet, JSON parser, Morgan logging, Router mount).
+  - `index.ts`: Unified async bootstrapper.
+- **DTOs (`src/dto/`)**:
+  - `decision.dto.ts`: `QueryDecisionsDto`, `ReviewDecisionDto`, `ResolveConflictDto`, `DecisionResponseDto`.
+  - `discussion.dto.ts`: `AnalyzeDiscussionRequestDto`, `AnalyzeDiscussionResponseDto`.
+  - `feedback.dto.ts`: `CreateFeedbackDto`, `FeedbackResponseDto`.
+  - `checkpoint.dto.ts`: `CheckpointResponseDto`, `SaveCheckpointDto`.
+  - `policy.dto.ts`: `PolicyResponseDto`.
+- **Models (`src/models/` or `src/repositories/models/`)**:
+  - `decision.entity.ts`: Persistent database row schema and entity definitions.
+  - `feedback.entity.ts`: External feedback entity.
+  - `checkpoint.entity.ts`: Channel checkpoint entity.
+- **Mappers (`src/mappers/`)**:
+  - `decision.mapper.ts`: Bidirectional conversion between DB rows, Domain Entities, and API DTOs.
+  - `feedback.mapper.ts`: Conversion between feedback DB rows and DTOs.
+- **Adapters (`src/adapters/`)**:
+  - `ai.adapter.ts`: External AI provider abstraction (Gemini 1.5 Flash, OpenAI GPT-4o-mini, Mock).
+- **Controllers (`src/api/controllers/`)**:
   - `DecisionController`: List query, webhook ingestion, review transitions (`Confirm`, `Defer`, `Reject`), conflict resolution.
   - `DiscussionController`: Handles `POST /api/discussions/analyze`.
   - `FeedbackController`: CRUD for external feedback.
@@ -102,12 +121,14 @@ An end-to-end, human-in-the-loop decision capture and governance pipeline organi
   - `FeedbackService`: External feedback management.
   - `CheckpointService`: Channel checkpoint storage.
   - `PolicyService`: Environment/Default policy resolution.
-- **Repositories (`src/db.ts`)**:
-  - SQLite persistent storage with automatic column migrations, checkpoint tables, external feedback tables, and rejected evidence hash tables.
-- **Router (`src/routes/router.ts`)**:
-  - Express `Router` declaring clean RESTful routes.
-- **Server (`src/server.ts`)**:
-  - `createApp()` providing configured Express app with CORS, JSON parser, Morgan logging, and `/api` router mount.
+- **Repositories (`src/repositories/`)**:
+  - SQLite persistent storage (`DecisionRepository`) with automatic column migrations, checkpoint tables, external feedback tables, and rejected evidence hash tables.
+- **Errors & Middlewares (`src/errors/`, `src/api/middlewares/`)**:
+  - `AppError` hierarchy and global `errorHandler` middleware.
+- **Router (`src/api/routes/`)**:
+  - Express sub-routers unified in `src/api/routes/index.ts`.
+- **Server (`src/app.ts` / `src/server.ts`)**:
+  - `createApp()` providing configured Express app with loaders.
 
 ### 4. Bot Layered & Event-Driven Architecture (`apps/bot`)
 - **Views (`src/views/embed.view.ts`)**:
