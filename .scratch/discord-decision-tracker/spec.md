@@ -1,108 +1,123 @@
-# Spec: Full-Stack Architecture Modernization & Boilerplate Elimination (TSOA, Prisma, TypeDI, discordx, React + TanStack Query)
+# Spec: Full-Stack Decision Tracker with Multi-Anchor Dense Embedding, Governance Rubric & Silent Discord Pipeline
 
 Status: `ready-for-agent`
 
 ## Problem Statement
 
-As the Decision Tracker system grew to encompass rich domain governance (multi-decision extraction, decision pivots, external advice integration, review states, and anti-recreation hashes), substantial boilerplate and cognitive overhead emerged across all three tiers:
-1. **Backend (`apps/be`)**: Repetitive Express router wiring, manual `Schema.safeParse(req.body)` calls, manual `try-catch` blocks in controllers, and 200+ lines of raw SQL string bindings with manual JSON serialization in SQLite.
-2. **Discord Bot (`apps/bot`)**: A monolithic 600-line client combining Gateway events, slash commands, harvesting algorithms, in-flight locks, and REST API calls, lacking a declarative decorator structure.
-3. **Frontend (`apps/fe`)**: A legacy monolithic single-file HTML script lacking component modularity, optimistic caching, and type-safe server state management.
+Engineering and product teams conduct critical architectural, technical, and scope discussions asynchronously across Discord channels. However, tracking these decisions reliably faces severe pain points:
+1. **Keyword Rigidity & False Negatives**: Natural agreement statements (e.g., *"이쪽 아키텍처로 가닥 잡고 진행합시다"*, *"결제 모듈은 MVP에서 빼고 갑시다"*) lack literal keyword matches and are completely missed by traditional regex filters.
+2. **Channel Message Pollution**: Chatty bots that post large embeds and confirmation buttons directly into discussion channels disrupt team flow and cause notification fatigue.
+3. **API Rate Limiting & Compute Cost**: Invoking generative cloud LLMs (Gemini / OpenAI) on every chat message leads to rate limit errors (HTTP 429/503), latency, and high operational costs.
+4. **Vague Rationales & Governance Gaps**: Informal consensus often lacks explicit rationales, rejected alternatives, or clear action item assignees, making past decisions hard to audit or pivot from.
 
 ## Solution
 
-Modernize the entire monorepo using enterprise best-practice design patterns (inspired by NASA Architecture standards) to eliminate boilerplate, achieve complete type safety, and establish clear separation of concerns:
+A **Multi-Tier Hybrid Decision Tracking Architecture**:
 
-1. **Backend Layer (`apps/be`)**:
-   - **TSOA Decorator Routing**: Express endpoints defined via `@Route`, `@Get`, `@Post`, `@Body`, `@Query`, `@Path`, with automatic runtime validation and zero manual routing files.
-   - **Interactive OpenAPI Documentation**: Swagger UI automatically generated and served at `/api-docs`.
-   - **Prisma ORM**: Single source of truth database modeling in `schema.prisma`, replacing manual SQL string concatenation with type-safe Prisma client operations.
-   - **TypeDI Dependency Injection**: Automatic IoC lifecycle management and controller resolution via `Container.get()` and `@Service()`.
+1. **Tier 1 — Discord Bot (`apps/bot`)**:
+   - **Multi-Anchor Dense Embedding Scorer**: Evaluates messages against 20 curated decision anchor templates across technical, functional, architecture, and consensus domains. Triggers candidate extraction when `max(cosine_similarity) >= 0.70`.
+   - **Formula-Based Discussion Consensus Scorer**: Direct in-bot calculation of consensus metrics (participant count, emoji reaction count, conversation length, and consensus keyword density) on a 1.0 to 4.0 scale.
+   - **Silent / Zero-Spam Mode**: Completely removes channel embed message posting. Provides non-intrusive feedback strictly via status emoji reactions (`👀` analyzing ➔ `📝` candidate registered in Review Queue).
+   - **Ephemeral Slash Commands**: `/스캔` and `/피드백입력` deliver private status responses (`ephemeral: true`) only to the invoking user.
 
-2. **Discord Bot Layer (`apps/bot`)**:
-   - **`discordx` Framework**: Declarative `@Discord()`, `@Slash()`, `@SlashOption()`, `@ButtonComponent()` decorator pattern.
-   - **Service Extraction**: Harvesting (`HarvesterService`), channel scanning, and AI extraction orchestration cleanly isolated in `AnalysisService`, leaving `client.ts` as a clean 40-line gateway entry point.
+2. **Tier 2 — Backend Engine & Governance Core (`apps/be`)**:
+   - **TSOA + Prisma + TypeDI Architecture**: High-speed, type-safe REST API with automatic Swagger UI (`/api-docs`).
+   - **30-Minute Idle Gap Session Slicing**: Slices continuous message streams into coherent distinct sessions.
+   - **Anti-Recreation Rejected Evidence Hash**: Prevents re-generating previously rejected candidate cards unless explicitly overridden by `📌` or manual `/스캔`.
+   - **Multi-Provider AI Extraction**: Google Gemini 2.5 Flash (`models/gemini-2.5-flash`) with structured JSON output, backed by OpenAI GPT-4o-mini and an automated Dynamic Heuristic Fallback parser.
+   - **4-Tier Governance Rubric**: Evaluates multi-participant consensus, rationale clarity, and action items (4.0 Strong, 3.0 Standard, 2.0 Weak, 1.0 Incomplete).
+   - **Conflict & Pivot Detection**: Automatically identifies superseded decisions and tags `isPivot: true`.
 
-3. **Frontend Dashboard Layer (`apps/fe`)**:
-   - **React 18 + Vite + Tailwind CSS + TanStack Query**: Feature-driven architecture (`features/review-queue`, `features/decision-timeline`, `features/feedback-board`) with automatic 5-second polling and optimistic UI mutations for PM review actions.
+3. **Tier 3 — PM Web Dashboard (`apps/fe`)**:
+   - Hosted at `http://localhost:3000` (Vite + React 18 + Tailwind CSS + TanStack Query).
+   - **Review Queue**: Real-time triage interface displaying 4.0 governance score badges, rationale, rejected alternatives, and action items with one-click Confirm/Reject actions.
+   - **Decision Timeline & Tree**: Chronological audit trail with state, category, and pivot history filters.
+   - **External Feedback Board**: Centralized store for professor, judge, and customer interview inputs.
 
-4. **Preserve Complete Domain Governance**:
-   - 100% fidelity of PM Decision Candidate extraction, Thread prioritization, Asymmetric Harvesting, 5-branch existing decision comparison, Anti-recreation rejected evidence memory, and Conflict/Pivot resolution buttons.
+---
 
 ## User Stories
 
-1. As a backend developer, I want to define API endpoints using TypeScript decorators (`@Route`, `@Get`, `@Post`), so that route binding and DTO validation are generated automatically without manual Express router files.
-2. As a backend developer, I want database operations executed via a type-safe Prisma ORM client, so that raw SQL strings, migration loops, and manual JSON stringification are eliminated.
-3. As a backend developer, I want services and controllers wired via TypeDI (`@Service()`), so that dependencies are injected automatically without manual factory constructors.
-4. As an API consumer or developer, I want an interactive Swagger UI at `/api-docs`, so that I can inspect schemas and test API calls in the browser.
-5. As a bot developer, I want Discord slash commands and button interactions defined using `discordx` decorators (`@Slash`, `@ButtonComponent`), so that event handling and routing are declarative and self-contained.
-6. As a bot developer, I want channel harvesting and analysis execution separated into `HarvesterService` and `AnalysisService`, so that the bot entry point remains lean and maintainable.
-7. As a product manager, I want all AI-extracted decision candidates presented in a web Review Queue in `Draft` state, so that I can approve (Confirm), defer (Defer), or reject (Reject) proposals with one click.
-8. As a product manager, I want optimistic UI updates when confirming or rejecting decisions in the frontend dashboard, so that state transitions feel instantaneous.
-9. As a reviewer confirming a decision, I want the system to record my name in `approvedBy` and set `decisionConfirmedDate` to the current timestamp.
-10. As a reviewer rejecting a candidate card, I want the system to permanently record the `evidenceHash` in `RejectedEvidenceHash`, so that unwanted cards are never re-generated from the same discussion.
-11. As a team member receiving feedback from professors, judges, or interviewees, I want to use `/피드백입력` or the Feedback Board to store external advice as reference context for AI decision extraction.
-12. As a team member chatting in Discord, I want consensus keywords (`~합시다`, `결정`, `확정`, `픽스`) to automatically trigger a 3-second debounced context extraction with `👀` reaction indicator.
-13. As a team member, I want to react with `📌` on any message to trigger an immediate, non-debounced decision extraction.
-14. As an engineer, I want all harvesting parameters (lookback window, debounce delay, reaction thresholds) managed centrally in `@ggaddak/shared/config.ts` and overridable via environment variables.
-15. As a frontend user, I want an interactive Decision Timeline view with category and state filters (Decided, Superseded, Deferred, Rejected), so that I can trace the historical evolution and pivots of our product.
-16. As an operator, I want security headers (`helmet`) and rate limiting (`express-rate-limit`) active on all backend API routes.
-17. As an SRE, I want structured Winston and Morgan logging across all HTTP and bot operations.
+1. As a developer discussing architecture in Discord, I want the bot to detect natural consensus phrasing using multi-anchor dense text embeddings, so that valid decisions are never lost even without exact keywords.
+2. As a team member, I want the bot to evaluate decision similarity locally against 20 curated anchors with a `>= 0.70` threshold, so that casual chatter is ignored without calling expensive generative LLMs.
+3. As a developer, I want the bot to calculate discussion consensus scores (1.0~4.0) based on participant diversity and emoji reactions in Discord, so that consensus strength is preserved before backend analysis.
+4. As a channel participant, I want the bot to operate in silent mode without posting embed cards into our chat, so that our team discussion remains clean and focused.
+5. As a channel participant, I want to see a `👀` emoji while the bot processes a discussion and a `📝` emoji when it is registered, so that I have clear, non-intrusive feedback.
+6. As a team member, I want to react with `📌` on any message to trigger an immediate, non-debounced decision extraction override.
+7. As a team member, I want to run `/스캔` with private responses (`ephemeral: true`), so that scan progress does not notify other channel members.
+8. As a team member, I want to record professor or judge advice using `/피드백입력`, so that the AI automatically injects external feedback into future decision extraction prompts.
+9. As a product manager, I want all extracted decision candidates presented in a web Review Queue in `Draft` state, so that I can review and confirm them before they become official.
+10. As a product manager, I want each candidate card to display its 4-tier governance score badge (`/4.0`), so that I can instantly judge the strength of team consensus.
+11. As a product manager, I want to view extracted rationales, rejected alternatives, and action item assignees on the card, so that decision context is fully transparent.
+12. As a reviewer confirming a decision, I want the system to record my name in `approvedBy` and set `decisionConfirmedDate` to the current timestamp.
+13. As a reviewer rejecting a candidate card, I want the system to store its `evidenceHash` in `RejectedEvidenceHash`, so that unwanted cards are never re-created from the same discussion.
+14. As a developer modifying an existing decision, I want the system to detect topic conflicts with active decisions and automatically flag the new candidate as a Pivot (`isPivot: true`).
+15. As a product manager, I want to browse the Decision Timeline view with category and state filters, so that I can trace product evolution and team agreements.
+16. As a developer working offline or during API rate limits, I want the backend to seamlessly fallback to a dynamic heuristic parser, so that development and testing are never blocked.
+17. As an API consumer, I want an interactive Swagger UI at `/api-docs`, so that I can inspect schemas and test API endpoints directly.
+18. As a frontend user, I want optimistic UI updates when confirming or rejecting decisions, so that state transitions feel instantaneous.
+19. As an engineer, I want all harvesting parameters (context window before/after, debounce delay, reaction threshold) centrally configured in `@ggaddak/shared`, so that policies are unified.
+20. As a DevOps engineer, I want the frontend running on port 3000 and the backend on port 3001 with proxy routing, so that local development operates smoothly.
+
+---
 
 ## Implementation Decisions
 
-### 1. Backend Architecture (`apps/be`)
-- **TSOA**: `tsoa.json` configured with `esm: true`, outputting routes to `src/api/routes/generated/routes.ts` and OpenAPI spec to `src/api/docs/swagger.json`.
-- **IoC Module**: `src/loaders/ioc.ts` bridging TSOA's `IocContainer` with TypeDI's `Container.get()`.
-- **Controllers**:
-  - `DecisionController`: `@Route('api')`, endpoints for `GET /api/decisions`, `POST /api/decisions/{id}/review`, `POST /api/decisions/conflict`, `POST /api/webhooks/decisions`.
-  - `DiscussionController`: `@Route('api/discussions')`, endpoint for `POST /api/discussions/analyze`.
-  - `FeedbackController`: `@Route('api/feedbacks')`, endpoints for `GET /api/feedbacks` and `POST /api/feedbacks`.
-  - `CheckpointController`: `@Route('api/channels')`, endpoints for `GET` and `POST` `/api/channels/{channelId}/checkpoint`.
-  - `PolicyController`: `@Route('api/config/policy')`, endpoint for `GET /api/config/policy`.
-- **Prisma ORM**: `prisma/schema.prisma` defines models for `Decision`, `ExternalFeedback`, `ChannelCheckpoint`, and `RejectedEvidenceHash`.
-- **Repository**: `DecisionRepository` delegates database operations to `PrismaService` while maintaining in-memory caching for ultra-fast offline unit testing.
-- **Express Loader**: `src/loaders/express.ts` mounts Helmet, CORS, JSON body parser, Morgan logging, Swagger UI at `/api-docs`, `RegisterRoutes(app)`, and centralized error handling.
+### 1. Multi-Anchor Dense Embedding Evaluator (`@ggaddak/shared/src/semantic-scorer.ts`)
+- Pre-computes normalized feature vectors for 20 curated decision anchors across 4 domains (Technical/DB, Architecture, Feature Scope/Pivot, Team Consensus).
+- Feature extraction combines word unigrams, compact character n-grams (2-gram, 3-gram), and core morpheme stem weighting (`결정`, `확정`, `합의`, `채택`, `도입`, `진행`, `우선`, `가닥`, `못박`, `제외`).
+- Non-linear cosine scaling ensures decision expressions yield `0.70 ~ 0.95`, while casual chatter yields `< 0.40`.
+- Exposes `evaluateDenseMultiAnchorSimilarity(text: string, threshold = 0.70): SemanticMatchResult`.
 
-### 2. Discord Bot Architecture (`apps/bot`)
-- **`discordx` Framework**: Replaces manual interaction listeners with decorator classes.
-- **Decorated Modules**:
-  - `FeedbackCommand`: `@Discord()`, `@Slash({ name: '피드백입력' })` with `@SlashChoice()` options for '교수', '심사위원', '팀원', '인터뷰이'.
-  - `ScanCommand`: `@Discord()`, `@Slash({ name: '스캔' })` for manual channel history harvesting.
-  - `ConflictButtonHandler`: `@Discord()`, `@ButtonComponent({ id: /conflict:.*/ })` for one-click Discord embed conflict/pivot resolution.
-- **Services**:
-  - `AnalysisService`: Manages per-channel in-flight locks, harvests context, invokes backend AI, renders embeds, and handles reaction transitions (`👀` -> `📝`).
-  - `HarvesterService`: Thread-first exploration with asymmetric 15/5 window slicing and overlapping interval merging.
-  - `BackendApiService`: Type-safe REST client for backend communication.
-- **Client**: `DecisionTrackerBot` (`src/bot/client.ts`) slimmed down to 40 lines of initialization logic.
+### 2. Discussion Score Formula (`@ggaddak/shared/src/score.ts`)
+- `calculateDiscussionScore({ participantCount, reactionsCount, messageCount, hasConsensusKeyword })`:
+  - 4.0 (Strong): 2+ participants, 2+ reactions, 3+ messages (or consensus keyword).
+  - 3.0 (Standard): 2+ participants or 2+ reactions.
+  - 2.0 (Weak): 1 participant with minimal reaction or keyword.
+  - 1.0 (Incomplete): Single message or isolated chatter.
 
-### 3. Frontend Architecture (`apps/fe`)
-- **React 18 + Vite + Tailwind CSS**: Modern SPA replacing legacy monolithic HTML.
-- **TanStack Query (`@tanstack/react-query`)**: Auto-polling every 5 seconds for decisions and feedbacks, with instant cache invalidation on review actions.
-- **Feature Modules**:
-  - `ReviewQueue`: PM triage queue with Confirm, Defer, Reject actions and governance compliance score badge.
-  - `DecisionTimeline`: Filterable historical timeline with category tags, supersedes links, and Discord jump links.
-  - `FeedbackBoard`: External feedback hub for creating and browsing advisor inputs.
+### 3. Discord Bot Harvester & Silent Trigger (`apps/bot`)
+- `MessageHandler`: Listens on `messageCreate`, runs `evaluateDenseMultiAnchorSimilarity`. If `maxSimilarity >= 0.70` or `CONSENSUS_REGEX` matches, attaches `👀` and schedules debounced harvest.
+- `ReactionHandler`: Listens on `messageReactionAdd`, triggers immediate override on `📌` or when reaction count reaches threshold.
+- `DiscussionHarvester`: Gathers 15 messages before, trigger message, and 5 messages after (or full thread history). Packages `rawMessages` with metadata (`reactionCount`, `reactions`, `isTrigger`) and transmits `score`, `participantCount`, `reactionsCount` to `POST /api/discussions/analyze`.
+- Removes `sendableChannel.send(...)` public embed calls. On backend success, switches `👀` to `📝`.
+
+### 4. Backend Architecture & Extraction Core (`apps/be`)
+- **TSOA Controllers**:
+  - `DiscussionController`: `POST /api/discussions/analyze`
+  - `DecisionController`: `GET /api/decisions`, `POST /api/decisions/{id}/review`, `POST /api/decisions/conflict`, `POST /api/webhooks/decisions`
+  - `FeedbackController`: `GET /api/feedbacks`, `POST /api/feedbacks`
+  - `PolicyController`: `GET /api/config/policy`
+- **Session Slicer (`DecisionExtractorCore`)**: Splits messages by 30-minute idle gap.
+- **AiAdapter**: Calls Google Gemini 2.5 Flash with structured JSON output (`ExtractionResultSchema`). Falls back to OpenAI GPT-4o-mini, then to Dynamic Heuristic Fallback parser.
+- **Governance Scoring**: Combines Discord-calculated score, rationale length, and action items.
+
+### 5. Frontend Dashboard (`apps/fe`)
+- Vite dev server running on `http://localhost:3000`, proxying `/api` requests to `http://localhost:3001`.
+- TanStack Query with 5-second polling and optimistic cache updates for review actions (`confirm`, `reject`, `defer`).
+
+---
 
 ## Testing Decisions
 
-### What Makes a Good Test
-- Tests verify observable system behavior through HTTP endpoints, Discord event pipelines, and domain state transitions, completely decoupled from internal class private properties.
+- **Primary Seams**:
+  - `evaluateDenseMultiAnchorSimilarity` and `calculateDiscussionScore` unit tests in `@ggaddak/shared/src/schemas.test.ts`.
+  - `DiscussionExtractorCore` session slicing and governance rubric tests in `apps/be/src/engine/extractor-core.test.ts`.
+  - `DiscussionHarvester` context window, in-flight locking, and semantic message handling tests in `apps/bot/src/bot.test.ts`.
+  - Full pipeline integration test in `test/e2e.test.ts` (Discord Messages ➔ Bot Embedding & Scorer ➔ Backend AI Core ➔ DB ➔ Review Queue).
+- **Good Test Criteria**: Test observable behavior against realistic Korean/English team dialogues, state transitions, anti-recreation hash verification, and governance scoring.
 
-### Testing Seams
-1. **Shared Domain Schemas (`packages/shared/src/schemas.test.ts`)**: Validates Zod runtime schema constraints and payload envelopes.
-2. **Backend Server & Ingestion Integration (`apps/be/src/server.test.ts`)**: Tests TSOA routes, review state machine, rate limiting, and Prisma database persistence.
-3. **Bot Core Unit Tests (`apps/bot/src/bot.test.ts`)**: Tests transcript context building, consensus regex pattern matching, conflict detection, and egress queue.
-4. **End-to-End Monorepo Pipeline (`test/e2e.test.ts`)**: Tests the full end-to-end flow: Discord discussion harvest -> TSOA AI extraction -> Review Queue approval/rejection -> Anti-recreation hash verification -> DB persistence.
+---
 
 ## Out of Scope
 
-- Multi-tenant Discord guild isolation (Single tenant / Capstone project team scope for MVP).
-- Real-time WebSocket streaming (TanStack Query 5s polling is sufficient and robust).
+- Audio voice-channel live transcription.
+- Third-party Vector DB cluster hosting (e.g. Pinecone/Qdrant) — in-process precomputed vector array is sufficient for 20+ anchors.
+- Automated code pull request generation from action items.
+
+---
 
 ## Further Notes
 
-- Run `npm run build` to build all workspaces (`shared`, `be`, `bot`, `fe`) and generate TSOA routes and OpenAPI specs.
-- Run `npm test` to execute all 18 test suites across the monorepo.
-- Backend Swagger UI is available at `http://localhost:3001/api-docs`.
-- Frontend Dashboard is served at `http://localhost:3000`.
+- Full test suite passes across all packages via `npm run build && npm test`.
+- All Git commits pushed to `origin/main`.
