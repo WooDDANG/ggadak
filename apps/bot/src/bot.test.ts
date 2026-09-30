@@ -15,7 +15,7 @@ describe('Bot Core Modules', () => {
         authorId: 'u1',
         authorName: 'wooddang',
         content: '메인 DB 어떤 걸로 갈까요?',
-        createdAt: new Date('2026-09-28T14:00:00Z')
+        createdAt: new Date('2026-09-28T14:00:00Z'),
       },
       {
         id: 'msg-2',
@@ -23,8 +23,8 @@ describe('Bot Core Modules', () => {
         authorName: 'alex',
         content: 'Postgres 추천합니다.',
         createdAt: new Date('2026-09-28T14:01:00Z'),
-        referenceAuthorName: 'wooddang'
-      }
+        referenceAuthorName: 'wooddang',
+      },
     ];
 
     const transcript = DiscussionContextBuilder.buildTranscript(messages);
@@ -73,9 +73,9 @@ describe('Bot Core Modules', () => {
         channelId: 'c1',
         triggerMessageId: 'm1',
         participants: [],
-        rawMessages: []
+        rawMessages: [],
       },
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
     };
 
     detector.registerDecision(dec1);
@@ -92,7 +92,7 @@ describe('Bot Core Modules', () => {
     let receivedPayload: any = null;
     const server = http.createServer((req, res) => {
       let body = '';
-      req.on('data', chunk => body += chunk);
+      req.on('data', chunk => (body += chunk));
       req.on('end', () => {
         receivedPayload = JSON.parse(body);
         res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -130,10 +130,10 @@ describe('Bot Core Modules', () => {
           channelId: 'c1',
           triggerMessageId: 'm1',
           participants: [],
-          rawMessages: []
+          rawMessages: [],
         },
-        createdAt: new Date().toISOString()
-      }
+        createdAt: new Date().toISOString(),
+      },
     };
 
     queue.enqueue(payload);

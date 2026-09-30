@@ -1,603 +1,649 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ko">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Discord Decision Tracker — Logic Prototype</title>
-  <style>
-    :root {
-      --bg: #0f172a;
-      --card-bg: #1e293b;
-      --border: #334155;
-      --text: #f8fafc;
-      --text-muted: #94a3b8;
-      --accent: #5865F2; /* Discord Blurple */
-      --accent-hover: #4752c4;
-      --green: #10b981;
-      --amber: #f59e0b;
-      --red: #ef4444;
-      --purple: #8b5cf6;
-    }
-
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    }
-
-    body {
-      background-color: var(--bg);
-      color: var(--text);
-      padding: 24px;
-      line-height: 1.5;
-    }
-
-    .container {
-      max-width: 1100px;
-      margin: 0 auto;
-    }
-
-    header {
-      margin-bottom: 24px;
-      border-bottom: 1px solid var(--border);
-      padding-bottom: 16px;
-    }
-
-    h1 {
-      font-size: 1.6rem;
-      font-weight: 700;
-      color: var(--text);
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .subtitle {
-      color: var(--text-muted);
-      font-size: 0.95rem;
-      margin-top: 6px;
-    }
-
-    .grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 20px;
-      margin-bottom: 24px;
-    }
-
-    .card {
-      background: var(--card-bg);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 18px;
-    }
-
-    .card-title {
-      font-size: 1.05rem;
-      font-weight: 600;
-      margin-bottom: 14px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .badge {
-      font-size: 0.75rem;
-      padding: 4px 10px;
-      border-radius: 999px;
-      font-weight: 600;
-      text-transform: uppercase;
-    }
-
-    .badge-decided { background: rgba(16, 185, 129, 0.2); color: var(--green); border: 1px solid var(--green); }
-    .badge-superseded { background: rgba(239, 68, 68, 0.2); color: var(--red); border: 1px solid var(--red); }
-    .badge-conflict { background: rgba(245, 158, 11, 0.2); color: var(--amber); border: 1px solid var(--amber); }
-    .badge-idle { background: rgba(148, 163, 184, 0.2); color: var(--text-muted); border: 1px solid var(--border); }
-
-    /* Discord Chat Simulation */
-    .chat-box {
-      background: #181f30;
-      border-radius: 8px;
-      padding: 12px;
-      height: 240px;
-      overflow-y: auto;
-      font-size: 0.88rem;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      border: 1px solid #28334e;
-    }
-
-    .chat-msg {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-    }
-
-    .chat-author {
-      font-weight: 600;
-      font-size: 0.8rem;
-      color: #38bdf8;
-    }
-
-    .chat-text {
-      color: #e2e8f0;
-    }
-
-    .chat-reaction {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      background: #253350;
-      border: 1px solid #3b82f6;
-      border-radius: 6px;
-      padding: 2px 6px;
-      font-size: 0.75rem;
-      width: fit-content;
-      margin-top: 4px;
-    }
-
-    /* Decision State List */
-    .decision-list {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      max-height: 240px;
-      overflow-y: auto;
-    }
-
-    .decision-item {
-      background: #181f30;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 12px;
-      font-size: 0.85rem;
-    }
-
-    .decision-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 6px;
-    }
-
-    .decision-id {
-      font-weight: 700;
-      color: var(--accent);
-    }
-
-    .decision-topic {
-      font-weight: 600;
-      color: var(--text);
-    }
-
-    .decision-desc {
-      color: #cbd5e1;
-      margin-bottom: 4px;
-    }
-
-    .decision-rationale {
-      color: var(--text-muted);
-      font-size: 0.78rem;
-      border-left: 2px solid var(--purple);
-      padding-left: 8px;
-      margin-top: 4px;
-    }
-
-    /* Action Buttons */
-    .btn-group {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin-top: 12px;
-    }
-
-    button {
-      background: var(--accent);
-      color: white;
-      border: none;
-      border-radius: 6px;
-      padding: 8px 14px;
-      font-size: 0.85rem;
-      font-weight: 500;
-      cursor: pointer;
-      transition: background 0.15s ease;
-    }
-
-    button:hover {
-      background: var(--accent-hover);
-    }
-
-    button.btn-secondary {
-      background: #334155;
-      color: #f1f5f9;
-    }
-
-    button.btn-secondary:hover {
-      background: #475569;
-    }
-
-    button.btn-warning {
-      background: var(--amber);
-      color: #1e293b;
-      font-weight: 600;
-    }
-
-    button.btn-warning:hover {
-      background: #d97706;
-    }
-
-    button.btn-green {
-      background: var(--green);
-    }
-
-    button.btn-green:hover {
-      background: #059669;
-    }
-
-    /* Walkthrough Tabs */
-    .walkthrough {
-      background: var(--card-bg);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 18px;
-    }
-
-    .tabs {
-      display: flex;
-      gap: 8px;
-      border-bottom: 1px solid var(--border);
-      padding-bottom: 10px;
-      margin-bottom: 16px;
-    }
-
-    .tab-btn {
-      background: transparent;
-      color: var(--text-muted);
-      border: 1px solid transparent;
-      padding: 6px 14px;
-      font-size: 0.85rem;
-    }
-
-    .tab-btn.active {
-      background: #334155;
-      color: var(--text);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-    }
-
-    .scenario-desc {
-      font-size: 0.9rem;
-      color: #cbd5e1;
-      margin-bottom: 14px;
-    }
-
-    .step-list {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    .step-item {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      background: #181f30;
-      padding: 8px 12px;
-      border-radius: 6px;
-      border: 1px solid #28334e;
-    }
-
-    .step-num {
-      font-size: 0.75rem;
-      font-weight: 700;
-      background: #334155;
-      color: #38bdf8;
-      width: 22px;
-      height: 22px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    /* Egress Payload Viewer */
-    .payload-viewer {
-      background: #090d16;
-      border: 1px solid #28334e;
-      border-radius: 8px;
-      padding: 12px;
-      font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
-      font-size: 0.78rem;
-      color: #38bdf8;
-      height: 180px;
-      overflow: auto;
-      white-space: pre-wrap;
-    }
-  </style>
-</head>
-<body>
-
-<div class="container">
-  <header>
-    <h1>🤖 Discord Decision Tracker — Logic Prototype</h1>
-    <p class="subtitle">
-      <strong>핵심 검증 질문:</strong> "디스코드 대화 수집 ➔ LLM 결정/근거 추출 ➔ 결정 충돌(Conflict) 해결 ➔ Web Egress Payload 생성"의 상태 전이 모델이 직관적인가?
-    </p>
-  </header>
-
-  <!-- State & Live Views -->
-  <div class="grid">
-    <!-- Discord Channel Simulation -->
-    <div class="card">
-      <div class="card-title">
-        <span>💬 디스코드 채널 시뮬레이션 (#dev-architecture)</span>
-        <span id="trigger-badge" class="badge badge-idle">대기중</span>
-      </div>
-      <div id="chat-box" class="chat-box"></div>
-      <div class="btn-group">
-        <button id="btn-react-pin" class="btn-secondary">📌 메시지에 이모지 반응 달기</button>
-        <button id="btn-slash-scan" class="btn-secondary">⚡ /decision scan 실행</button>
-      </div>
-    </div>
-
-    <!-- Extracted Decisions & Conflict Banner -->
-    <div class="card">
-      <div class="card-title">
-        <span>📋 저장된 의사결정 (Decisions State)</span>
-        <span id="conflict-badge" class="badge badge-idle">충돌 없음</span>
-      </div>
-      <div id="decision-list" class="decision-list"></div>
-      
-      <!-- Interactive Conflict Resolution Row -->
-      <div id="conflict-actions" class="btn-group" style="display: none; border-top: 1px solid var(--border); padding-top: 10px; margin-top: 10px;">
-        <span style="font-size: 0.8rem; color: var(--amber); width: 100%;">⚠️ 이전 결정과 충돌 발생! 어떻게 처리할까요?</span>
-        <button id="btn-resolve-supersede" class="btn-warning">🔄 기존 결정 대체 (Supersede)</button>
-        <button id="btn-resolve-independent" class="btn-secondary">➕ 독립된 새 결정으로 유지</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Webhook Egress Payload View -->
-  <div class="card" style="margin-bottom: 24px;">
-    <div class="card-title">
-      <span>🌐 Web Consumer Egress Payload (HTTP POST /api/decisions)</span>
-      <span id="webhook-badge" class="badge badge-idle">전송 대기</span>
-    </div>
-    <div id="payload-viewer" class="payload-viewer">// 아직 전송된 결정 페이로드가 없습니다.</div>
-    <div class="btn-group">
-      <button id="btn-push-webhook" class="btn-green">🚀 최신 결정 Webhook 전송</button>
-      <button id="btn-reset" class="btn-secondary">🔄 초기화</button>
-    </div>
-  </div>
-
-  <!-- Guided Walkthroughs -->
-  <div class="walkthrough">
-    <div class="card-title">
-      <span>🎯 가이드 시나리오 (Walkthroughs)</span>
-    </div>
-    <div class="tabs">
-      <button class="tab-btn active" data-tab="1">시나리오 1: 표준 결정 등록 (Happy Path)</button>
-      <button class="tab-btn" data-tab="2">시나리오 2: 결정 충돌 및 대체 (Supersede)</button>
-      <button class="tab-btn" data-tab="3">시나리오 3: 독립 결정 병행 (Coexistence)</button>
-    </div>
-
-    <div id="tab-content-1">
-      <p class="scenario-desc">
-        <strong>상황:</strong> 팀이 대화 중 "DB를 PostgreSQL로 채택"하기로 합의하고 📌 이모지를 달았을 때, LLM이 결정과 근거를 추출하고 Web API로 전송하는 흐름을 확인합니다.
-      </p>
-      <div class="step-list">
-        <div class="step-item">
-          <span class="step-num">1</span>
-          <span>채팅 대화 생성 및 📌 반응 트리거</span>
-          <button id="step-1-1" style="margin-left: auto;">실행</button>
-        </div>
-        <div class="step-item">
-          <span class="step-num">2</span>
-          <span>LLM 파싱 (결정: PostgreSQL 선정 / 근거: ACID 보장)</span>
-          <button id="step-1-2" class="btn-secondary" style="margin-left: auto;">실행</button>
-        </div>
-        <div class="step-item">
-          <span class="step-num">3</span>
-          <span>Web Consumer로 표준 페이로드 전송</span>
-          <button id="step-1-3" class="btn-green" style="margin-left: auto;">실행</button>
-        </div>
-      </div>
-    </div>
-
-    <div id="tab-content-2" style="display: none;">
-      <p class="scenario-desc">
-        <strong>상황:</strong> 이후 논의에서 "PostgreSQL 대신 MongoDB로 변경"하기로 합의했을 때, 시스템이 충돌을 감지하고 기존 결정을 `Superseded`로 전이시키는 흐름을 검증합니다.
-      </p>
-      <div class="step-list">
-        <div class="step-item">
-          <span class="step-num">1</span>
-          <span>충돌 대화 생성 (MongoDB 전환 논의)</span>
-          <button id="step-2-1" style="margin-left: auto;">실행</button>
-        </div>
-        <div class="step-item">
-          <span class="step-num">2</span>
-          <span>충돌 감지 및 디스코드 확인 인터랙션 노출</span>
-          <button id="step-2-2" class="btn-warning" style="margin-left: auto;">실행</button>
-        </div>
-        <div class="step-item">
-          <span class="step-num">3</span>
-          <span>[대체하기(Supersede)] 선택 ➔ DEC-001 대체 및 웹 전송</span>
-          <button id="step-2-3" class="btn-green" style="margin-left: auto;">실행</button>
-        </div>
-      </div>
-    </div>
-
-    <div id="tab-content-3" style="display: none;">
-      <p class="scenario-desc">
-        <strong>상황:</strong> "로그 저장용으로는 MongoDB 사용"처럼 기존 PostgreSQL 결정과 공존하는 경우, 충돌 시 [독립 결정 유지]를 선택하여 둘 다 활성 상태를 유지합니다.
-      </p>
-      <div class="step-list">
-        <div class="step-item">
-          <span class="step-num">1</span>
-          <span>보조 DB 논의 생성 및 충돌 감지</span>
-          <button id="step-3-1" style="margin-left: auto;">실행</button>
-        </div>
-        <div class="step-item">
-          <span class="step-num">2</span>
-          <span>[독립 결정 유지] 선택 ➔ 별도 활성 결정으로 기록</span>
-          <button id="step-3-2" class="btn-secondary" style="margin-left: auto;">실행</button>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Pure Logic Module (Liftable) -->
-<script>
-/**
- * DecisionTrackerState Pure Engine
- * This module is isolated from the DOM and can be lifted directly into the production codebase.
- */
-class DecisionTrackerEngine {
-  constructor() {
-    this.decisions = [];
-    this.pendingConflict = null;
-    this.lastEgressPayload = null;
-  }
-
-  // 1. Extract and Add Decision
-  extractDecision({ topic, decision, rationale, actionItems, source }) {
-    const newDecision = {
-      id: `DEC-${String(this.decisions.length + 1).padStart(3, '0')}`,
-      topic,
-      decision,
-      rationale,
-      actionItems: actionItems || [],
-      state: 'Decided', // 'Proposed' | 'Discussing' | 'Decided' | 'Superseded'
-      supersedesId: null,
-      source: source || { channel: 'dev-architecture', messageId: 'msg-999' },
-      createdAt: new Date().toISOString()
-    };
-
-    // Check for conflict against existing active decisions in same topic area
-    const conflicting = this.decisions.find(
-      d => d.state === 'Decided' && d.topic.toLowerCase() === topic.toLowerCase()
-    );
-
-    if (conflicting) {
-      this.pendingConflict = {
-        newDecision,
-        conflictingDecisionId: conflicting.id
-      };
-      return { status: 'CONFLICT_DETECTED', conflict: this.pendingConflict };
-    }
-
-    this.decisions.push(newDecision);
-    this.lastEgressPayload = this.buildPayload(newDecision);
-    return { status: 'DECISION_RECORDED', decision: newDecision };
-  }
-
-  // 2. Resolve Conflict as Supersede
-  resolveConflictSupersede() {
-    if (!this.pendingConflict) return null;
-    const { newDecision, conflictingDecisionId } = this.pendingConflict;
-
-    const oldDecision = this.decisions.find(d => d.id === conflictingDecisionId);
-    if (oldDecision) {
-      oldDecision.state = 'Superseded';
-    }
-
-    newDecision.supersedesId = conflictingDecisionId;
-    this.decisions.push(newDecision);
-    this.pendingConflict = null;
-    this.lastEgressPayload = this.buildPayload(newDecision);
-
-    return { status: 'CONFLICT_RESOLVED_SUPERSEDE', decision: newDecision };
-  }
-
-  // 3. Resolve Conflict as Independent
-  resolveConflictIndependent() {
-    if (!this.pendingConflict) return null;
-    const { newDecision } = this.pendingConflict;
-
-    this.decisions.push(newDecision);
-    this.pendingConflict = null;
-    this.lastEgressPayload = this.buildPayload(newDecision);
-
-    return { status: 'CONFLICT_RESOLVED_INDEPENDENT', decision: newDecision };
-  }
-
-  // 4. Build Standard Web Egress Payload
-  buildPayload(decision) {
-    return {
-      event: 'decision.recorded',
-      version: '1.0.0',
-      payload: {
-        id: decision.id,
-        topic: decision.topic,
-        decision: decision.decision,
-        rationale: decision.rationale,
-        action_items: decision.actionItems,
-        state: decision.state,
-        supersedes_id: decision.supersedesId,
-        source: {
-          guild_id: 'guild-1029384756',
-          channel_name: decision.source.channel,
-          message_url: `https://discord.com/channels/1029384756/${decision.source.channel}/${decision.source.messageId}`
-        },
-        timestamp: decision.createdAt
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Discord Decision Tracker — Logic Prototype</title>
+    <style>
+      :root {
+        --bg: #0f172a;
+        --card-bg: #1e293b;
+        --border: #334155;
+        --text: #f8fafc;
+        --text-muted: #94a3b8;
+        --accent: #5865f2; /* Discord Blurple */
+        --accent-hover: #4752c4;
+        --green: #10b981;
+        --amber: #f59e0b;
+        --red: #ef4444;
+        --purple: #8b5cf6;
       }
-    };
-  }
 
-  reset() {
-    this.decisions = [];
-    this.pendingConflict = null;
-    this.lastEgressPayload = null;
-  }
-}
-</script>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        font-family:
+          -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      }
 
-<!-- UI Shell & Interactions -->
-<script>
-  const engine = new DecisionTrackerEngine();
-  const chatBox = document.getElementById('chat-box');
-  const decisionList = document.getElementById('decision-list');
-  const payloadViewer = document.getElementById('payload-viewer');
-  const triggerBadge = document.getElementById('trigger-badge');
-  const conflictBadge = document.getElementById('conflict-badge');
-  const webhookBadge = document.getElementById('webhook-badge');
-  const conflictActions = document.getElementById('conflict-actions');
+      body {
+        background-color: var(--bg);
+        color: var(--text);
+        padding: 24px;
+        line-height: 1.5;
+      }
 
-  let mockMessages = [
-    { author: 'wooddang', text: '우리 이번 프로젝트 메인 DB 어떤 걸로 갈까요?' },
-    { author: 'dev_alex', text: '트랜잭션이랑 정합성이 중요하니까 PostgreSQL이 제일 무난할 것 같습니다.' },
-    { author: 'wooddang', text: '좋습니다. 메인 DB는 PostgreSQL로 확정하고 스키마 설계 들어갑시다.' }
-  ];
+      .container {
+        max-width: 1100px;
+        margin: 0 auto;
+      }
 
-  function renderChat(messages, reactionIndex = null) {
-    chatBox.innerHTML = '';
-    messages.forEach((msg, idx) => {
-      const div = document.createElement('div');
-      div.className = 'chat-msg';
-      div.innerHTML = `
+      header {
+        margin-bottom: 24px;
+        border-bottom: 1px solid var(--border);
+        padding-bottom: 16px;
+      }
+
+      h1 {
+        font-size: 1.6rem;
+        font-weight: 700;
+        color: var(--text);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .subtitle {
+        color: var(--text-muted);
+        font-size: 0.95rem;
+        margin-top: 6px;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+        margin-bottom: 24px;
+      }
+
+      .card {
+        background: var(--card-bg);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 18px;
+      }
+
+      .card-title {
+        font-size: 1.05rem;
+        font-weight: 600;
+        margin-bottom: 14px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .badge {
+        font-size: 0.75rem;
+        padding: 4px 10px;
+        border-radius: 999px;
+        font-weight: 600;
+        text-transform: uppercase;
+      }
+
+      .badge-decided {
+        background: rgba(16, 185, 129, 0.2);
+        color: var(--green);
+        border: 1px solid var(--green);
+      }
+      .badge-superseded {
+        background: rgba(239, 68, 68, 0.2);
+        color: var(--red);
+        border: 1px solid var(--red);
+      }
+      .badge-conflict {
+        background: rgba(245, 158, 11, 0.2);
+        color: var(--amber);
+        border: 1px solid var(--amber);
+      }
+      .badge-idle {
+        background: rgba(148, 163, 184, 0.2);
+        color: var(--text-muted);
+        border: 1px solid var(--border);
+      }
+
+      /* Discord Chat Simulation */
+      .chat-box {
+        background: #181f30;
+        border-radius: 8px;
+        padding: 12px;
+        height: 240px;
+        overflow-y: auto;
+        font-size: 0.88rem;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        border: 1px solid #28334e;
+      }
+
+      .chat-msg {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+
+      .chat-author {
+        font-weight: 600;
+        font-size: 0.8rem;
+        color: #38bdf8;
+      }
+
+      .chat-text {
+        color: #e2e8f0;
+      }
+
+      .chat-reaction {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        background: #253350;
+        border: 1px solid #3b82f6;
+        border-radius: 6px;
+        padding: 2px 6px;
+        font-size: 0.75rem;
+        width: fit-content;
+        margin-top: 4px;
+      }
+
+      /* Decision State List */
+      .decision-list {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        max-height: 240px;
+        overflow-y: auto;
+      }
+
+      .decision-item {
+        background: #181f30;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 12px;
+        font-size: 0.85rem;
+      }
+
+      .decision-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 6px;
+      }
+
+      .decision-id {
+        font-weight: 700;
+        color: var(--accent);
+      }
+
+      .decision-topic {
+        font-weight: 600;
+        color: var(--text);
+      }
+
+      .decision-desc {
+        color: #cbd5e1;
+        margin-bottom: 4px;
+      }
+
+      .decision-rationale {
+        color: var(--text-muted);
+        font-size: 0.78rem;
+        border-left: 2px solid var(--purple);
+        padding-left: 8px;
+        margin-top: 4px;
+      }
+
+      /* Action Buttons */
+      .btn-group {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 12px;
+      }
+
+      button {
+        background: var(--accent);
+        color: white;
+        border: none;
+        border-radius: 6px;
+        padding: 8px 14px;
+        font-size: 0.85rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: background 0.15s ease;
+      }
+
+      button:hover {
+        background: var(--accent-hover);
+      }
+
+      button.btn-secondary {
+        background: #334155;
+        color: #f1f5f9;
+      }
+
+      button.btn-secondary:hover {
+        background: #475569;
+      }
+
+      button.btn-warning {
+        background: var(--amber);
+        color: #1e293b;
+        font-weight: 600;
+      }
+
+      button.btn-warning:hover {
+        background: #d97706;
+      }
+
+      button.btn-green {
+        background: var(--green);
+      }
+
+      button.btn-green:hover {
+        background: #059669;
+      }
+
+      /* Walkthrough Tabs */
+      .walkthrough {
+        background: var(--card-bg);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 18px;
+      }
+
+      .tabs {
+        display: flex;
+        gap: 8px;
+        border-bottom: 1px solid var(--border);
+        padding-bottom: 10px;
+        margin-bottom: 16px;
+      }
+
+      .tab-btn {
+        background: transparent;
+        color: var(--text-muted);
+        border: 1px solid transparent;
+        padding: 6px 14px;
+        font-size: 0.85rem;
+      }
+
+      .tab-btn.active {
+        background: #334155;
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+      }
+
+      .scenario-desc {
+        font-size: 0.9rem;
+        color: #cbd5e1;
+        margin-bottom: 14px;
+      }
+
+      .step-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .step-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        background: #181f30;
+        padding: 8px 12px;
+        border-radius: 6px;
+        border: 1px solid #28334e;
+      }
+
+      .step-num {
+        font-size: 0.75rem;
+        font-weight: 700;
+        background: #334155;
+        color: #38bdf8;
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      /* Egress Payload Viewer */
+      .payload-viewer {
+        background: #090d16;
+        border: 1px solid #28334e;
+        border-radius: 8px;
+        padding: 12px;
+        font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+        font-size: 0.78rem;
+        color: #38bdf8;
+        height: 180px;
+        overflow: auto;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <h1>🤖 Discord Decision Tracker — Logic Prototype</h1>
+        <p class="subtitle">
+          <strong>핵심 검증 질문:</strong> "디스코드 대화 수집 ➔ LLM 결정/근거 추출 ➔ 결정
+          충돌(Conflict) 해결 ➔ Web Egress Payload 생성"의 상태 전이 모델이 직관적인가?
+        </p>
+      </header>
+
+      <!-- State & Live Views -->
+      <div class="grid">
+        <!-- Discord Channel Simulation -->
+        <div class="card">
+          <div class="card-title">
+            <span>💬 디스코드 채널 시뮬레이션 (#dev-architecture)</span>
+            <span id="trigger-badge" class="badge badge-idle">대기중</span>
+          </div>
+          <div id="chat-box" class="chat-box"></div>
+          <div class="btn-group">
+            <button id="btn-react-pin" class="btn-secondary">📌 메시지에 이모지 반응 달기</button>
+            <button id="btn-slash-scan" class="btn-secondary">⚡ /decision scan 실행</button>
+          </div>
+        </div>
+
+        <!-- Extracted Decisions & Conflict Banner -->
+        <div class="card">
+          <div class="card-title">
+            <span>📋 저장된 의사결정 (Decisions State)</span>
+            <span id="conflict-badge" class="badge badge-idle">충돌 없음</span>
+          </div>
+          <div id="decision-list" class="decision-list"></div>
+
+          <!-- Interactive Conflict Resolution Row -->
+          <div
+            id="conflict-actions"
+            class="btn-group"
+            style="
+              display: none;
+              border-top: 1px solid var(--border);
+              padding-top: 10px;
+              margin-top: 10px;
+            "
+          >
+            <span style="font-size: 0.8rem; color: var(--amber); width: 100%"
+              >⚠️ 이전 결정과 충돌 발생! 어떻게 처리할까요?</span
+            >
+            <button id="btn-resolve-supersede" class="btn-warning">
+              🔄 기존 결정 대체 (Supersede)
+            </button>
+            <button id="btn-resolve-independent" class="btn-secondary">
+              ➕ 독립된 새 결정으로 유지
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Webhook Egress Payload View -->
+      <div class="card" style="margin-bottom: 24px">
+        <div class="card-title">
+          <span>🌐 Web Consumer Egress Payload (HTTP POST /api/decisions)</span>
+          <span id="webhook-badge" class="badge badge-idle">전송 대기</span>
+        </div>
+        <div id="payload-viewer" class="payload-viewer">
+          // 아직 전송된 결정 페이로드가 없습니다.
+        </div>
+        <div class="btn-group">
+          <button id="btn-push-webhook" class="btn-green">🚀 최신 결정 Webhook 전송</button>
+          <button id="btn-reset" class="btn-secondary">🔄 초기화</button>
+        </div>
+      </div>
+
+      <!-- Guided Walkthroughs -->
+      <div class="walkthrough">
+        <div class="card-title">
+          <span>🎯 가이드 시나리오 (Walkthroughs)</span>
+        </div>
+        <div class="tabs">
+          <button class="tab-btn active" data-tab="1">
+            시나리오 1: 표준 결정 등록 (Happy Path)
+          </button>
+          <button class="tab-btn" data-tab="2">시나리오 2: 결정 충돌 및 대체 (Supersede)</button>
+          <button class="tab-btn" data-tab="3">시나리오 3: 독립 결정 병행 (Coexistence)</button>
+        </div>
+
+        <div id="tab-content-1">
+          <p class="scenario-desc">
+            <strong>상황:</strong> 팀이 대화 중 "DB를 PostgreSQL로 채택"하기로 합의하고 📌 이모지를
+            달았을 때, LLM이 결정과 근거를 추출하고 Web API로 전송하는 흐름을 확인합니다.
+          </p>
+          <div class="step-list">
+            <div class="step-item">
+              <span class="step-num">1</span>
+              <span>채팅 대화 생성 및 📌 반응 트리거</span>
+              <button id="step-1-1" style="margin-left: auto">실행</button>
+            </div>
+            <div class="step-item">
+              <span class="step-num">2</span>
+              <span>LLM 파싱 (결정: PostgreSQL 선정 / 근거: ACID 보장)</span>
+              <button id="step-1-2" class="btn-secondary" style="margin-left: auto">실행</button>
+            </div>
+            <div class="step-item">
+              <span class="step-num">3</span>
+              <span>Web Consumer로 표준 페이로드 전송</span>
+              <button id="step-1-3" class="btn-green" style="margin-left: auto">실행</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="tab-content-2" style="display: none">
+          <p class="scenario-desc">
+            <strong>상황:</strong> 이후 논의에서 "PostgreSQL 대신 MongoDB로 변경"하기로 합의했을 때,
+            시스템이 충돌을 감지하고 기존 결정을 `Superseded`로 전이시키는 흐름을 검증합니다.
+          </p>
+          <div class="step-list">
+            <div class="step-item">
+              <span class="step-num">1</span>
+              <span>충돌 대화 생성 (MongoDB 전환 논의)</span>
+              <button id="step-2-1" style="margin-left: auto">실행</button>
+            </div>
+            <div class="step-item">
+              <span class="step-num">2</span>
+              <span>충돌 감지 및 디스코드 확인 인터랙션 노출</span>
+              <button id="step-2-2" class="btn-warning" style="margin-left: auto">실행</button>
+            </div>
+            <div class="step-item">
+              <span class="step-num">3</span>
+              <span>[대체하기(Supersede)] 선택 ➔ DEC-001 대체 및 웹 전송</span>
+              <button id="step-2-3" class="btn-green" style="margin-left: auto">실행</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="tab-content-3" style="display: none">
+          <p class="scenario-desc">
+            <strong>상황:</strong> "로그 저장용으로는 MongoDB 사용"처럼 기존 PostgreSQL 결정과
+            공존하는 경우, 충돌 시 [독립 결정 유지]를 선택하여 둘 다 활성 상태를 유지합니다.
+          </p>
+          <div class="step-list">
+            <div class="step-item">
+              <span class="step-num">1</span>
+              <span>보조 DB 논의 생성 및 충돌 감지</span>
+              <button id="step-3-1" style="margin-left: auto">실행</button>
+            </div>
+            <div class="step-item">
+              <span class="step-num">2</span>
+              <span>[독립 결정 유지] 선택 ➔ 별도 활성 결정으로 기록</span>
+              <button id="step-3-2" class="btn-secondary" style="margin-left: auto">실행</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pure Logic Module (Liftable) -->
+    <script>
+      /**
+       * DecisionTrackerState Pure Engine
+       * This module is isolated from the DOM and can be lifted directly into the production codebase.
+       */
+      class DecisionTrackerEngine {
+        constructor() {
+          this.decisions = [];
+          this.pendingConflict = null;
+          this.lastEgressPayload = null;
+        }
+
+        // 1. Extract and Add Decision
+        extractDecision({ topic, decision, rationale, actionItems, source }) {
+          const newDecision = {
+            id: `DEC-${String(this.decisions.length + 1).padStart(3, '0')}`,
+            topic,
+            decision,
+            rationale,
+            actionItems: actionItems || [],
+            state: 'Decided', // 'Proposed' | 'Discussing' | 'Decided' | 'Superseded'
+            supersedesId: null,
+            source: source || { channel: 'dev-architecture', messageId: 'msg-999' },
+            createdAt: new Date().toISOString(),
+          };
+
+          // Check for conflict against existing active decisions in same topic area
+          const conflicting = this.decisions.find(
+            d => d.state === 'Decided' && d.topic.toLowerCase() === topic.toLowerCase(),
+          );
+
+          if (conflicting) {
+            this.pendingConflict = {
+              newDecision,
+              conflictingDecisionId: conflicting.id,
+            };
+            return { status: 'CONFLICT_DETECTED', conflict: this.pendingConflict };
+          }
+
+          this.decisions.push(newDecision);
+          this.lastEgressPayload = this.buildPayload(newDecision);
+          return { status: 'DECISION_RECORDED', decision: newDecision };
+        }
+
+        // 2. Resolve Conflict as Supersede
+        resolveConflictSupersede() {
+          if (!this.pendingConflict) return null;
+          const { newDecision, conflictingDecisionId } = this.pendingConflict;
+
+          const oldDecision = this.decisions.find(d => d.id === conflictingDecisionId);
+          if (oldDecision) {
+            oldDecision.state = 'Superseded';
+          }
+
+          newDecision.supersedesId = conflictingDecisionId;
+          this.decisions.push(newDecision);
+          this.pendingConflict = null;
+          this.lastEgressPayload = this.buildPayload(newDecision);
+
+          return { status: 'CONFLICT_RESOLVED_SUPERSEDE', decision: newDecision };
+        }
+
+        // 3. Resolve Conflict as Independent
+        resolveConflictIndependent() {
+          if (!this.pendingConflict) return null;
+          const { newDecision } = this.pendingConflict;
+
+          this.decisions.push(newDecision);
+          this.pendingConflict = null;
+          this.lastEgressPayload = this.buildPayload(newDecision);
+
+          return { status: 'CONFLICT_RESOLVED_INDEPENDENT', decision: newDecision };
+        }
+
+        // 4. Build Standard Web Egress Payload
+        buildPayload(decision) {
+          return {
+            event: 'decision.recorded',
+            version: '1.0.0',
+            payload: {
+              id: decision.id,
+              topic: decision.topic,
+              decision: decision.decision,
+              rationale: decision.rationale,
+              action_items: decision.actionItems,
+              state: decision.state,
+              supersedes_id: decision.supersedesId,
+              source: {
+                guild_id: 'guild-1029384756',
+                channel_name: decision.source.channel,
+                message_url: `https://discord.com/channels/1029384756/${decision.source.channel}/${decision.source.messageId}`,
+              },
+              timestamp: decision.createdAt,
+            },
+          };
+        }
+
+        reset() {
+          this.decisions = [];
+          this.pendingConflict = null;
+          this.lastEgressPayload = null;
+        }
+      }
+    </script>
+
+    <!-- UI Shell & Interactions -->
+    <script>
+      const engine = new DecisionTrackerEngine();
+      const chatBox = document.getElementById('chat-box');
+      const decisionList = document.getElementById('decision-list');
+      const payloadViewer = document.getElementById('payload-viewer');
+      const triggerBadge = document.getElementById('trigger-badge');
+      const conflictBadge = document.getElementById('conflict-badge');
+      const webhookBadge = document.getElementById('webhook-badge');
+      const conflictActions = document.getElementById('conflict-actions');
+
+      let mockMessages = [
+        { author: 'wooddang', text: '우리 이번 프로젝트 메인 DB 어떤 걸로 갈까요?' },
+        {
+          author: 'dev_alex',
+          text: '트랜잭션이랑 정합성이 중요하니까 PostgreSQL이 제일 무난할 것 같습니다.',
+        },
+        {
+          author: 'wooddang',
+          text: '좋습니다. 메인 DB는 PostgreSQL로 확정하고 스키마 설계 들어갑시다.',
+        },
+      ];
+
+      function renderChat(messages, reactionIndex = null) {
+        chatBox.innerHTML = '';
+        messages.forEach((msg, idx) => {
+          const div = document.createElement('div');
+          div.className = 'chat-msg';
+          div.innerHTML = `
         <span class="chat-author">${msg.author}</span>
         <span class="chat-text">${msg.text}</span>
         ${reactionIndex === idx ? `<div class="chat-reaction">📌 1개 (수집 트리거됨)</div>` : ''}
       `;
-      chatBox.appendChild(div);
-    });
-    chatBox.scrollTop = chatBox.scrollHeight;
-  }
+          chatBox.appendChild(div);
+        });
+        chatBox.scrollTop = chatBox.scrollHeight;
+      }
 
-  function renderState() {
-    // 1. Render decisions list
-    decisionList.innerHTML = '';
-    if (engine.decisions.length === 0) {
-      decisionList.innerHTML = '<div style="color: var(--text-muted); font-size: 0.85rem;">기록된 의사결정이 없습니다.</div>';
-    } else {
-      engine.decisions.forEach(d => {
-        const item = document.createElement('div');
-        item.className = 'decision-item';
-        const badgeClass = d.state === 'Decided' ? 'badge-decided' : 'badge-superseded';
-        item.innerHTML = `
+      function renderState() {
+        // 1. Render decisions list
+        decisionList.innerHTML = '';
+        if (engine.decisions.length === 0) {
+          decisionList.innerHTML =
+            '<div style="color: var(--text-muted); font-size: 0.85rem;">기록된 의사결정이 없습니다.</div>';
+        } else {
+          engine.decisions.forEach(d => {
+            const item = document.createElement('div');
+            item.className = 'decision-item';
+            const badgeClass = d.state === 'Decided' ? 'badge-decided' : 'badge-superseded';
+            item.innerHTML = `
           <div class="decision-header">
             <span class="decision-id">${d.id}</span>
             <span class="badge ${badgeClass}">${d.state}${d.supersedesId ? ` (← ${d.supersedesId})` : ''}</span>
@@ -605,146 +651,151 @@ class DecisionTrackerEngine {
           <div class="decision-topic">[${d.topic}] ${d.decision}</div>
           <div class="decision-rationale">💡 근거: ${d.rationale}</div>
         `;
-        decisionList.appendChild(item);
+            decisionList.appendChild(item);
+          });
+        }
+
+        // 2. Conflict Banner
+        if (engine.pendingConflict) {
+          conflictBadge.className = 'badge badge-conflict';
+          conflictBadge.textContent = '충돌 대기중';
+          conflictActions.style.display = 'flex';
+        } else {
+          conflictBadge.className = 'badge badge-idle';
+          conflictBadge.textContent = '충돌 없음';
+          conflictActions.style.display = 'none';
+        }
+
+        // 3. Payload Viewer
+        if (engine.lastEgressPayload) {
+          payloadViewer.textContent = JSON.stringify(engine.lastEgressPayload, null, 2);
+          webhookBadge.className = 'badge badge-decided';
+          webhookBadge.textContent = '전송 완료 (200 OK)';
+        } else {
+          payloadViewer.textContent = '// 아직 전송된 결정 페이로드가 없습니다.';
+          webhookBadge.className = 'badge badge-idle';
+          webhookBadge.textContent = '전송 대기';
+        }
+      }
+
+      // Event Handlers
+      document.getElementById('btn-react-pin').addEventListener('click', () => {
+        triggerBadge.className = 'badge badge-decided';
+        triggerBadge.textContent = '이모지 감지';
+        renderChat(mockMessages, 2);
+        engine.extractDecision({
+          topic: 'Database Selection',
+          decision: '메인 데이터베이스로 PostgreSQL 채택',
+          rationale: '금융 및 트랜잭션 정합성(ACID) 보장 필요',
+          actionItems: [{ task: 'PostgreSQL 인스턴스 프로비저닝', assignee: 'alex' }],
+        });
+        renderState();
       });
-    }
 
-    // 2. Conflict Banner
-    if (engine.pendingConflict) {
-      conflictBadge.className = 'badge badge-conflict';
-      conflictBadge.textContent = '충돌 대기중';
-      conflictActions.style.display = 'flex';
-    } else {
-      conflictBadge.className = 'badge badge-idle';
-      conflictBadge.textContent = '충돌 없음';
-      conflictActions.style.display = 'none';
-    }
+      document.getElementById('btn-resolve-supersede').addEventListener('click', () => {
+        engine.resolveConflictSupersede();
+        renderState();
+      });
 
-    // 3. Payload Viewer
-    if (engine.lastEgressPayload) {
-      payloadViewer.textContent = JSON.stringify(engine.lastEgressPayload, null, 2);
-      webhookBadge.className = 'badge badge-decided';
-      webhookBadge.textContent = '전송 완료 (200 OK)';
-    } else {
-      payloadViewer.textContent = '// 아직 전송된 결정 페이로드가 없습니다.';
-      webhookBadge.className = 'badge badge-idle';
-      webhookBadge.textContent = '전송 대기';
-    }
-  }
+      document.getElementById('btn-resolve-independent').addEventListener('click', () => {
+        engine.resolveConflictIndependent();
+        renderState();
+      });
 
-  // Event Handlers
-  document.getElementById('btn-react-pin').addEventListener('click', () => {
-    triggerBadge.className = 'badge badge-decided';
-    triggerBadge.textContent = '이모지 감지';
-    renderChat(mockMessages, 2);
-    engine.extractDecision({
-      topic: 'Database Selection',
-      decision: '메인 데이터베이스로 PostgreSQL 채택',
-      rationale: '금융 및 트랜잭션 정합성(ACID) 보장 필요',
-      actionItems: [{ task: 'PostgreSQL 인스턴스 프로비저닝', assignee: 'alex' }]
-    });
-    renderState();
-  });
+      document.getElementById('btn-reset').addEventListener('click', () => {
+        engine.reset();
+        triggerBadge.className = 'badge badge-idle';
+        triggerBadge.textContent = '대기중';
+        renderChat(mockMessages);
+        renderState();
+      });
 
-  document.getElementById('btn-resolve-supersede').addEventListener('click', () => {
-    engine.resolveConflictSupersede();
-    renderState();
-  });
+      // Tab switching
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', e => {
+          document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+          e.target.classList.add('active');
+          const tabId = e.target.dataset.tab;
+          document.getElementById('tab-content-1').style.display = tabId === '1' ? 'block' : 'none';
+          document.getElementById('tab-content-2').style.display = tabId === '2' ? 'block' : 'none';
+          document.getElementById('tab-content-3').style.display = tabId === '3' ? 'block' : 'none';
+        });
+      });
 
-  document.getElementById('btn-resolve-independent').addEventListener('click', () => {
-    engine.resolveConflictIndependent();
-    renderState();
-  });
+      // Step Scripts
+      document.getElementById('step-1-1').addEventListener('click', () => {
+        renderChat(mockMessages, 2);
+        triggerBadge.className = 'badge badge-decided';
+        triggerBadge.textContent = '이모지 감지 (📌)';
+      });
 
-  document.getElementById('btn-reset').addEventListener('click', () => {
-    engine.reset();
-    triggerBadge.className = 'badge badge-idle';
-    triggerBadge.textContent = '대기중';
-    renderChat(mockMessages);
-    renderState();
-  });
+      document.getElementById('step-1-2').addEventListener('click', () => {
+        engine.extractDecision({
+          topic: 'Database Selection',
+          decision: '메인 데이터베이스로 PostgreSQL 채택',
+          rationale: '금융 및 트랜잭션 정합성(ACID) 보장 필요',
+          actionItems: [{ task: 'PostgreSQL 인스턴스 프로비저닝', assignee: 'alex' }],
+        });
+        renderState();
+      });
 
-  // Tab switching
-  document.querySelectorAll('.tab-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-      e.target.classList.add('active');
-      const tabId = e.target.dataset.tab;
-      document.getElementById('tab-content-1').style.display = tabId === '1' ? 'block' : 'none';
-      document.getElementById('tab-content-2').style.display = tabId === '2' ? 'block' : 'none';
-      document.getElementById('tab-content-3').style.display = tabId === '3' ? 'block' : 'none';
-    });
-  });
+      document.getElementById('step-1-3').addEventListener('click', () => {
+        renderState();
+      });
 
-  // Step Scripts
-  document.getElementById('step-1-1').addEventListener('click', () => {
-    renderChat(mockMessages, 2);
-    triggerBadge.className = 'badge badge-decided';
-    triggerBadge.textContent = '이모지 감지 (📌)';
-  });
+      document.getElementById('step-2-1').addEventListener('click', () => {
+        const conflictMsgs = [
+          {
+            author: 'wooddang',
+            text: '생각해보니 대용량 로그성 데이터가 많아서 문서형 DB가 더 유리할 것 같습니다.',
+          },
+          { author: 'dev_alex', text: '그러면 PostgreSQL 대신 MongoDB로 전면 교체하시죠.' },
+          { author: 'wooddang', text: '네, 메인 DB를 MongoDB로 전면 변경합시다.' },
+        ];
+        renderChat(conflictMsgs, 2);
+        triggerBadge.className = 'badge badge-conflict';
+        triggerBadge.textContent = '변경 논의 포착';
+      });
 
-  document.getElementById('step-1-2').addEventListener('click', () => {
-    engine.extractDecision({
-      topic: 'Database Selection',
-      decision: '메인 데이터베이스로 PostgreSQL 채택',
-      rationale: '금융 및 트랜잭션 정합성(ACID) 보장 필요',
-      actionItems: [{ task: 'PostgreSQL 인스턴스 프로비저닝', assignee: 'alex' }]
-    });
-    renderState();
-  });
+      document.getElementById('step-2-2').addEventListener('click', () => {
+        engine.extractDecision({
+          topic: 'Database Selection',
+          decision: '메인 데이터베이스를 MongoDB로 전면 교체',
+          rationale: '대용량 비정형 로그 데이터 처리 성능 및 유연성 확보',
+          actionItems: [{ task: 'MongoDB 클러스터 설정', assignee: 'alex' }],
+        });
+        renderState();
+      });
 
-  document.getElementById('step-1-3').addEventListener('click', () => {
-    renderState();
-  });
+      document.getElementById('step-2-3').addEventListener('click', () => {
+        engine.resolveConflictSupersede();
+        renderState();
+      });
 
-  document.getElementById('step-2-1').addEventListener('click', () => {
-    const conflictMsgs = [
-      { author: 'wooddang', text: '생각해보니 대용량 로그성 데이터가 많아서 문서형 DB가 더 유리할 것 같습니다.' },
-      { author: 'dev_alex', text: '그러면 PostgreSQL 대신 MongoDB로 전면 교체하시죠.' },
-      { author: 'wooddang', text: '네, 메인 DB를 MongoDB로 전면 변경합시다.' }
-    ];
-    renderChat(conflictMsgs, 2);
-    triggerBadge.className = 'badge badge-conflict';
-    triggerBadge.textContent = '변경 논의 포착';
-  });
+      document.getElementById('step-3-1').addEventListener('click', () => {
+        const logMsgs = [
+          {
+            author: 'wooddang',
+            text: '메인 DB(Postgres)는 유지하고, 로그 전용 보조 DB로 MongoDB를 추가합시다.',
+          },
+        ];
+        renderChat(logMsgs, 0);
+        engine.extractDecision({
+          topic: 'Database Selection',
+          decision: '로그 적재용 보조 DB로 MongoDB 병행 도입',
+          rationale: '메인 DB 트래픽 분리 및 로그 집계 최적화',
+        });
+        renderState();
+      });
 
-  document.getElementById('step-2-2').addEventListener('click', () => {
-    engine.extractDecision({
-      topic: 'Database Selection',
-      decision: '메인 데이터베이스를 MongoDB로 전면 교체',
-      rationale: '대용량 비정형 로그 데이터 처리 성능 및 유연성 확보',
-      actionItems: [{ task: 'MongoDB 클러스터 설정', assignee: 'alex' }]
-    });
-    renderState();
-  });
+      document.getElementById('step-3-2').addEventListener('click', () => {
+        engine.resolveConflictIndependent();
+        renderState();
+      });
 
-  document.getElementById('step-2-3').addEventListener('click', () => {
-    engine.resolveConflictSupersede();
-    renderState();
-  });
-
-  document.getElementById('step-3-1').addEventListener('click', () => {
-    const logMsgs = [
-      { author: 'wooddang', text: '메인 DB(Postgres)는 유지하고, 로그 전용 보조 DB로 MongoDB를 추가합시다.' }
-    ];
-    renderChat(logMsgs, 0);
-    engine.extractDecision({
-      topic: 'Database Selection',
-      decision: '로그 적재용 보조 DB로 MongoDB 병행 도입',
-      rationale: '메인 DB 트래픽 분리 및 로그 집계 최적화'
-    });
-    renderState();
-  });
-
-  document.getElementById('step-3-2').addEventListener('click', () => {
-    engine.resolveConflictIndependent();
-    renderState();
-  });
-
-  // Init
-  renderChat(mockMessages);
-  renderState();
-</script>
-
-</body>
+      // Init
+      renderChat(mockMessages);
+      renderState();
+    </script>
+  </body>
 </html>

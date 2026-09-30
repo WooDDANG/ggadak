@@ -1,18 +1,31 @@
 import { z } from 'zod';
-import { ActionItem } from '@ggaddak/shared';
 
 export const ExtractedDecisionSchema = z.object({
-  found: z.boolean().describe('True if a clear consensus or decision was reached in the conversation, false otherwise.'),
-  topic: z.string().describe('The broad topic or agenda being discussed (e.g. "Database Selection", "Auth Provider").'),
-  decision: z.string().describe('The concrete agreement or conclusion reached by the participants.'),
-  rationale: z.string().describe('The reasoning, trade-offs, and context that led to this decision.'),
-  actionItems: z.array(
-    z.object({
-      task: z.string(),
-      assignee: z.string().optional(),
-      dueDate: z.string().optional()
-    })
-  ).default([])
+  found: z
+    .boolean()
+    .describe(
+      'True if a clear consensus or decision was reached in the conversation, false otherwise.',
+    ),
+  topic: z
+    .string()
+    .describe(
+      'The broad topic or agenda being discussed (e.g. "Database Selection", "Auth Provider").',
+    ),
+  decision: z
+    .string()
+    .describe('The concrete agreement or conclusion reached by the participants.'),
+  rationale: z
+    .string()
+    .describe('The reasoning, trade-offs, and context that led to this decision.'),
+  actionItems: z
+    .array(
+      z.object({
+        task: z.string(),
+        assignee: z.string().optional(),
+        dueDate: z.string().optional(),
+      }),
+    )
+    .default([]),
 });
 
 export type ExtractedDecision = z.infer<typeof ExtractedDecisionSchema>;
@@ -30,7 +43,7 @@ export class MockLLMProvider implements LLMProvider {
         topic: 'Database Selection',
         decision: 'Adopt PostgreSQL as the primary transactional database',
         rationale: 'Required strong ACID consistency and robust relational modeling',
-        actionItems: [{ task: 'Provision PostgreSQL RDS instance', assignee: 'alex' }]
+        actionItems: [{ task: 'Provision PostgreSQL RDS instance', assignee: 'alex' }],
       };
     }
 
@@ -40,7 +53,7 @@ export class MockLLMProvider implements LLMProvider {
         topic: 'Database Selection',
         decision: 'Adopt MongoDB for document and log storage',
         rationale: 'High throughput for unstructured log entries and flexible schemas',
-        actionItems: [{ task: 'Setup MongoDB cluster', assignee: 'wooddang' }]
+        actionItems: [{ task: 'Setup MongoDB cluster', assignee: 'wooddang' }],
       };
     }
 
@@ -49,7 +62,7 @@ export class MockLLMProvider implements LLMProvider {
       topic: 'General Agreement',
       decision: 'Extracted decision from discussion',
       rationale: 'Team converged on common consensus in chat',
-      actionItems: []
+      actionItems: [],
     };
   }
 }

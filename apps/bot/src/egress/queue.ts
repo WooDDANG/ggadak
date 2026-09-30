@@ -29,11 +29,7 @@ export class EgressQueue {
       VALUES (?, ?, 'PENDING', 0, ?)
     `);
 
-    const result = stmt.run(
-      payload.payload.id,
-      JSON.stringify(payload),
-      new Date().toISOString()
-    );
+    const result = stmt.run(payload.payload.id, JSON.stringify(payload), new Date().toISOString());
 
     return Number(result.lastInsertRowid);
   }
@@ -52,25 +48,25 @@ export class EgressQueue {
         const res = await fetch(webhookUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: row.payload_json
+          body: row.payload_json,
         });
 
         if (res.ok) {
           const updateStmt = this.db.prepare(
-            `UPDATE egress_queue SET status = 'SENT' WHERE id = ?`
+            `UPDATE egress_queue SET status = 'SENT' WHERE id = ?`,
           );
           updateStmt.run(row.id);
           sentCount++;
         } else {
           const updateStmt = this.db.prepare(
-            `UPDATE egress_queue SET attempts = attempts + 1 WHERE id = ?`
+            `UPDATE egress_queue SET attempts = attempts + 1 WHERE id = ?`,
           );
           updateStmt.run(row.id);
           failedCount++;
         }
-      } catch (err) {
+      } catch {
         const updateStmt = this.db.prepare(
-          `UPDATE egress_queue SET attempts = attempts + 1 WHERE id = ?`
+          `UPDATE egress_queue SET attempts = attempts + 1 WHERE id = ?`,
         );
         updateStmt.run(row.id);
         failedCount++;
@@ -81,7 +77,9 @@ export class EgressQueue {
   }
 
   getPendingCount(): number {
-    const stmt = this.db.prepare(`SELECT count(*) as count FROM egress_queue WHERE status = 'PENDING'`);
+    const stmt = this.db.prepare(
+      `SELECT count(*) as count FROM egress_queue WHERE status = 'PENDING'`,
+    );
     const row = stmt.get() as any;
     return row.count;
   }

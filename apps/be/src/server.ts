@@ -7,7 +7,7 @@ import {
   createLogger,
   getHarvestingPolicyFromEnv,
   ExternalFeedbackSchema,
-  ReviewActionSchema
+  ReviewActionSchema,
 } from '@ggaddak/shared';
 import { DecisionRepository } from './db.js';
 import { BackendExtractionEngine } from './extractor/engine.js';
@@ -16,11 +16,14 @@ export function createServer(repo: DecisionRepository, extractor = new BackendEx
   const logger = createLogger('BE');
 
   // Morgan HTTP logging middleware
-  const morganMiddleware = morgan('":method :url" :status :res[content-length] - :response-time ms', {
-    stream: {
-      write: (message: string) => logger.info(`[HTTP] ${message.trim()}`)
-    }
-  });
+  const morganMiddleware = morgan(
+    '":method :url" :status :res[content-length] - :response-time ms',
+    {
+      stream: {
+        write: (message: string) => logger.info(`[HTTP] ${message.trim()}`),
+      },
+    },
+  );
 
   return http.createServer((req, res) => {
     morganMiddleware(req, res, async () => {
@@ -55,11 +58,12 @@ export function createServer(repo: DecisionRepository, extractor = new BackendEx
       // 1. Centralized AI Discussion Analysis: POST /api/discussions/analyze
       if (req.method === 'POST' && url.pathname === '/api/discussions/analyze') {
         let body = '';
-        req.on('data', chunk => body += chunk);
+        req.on('data', chunk => (body += chunk));
         req.on('end', async () => {
           try {
             const raw = JSON.parse(body);
-            const { rawMessages, guildId, channelId, channelName, triggerMessageId, messageUrl } = raw;
+            const { rawMessages, guildId, channelId, channelName, triggerMessageId, messageUrl } =
+              raw;
 
             if (!Array.isArray(rawMessages) || rawMessages.length === 0) {
               res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -68,17 +72,24 @@ export function createServer(repo: DecisionRepository, extractor = new BackendEx
             }
 
             // Compute evidence hash for anti-recreation check
-            const evidenceString = rawMessages.map((m: any) => m.id || `${m.author}:${m.content}:${m.createdAt}`).join('|');
+            const evidenceString = rawMessages
+              .map((m: any) => m.id || `${m.author}:${m.content}:${m.createdAt}`)
+              .join('|');
             const evidenceHash = crypto.createHash('sha256').update(evidenceString).digest('hex');
 
             if (repo.isEvidenceRejected(evidenceHash)) {
-              logger.info(`[Analyze] Skipping analysis for evidence hash [${evidenceHash.slice(0, 8)}] - Previously rejected.`);
+              logger.info(
+                `[Analyze] Skipping analysis for evidence hash [${evidenceHash.slice(0, 8)}] - Previously rejected.`,
+              );
               res.writeHead(200, { 'Content-Type': 'application/json' });
-              res.end(JSON.stringify({
-                found: false,
-                summary: '이전에 기각/삭제된 대화 구간입니다. 새 대화가 추가되면 다시 분석됩니다.',
-                decisions: []
-              }));
+              res.end(
+                JSON.stringify({
+                  found: false,
+                  summary:
+                    '이전에 기각/삭제된 대화 구간입니다. 새 대화가 추가되면 다시 분석됩니다.',
+                  decisions: [],
+                }),
+              );
               return;
             }
 
@@ -88,13 +99,17 @@ export function createServer(repo: DecisionRepository, extractor = new BackendEx
             // Build transcript
             const transcript = rawMessages
               .map((m: any) => {
-                const time = m.createdAt ? new Date(m.createdAt).toISOString().substring(11, 19) : '';
+                const time = m.createdAt
+                  ? new Date(m.createdAt).toISOString().substring(11, 19)
+                  : '';
                 const reply = m.replyingTo ? ` (replying to ${m.replyingTo})` : '';
                 return `[${time}] ${m.author}${reply}: ${m.content}`;
               })
               .join('\n');
 
-            logger.info(`[Analyze] Analyzing ${rawMessages.length} messages from #${channelName || channelId}...`);
+            logger.info(
+              `[Analyze] Analyzing ${rawMessages.length} messages from #${channelName || channelId}...`,
+            );
             const extraction = await extractor.analyzeTranscript(transcript, recentFeedbacks);
 
             if (!extraction.found || extraction.decisions.length === 0) {
@@ -105,9 +120,13 @@ export function createServer(repo: DecisionRepository, extractor = new BackendEx
             }
 
             const savedDecisions: Decision[] = [];
-            let lastConflict: { hasConflict: boolean; conflictingDecision?: Decision } = { hasConflict: false };
+            let lastConflict: { hasConflict: boolean; conflictingDecision?: Decision } = {
+              hasConflict: false,
+            };
 
-            const participants = Array.from(new Set(rawMessages.map((m: any) => m.author))) as string[];
+            const participants = Array.from(
+              new Set(rawMessages.map((m: any) => m.author)),
+            ) as string[];
             const rawEvidence = rawMessages.map((m: any) => m.id || m.content).filter(Boolean);
 
             for (const item of extraction.decisions) {
@@ -121,7 +140,7 @@ export function createServer(repo: DecisionRepository, extractor = new BackendEx
               if (conflicting) {
                 lastConflict = {
                   hasConflict: true,
-                  conflictingDecision: conflicting
+                  conflictingDecision: conflicting,
                 };
               }
 
@@ -158,17 +177,20 @@ export function createServer(repo: DecisionRepository, extractor = new BackendEx
                     author: m.author,
                     content: m.content,
                     createdAt: m.createdAt || new Date().toISOString(),
-                    replyingTo: m.replyingTo
-                  }))
+                    replyingTo: m.replyingTo,
+                  })),
                 },
-                messageCreatedAt: rawMessages[rawMessages.length - 1]?.createdAt || new Date().toISOString(),
-                createdAt: new Date().toISOString()
+                messageCreatedAt:
+                  rawMessages[rawMessages.length - 1]?.createdAt || new Date().toISOString(),
+                createdAt: new Date().toISOString(),
               };
 
               repo.saveDecision(newDecision);
               savedDecisions.push(newDecision);
 
-              logger.info(`[Analyze] Saved DRAFT Decision [${newDecision.id}] Title="${newDecision.title}" Category="${newDecision.categoryTag}"`);
+              logger.info(
+                `[Analyze] Saved DRAFT Decision [${newDecision.id}] Title="${newDecision.title}" Category="${newDecision.categoryTag}"`,
+              );
             }
 
             // Update checkpoint for channel
@@ -177,15 +199,19 @@ export function createServer(repo: DecisionRepository, extractor = new BackendEx
             }
 
             res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({
-              found: true,
-              summary: extraction.summary,
-              decisions: savedDecisions,
-              hasConflict: lastConflict.hasConflict,
-              conflictingDecision: lastConflict.conflictingDecision
-            }));
+            res.end(
+              JSON.stringify({
+                found: true,
+                summary: extraction.summary,
+                decisions: savedDecisions,
+                hasConflict: lastConflict.hasConflict,
+                conflictingDecision: lastConflict.conflictingDecision,
+              }),
+            );
           } catch (err: any) {
-            logger.error(`[Analyze] Error processing discussion analysis: ${err.message}`, { stack: err.stack });
+            logger.error(`[Analyze] Error processing discussion analysis: ${err.message}`, {
+              stack: err.stack,
+            });
             res.writeHead(500, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ error: 'Internal Server Error' }));
           }
@@ -198,24 +224,27 @@ export function createServer(repo: DecisionRepository, extractor = new BackendEx
       if (req.method === 'POST' && reviewMatch) {
         const decisionId = reviewMatch[1];
         let body = '';
-        req.on('data', chunk => body += chunk);
+        req.on('data', chunk => (body += chunk));
         req.on('end', () => {
           try {
             const raw = JSON.parse(body);
             const parsed = ReviewActionSchema.safeParse(raw);
             if (!parsed.success) {
               res.writeHead(400, { 'Content-Type': 'application/json' });
-              res.end(JSON.stringify({ error: 'Invalid ReviewAction', details: parsed.error.issues }));
+              res.end(
+                JSON.stringify({ error: 'Invalid ReviewAction', details: parsed.error.issues }),
+              );
               return;
             }
 
-            const { action, approvedBy, title, decisionContent, rationale, categoryTag } = parsed.data;
+            const { action, approvedBy, title, decisionContent, rationale, categoryTag } =
+              parsed.data;
             const updated = repo.reviewDecision(decisionId, action, {
               approvedBy,
               title,
               decisionContent,
               rationale,
-              categoryTag
+              categoryTag,
             });
 
             if (!updated) {
@@ -224,7 +253,9 @@ export function createServer(repo: DecisionRepository, extractor = new BackendEx
               return;
             }
 
-            logger.info(`[Review] Decision [${decisionId}] reviewed with action: ${action} -> state: ${updated.state}`);
+            logger.info(
+              `[Review] Decision [${decisionId}] reviewed with action: ${action} -> state: ${updated.state}`,
+            );
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ status: 'ok', decision: updated }));
           } catch (err: any) {
@@ -239,7 +270,9 @@ export function createServer(repo: DecisionRepository, extractor = new BackendEx
       if (url.pathname === '/api/feedbacks') {
         if (req.method === 'GET') {
           const channelId = url.searchParams.get('channelId') || undefined;
-          const limit = url.searchParams.get('limit') ? parseInt(url.searchParams.get('limit')!, 10) : 10;
+          const limit = url.searchParams.get('limit')
+            ? parseInt(url.searchParams.get('limit')!, 10)
+            : 10;
           const feedbacks = repo.getRecentFeedbacks(channelId, limit);
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ feedbacks }));
@@ -248,19 +281,26 @@ export function createServer(repo: DecisionRepository, extractor = new BackendEx
 
         if (req.method === 'POST') {
           let body = '';
-          req.on('data', chunk => body += chunk);
+          req.on('data', chunk => (body += chunk));
           req.on('end', () => {
             try {
               const raw = JSON.parse(body);
               const parsed = ExternalFeedbackSchema.safeParse(raw);
               if (!parsed.success) {
                 res.writeHead(400, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ error: 'Invalid ExternalFeedback', details: parsed.error.issues }));
+                res.end(
+                  JSON.stringify({
+                    error: 'Invalid ExternalFeedback',
+                    details: parsed.error.issues,
+                  }),
+                );
                 return;
               }
 
               repo.saveFeedback(parsed.data);
-              logger.info(`[Feedback] Saved External Feedback [${parsed.data.id}] Source="${parsed.data.source}"`);
+              logger.info(
+                `[Feedback] Saved External Feedback [${parsed.data.id}] Source="${parsed.data.source}"`,
+              );
               res.writeHead(201, { 'Content-Type': 'application/json' });
               res.end(JSON.stringify({ status: 'ok', id: parsed.data.id }));
             } catch (err: any) {
@@ -286,7 +326,7 @@ export function createServer(repo: DecisionRepository, extractor = new BackendEx
 
         if (req.method === 'POST') {
           let body = '';
-          req.on('data', chunk => body += chunk);
+          req.on('data', chunk => (body += chunk));
           req.on('end', () => {
             try {
               const { lastMessageId } = JSON.parse(body);
@@ -310,7 +350,7 @@ export function createServer(repo: DecisionRepository, extractor = new BackendEx
       // 5. Resolve Conflict: POST /api/decisions/resolve-conflict
       if (req.method === 'POST' && url.pathname === '/api/decisions/resolve-conflict') {
         let body = '';
-        req.on('data', chunk => body += chunk);
+        req.on('data', chunk => (body += chunk));
         req.on('end', () => {
           try {
             const { decisionId, conflictingId, resolution } = JSON.parse(body);
@@ -320,7 +360,9 @@ export function createServer(repo: DecisionRepository, extractor = new BackendEx
                 current.supersedesId = conflictingId;
                 current.state = 'Decided';
                 repo.saveDecision(current);
-                logger.info(`[Conflict] Decision [${decisionId}] now supersedes [${conflictingId}]`);
+                logger.info(
+                  `[Conflict] Decision [${decisionId}] now supersedes [${conflictingId}]`,
+                );
               }
             }
             res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -336,23 +378,29 @@ export function createServer(repo: DecisionRepository, extractor = new BackendEx
       // 6. Webhook ingestion: POST /api/webhooks/decisions (backward compatibility)
       if (req.method === 'POST' && url.pathname === '/api/webhooks/decisions') {
         let body = '';
-        req.on('data', chunk => body += chunk);
+        req.on('data', chunk => (body += chunk));
         req.on('end', () => {
           try {
             const raw = JSON.parse(body);
             const parsed = DecisionPayloadSchema.safeParse(raw);
 
             if (!parsed.success) {
-              logger.warn(`[Webhook] Rejected malformed payload: ${JSON.stringify(parsed.error.issues)}`);
+              logger.warn(
+                `[Webhook] Rejected malformed payload: ${JSON.stringify(parsed.error.issues)}`,
+              );
               res.writeHead(400, { 'Content-Type': 'application/json' });
-              res.end(JSON.stringify({ error: 'Invalid DecisionPayload', details: parsed.error.issues }));
+              res.end(
+                JSON.stringify({ error: 'Invalid DecisionPayload', details: parsed.error.issues }),
+              );
               return;
             }
 
             const decision = parsed.data.payload;
             repo.saveDecision(decision);
 
-            logger.info(`[Webhook] Successfully saved decision [${decision.id}] Topic="${decision.topic}"`);
+            logger.info(
+              `[Webhook] Successfully saved decision [${decision.id}] Topic="${decision.topic}"`,
+            );
             res.writeHead(201, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ status: 'ok', id: decision.id }));
           } catch (err: any) {

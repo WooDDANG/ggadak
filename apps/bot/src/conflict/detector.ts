@@ -25,7 +25,7 @@ export class ConflictDetector {
       if (decision.state === 'Decided' && decision.topic.trim().toLowerCase() === normalizedTopic) {
         return {
           hasConflict: true,
-          conflictingDecision: decision
+          conflictingDecision: decision,
         };
       }
     }

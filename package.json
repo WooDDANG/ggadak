@@ -10,10 +10,19 @@
     "dev:be": "npm run dev --workspace=@ggaddak/be",
     "dev:fe": "npm run dev --workspace=@ggaddak/fe",
     "build": "npm run build --workspaces --if-present",
-    "test": "npm run build && npm run test --workspaces --if-present && tsc -p tsconfig.test.json && node --test dist-test/e2e.test.js"
+    "test": "npm run build && npm run test --workspaces --if-present && tsc -p tsconfig.test.json && node --test dist-test/e2e.test.js",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write \"**/*.{ts,js,json,html}\"",
+    "format:check": "prettier --check \"**/*.{ts,js,json,html}\""
   },
   "devDependencies": {
-    "typescript": "^5.4.5",
-    "@types/node": "^22.0.0"
+    "@types/node": "^22.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.71.0",
+    "@typescript-eslint/parser": "^8.71.0",
+    "eslint": "^10.11.0",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.9.9",
+    "typescript": "^5.4.5"
   }
 }

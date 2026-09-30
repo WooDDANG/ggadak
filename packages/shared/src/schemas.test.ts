@@ -9,9 +9,7 @@ describe('Shared Domain Schemas', () => {
       topic: 'Database Selection',
       decision: 'Use PostgreSQL as primary DB',
       rationale: 'Requires ACID transactions and strong schema guarantees',
-      actionItems: [
-        { task: 'Provision AWS RDS Postgres instance', assignee: 'alex' }
-      ],
+      actionItems: [{ task: 'Provision AWS RDS Postgres instance', assignee: 'alex' }],
       state: 'Decided',
       supersedesId: null,
       source: {
@@ -20,9 +18,9 @@ describe('Shared Domain Schemas', () => {
         channelName: 'dev-architecture',
         triggerMessageId: 'msg-789',
         messageUrl: 'https://discord.com/channels/123/456/789',
-        participants: ['wooddang', 'alex']
+        participants: ['wooddang', 'alex'],
       },
-      createdAt: '2026-09-28T14:00:00.000Z'
+      createdAt: '2026-09-28T14:00:00.000Z',
     };
 
     const parsed = DecisionSchema.parse(validDecision);
@@ -47,10 +45,10 @@ describe('Shared Domain Schemas', () => {
           guildId: 'guild-123',
           channelId: 'channel-456',
           triggerMessageId: 'msg-999',
-          participants: []
+          participants: [],
         },
-        createdAt: '2026-09-28T14:15:00.000Z'
-      }
+        createdAt: '2026-09-28T14:15:00.000Z',
+      },
     };
 
     const parsed = DecisionPayloadSchema.parse(payload);

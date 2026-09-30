@@ -57,13 +57,13 @@ export class DecisionRepository {
       `evidence_hash TEXT`,
       `raw_transcript TEXT`,
       `source TEXT NOT NULL DEFAULT '{}'`,
-      `message_created_at TEXT`
+      `message_created_at TEXT`,
     ];
 
     for (const col of optionalColumns) {
       try {
         this.db.exec(`ALTER TABLE decisions ADD COLUMN ${col};`);
-      } catch (_) {
+      } catch {
         // Column already exists
       }
     }
@@ -101,7 +101,9 @@ export class DecisionRepository {
 
   // --- Checkpoints ---
   getCheckpoint(channelId: string): string | null {
-    const stmt = this.db.prepare('SELECT last_message_id FROM channel_checkpoints WHERE channel_id = ?');
+    const stmt = this.db.prepare(
+      'SELECT last_message_id FROM channel_checkpoints WHERE channel_id = ?',
+    );
     const row = stmt.get(channelId) as { last_message_id: string } | undefined;
     return row ? row.last_message_id : null;
   }
@@ -141,7 +143,7 @@ export class DecisionRepository {
       detail: r.detail,
       content: r.content,
       channelId: r.channel_id,
-      createdAt: r.created_at
+      createdAt: r.created_at,
     }));
   }
 
@@ -155,7 +157,9 @@ export class DecisionRepository {
   }
 
   isEvidenceRejected(evidenceHash: string): boolean {
-    const stmt = this.db.prepare('SELECT evidence_hash FROM rejected_evidence_hashes WHERE evidence_hash = ?');
+    const stmt = this.db.prepare(
+      'SELECT evidence_hash FROM rejected_evidence_hashes WHERE evidence_hash = ?',
+    );
     const row = stmt.get(evidenceHash);
     return !!row;
   }
@@ -163,9 +167,7 @@ export class DecisionRepository {
   // --- Decisions ---
   saveDecision(decision: Decision): void {
     if (decision.supersedesId) {
-      const updateStmt = this.db.prepare(
-        `UPDATE decisions SET state = 'Superseded' WHERE id = ?`
-      );
+      const updateStmt = this.db.prepare(`UPDATE decisions SET state = 'Superseded' WHERE id = ?`);
       updateStmt.run(decision.supersedesId);
     }
 
@@ -201,17 +203,21 @@ export class DecisionRepository {
       decision.rawTranscript ?? null,
       JSON.stringify(decision.source),
       decision.messageCreatedAt ?? null,
-      decision.createdAt
+      decision.createdAt,
     );
   }
 
-  reviewDecision(id: string, action: 'confirm' | 'defer' | 'reject' | 'edit', params?: {
-    approvedBy?: string;
-    title?: string;
-    decisionContent?: string;
-    rationale?: string;
-    categoryTag?: string;
-  }): Decision | null {
+  reviewDecision(
+    id: string,
+    action: 'confirm' | 'defer' | 'reject' | 'edit',
+    params?: {
+      approvedBy?: string;
+      title?: string;
+      decisionContent?: string;
+      rationale?: string;
+      categoryTag?: string;
+    },
+  ): Decision | null {
     const existing = this.getDecisionById(id);
     if (!existing) return null;
 
@@ -304,7 +310,7 @@ export class DecisionRepository {
       rawTranscript: row.raw_transcript,
       source: JSON.parse(row.source),
       messageCreatedAt: row.message_created_at,
-      createdAt: row.created_at
+      createdAt: row.created_at,
     }));
   }
 
@@ -336,7 +342,7 @@ export class DecisionRepository {
       rawTranscript: row.raw_transcript,
       source: JSON.parse(row.source),
       messageCreatedAt: row.message_created_at,
-      createdAt: row.created_at
+      createdAt: row.created_at,
     };
   }
 

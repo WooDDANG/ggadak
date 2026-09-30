@@ -12,7 +12,7 @@ describe('BE Server & Ingestion API', () => {
   before(async () => {
     repo = new DecisionRepository(':memory:');
     server = createServer(repo);
-    await new Promise<void>((resolve) => {
+    await new Promise<void>(resolve => {
       server.listen(0, () => {
         const addr = server.address() as any;
         port = addr.port;
@@ -22,7 +22,7 @@ describe('BE Server & Ingestion API', () => {
   });
 
   after(async () => {
-    await new Promise<void>((resolve) => {
+    await new Promise<void>(resolve => {
       server.close(() => {
         repo.close();
         resolve();
@@ -46,20 +46,20 @@ describe('BE Server & Ingestion API', () => {
           guildId: 'guild-1',
           channelId: 'chan-1',
           triggerMessageId: 'msg-1',
-          participants: ['wooddang']
+          participants: ['wooddang'],
         },
-        createdAt: '2026-09-28T14:20:00.000Z'
-      }
+        createdAt: '2026-09-28T14:20:00.000Z',
+      },
     };
 
     const res = await fetch(`http://localhost:${port}/api/webhooks/decisions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
     });
 
     assert.strictEqual(res.status, 201);
-    const body = await res.json() as any;
+    const body = (await res.json()) as any;
     assert.strictEqual(body.status, 'ok');
     assert.strictEqual(body.id, 'DEC-101');
 
@@ -72,7 +72,7 @@ describe('BE Server & Ingestion API', () => {
   it('queries decision list via GET /api/decisions', async () => {
     const res = await fetch(`http://localhost:${port}/api/decisions`);
     assert.strictEqual(res.status, 200);
-    const data = await res.json() as any;
+    const data = (await res.json()) as any;
     assert.ok(Array.isArray(data.decisions));
     assert.strictEqual(data.decisions.length, 1);
   });
@@ -93,16 +93,16 @@ describe('BE Server & Ingestion API', () => {
           guildId: 'guild-1',
           channelId: 'chan-1',
           triggerMessageId: 'msg-2',
-          participants: ['wooddang']
+          participants: ['wooddang'],
         },
-        createdAt: '2026-09-28T14:25:00.000Z'
-      }
+        createdAt: '2026-09-28T14:25:00.000Z',
+      },
     };
 
     const res = await fetch(`http://localhost:${port}/api/webhooks/decisions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload2)
+      body: JSON.stringify(payload2),
     });
     assert.strictEqual(res.status, 201);
 
@@ -117,7 +117,7 @@ describe('BE Server & Ingestion API', () => {
     const res = await fetch(`http://localhost:${port}/api/webhooks/decisions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ invalid: 'data' })
+      body: JSON.stringify({ invalid: 'data' }),
     });
     assert.strictEqual(res.status, 400);
   });
@@ -126,7 +126,7 @@ describe('BE Server & Ingestion API', () => {
     // 1. Initial GET should return null for lastMessageId
     const res1 = await fetch(`http://localhost:${port}/api/channels/test-chan-1/checkpoint`);
     assert.strictEqual(res1.status, 200);
-    const data1 = await res1.json() as any;
+    const data1 = (await res1.json()) as any;
     assert.strictEqual(data1.channelId, 'test-chan-1');
     assert.strictEqual(data1.lastMessageId, null);
 
@@ -134,21 +134,21 @@ describe('BE Server & Ingestion API', () => {
     const res2 = await fetch(`http://localhost:${port}/api/channels/test-chan-1/checkpoint`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ lastMessageId: 'msg-999' })
+      body: JSON.stringify({ lastMessageId: 'msg-999' }),
     });
     assert.strictEqual(res2.status, 200);
 
     // 3. GET should return updated lastMessageId
     const res3 = await fetch(`http://localhost:${port}/api/channels/test-chan-1/checkpoint`);
     assert.strictEqual(res3.status, 200);
-    const data3 = await res3.json() as any;
+    const data3 = (await res3.json()) as any;
     assert.strictEqual(data3.lastMessageId, 'msg-999');
   });
 
   it('exposes centralized harvesting policy via GET /api/config/policy', async () => {
     const res = await fetch(`http://localhost:${port}/api/config/policy`);
     assert.strictEqual(res.status, 200);
-    const policy = await res.json() as any;
+    const policy = (await res.json()) as any;
     assert.strictEqual(policy.initialScanLimit, 50);
     assert.strictEqual(policy.contextWindowBefore, 15);
     assert.strictEqual(policy.contextWindowAfter, 5);
@@ -177,8 +177,14 @@ describe('BE Server & Ingestion API', () => {
       feedbackReceivedDate: null,
       rawEvidence: ['msg-1', 'msg-2'],
       evidenceHash: 'hash-tailwind-123',
-      source: { guildId: 'g1', channelId: 'c1', triggerMessageId: 'm1', participants: [], rawMessages: [] },
-      createdAt: new Date().toISOString()
+      source: {
+        guildId: 'g1',
+        channelId: 'c1',
+        triggerMessageId: 'm1',
+        participants: [],
+        rawMessages: [],
+      },
+      createdAt: new Date().toISOString(),
     });
 
     // 1. Confirm review action
@@ -188,11 +194,11 @@ describe('BE Server & Ingestion API', () => {
       body: JSON.stringify({
         action: 'confirm',
         approvedBy: 'reviewer_wooddang',
-        title: 'Adopt Tailwind CSS v4'
-      })
+        title: 'Adopt Tailwind CSS v4',
+      }),
     });
     assert.strictEqual(res.status, 200);
-    const body = await res.json() as any;
+    const body = (await res.json()) as any;
     assert.strictEqual(body.decision.state, 'Decided');
     assert.strictEqual(body.decision.approvedBy, 'reviewer_wooddang');
     assert.strictEqual(body.decision.title, 'Adopt Tailwind CSS v4');
@@ -216,14 +222,20 @@ describe('BE Server & Ingestion API', () => {
       feedbackReceivedDate: null,
       rawEvidence: ['msg-x'],
       evidenceHash: 'hash-rejected-999',
-      source: { guildId: 'g1', channelId: 'c1', triggerMessageId: 'mx', participants: [], rawMessages: [] },
-      createdAt: new Date().toISOString()
+      source: {
+        guildId: 'g1',
+        channelId: 'c1',
+        triggerMessageId: 'mx',
+        participants: [],
+        rawMessages: [],
+      },
+      createdAt: new Date().toISOString(),
     });
 
     const resReject = await fetch(`http://localhost:${port}/api/decisions/DEC-DRAFT-2/review`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'reject' })
+      body: JSON.stringify({ action: 'reject' }),
     });
     assert.strictEqual(resReject.status, 200);
     assert.strictEqual(repo.isEvidenceRejected('hash-rejected-999'), true);
@@ -236,19 +248,19 @@ describe('BE Server & Ingestion API', () => {
       detail: '캡스톤 중간발표',
       content: '대학생 전체보다 동아리 프로젝트 팀으로 타깃을 좁혀보세요.',
       channelId: 'chan-feedback-1',
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
     };
 
     const postRes = await fetch(`http://localhost:${port}/api/feedbacks`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(feedbackPayload)
+      body: JSON.stringify(feedbackPayload),
     });
     assert.strictEqual(postRes.status, 201);
 
     const getRes = await fetch(`http://localhost:${port}/api/feedbacks?channelId=chan-feedback-1`);
     assert.strictEqual(getRes.status, 200);
-    const getData = await getRes.json() as any;
+    const getData = (await getRes.json()) as any;
     assert.strictEqual(getData.feedbacks.length, 1);
     assert.strictEqual(getData.feedbacks[0].content, feedbackPayload.content);
     assert.strictEqual(getData.feedbacks[0].source, '교수');

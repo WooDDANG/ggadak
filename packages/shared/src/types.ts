@@ -10,7 +10,7 @@ import {
   DecisionPayloadSchema,
   ChannelCheckpointSchema,
   ExternalFeedbackSchema,
-  ReviewActionSchema
+  ReviewActionSchema,
 } from './schemas.js';
 
 export type DecisionState = z.infer<typeof DecisionStateSchema>;

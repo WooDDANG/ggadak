@@ -10,7 +10,7 @@ const potentialEnvPaths = [
   path.resolve(process.cwd(), '.env'),
   path.resolve(__dirname, '../.env'),
   path.resolve(__dirname, '../../.env'),
-  path.resolve(__dirname, '../../../.env')
+  path.resolve(__dirname, '../../../.env'),
 ];
 
 for (const envPath of potentialEnvPaths) {
@@ -26,7 +26,7 @@ const TRIGGER_EMOJI = process.env.TRIGGER_EMOJI || '📌';
 
 const bot = new DecisionTrackerBot({
   backendUrl: BACKEND_URL,
-  triggerEmoji: TRIGGER_EMOJI
+  triggerEmoji: TRIGGER_EMOJI,
 });
 
 bot.start().catch(err => {

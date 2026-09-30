@@ -1,581 +1,655 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ko">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>GGADDAK — 팀 의사결정 타임라인 & 검수 큐</title>
-  <style>
-    :root {
-      --bg: #0b0f19;
-      --card-bg: #151d30;
-      --card-border: #232f4a;
-      --text: #f1f5f9;
-      --text-muted: #94a3b8;
-      --accent: #6366f1;
-      --accent-hover: #4f46e5;
-      --green: #10b981;
-      --amber: #f59e0b;
-      --red: #ef4444;
-      --purple: #a855f7;
-      --blue: #38bdf8;
-      --chat-bg: #0d1322;
-      --chat-border: #1e293b;
-    }
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GGADDAK — 팀 의사결정 타임라인 & 검수 큐</title>
+    <style>
+      :root {
+        --bg: #0b0f19;
+        --card-bg: #151d30;
+        --card-border: #232f4a;
+        --text: #f1f5f9;
+        --text-muted: #94a3b8;
+        --accent: #6366f1;
+        --accent-hover: #4f46e5;
+        --green: #10b981;
+        --amber: #f59e0b;
+        --red: #ef4444;
+        --purple: #a855f7;
+        --blue: #38bdf8;
+        --chat-bg: #0d1322;
+        --chat-border: #1e293b;
+      }
 
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        font-family:
+          -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      }
 
-    body {
-      background-color: var(--bg);
-      color: var(--text);
-      padding: 32px 24px;
-      line-height: 1.6;
-    }
+      body {
+        background-color: var(--bg);
+        color: var(--text);
+        padding: 32px 24px;
+        line-height: 1.6;
+      }
 
-    .container {
-      max-width: 1040px;
-      margin: 0 auto;
-    }
+      .container {
+        max-width: 1040px;
+        margin: 0 auto;
+      }
 
-    header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 24px;
-      border-bottom: 1px solid var(--card-border);
-      padding-bottom: 20px;
-    }
+      header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+        border-bottom: 1px solid var(--card-border);
+        padding-bottom: 20px;
+      }
 
-    .title-group h1 {
-      font-size: 1.75rem;
-      font-weight: 700;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
+      .title-group h1 {
+        font-size: 1.75rem;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
 
-    .title-group p {
-      color: var(--text-muted);
-      font-size: 0.95rem;
-      margin-top: 4px;
-    }
+      .title-group p {
+        color: var(--text-muted);
+        font-size: 0.95rem;
+        margin-top: 4px;
+      }
 
-    .nav-tabs {
-      display: flex;
-      gap: 8px;
-      margin-bottom: 20px;
-    }
+      .nav-tabs {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 20px;
+      }
 
-    .tab-btn {
-      background: var(--card-bg);
-      color: var(--text-muted);
-      border: 1px solid var(--card-border);
-      padding: 8px 18px;
-      border-radius: 8px;
-      cursor: pointer;
-      font-weight: 600;
-      font-size: 0.9rem;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
+      .tab-btn {
+        background: var(--card-bg);
+        color: var(--text-muted);
+        border: 1px solid var(--card-border);
+        padding: 8px 18px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: 600;
+        font-size: 0.9rem;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
 
-    .tab-btn.active {
-      background: var(--accent);
-      color: white;
-      border-color: var(--accent);
-    }
+      .tab-btn.active {
+        background: var(--accent);
+        color: white;
+        border-color: var(--accent);
+      }
 
-    .tab-count {
-      background: rgba(255, 255, 255, 0.2);
-      padding: 2px 7px;
-      border-radius: 999px;
-      font-size: 0.75rem;
-    }
+      .tab-count {
+        background: rgba(255, 255, 255, 0.2);
+        padding: 2px 7px;
+        border-radius: 999px;
+        font-size: 0.75rem;
+      }
 
-    .controls {
-      display: flex;
-      gap: 12px;
-      margin-bottom: 24px;
-      flex-wrap: wrap;
-    }
+      .controls {
+        display: flex;
+        gap: 12px;
+        margin-bottom: 24px;
+        flex-wrap: wrap;
+      }
 
-    .search-input {
-      flex: 1;
-      min-width: 250px;
-      background: var(--card-bg);
-      border: 1px solid var(--card-border);
-      border-radius: 8px;
-      padding: 10px 16px;
-      color: var(--text);
-      font-size: 0.9rem;
-      outline: none;
-    }
+      .search-input {
+        flex: 1;
+        min-width: 250px;
+        background: var(--card-bg);
+        border: 1px solid var(--card-border);
+        border-radius: 8px;
+        padding: 10px 16px;
+        color: var(--text);
+        font-size: 0.9rem;
+        outline: none;
+      }
 
-    .search-input:focus {
-      border-color: var(--accent);
-    }
+      .search-input:focus {
+        border-color: var(--accent);
+      }
 
-    .filter-select {
-      background: var(--card-bg);
-      border: 1px solid var(--card-border);
-      border-radius: 8px;
-      padding: 10px 16px;
-      color: var(--text);
-      font-size: 0.9rem;
-      outline: none;
-      cursor: pointer;
-    }
+      .filter-select {
+        background: var(--card-bg);
+        border: 1px solid var(--card-border);
+        border-radius: 8px;
+        padding: 10px 16px;
+        color: var(--text);
+        font-size: 0.9rem;
+        outline: none;
+        cursor: pointer;
+      }
 
-    .btn-refresh {
-      background: var(--accent);
-      color: white;
-      border: none;
-      border-radius: 8px;
-      padding: 10px 18px;
-      font-weight: 600;
-      font-size: 0.9rem;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
+      .btn-refresh {
+        background: var(--accent);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        padding: 10px 18px;
+        font-weight: 600;
+        font-size: 0.9rem;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
 
-    .btn-refresh:hover {
-      background: var(--accent-hover);
-    }
+      .btn-refresh:hover {
+        background: var(--accent-hover);
+      }
 
-    .timeline {
-      position: relative;
-      margin-left: 20px;
-      padding-left: 28px;
-      border-left: 2px solid var(--card-border);
-      display: flex;
-      flex-direction: column;
-      gap: 24px;
-    }
+      .timeline {
+        position: relative;
+        margin-left: 20px;
+        padding-left: 28px;
+        border-left: 2px solid var(--card-border);
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+      }
 
-    .timeline-node {
-      position: relative;
-    }
+      .timeline-node {
+        position: relative;
+      }
 
-    .timeline-dot {
-      position: absolute;
-      left: -37px;
-      top: 18px;
-      width: 16px;
-      height: 16px;
-      border-radius: 50%;
-      background: var(--accent);
-      border: 3px solid var(--bg);
-    }
+      .timeline-dot {
+        position: absolute;
+        left: -37px;
+        top: 18px;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: var(--accent);
+        border: 3px solid var(--bg);
+      }
 
-    .timeline-dot.draft { background: var(--blue); }
-    .timeline-dot.decided { background: var(--green); }
-    .timeline-dot.superseded { background: var(--red); }
-    .timeline-dot.deferred { background: var(--amber); }
+      .timeline-dot.draft {
+        background: var(--blue);
+      }
+      .timeline-dot.decided {
+        background: var(--green);
+      }
+      .timeline-dot.superseded {
+        background: var(--red);
+      }
+      .timeline-dot.deferred {
+        background: var(--amber);
+      }
 
-    .card {
-      background: var(--card-bg);
-      border: 1px solid var(--card-border);
-      border-radius: 12px;
-      padding: 20px;
-      transition: transform 0.15s ease, border-color 0.15s ease;
-    }
+      .card {
+        background: var(--card-bg);
+        border: 1px solid var(--card-border);
+        border-radius: 12px;
+        padding: 20px;
+        transition:
+          transform 0.15s ease,
+          border-color 0.15s ease;
+      }
 
-    .card:hover {
-      border-color: #3b82f6;
-    }
+      .card:hover {
+        border-color: #3b82f6;
+      }
 
-    .card-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      margin-bottom: 12px;
-      gap: 12px;
-    }
+      .card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 12px;
+        gap: 12px;
+      }
 
-    .card-topic-group {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: 8px;
-    }
+      .card-topic-group {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+      }
 
-    .card-topic {
-      font-size: 1.15rem;
-      font-weight: 700;
-      color: var(--text);
-    }
+      .card-topic {
+        font-size: 1.15rem;
+        font-weight: 700;
+        color: var(--text);
+      }
 
-    .badge {
-      font-size: 0.72rem;
-      padding: 3px 10px;
-      border-radius: 999px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
+      .badge {
+        font-size: 0.72rem;
+        padding: 3px 10px;
+        border-radius: 999px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
 
-    .badge-category { background: rgba(99, 102, 241, 0.15); color: var(--accent); border: 1px solid var(--accent); }
-    .badge-draft { background: rgba(56, 189, 248, 0.15); color: var(--blue); border: 1px solid var(--blue); }
-    .badge-decided { background: rgba(16, 185, 129, 0.15); color: var(--green); border: 1px solid var(--green); }
-    .badge-superseded { background: rgba(239, 68, 68, 0.15); color: var(--red); border: 1px solid var(--red); }
-    .badge-deferred { background: rgba(245, 158, 11, 0.15); color: var(--amber); border: 1px solid var(--amber); }
-    .badge-pivot { background: rgba(245, 158, 11, 0.2); color: var(--amber); border: 1px solid var(--amber); }
+      .badge-category {
+        background: rgba(99, 102, 241, 0.15);
+        color: var(--accent);
+        border: 1px solid var(--accent);
+      }
+      .badge-draft {
+        background: rgba(56, 189, 248, 0.15);
+        color: var(--blue);
+        border: 1px solid var(--blue);
+      }
+      .badge-decided {
+        background: rgba(16, 185, 129, 0.15);
+        color: var(--green);
+        border: 1px solid var(--green);
+      }
+      .badge-superseded {
+        background: rgba(239, 68, 68, 0.15);
+        color: var(--red);
+        border: 1px solid var(--red);
+      }
+      .badge-deferred {
+        background: rgba(245, 158, 11, 0.15);
+        color: var(--amber);
+        border: 1px solid var(--amber);
+      }
+      .badge-pivot {
+        background: rgba(245, 158, 11, 0.2);
+        color: var(--amber);
+        border: 1px solid var(--amber);
+      }
 
-    .card-decision {
-      font-size: 1.05rem;
-      font-weight: 600;
-      color: #38bdf8;
-      margin-bottom: 10px;
-    }
+      .card-decision {
+        font-size: 1.05rem;
+        font-weight: 600;
+        color: #38bdf8;
+        margin-bottom: 10px;
+      }
 
-    .card-rationale {
-      background: #0f1524;
-      border-left: 3px solid var(--purple);
-      border-radius: 4px;
-      padding: 10px 14px;
-      font-size: 0.88rem;
-      color: #cbd5e1;
-      margin-bottom: 12px;
-    }
+      .card-rationale {
+        background: #0f1524;
+        border-left: 3px solid var(--purple);
+        border-radius: 4px;
+        padding: 10px 14px;
+        font-size: 0.88rem;
+        color: #cbd5e1;
+        margin-bottom: 12px;
+      }
 
-    .alternatives-section {
-      background: #111827;
-      border-left: 3px solid var(--amber);
-      border-radius: 4px;
-      padding: 8px 12px;
-      font-size: 0.82rem;
-      color: #cbd5e1;
-      margin-bottom: 12px;
-    }
+      .alternatives-section {
+        background: #111827;
+        border-left: 3px solid var(--amber);
+        border-radius: 4px;
+        padding: 8px 12px;
+        font-size: 0.82rem;
+        color: #cbd5e1;
+        margin-bottom: 12px;
+      }
 
-    .action-items-list {
-      margin-top: 10px;
-      margin-bottom: 14px;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
+      .action-items-list {
+        margin-top: 10px;
+        margin-bottom: 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
 
-    .action-item {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 0.82rem;
-      color: #94a3b8;
-      background: #182239;
-      padding: 6px 10px;
-      border-radius: 6px;
-    }
+      .action-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.82rem;
+        color: #94a3b8;
+        background: #182239;
+        padding: 6px 10px;
+        border-radius: 6px;
+      }
 
-    .review-toolbar {
-      display: flex;
-      gap: 8px;
-      margin-top: 14px;
-      padding-top: 12px;
-      border-top: 1px solid rgba(255, 255, 255, 0.08);
-    }
+      .review-toolbar {
+        display: flex;
+        gap: 8px;
+        margin-top: 14px;
+        padding-top: 12px;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+      }
 
-    .btn-review {
-      padding: 6px 14px;
-      border-radius: 6px;
-      font-size: 0.82rem;
-      font-weight: 600;
-      cursor: pointer;
-      border: 1px solid transparent;
-      display: flex;
-      align-items: center;
-      gap: 4px;
-    }
+      .btn-review {
+        padding: 6px 14px;
+        border-radius: 6px;
+        font-size: 0.82rem;
+        font-weight: 600;
+        cursor: pointer;
+        border: 1px solid transparent;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
 
-    .btn-confirm { background: var(--green); color: white; }
-    .btn-confirm:hover { opacity: 0.9; }
-    .btn-defer { background: #374151; color: var(--amber); border-color: var(--amber); }
-    .btn-defer:hover { background: #4b5563; }
-    .btn-reject { background: #374151; color: var(--red); border-color: var(--red); }
-    .btn-reject:hover { background: #4b5563; }
+      .btn-confirm {
+        background: var(--green);
+        color: white;
+      }
+      .btn-confirm:hover {
+        opacity: 0.9;
+      }
+      .btn-defer {
+        background: #374151;
+        color: var(--amber);
+        border-color: var(--amber);
+      }
+      .btn-defer:hover {
+        background: #4b5563;
+      }
+      .btn-reject {
+        background: #374151;
+        color: var(--red);
+        border-color: var(--red);
+      }
+      .btn-reject:hover {
+        background: #4b5563;
+      }
 
-    /* Expandable Transcript Accordion */
-    .transcript-accordion {
-      background: var(--chat-bg);
-      border: 1px solid var(--chat-border);
-      border-radius: 8px;
-      margin-top: 12px;
-      overflow: hidden;
-    }
+      /* Expandable Transcript Accordion */
+      .transcript-accordion {
+        background: var(--chat-bg);
+        border: 1px solid var(--chat-border);
+        border-radius: 8px;
+        margin-top: 12px;
+        overflow: hidden;
+      }
 
-    .transcript-summary {
-      padding: 10px 14px;
-      font-size: 0.85rem;
-      font-weight: 600;
-      color: #38bdf8;
-      cursor: pointer;
-      user-select: none;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
+      .transcript-summary {
+        padding: 10px 14px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: #38bdf8;
+        cursor: pointer;
+        user-select: none;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
 
-    .transcript-summary:hover {
-      background: rgba(56, 189, 248, 0.05);
-    }
+      .transcript-summary:hover {
+        background: rgba(56, 189, 248, 0.05);
+      }
 
-    .transcript-body {
-      padding: 12px 14px;
-      border-top: 1px solid var(--chat-border);
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      max-height: 280px;
-      overflow-y: auto;
-    }
+      .transcript-body {
+        padding: 12px 14px;
+        border-top: 1px solid var(--chat-border);
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        max-height: 280px;
+        overflow-y: auto;
+      }
 
-    .chat-bubble {
-      display: flex;
-      flex-direction: column;
-      gap: 3px;
-      background: #141c2e;
-      padding: 8px 12px;
-      border-radius: 6px;
-      border-left: 2px solid #3b82f6;
-    }
+      .chat-bubble {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        background: #141c2e;
+        padding: 8px 12px;
+        border-radius: 6px;
+        border-left: 2px solid #3b82f6;
+      }
 
-    .chat-bubble-header {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 0.75rem;
-    }
+      .chat-bubble-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.75rem;
+      }
 
-    .chat-author {
-      font-weight: 700;
-      color: #38bdf8;
-    }
+      .chat-author {
+        font-weight: 700;
+        color: #38bdf8;
+      }
 
-    .chat-reply-tag {
-      color: var(--text-muted);
-      font-size: 0.72rem;
-    }
+      .chat-reply-tag {
+        color: var(--text-muted);
+        font-size: 0.72rem;
+      }
 
-    .chat-time {
-      margin-left: auto;
-      color: #64748b;
-      font-size: 0.7rem;
-    }
+      .chat-time {
+        margin-left: auto;
+        color: #64748b;
+        font-size: 0.7rem;
+      }
 
-    .chat-text {
-      font-size: 0.84rem;
-      color: #e2e8f0;
-    }
+      .chat-text {
+        font-size: 0.84rem;
+        color: #e2e8f0;
+      }
 
-    .card-footer {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-top: 16px;
-      padding-top: 12px;
-      border-top: 1px solid rgba(255, 255, 255, 0.06);
-      font-size: 0.78rem;
-      color: var(--text-muted);
-    }
+      .card-footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 16px;
+        padding-top: 12px;
+        border-top: 1px solid rgba(255, 255, 255, 0.06);
+        font-size: 0.78rem;
+        color: var(--text-muted);
+      }
 
-    .discord-link {
-      color: #818cf8;
-      text-decoration: none;
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-    }
+      .discord-link {
+        color: #818cf8;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+      }
 
-    .discord-link:hover {
-      text-decoration: underline;
-    }
+      .discord-link:hover {
+        text-decoration: underline;
+      }
 
-    .empty-state {
-      text-align: center;
-      padding: 48px 0;
-      color: var(--text-muted);
-    }
-  </style>
-</head>
-<body>
+      .empty-state {
+        text-align: center;
+        padding: 48px 0;
+        color: var(--text-muted);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <div class="title-group">
+          <h1>⚡ GGADDAK 의사결정 타임라인 & 검수 큐</h1>
+          <p>디스코드 서버에서 실시간 추출된 의사결정 후보(DRAFT) 검수 및 확정 타임라인</p>
+        </div>
+        <button id="btn-refresh" class="btn-refresh">🔄 새로고침</button>
+      </header>
 
-<div class="container">
-  <header>
-    <div class="title-group">
-      <h1>⚡ GGADDAK 의사결정 타임라인 & 검수 큐</h1>
-      <p>디스코드 서버에서 실시간 추출된 의사결정 후보(DRAFT) 검수 및 확정 타임라인</p>
+      <div class="nav-tabs">
+        <button class="tab-btn active" data-tab="timeline">
+          📋 전체 타임라인
+          <span id="count-total" class="tab-count">0</span>
+        </button>
+        <button class="tab-btn" data-tab="review">
+          🔍 검수 큐 (DRAFT)
+          <span id="count-draft" class="tab-count" style="background: #3b82f6; color: white"
+            >0</span
+          >
+        </button>
+      </div>
+
+      <div class="controls">
+        <input
+          type="text"
+          id="search-input"
+          class="search-input"
+          placeholder="안건, 결정 내용, 근거, 대안 또는 대화 원문 검색..."
+        />
+        <select id="state-filter" class="filter-select">
+          <option value="">모든 상태</option>
+          <option value="Draft">검수 대기 (Draft)</option>
+          <option value="Decided">확정됨 (Decided)</option>
+          <option value="Deferred">보류됨 (Deferred)</option>
+          <option value="Superseded">대체됨 (Superseded)</option>
+          <option value="Rejected">기각됨 (Rejected)</option>
+        </select>
+        <select id="category-filter" class="filter-select">
+          <option value="">모든 카테고리</option>
+          <option value="타깃">타깃</option>
+          <option value="문제정의">문제정의</option>
+          <option value="기능">기능</option>
+          <option value="기술">기술</option>
+          <option value="BM">BM</option>
+          <option value="기타">기타</option>
+        </select>
+      </div>
+
+      <div id="timeline" class="timeline"></div>
     </div>
-    <button id="btn-refresh" class="btn-refresh">🔄 새로고침</button>
-  </header>
 
-  <div class="nav-tabs">
-    <button class="tab-btn active" data-tab="timeline">
-      📋 전체 타임라인
-      <span id="count-total" class="tab-count">0</span>
-    </button>
-    <button class="tab-btn" data-tab="review">
-      🔍 검수 큐 (DRAFT)
-      <span id="count-draft" class="tab-count" style="background: #3b82f6; color: white;">0</span>
-    </button>
-  </div>
+    <script>
+      const API_URL = 'http://localhost:3001/api/decisions';
+      let allDecisions = [];
+      let currentTab = 'timeline';
 
-  <div class="controls">
-    <input type="text" id="search-input" class="search-input" placeholder="안건, 결정 내용, 근거, 대안 또는 대화 원문 검색...">
-    <select id="state-filter" class="filter-select">
-      <option value="">모든 상태</option>
-      <option value="Draft">검수 대기 (Draft)</option>
-      <option value="Decided">확정됨 (Decided)</option>
-      <option value="Deferred">보류됨 (Deferred)</option>
-      <option value="Superseded">대체됨 (Superseded)</option>
-      <option value="Rejected">기각됨 (Rejected)</option>
-    </select>
-    <select id="category-filter" class="filter-select">
-      <option value="">모든 카테고리</option>
-      <option value="타깃">타깃</option>
-      <option value="문제정의">문제정의</option>
-      <option value="기능">기능</option>
-      <option value="기술">기술</option>
-      <option value="BM">BM</option>
-      <option value="기타">기타</option>
-    </select>
-  </div>
-
-  <div id="timeline" class="timeline"></div>
-</div>
-
-<script>
-  const API_URL = 'http://localhost:3001/api/decisions';
-  let allDecisions = [];
-  let currentTab = 'timeline';
-
-  async function fetchDecisions() {
-    try {
-      const res = await fetch(API_URL);
-      if (!res.ok) throw new Error('API 응답 실패');
-      const data = await res.json();
-      allDecisions = data.decisions || [];
-      updateCounts();
-      renderTimeline();
-    } catch (err) {
-      console.warn('Backend API connection failed, rendering sample or empty:', err);
-      if (allDecisions.length === 0) {
-        renderTimeline();
+      async function fetchDecisions() {
+        try {
+          const res = await fetch(API_URL);
+          if (!res.ok) throw new Error('API 응답 실패');
+          const data = await res.json();
+          allDecisions = data.decisions || [];
+          updateCounts();
+          renderTimeline();
+        } catch (err) {
+          console.warn('Backend API connection failed, rendering sample or empty:', err);
+          if (allDecisions.length === 0) {
+            renderTimeline();
+          }
+        }
       }
-    }
-  }
 
-  function updateCounts() {
-    const totalCount = allDecisions.length;
-    const draftCount = allDecisions.filter(d => d.state === 'Draft').length;
-    document.getElementById('count-total').textContent = totalCount;
-    document.getElementById('count-draft').textContent = draftCount;
-  }
-
-  async function handleReviewAction(decisionId, action) {
-    try {
-      const res = await fetch(`http://localhost:3001/api/decisions/${decisionId}/review`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action,
-          approvedBy: 'Web Reviewer'
-        })
-      });
-      if (res.ok) {
-        await fetchDecisions();
-      } else {
-        alert('검수 처리 중 오류가 발생했습니다.');
+      function updateCounts() {
+        const totalCount = allDecisions.length;
+        const draftCount = allDecisions.filter(d => d.state === 'Draft').length;
+        document.getElementById('count-total').textContent = totalCount;
+        document.getElementById('count-draft').textContent = draftCount;
       }
-    } catch (err) {
-      alert(`백엔드 통신 오류: ${err.message}`);
-    }
-  }
 
-  function renderTimeline() {
-    const timelineEl = document.getElementById('timeline');
-    const query = document.getElementById('search-input').value.toLowerCase().trim();
-    let stateFilter = document.getElementById('state-filter').value;
-    const categoryFilter = document.getElementById('category-filter').value;
+      async function handleReviewAction(decisionId, action) {
+        try {
+          const res = await fetch(`http://localhost:3001/api/decisions/${decisionId}/review`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action,
+              approvedBy: 'Web Reviewer',
+            }),
+          });
+          if (res.ok) {
+            await fetchDecisions();
+          } else {
+            alert('검수 처리 중 오류가 발생했습니다.');
+          }
+        } catch (err) {
+          alert(`백엔드 통신 오류: ${err.message}`);
+        }
+      }
 
-    if (currentTab === 'review') {
-      stateFilter = 'Draft';
-    }
+      function renderTimeline() {
+        const timelineEl = document.getElementById('timeline');
+        const query = document.getElementById('search-input').value.toLowerCase().trim();
+        let stateFilter = document.getElementById('state-filter').value;
+        const categoryFilter = document.getElementById('category-filter').value;
 
-    const filtered = allDecisions.filter(d => {
-      const matchesSearch = 
-        (d.title && d.title.toLowerCase().includes(query)) ||
-        d.topic.toLowerCase().includes(query) ||
-        (d.decisionContent && d.decisionContent.toLowerCase().includes(query)) ||
-        d.decision.toLowerCase().includes(query) ||
-        d.rationale.toLowerCase().includes(query) ||
-        (d.rawTranscript && d.rawTranscript.toLowerCase().includes(query));
-      const matchesState = !stateFilter || d.state === stateFilter;
-      const matchesCategory = !categoryFilter || d.categoryTag === categoryFilter;
-      return matchesSearch && matchesState && matchesCategory;
-    });
+        if (currentTab === 'review') {
+          stateFilter = 'Draft';
+        }
 
-    if (filtered.length === 0) {
-      timelineEl.innerHTML = `
+        const filtered = allDecisions.filter(d => {
+          const matchesSearch =
+            (d.title && d.title.toLowerCase().includes(query)) ||
+            d.topic.toLowerCase().includes(query) ||
+            (d.decisionContent && d.decisionContent.toLowerCase().includes(query)) ||
+            d.decision.toLowerCase().includes(query) ||
+            d.rationale.toLowerCase().includes(query) ||
+            (d.rawTranscript && d.rawTranscript.toLowerCase().includes(query));
+          const matchesState = !stateFilter || d.state === stateFilter;
+          const matchesCategory = !categoryFilter || d.categoryTag === categoryFilter;
+          return matchesSearch && matchesState && matchesCategory;
+        });
+
+        if (filtered.length === 0) {
+          timelineEl.innerHTML = `
         <div class="empty-state">
           <h3>표시할 의사결정 카드가 없습니다</h3>
           <p style="margin-top: 6px;">${currentTab === 'review' ? '현재 검수 대기 중인 DRAFT 후보가 없습니다.' : '디스코드 채널에서 토론 후 합의 발화 또는 리액션을 남겨보세요.'}</p>
         </div>
       `;
-      return;
-    }
+          return;
+        }
 
-    timelineEl.innerHTML = filtered.map(d => {
-      const stateClass = d.state.toLowerCase();
-      const dotClass = stateClass;
-      const dateStr = new Date(d.createdAt).toLocaleString('ko-KR');
+        timelineEl.innerHTML = filtered
+          .map(d => {
+            const stateClass = d.state.toLowerCase();
+            const dotClass = stateClass;
+            const dateStr = new Date(d.createdAt).toLocaleString('ko-KR');
 
-      const actionItemsHtml = d.actionItems && d.actionItems.length > 0 ? `
+            const actionItemsHtml =
+              d.actionItems && d.actionItems.length > 0
+                ? `
         <div class="action-items-list">
-          ${d.actionItems.map(item => `
+          ${d.actionItems
+            .map(
+              item => `
             <div class="action-item">
               <span>☑️ ${item.task}</span>
               ${item.assignee ? `<span style="color: #38bdf8;">(@${item.assignee})</span>` : ''}
             </div>
-          `).join('')}
+          `,
+            )
+            .join('')}
         </div>
-      ` : '';
+      `
+                : '';
 
-      const alternativesHtml = d.alternatives && d.alternatives.length > 0 ? `
+            const alternativesHtml =
+              d.alternatives && d.alternatives.length > 0
+                ? `
         <div class="alternatives-section">
           <strong>🔍 검토 및 기각된 대안:</strong>
           <ul style="margin-top: 4px; padding-left: 18px;">
             ${d.alternatives.map(alt => `<li><strong>${alt.option}</strong>: ${alt.reason}</li>`).join('')}
           </ul>
         </div>
-      ` : '';
+      `
+                : '';
 
-      const reviewToolbarHtml = d.state === 'Draft' ? `
+            const reviewToolbarHtml =
+              d.state === 'Draft'
+                ? `
         <div class="review-toolbar">
           <button class="btn-review btn-confirm" onclick="handleReviewAction('${d.id}', 'confirm')">✅ 확정 승인 (Confirm)</button>
           <button class="btn-review btn-defer" onclick="handleReviewAction('${d.id}', 'defer')">⏸️ 보류 (Defer)</button>
           <button class="btn-review btn-reject" onclick="handleReviewAction('${d.id}', 'reject')">❌ 기각 및 삭제 (Reject)</button>
         </div>
-      ` : '';
+      `
+                : '';
 
-      const rawMessages = d.source?.rawMessages || [];
-      let transcriptHtml = '';
+            const rawMessages = d.source?.rawMessages || [];
+            let transcriptHtml = '';
 
-      if (rawMessages.length > 0) {
-        transcriptHtml = `
+            if (rawMessages.length > 0) {
+              transcriptHtml = `
           <details class="transcript-accordion">
             <summary class="transcript-summary">
               <span>💬 대화 원문 보기 (${rawMessages.length}개 메시지)</span>
               <span>▼</span>
             </summary>
             <div class="transcript-body">
-              ${rawMessages.map(m => `
+              ${rawMessages
+                .map(
+                  m => `
                 <div class="chat-bubble">
                   <div class="chat-bubble-header">
                     <span class="chat-author">${m.author}</span>
@@ -584,12 +658,14 @@
                   </div>
                   <div class="chat-text">${m.content}</div>
                 </div>
-              `).join('')}
+              `,
+                )
+                .join('')}
             </div>
           </details>
         `;
-      } else if (d.rawTranscript) {
-        transcriptHtml = `
+            } else if (d.rawTranscript) {
+              transcriptHtml = `
           <details class="transcript-accordion">
             <summary class="transcript-summary">
               <span>💬 대화 원문 보기</span>
@@ -600,9 +676,9 @@
             </div>
           </details>
         `;
-      }
+            }
 
-      return `
+            return `
         <div class="timeline-node">
           <div class="timeline-dot ${dotClass}"></div>
           <div class="card">
@@ -634,26 +710,26 @@
           </div>
         </div>
       `;
-    }).join('');
-  }
+          })
+          .join('');
+      }
 
-  // Tabs
-  document.querySelectorAll('.tab-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      currentTab = btn.dataset.tab;
-      renderTimeline();
-    });
-  });
+      // Tabs
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          currentTab = btn.dataset.tab;
+          renderTimeline();
+        });
+      });
 
-  document.getElementById('btn-refresh').addEventListener('click', fetchDecisions);
-  document.getElementById('search-input').addEventListener('input', renderTimeline);
-  document.getElementById('state-filter').addEventListener('change', renderTimeline);
-  document.getElementById('category-filter').addEventListener('change', renderTimeline);
+      document.getElementById('btn-refresh').addEventListener('click', fetchDecisions);
+      document.getElementById('search-input').addEventListener('input', renderTimeline);
+      document.getElementById('state-filter').addEventListener('change', renderTimeline);
+      document.getElementById('category-filter').addEventListener('change', renderTimeline);
 
-  fetchDecisions();
-</script>
-
-</body>
+      fetchDecisions();
+    </script>
+  </body>
 </html>

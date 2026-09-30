@@ -23,9 +23,9 @@ export function createLogger(serviceName: string): winston.Logger {
       format: winston.format.combine(
         winston.format.colorize(),
         winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
-        customFormat
-      )
-    })
+        customFormat,
+      ),
+    }),
   ];
 
   if (fs.existsSync(logDir)) {
@@ -35,21 +35,21 @@ export function createLogger(serviceName: string): winston.Logger {
         level: 'error',
         format: winston.format.combine(
           winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
-          customFormat
-        )
+          customFormat,
+        ),
       }),
       new winston.transports.File({
         filename: path.join(logDir, 'combined.log'),
         format: winston.format.combine(
           winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
-          customFormat
-        )
-      })
+          customFormat,
+        ),
+      }),
     );
   }
 
   return winston.createLogger({
     level: process.env.LOG_LEVEL || 'info',
-    transports
+    transports,
   });
 }
