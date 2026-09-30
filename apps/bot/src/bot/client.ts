@@ -3,8 +3,7 @@ import { GatewayIntentBits, Partials, Message } from 'discord.js';
 import { Client } from 'discordx';
 import { Decision, createLogger, HarvestingPolicyConfig, DEFAULT_HARVESTING_POLICY } from '@ggaddak/shared';
 import { BackendApiService } from '../services/backend-api.service.js';
-import { HarvesterService } from '../services/harvester.service.js';
-import { AnalysisService } from '../services/analysis.service.js';
+import { DiscussionHarvester } from '../services/harvester.service.js';
 import { MessageHandler, CONSENSUS_REGEX } from '../handlers/message.handler.js';
 import { ReactionHandler } from '../handlers/reaction.handler.js';
 import { registerEvents } from '../events/index.js';
@@ -24,7 +23,7 @@ export { CONSENSUS_REGEX };
 export class DecisionTrackerBot {
   public client: Client;
   private backendApi: BackendApiService;
-  private analysisService: AnalysisService;
+  private analysisService: DiscussionHarvester;
   private messageHandler: MessageHandler;
   private reactionHandler: ReactionHandler;
   private policy: HarvestingPolicyConfig = DEFAULT_HARVESTING_POLICY;
@@ -32,8 +31,7 @@ export class DecisionTrackerBot {
   constructor(config: BotConfig) {
     const triggerEmoji = config.triggerEmoji || '📌';
     this.backendApi = new BackendApiService(config.backendUrl);
-    const harvester = new HarvesterService();
-    this.analysisService = new AnalysisService(this.backendApi, harvester);
+    this.analysisService = new DiscussionHarvester(this.backendApi);
 
     this.messageHandler = new MessageHandler(
       (msg, override) => this.analysisService.executeAnalysis(msg, this.policy, override),

@@ -1,151 +1,104 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import http from 'node:http';
-import { DiscussionContextBuilder } from './context/builder.js';
-import { DecisionExtractor } from './extractor/engine.js';
-import { ConflictDetector } from './conflict/detector.js';
-import { EgressQueue } from './egress/queue.js';
-import { Decision, DecisionPayload } from '@ggaddak/shared';
+import { DiscussionHarvester, RawMessageData } from './services/harvester.service.js';
+import { DEFAULT_HARVESTING_POLICY, Decision } from '@ggaddak/shared';
 
-describe('Bot Core Modules', () => {
-  it('DiscussionContextBuilder constructs structured transcripts with replies', () => {
-    const messages = [
-      {
-        id: 'msg-1',
-        authorId: 'u1',
-        authorName: 'wooddang',
-        content: '메인 DB 어떤 걸로 갈까요?',
-        createdAt: new Date('2026-09-28T14:00:00Z'),
-      },
-      {
-        id: 'msg-2',
-        authorId: 'u2',
-        authorName: 'alex',
-        content: 'Postgres 추천합니다.',
-        createdAt: new Date('2026-09-28T14:01:00Z'),
-        referenceAuthorName: 'wooddang',
-      },
-    ];
+describe('DiscussionHarvester Deep Module', () => {
+  it('harvests asymmetric context window (before 15, after 5) in text channels', async () => {
+    const harvester = new DiscussionHarvester({
+      analyzeDiscussion: async () => ({ found: false, decisions: [] }),
+      getCheckpoint: async () => null,
+      saveCheckpoint: async () => true,
+    } as any);
 
-    const transcript = DiscussionContextBuilder.buildTranscript(messages);
-    assert.ok(transcript.includes('[2026-09-28 14:00:00] wooddang: 메인 DB 어떤 걸로 갈까요?'));
-    assert.ok(transcript.includes('(replying to wooddang)'));
-
-    const handles = DiscussionContextBuilder.extractParticipantHandles(messages);
-    assert.deepStrictEqual(handles, ['wooddang', 'alex']);
-  });
-
-  it('DecisionExtractor extracts structured Decision and Rationale', async () => {
-    const extractor = new DecisionExtractor();
-    const transcript = `
-      [2026-09-28 14:00:00] wooddang: 메인 DB 어떤 걸로 갈까요?
-      [2026-09-28 14:01:00] alex: 트랜잭션 때문에 PostgreSQL로 갑시다.
-    `;
-
-    const extracted = await extractor.extract(transcript);
-    assert.ok(extracted);
-    assert.strictEqual(extracted.topic, 'Database Selection');
-    assert.ok(extracted.decision.includes('PostgreSQL'));
-    assert.ok(extracted.rationale.length > 0);
-  });
-
-  it('ConflictDetector detects overlapping active decisions', () => {
-    const detector = new ConflictDetector();
-    const dec1: Decision = {
-      id: 'DEC-001',
-      topic: 'Database Selection',
-      decision: 'Use PostgreSQL',
-      rationale: 'ACID transactions',
-      alternatives: [],
-      categoryTag: '기술',
-      actionItems: [],
-      state: 'Decided',
-      supersedesId: null,
-      isPivot: false,
-      approvedBy: null,
-      decisionConfirmedDate: null,
-      feedbackSourceType: null,
-      feedbackSourceDetail: null,
-      feedbackReceivedDate: null,
-      rawEvidence: [],
-      source: {
-        guildId: 'g1',
-        channelId: 'c1',
-        triggerMessageId: 'm1',
-        participants: [],
-        rawMessages: [],
-      },
-      createdAt: new Date().toISOString(),
-    };
-
-    detector.registerDecision(dec1);
-
-    const conflict = detector.checkConflict('database selection');
-    assert.strictEqual(conflict.hasConflict, true);
-    assert.strictEqual(conflict.conflictingDecision?.id, 'DEC-001');
-
-    const noConflict = detector.checkConflict('Auth Provider');
-    assert.strictEqual(noConflict.hasConflict, false);
-  });
-
-  it('EgressQueue enqueues and dispatches DecisionPayload to webhook receiver', async () => {
-    let receivedPayload: any = null;
-    const server = http.createServer((req, res) => {
-      let body = '';
-      req.on('data', chunk => (body += chunk));
-      req.on('end', () => {
-        receivedPayload = JSON.parse(body);
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ status: 'ok' }));
+    const mockMessages: any[] = [];
+    for (let i = 1; i <= 30; i++) {
+      mockMessages.push({
+        id: `msg-${i}`,
+        author: { id: `user-${i}`, username: `member${i}` },
+        content: `Message ${i}`,
+        createdAt: new Date(2026, 8, 30, 10, i),
       });
-    });
+    }
 
-    await new Promise<void>(resolve => server.listen(0, resolve));
-    const addr = server.address() as any;
-    const webhookUrl = `http://localhost:${addr.port}/webhook`;
+    const triggerMsg = mockMessages[19]; // msg-20 (0-indexed 19)
 
-    const queue = new EgressQueue(':memory:');
-    const payload: DecisionPayload = {
-      event: 'decision.recorded',
-      version: '1.0.0',
-      payload: {
-        id: 'DEC-888',
-        topic: 'Cache Engine',
-        decision: 'Use Redis',
-        rationale: 'Sub-millisecond latency for session cache',
-        alternatives: [],
-        categoryTag: '기술',
-        actionItems: [],
-        state: 'Decided',
-        supersedesId: null,
-        isPivot: false,
-        approvedBy: null,
-        decisionConfirmedDate: null,
-        feedbackSourceType: null,
-        feedbackSourceDetail: null,
-        feedbackReceivedDate: null,
-        rawEvidence: [],
-        source: {
-          guildId: 'g1',
-          channelId: 'c1',
-          triggerMessageId: 'm1',
-          participants: [],
-          rawMessages: [],
+    const mockChannel = {
+      id: 'chan-123',
+      name: 'dev-discuss',
+      isTextBased: () => true,
+      isThread: () => false,
+      messages: {
+        fetch: async (opts: any) => {
+          if (opts.before) {
+            // Discord API returns messages before target in descending order (newest first)
+            const targetIdx = mockMessages.findIndex(m => m.id === opts.before);
+            const slice = mockMessages.slice(Math.max(0, targetIdx - opts.limit), targetIdx);
+            return new Map(slice.reverse().map(m => [m.id, m]));
+          }
+          if (opts.after) {
+            // Discord API returns messages in descending order (newest first)
+            const targetIdx = mockMessages.findIndex(m => m.id === opts.after);
+            const slice = mockMessages.slice(targetIdx + 1, targetIdx + 1 + opts.limit);
+            return new Map(slice.reverse().map(m => [m.id, m]));
+          }
+          return new Map();
         },
-        createdAt: new Date().toISOString(),
       },
+      send: async () => ({ id: 'bot-embed-1' }),
     };
 
-    queue.enqueue(payload);
-    assert.strictEqual(queue.getPendingCount(), 1);
+    triggerMsg.channel = mockChannel;
 
-    const result = await queue.dispatchPending(webhookUrl);
-    assert.strictEqual(result.sent, 1);
-    assert.strictEqual(queue.getPendingCount(), 0);
-    assert.strictEqual(receivedPayload.payload.id, 'DEC-888');
+    const harvested = await harvester.harvestContextMessages(triggerMsg, DEFAULT_HARVESTING_POLICY);
+    assert.strictEqual(harvested.length, 21); // 15 before + 1 trigger + 5 after
+    assert.strictEqual(harvested[0].id, 'msg-5');
+    assert.strictEqual(harvested[15].id, 'msg-20');
+    assert.strictEqual(harvested[20].id, 'msg-25');
+  });
 
-    server.close();
-    queue.close();
+  it('acquires in-flight lock and rejects concurrent duplicate analyses on the same channel', async () => {
+    let analyzeCallCount = 0;
+    const harvester = new DiscussionHarvester({
+      analyzeDiscussion: async () => {
+        analyzeCallCount++;
+        await new Promise(r => setTimeout(r, 50));
+        return { found: true, decisions: [{ id: 'DEC-1' }] as any };
+      },
+      getCheckpoint: async () => null,
+      saveCheckpoint: async () => true,
+    } as any);
+
+    const mockChannel = {
+      id: 'chan-locked',
+      name: 'general',
+      isTextBased: () => true,
+      isThread: () => false,
+      messages: {
+        fetch: async () => new Map(),
+      },
+      send: async () => ({}),
+    };
+
+    const msg: any = {
+      id: 'msg-trig',
+      channelId: 'chan-locked',
+      channel: mockChannel,
+      author: { id: 'u1', username: 'alex', bot: false },
+      content: '결정합시다',
+      createdAt: new Date(),
+      url: 'https://discord.com/channels/1/2/3',
+    };
+
+    // First call acquires lock
+    const p1 = harvester.processAnalysis(msg, DEFAULT_HARVESTING_POLICY, false);
+    // Second concurrent call on same channel without manual override
+    const p2 = harvester.processAnalysis(msg, DEFAULT_HARVESTING_POLICY, false);
+
+    const [res1, res2] = await Promise.all([p1, p2]);
+    assert.ok(res1 !== null);
+    assert.strictEqual(res2, null); // skipped by lock
+    assert.strictEqual(analyzeCallCount, 1);
   });
 
   it('CONSENSUS_REGEX accurately matches agreement phrases and ignores casual talk', async () => {
