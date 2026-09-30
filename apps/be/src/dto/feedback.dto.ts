@@ -1,15 +1,38 @@
 import { z } from 'zod';
-import { ExternalFeedback, ExternalFeedbackSchema } from '@ggaddak/shared';
+import { ExternalFeedbackSchema } from '@ggaddak/shared';
+
+export type FeedbackSourceType = '교수' | '심사위원' | '팀원' | '인터뷰이';
+
+export interface ExternalFeedbackItemDto {
+  id: string;
+  source: FeedbackSourceType;
+  detail?: string;
+  content: string;
+  channelId: string;
+  createdAt: string;
+}
 
 export const CreateFeedbackDtoSchema = ExternalFeedbackSchema;
-export type CreateFeedbackDto = z.infer<typeof CreateFeedbackDtoSchema>;
+
+export interface CreateFeedbackDto {
+  id: string;
+  source: FeedbackSourceType;
+  detail?: string;
+  content: string;
+  channelId: string;
+  createdAt: string;
+}
 
 export const QueryFeedbacksDtoSchema = z.object({
   channelId: z.string().optional(),
   limit: z.coerce.number().optional().default(10),
 });
-export type QueryFeedbacksDto = z.infer<typeof QueryFeedbacksDtoSchema>;
+
+export interface QueryFeedbacksDto {
+  channelId?: string;
+  limit?: number;
+}
 
 export interface FeedbackListResponseDto {
-  feedbacks: ExternalFeedback[];
+  feedbacks: ExternalFeedbackItemDto[];
 }

@@ -1,10 +1,28 @@
+import { Controller, Route, Tags, Post, Body } from 'tsoa';
+import { Service } from 'typedi';
 import { Request, Response, NextFunction } from 'express';
 import { DiscussionService } from '../../services/discussion.service.js';
-import { AnalyzeDiscussionRequestDtoSchema } from '../../dto/discussion.dto.js';
+import {
+  AnalyzeDiscussionRequestDtoSchema,
+  AnalyzeDiscussionRequestDto,
+  AnalyzeDiscussionResponseDto,
+} from '../../dto/discussion.dto.js';
 import { BadRequestError } from '../../errors/AppError.js';
 
-export class DiscussionController {
-  constructor(private service: DiscussionService) {}
+@Tags('Discussions')
+@Route('api/discussions')
+@Service()
+export class DiscussionController extends Controller {
+  constructor(private service: DiscussionService) {
+    super();
+  }
+
+  @Post('analyze')
+  public async analyze(
+    @Body() body: AnalyzeDiscussionRequestDto,
+  ): Promise<AnalyzeDiscussionResponseDto> {
+    return this.service.analyzeDiscussion(body);
+  }
 
   analyzeDiscussion = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {

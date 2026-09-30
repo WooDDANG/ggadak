@@ -1,10 +1,38 @@
+import { Controller, Route, Tags, Get, Post, Body, Path } from 'tsoa';
+import { Service } from 'typedi';
 import { Request, Response, NextFunction } from 'express';
 import { CheckpointService } from '../../services/checkpoint.service.js';
-import { SaveCheckpointDtoSchema } from '../../dto/checkpoint.dto.js';
+import {
+  SaveCheckpointDtoSchema,
+  SaveCheckpointDto,
+  CheckpointResponseDto,
+} from '../../dto/checkpoint.dto.js';
 import { BadRequestError } from '../../errors/AppError.js';
 
-export class CheckpointController {
-  constructor(private service: CheckpointService) {}
+@Tags('Checkpoints')
+@Route('api/checkpoints')
+@Service()
+export class CheckpointController extends Controller {
+  constructor(private service: CheckpointService) {
+    super();
+  }
+
+  @Get('{channelId}')
+  public async getByChannelId(
+    @Path() channelId: string,
+  ): Promise<CheckpointResponseDto> {
+    const lastMessageId = this.service.getCheckpoint(channelId);
+    return { channelId, lastMessageId };
+  }
+
+  @Post('{channelId}')
+  public async save(
+    @Path() channelId: string,
+    @Body() body: SaveCheckpointDto,
+  ): Promise<{ status: string; channelId: string; lastMessageId: string }> {
+    this.service.saveCheckpoint(channelId, body.lastMessageId);
+    return { status: 'ok', channelId, lastMessageId: body.lastMessageId };
+  }
 
   getCheckpoint = (req: Request, res: Response, next: NextFunction): void => {
     try {

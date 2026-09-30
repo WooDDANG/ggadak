@@ -1,8 +1,10 @@
+import { Service } from 'typedi';
 import { ExternalFeedback, createLogger } from '@ggaddak/shared';
-import { DecisionRepository } from '../db.js';
+import { DecisionRepository } from '../repositories/decision.repository.js';
 
 const logger = createLogger('BE-FEEDBACK-SERVICE');
 
+@Service()
 export class FeedbackService {
   constructor(private repo: DecisionRepository) {}
 

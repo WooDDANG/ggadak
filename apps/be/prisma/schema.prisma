@@ -1,0 +1,62 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Decision {
+  id              String   @id
+  guildId         String
+  channelId       String
+  messageId       String
+  title           String
+  decisionSummary String
+  keyReason       String
+  status          String   @default("proposed") // "proposed" | "confirmed" | "rejected"
+  decisionMaker   String
+  participants    String   // JSON string array
+  alternatives    String   // JSON string array
+  tags            String   // JSON string array
+  supersedesId    String?
+  supersededById  String?
+  sourceJumpUrl   String
+  evidenceSummary String
+  evidenceHash    String
+  governanceScore Float
+  governanceReason String
+  governancePassed Boolean
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  archivedAt      DateTime?
+
+  @@index([guildId, channelId])
+  @@index([status])
+  @@index([supersedesId])
+}
+
+model ExternalFeedback {
+  id           String   @id
+  decisionId   String
+  source       String   // "slack" | "jira" | "github" | "manual"
+  author       String
+  content      String
+  externalUrl  String?
+  createdAt    DateTime @default(now())
+
+  @@index([decisionId])
+}
+
+model ChannelCheckpoint {
+  channelId     String   @id
+  lastMessageId String
+  updatedAt     DateTime @default(now())
+}
+
+model RejectedEvidenceHash {
+  evidenceHash String   @id
+  reason       String
+  createdAt    DateTime @default(now())
+}

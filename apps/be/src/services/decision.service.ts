@@ -1,5 +1,6 @@
+import { Service } from 'typedi';
 import { Decision, ReviewAction, createLogger } from '@ggaddak/shared';
-import { DecisionRepository } from '../db.js';
+import { DecisionRepository } from '../repositories/decision.repository.js';
 
 const logger = createLogger('BE-DECISION-SERVICE');
 
@@ -9,6 +10,7 @@ export interface QueryDecisionsFilter {
   categoryTag?: string;
 }
 
+@Service()
 export class DecisionService {
   constructor(private repo: DecisionRepository) {}
 

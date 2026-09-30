@@ -1,7 +1,8 @@
 import crypto from 'node:crypto';
+import { Service } from 'typedi';
 import { Decision, createLogger } from '@ggaddak/shared';
 import { DecisionRepository } from '../repositories/decision.repository.js';
-import { IAiAdapter } from '../adapters/ai.adapter.js';
+import { AiAdapter } from '../adapters/ai.adapter.js';
 
 const logger = createLogger('BE-DISCUSSION-SERVICE');
 
@@ -22,10 +23,11 @@ export interface AnalyzeDiscussionResult {
   conflictingDecision?: Decision;
 }
 
+@Service()
 export class DiscussionService {
   constructor(
     private repo: DecisionRepository,
-    private extractor: IAiAdapter,
+    private extractor: AiAdapter,
   ) {}
 
   async analyzeDiscussion(params: AnalyzeDiscussionParams): Promise<AnalyzeDiscussionResult> {

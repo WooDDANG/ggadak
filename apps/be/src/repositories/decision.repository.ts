@@ -1,13 +1,16 @@
 import { DatabaseSync } from 'node:sqlite';
+import { Service } from 'typedi';
 import { Decision, ExternalFeedback, ReviewAction } from '@ggaddak/shared';
 import { DecisionMapper, FeedbackMapper } from '../mappers/index.js';
 import { DecisionDbRow, FeedbackDbRow } from '../models/index.js';
 
+@Service()
 export class DecisionRepository {
   private db: DatabaseSync;
 
-  constructor(dbPath: string = ':memory:') {
-    this.db = new DatabaseSync(dbPath);
+  constructor(dbPath?: string) {
+    const targetPath = dbPath || process.env.DATABASE_PATH || 'decisions.sqlite';
+    this.db = new DatabaseSync(targetPath);
     this.init();
   }
 

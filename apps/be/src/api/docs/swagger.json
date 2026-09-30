@@ -1,0 +1,949 @@
+{
+	"openapi": "3.0.0",
+	"components": {
+		"examples": {},
+		"headers": {},
+		"parameters": {},
+		"requestBodies": {},
+		"responses": {},
+		"schemas": {
+			"HarvestingPolicyDto": {
+				"properties": {
+					"initialScanLimit": {
+						"type": "number",
+						"format": "double"
+					},
+					"contextWindowBefore": {
+						"type": "number",
+						"format": "double"
+					},
+					"contextWindowAfter": {
+						"type": "number",
+						"format": "double"
+					},
+					"maxMergedWindow": {
+						"type": "number",
+						"format": "double"
+					},
+					"reactionThreshold": {
+						"type": "number",
+						"format": "double"
+					},
+					"debounceMs": {
+						"type": "number",
+						"format": "double"
+					},
+					"agreementThreshold": {
+						"type": "number",
+						"format": "double"
+					},
+					"lookbackDays": {
+						"type": "number",
+						"format": "double"
+					}
+				},
+				"required": [
+					"initialScanLimit",
+					"contextWindowBefore",
+					"contextWindowAfter",
+					"maxMergedWindow",
+					"reactionThreshold",
+					"debounceMs",
+					"agreementThreshold",
+					"lookbackDays"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"FeedbackSourceType": {
+				"type": "string",
+				"enum": [
+					"교수",
+					"심사위원",
+					"팀원",
+					"인터뷰이"
+				]
+			},
+			"ExternalFeedbackItemDto": {
+				"properties": {
+					"id": {
+						"type": "string"
+					},
+					"source": {
+						"$ref": "#/components/schemas/FeedbackSourceType"
+					},
+					"detail": {
+						"type": "string"
+					},
+					"content": {
+						"type": "string"
+					},
+					"channelId": {
+						"type": "string"
+					},
+					"createdAt": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"id",
+					"source",
+					"content",
+					"channelId",
+					"createdAt"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"FeedbackListResponseDto": {
+				"properties": {
+					"feedbacks": {
+						"items": {
+							"$ref": "#/components/schemas/ExternalFeedbackItemDto"
+						},
+						"type": "array"
+					}
+				},
+				"required": [
+					"feedbacks"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"CreateFeedbackDto": {
+				"properties": {
+					"id": {
+						"type": "string"
+					},
+					"source": {
+						"$ref": "#/components/schemas/FeedbackSourceType"
+					},
+					"detail": {
+						"type": "string"
+					},
+					"content": {
+						"type": "string"
+					},
+					"channelId": {
+						"type": "string"
+					},
+					"createdAt": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"id",
+					"source",
+					"content",
+					"channelId",
+					"createdAt"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"AlternativeItemDto": {
+				"properties": {
+					"option": {
+						"type": "string"
+					},
+					"reason": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"option",
+					"reason"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"ActionItemDto": {
+				"properties": {
+					"task": {
+						"type": "string"
+					},
+					"assignee": {
+						"type": "string"
+					},
+					"dueDate": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"task"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"Record_string.any_": {
+				"properties": {},
+				"additionalProperties": {},
+				"type": "object",
+				"description": "Construct a type with a set of properties K of type T"
+			},
+			"DecisionItemDto": {
+				"properties": {
+					"id": {
+						"type": "string"
+					},
+					"topic": {
+						"type": "string"
+					},
+					"decision": {
+						"type": "string"
+					},
+					"title": {
+						"type": "string"
+					},
+					"decisionContent": {
+						"type": "string"
+					},
+					"rationale": {
+						"type": "string"
+					},
+					"alternatives": {
+						"items": {
+							"$ref": "#/components/schemas/AlternativeItemDto"
+						},
+						"type": "array"
+					},
+					"categoryTag": {
+						"type": "string",
+						"enum": [
+							"타깃",
+							"문제정의",
+							"기능",
+							"기술",
+							"BM",
+							"기타"
+						]
+					},
+					"actionItems": {
+						"items": {
+							"$ref": "#/components/schemas/ActionItemDto"
+						},
+						"type": "array"
+					},
+					"state": {
+						"type": "string",
+						"enum": [
+							"Draft",
+							"Proposed",
+							"Discussing",
+							"Decided",
+							"Superseded",
+							"Deferred",
+							"Rejected"
+						]
+					},
+					"supersedesId": {
+						"type": "string",
+						"nullable": true
+					},
+					"isPivot": {
+						"type": "boolean",
+						"nullable": true
+					},
+					"approvedBy": {
+						"type": "string",
+						"nullable": true
+					},
+					"decisionConfirmedDate": {
+						"type": "string",
+						"nullable": true
+					},
+					"feedbackSourceType": {
+						"type": "string",
+						"nullable": true
+					},
+					"feedbackSourceDetail": {
+						"type": "string",
+						"nullable": true
+					},
+					"feedbackReceivedDate": {
+						"type": "string",
+						"nullable": true
+					},
+					"rawEvidence": {
+						"items": {
+							"type": "string"
+						},
+						"type": "array"
+					},
+					"evidenceHash": {
+						"type": "string",
+						"nullable": true
+					},
+					"rawTranscript": {
+						"type": "string",
+						"nullable": true
+					},
+					"source": {
+						"$ref": "#/components/schemas/Record_string.any_"
+					},
+					"messageCreatedAt": {
+						"type": "string",
+						"nullable": true
+					},
+					"createdAt": {
+						"type": "string"
+					},
+					"governanceScore": {
+						"type": "number",
+						"format": "double"
+					},
+					"governanceReason": {
+						"type": "string"
+					},
+					"governancePassed": {
+						"type": "boolean"
+					}
+				},
+				"required": [
+					"id",
+					"topic",
+					"decision",
+					"rationale",
+					"state",
+					"createdAt"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"AnalyzeDiscussionResponseDto": {
+				"properties": {
+					"found": {
+						"type": "boolean"
+					},
+					"summary": {
+						"type": "string"
+					},
+					"decisions": {
+						"items": {
+							"$ref": "#/components/schemas/DecisionItemDto"
+						},
+						"type": "array"
+					},
+					"hasConflict": {
+						"type": "boolean"
+					},
+					"conflictingDecision": {
+						"$ref": "#/components/schemas/DecisionItemDto"
+					}
+				},
+				"required": [
+					"found",
+					"summary",
+					"decisions"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"RawMessageItemDto": {
+				"properties": {
+					"id": {
+						"type": "string"
+					},
+					"author": {
+						"type": "string"
+					},
+					"content": {
+						"type": "string"
+					},
+					"createdAt": {
+						"type": "string"
+					},
+					"replyingTo": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"author",
+					"content"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"AnalyzeDiscussionRequestDto": {
+				"properties": {
+					"rawMessages": {
+						"items": {
+							"$ref": "#/components/schemas/RawMessageItemDto"
+						},
+						"type": "array"
+					},
+					"guildId": {
+						"type": "string"
+					},
+					"channelId": {
+						"type": "string"
+					},
+					"channelName": {
+						"type": "string"
+					},
+					"triggerMessageId": {
+						"type": "string"
+					},
+					"messageUrl": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"rawMessages"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"DecisionListResponseDto": {
+				"properties": {
+					"decisions": {
+						"items": {
+							"$ref": "#/components/schemas/DecisionItemDto"
+						},
+						"type": "array"
+					}
+				},
+				"required": [
+					"decisions"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"ReviewDecisionResponseDto": {
+				"properties": {
+					"status": {
+						"type": "string",
+						"enum": [
+							"ok"
+						],
+						"nullable": false
+					},
+					"decision": {
+						"$ref": "#/components/schemas/DecisionItemDto"
+					}
+				},
+				"required": [
+					"status",
+					"decision"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"ReviewDecisionDto": {
+				"properties": {
+					"action": {
+						"type": "string",
+						"enum": [
+							"confirm",
+							"defer",
+							"reject",
+							"edit"
+						]
+					},
+					"approvedBy": {
+						"type": "string"
+					},
+					"title": {
+						"type": "string"
+					},
+					"decisionContent": {
+						"type": "string"
+					},
+					"rationale": {
+						"type": "string"
+					},
+					"categoryTag": {
+						"type": "string",
+						"enum": [
+							"타깃",
+							"문제정의",
+							"기능",
+							"기술",
+							"BM",
+							"기타"
+						]
+					}
+				},
+				"required": [
+					"action"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"ResolveConflictDto": {
+				"properties": {
+					"decisionId": {
+						"type": "string"
+					},
+					"conflictingId": {
+						"type": "string"
+					},
+					"resolution": {
+						"type": "string",
+						"enum": [
+							"supersede",
+							"coexist"
+						]
+					}
+				},
+				"required": [
+					"decisionId",
+					"conflictingId",
+					"resolution"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"DecisionWebhookDto": {
+				"properties": {
+					"event": {
+						"type": "string"
+					},
+					"payload": {}
+				},
+				"required": [
+					"event",
+					"payload"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"CheckpointResponseDto": {
+				"properties": {
+					"channelId": {
+						"type": "string"
+					},
+					"lastMessageId": {
+						"type": "string",
+						"nullable": true
+					}
+				},
+				"required": [
+					"channelId",
+					"lastMessageId"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"SaveCheckpointDto": {
+				"properties": {
+					"lastMessageId": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"lastMessageId"
+				],
+				"type": "object",
+				"additionalProperties": false
+			}
+		},
+		"securitySchemes": {}
+	},
+	"info": {
+		"title": "@ggaddak/be",
+		"version": "1.0.0",
+		"contact": {}
+	},
+	"paths": {
+		"/api/policy": {
+			"get": {
+				"operationId": "Get",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/HarvestingPolicyDto"
+								}
+							}
+						}
+					}
+				},
+				"tags": [
+					"Policy"
+				],
+				"security": [],
+				"parameters": []
+			}
+		},
+		"/api/feedbacks": {
+			"get": {
+				"operationId": "ListFeedbacks",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/FeedbackListResponseDto"
+								}
+							}
+						}
+					}
+				},
+				"tags": [
+					"Feedbacks"
+				],
+				"security": [],
+				"parameters": [
+					{
+						"in": "query",
+						"name": "channelId",
+						"required": false,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"in": "query",
+						"name": "limit",
+						"required": false,
+						"schema": {
+							"format": "double",
+							"type": "number"
+						}
+					}
+				]
+			},
+			"post": {
+				"operationId": "CreateFeedback",
+				"responses": {
+					"201": {
+						"description": "Created",
+						"content": {
+							"application/json": {
+								"schema": {
+									"properties": {
+										"id": {
+											"type": "string"
+										},
+										"status": {
+											"type": "string"
+										}
+									},
+									"required": [
+										"id",
+										"status"
+									],
+									"type": "object"
+								}
+							}
+						}
+					}
+				},
+				"tags": [
+					"Feedbacks"
+				],
+				"security": [],
+				"parameters": [],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/CreateFeedbackDto"
+							}
+						}
+					}
+				}
+			}
+		},
+		"/api/discussions/analyze": {
+			"post": {
+				"operationId": "Analyze",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/AnalyzeDiscussionResponseDto"
+								}
+							}
+						}
+					}
+				},
+				"tags": [
+					"Discussions"
+				],
+				"security": [],
+				"parameters": [],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/AnalyzeDiscussionRequestDto"
+							}
+						}
+					}
+				}
+			}
+		},
+		"/api/decisions": {
+			"get": {
+				"operationId": "ListDecisions",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/DecisionListResponseDto"
+								}
+							}
+						}
+					}
+				},
+				"tags": [
+					"Decisions"
+				],
+				"security": [],
+				"parameters": [
+					{
+						"in": "query",
+						"name": "topic",
+						"required": false,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"in": "query",
+						"name": "state",
+						"required": false,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"in": "query",
+						"name": "categoryTag",
+						"required": false,
+						"schema": {
+							"type": "string"
+						}
+					}
+				]
+			}
+		},
+		"/api/decisions/{id}/review": {
+			"post": {
+				"operationId": "Review",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ReviewDecisionResponseDto"
+								}
+							}
+						}
+					}
+				},
+				"tags": [
+					"Decisions"
+				],
+				"security": [],
+				"parameters": [
+					{
+						"in": "path",
+						"name": "id",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/ReviewDecisionDto"
+							}
+						}
+					}
+				}
+			}
+		},
+		"/api/decisions/conflict": {
+			"post": {
+				"operationId": "Resolve",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"properties": {
+										"status": {
+											"type": "string"
+										}
+									},
+									"required": [
+										"status"
+									],
+									"type": "object"
+								}
+							}
+						}
+					}
+				},
+				"tags": [
+					"Decisions"
+				],
+				"security": [],
+				"parameters": [],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/ResolveConflictDto"
+							}
+						}
+					}
+				}
+			}
+		},
+		"/api/webhooks/decisions": {
+			"post": {
+				"operationId": "Webhook",
+				"responses": {
+					"201": {
+						"description": "Created",
+						"content": {
+							"application/json": {
+								"schema": {
+									"properties": {
+										"id": {
+											"type": "string"
+										},
+										"status": {
+											"type": "string"
+										}
+									},
+									"required": [
+										"id",
+										"status"
+									],
+									"type": "object"
+								}
+							}
+						}
+					}
+				},
+				"tags": [
+					"Decisions"
+				],
+				"security": [],
+				"parameters": [],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/DecisionWebhookDto"
+							}
+						}
+					}
+				}
+			}
+		},
+		"/api/checkpoints/{channelId}": {
+			"get": {
+				"operationId": "GetByChannelId",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/CheckpointResponseDto"
+								}
+							}
+						}
+					}
+				},
+				"tags": [
+					"Checkpoints"
+				],
+				"security": [],
+				"parameters": [
+					{
+						"in": "path",
+						"name": "channelId",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				]
+			},
+			"post": {
+				"operationId": "Save",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"properties": {
+										"lastMessageId": {
+											"type": "string"
+										},
+										"channelId": {
+											"type": "string"
+										},
+										"status": {
+											"type": "string"
+										}
+									},
+									"required": [
+										"lastMessageId",
+										"channelId",
+										"status"
+									],
+									"type": "object"
+								}
+							}
+						}
+					}
+				},
+				"tags": [
+					"Checkpoints"
+				],
+				"security": [],
+				"parameters": [
+					{
+						"in": "path",
+						"name": "channelId",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/SaveCheckpointDto"
+							}
+						}
+					}
+				}
+			}
+		}
+	},
+	"servers": [
+		{
+			"url": "/"
+		}
+	]
+}

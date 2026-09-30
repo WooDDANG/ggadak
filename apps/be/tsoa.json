@@ -1,0 +1,20 @@
+{
+  "entryFile": "src/index.ts",
+  "noImplicitAdditionalProperties": "silently-remove-extras",
+  "controllerPathGlobs": ["src/api/controllers/**/*.controller.ts"],
+  "routes": {
+    "routesDir": "src/api/routes/generated",
+    "iocModule": "src/loaders/ioc.ts",
+    "middleware": "express",
+    "esm": true
+  },
+  "spec": {
+    "outputDirectory": "src/api/docs",
+    "specVersion": 3,
+    "info": {
+      "title": "GGADDAK Decision Tracking Backend API",
+      "version": "1.0.0",
+      "description": "Discord Governance & Decision Tracking API with AI Extraction"
+    }
+  }
+}

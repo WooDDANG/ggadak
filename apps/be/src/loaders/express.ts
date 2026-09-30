@@ -1,3 +1,6 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import swaggerUi from 'swagger-ui-express';
 import express, { Express } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -42,7 +45,19 @@ export function initExpress({
     }),
   );
 
-  // 6. Health & Status Check
+  // 6. Swagger UI Docs (/api-docs)
+  try {
+    const swaggerDocPath = path.resolve(process.cwd(), 'src/api/docs/swagger.json');
+    if (fs.existsSync(swaggerDocPath)) {
+      const swaggerDocument = JSON.parse(fs.readFileSync(swaggerDocPath, 'utf-8'));
+      app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+      logger.info('✌️ Swagger UI documentation mounted at /api-docs');
+    }
+  } catch (err: any) {
+    logger.warn(`Failed to initialize Swagger UI: ${err.message}`);
+  }
+
+  // 7. Health & Status Check
   app.get('/health', (_req, res) => {
     res.status(200).json({ status: 'healthy' });
   });
@@ -50,18 +65,18 @@ export function initExpress({
     res.status(200).json({ status: 'ok' });
   });
 
-  // 7. Mount API Sub-Routers
+  // 8. Mount API Sub-Routers
   const apiRouter = createApiRouter(controllers);
   app.use('/api', apiRouter);
 
-  // 8. 404 Route Handler
+  // 9. 404 Route Handler
   app.use((req, res) => {
     logger.warn(`[HTTP] Route not found: ${req.method} ${req.url}`);
     res.status(404).json({ error: 'Not Found' });
   });
 
-  // 9. Centralized Error Handler Middleware (must be last)
+  // 10. Centralized Error Handler Middleware (must be last)
   app.use(errorHandler);
 
-  logger.info('✌️ Express base, security (Helmet/RateLimit), routes, and error handler configured');
+  logger.info('✌️ Express base, security (Helmet/RateLimit), routes, Swagger, and error handler configured');
 }

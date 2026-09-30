@@ -17,6 +17,7 @@ import { HarvesterService } from '../services/harvester.service.js';
 import { MessageHandler, CONSENSUS_REGEX } from '../handlers/message.handler.js';
 import { ReactionHandler } from '../handlers/reaction.handler.js';
 import { InteractionHandler } from '../handlers/interaction.handler.js';
+import { registerEvents } from '../events/index.js';
 
 export interface BotConfig {
   token?: string;
@@ -80,44 +81,15 @@ export class DecisionTrackerBot {
   }
 
   private setupListeners() {
-    this.client.on('ready', async () => {
-      logger.info(
-        `Discord Gateway connected! Logged in as ${this.client.user?.tag} (ID: ${this.client.user?.id})`,
-      );
-      logger.info(`Backend AI API target: ${this.backendApi.baseUrl}`);
-
-      await this.syncPolicyFromBackend();
-      logger.info(
-        `Autonomous monitoring enabled (Keywords, Reactions >= ${this.policy.reactionThreshold}, and '${this.triggerEmoji}' Override)`,
-      );
-
-      // Initial channel scan across uninitialized channels
-      try {
-        await this.scanAllChannels(this.policy.initialScanLimit);
-      } catch (err: any) {
-        logger.error(`[Initial Scan] Error during startup scan: ${err.message}`, {
-          stack: err.stack,
-        });
-      }
-    });
-
-    // 1. Passive Stream Monitoring: messageCreate
-    this.client.on('messageCreate', async message => {
-      await this.messageHandler.handleMessage(message, this.policy);
-    });
-
-    // 2. Passive Stream Monitoring: messageReactionAdd
-    this.client.on('messageReactionAdd', async (reaction, user) => {
-      await this.reactionHandler.handleReactionAdd(reaction, user, this.policy);
-    });
-
-    // 3. Global Interaction Listener (Buttons & Slash Commands)
-    this.client.on('interactionCreate', async interaction => {
-      if (interaction.isButton()) {
-        await this.interactionHandler.handleButton(interaction);
-      } else if (interaction.isChatInputCommand()) {
-        await this.interactionHandler.handleSlashCommand(interaction, this.policy);
-      }
+    registerEvents({
+      client: this.client,
+      token: process.env.DISCORD_BOT_TOKEN,
+      apiService: this.backendApi,
+      messageHandler: this.messageHandler,
+      reactionHandler: this.reactionHandler,
+      interactionHandler: this.interactionHandler,
+      getPolicy: () => this.policy,
+      onScanChannels: limit => this.scanAllChannels(limit),
     });
   }
 

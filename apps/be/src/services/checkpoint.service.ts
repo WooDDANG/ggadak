@@ -1,5 +1,7 @@
-import { DecisionRepository } from '../db.js';
+import { Service } from 'typedi';
+import { DecisionRepository } from '../repositories/decision.repository.js';
 
+@Service()
 export class CheckpointService {
   constructor(private repo: DecisionRepository) {}
 

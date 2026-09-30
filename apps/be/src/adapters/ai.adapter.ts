@@ -1,5 +1,6 @@
 import { generateObject } from 'ai';
 import { openai } from '@ai-sdk/openai';
+import { Service } from 'typedi';
 import { createLogger, ExternalFeedback } from '@ggaddak/shared';
 import { EXTRACTION_SYSTEM_PROMPT } from '../extractor/prompt.js';
 import { ExtractionResult, ExtractionResultSchema } from '../extractor/schemas.js';
@@ -10,6 +11,7 @@ export interface IAiAdapter {
   analyzeTranscript(transcript: string, feedbacks?: ExternalFeedback[]): Promise<ExtractionResult>;
 }
 
+@Service()
 export class AiAdapter implements IAiAdapter {
   async analyzeTranscript(
     transcript: string,

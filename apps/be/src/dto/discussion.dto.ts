@@ -1,5 +1,13 @@
 import { z } from 'zod';
-import { Decision } from '@ggaddak/shared';
+import { DecisionItemDto } from './decision.dto.js';
+
+export interface RawMessageItemDto {
+  id?: string;
+  author: string;
+  content: string;
+  createdAt?: string;
+  replyingTo?: string;
+}
 
 export const RawMessageItemDtoSchema = z.object({
   id: z.string().optional(),
@@ -8,6 +16,15 @@ export const RawMessageItemDtoSchema = z.object({
   createdAt: z.string().optional(),
   replyingTo: z.string().optional(),
 });
+
+export interface AnalyzeDiscussionRequestDto {
+  rawMessages: RawMessageItemDto[];
+  guildId?: string;
+  channelId?: string;
+  channelName?: string;
+  triggerMessageId?: string;
+  messageUrl?: string;
+}
 
 export const AnalyzeDiscussionRequestDtoSchema = z.object({
   rawMessages: z.array(RawMessageItemDtoSchema).min(1, 'rawMessages array must not be empty'),
@@ -18,12 +35,10 @@ export const AnalyzeDiscussionRequestDtoSchema = z.object({
   messageUrl: z.string().optional(),
 });
 
-export type AnalyzeDiscussionRequestDto = z.infer<typeof AnalyzeDiscussionRequestDtoSchema>;
-
 export interface AnalyzeDiscussionResponseDto {
   found: boolean;
   summary: string;
-  decisions: Decision[];
+  decisions: DecisionItemDto[];
   hasConflict?: boolean;
-  conflictingDecision?: Decision;
+  conflictingDecision?: DecisionItemDto;
 }
