@@ -30,20 +30,15 @@ export class AiAdapter implements IAiAdapter {
           .join('\n');
     }
 
-    const provider =
-      process.env.AI_PROVIDER ||
-      (process.env.GOOGLE_GENERATIVE_AI_API_KEY
-        ? 'gemini'
-        : process.env.OPENAI_API_KEY
-          ? 'openai'
-          : 'mock');
+    const apiKey =
+      process.env.GOOGLE_GENERATIVE_AI_API_KEY ||
+      process.env.GEMINI_API_KEY;
 
-    if (provider === 'gemini' && process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
+    if (apiKey) {
       try {
-        logger.info('Calling Google Gemini 1.5 Flash for decision extraction...');
-        const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+        logger.info('Calling Google Gemini 2.5 Flash for decision extraction...');
         const res = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -75,23 +70,24 @@ export class AiAdapter implements IAiAdapter {
             const parsed = JSON.parse(candidateText);
             const validated = ExtractionResultSchema.safeParse(parsed);
             if (validated.success) {
+              logger.info(`[Gemini AI] Successfully extracted ${validated.data.decisions.length} decisions.`);
               return validated.data;
             }
           }
         } else {
           const errorBody = await res.text();
           logger.warn(
-            `Gemini API returned status ${res.status}: ${errorBody.slice(0, 200)}. Falling back to deterministic parser.`,
+            `Gemini API returned status ${res.status}: ${errorBody.slice(0, 200)}. Falling back to dynamic heuristic parser.`,
           );
         }
       } catch (err: any) {
         logger.error(
-          `Gemini API call failed: ${err.message}. Falling back to deterministic parser.`,
+          `Gemini API call failed: ${err.message}. Falling back to dynamic heuristic parser.`,
         );
       }
     }
 
-    if (provider === 'openai' && process.env.OPENAI_API_KEY) {
+    if (process.env.OPENAI_API_KEY) {
       try {
         logger.info('Calling OpenAI GPT-4o-mini for decision extraction...');
         const result = await generateObject({
@@ -103,72 +99,67 @@ export class AiAdapter implements IAiAdapter {
         return result.object;
       } catch (err: any) {
         logger.error(
-          `OpenAI API call failed: ${err.message}. Falling back to deterministic parser.`,
+          `OpenAI API call failed: ${err.message}. Falling back to dynamic heuristic parser.`,
         );
       }
     }
 
-    // Mock / Deterministic Fallback parser
+    // Dynamic Heuristic Fallback parser
     return this.mockExtract(transcript);
   }
 
   private mockExtract(transcript: string): ExtractionResult {
-    const lines = transcript.split('\n');
+    const lines = transcript
+      .split('\n')
+      .map(l => l.trim())
+      .filter(Boolean);
+
     const decisions: any[] = [];
+    const consensusPattern =
+      /(~?합시다|~?합세|~?하자|~?하죠|~?해요|~?결정|~?확정|~?합의|~?채택|~?가시죠|~?가자|~?가요|~?진행할게요|~?완료|픽스|fix|agree|찬성|좋습니다|이걸로)/i;
 
-    // Filter out casual talk
-    const isCasual = /(밥|점심|저녁|날씨|안녕|감사|ㅋㅋ|ㅎㅎ)/.test(transcript);
-    const hasConsensus = /(~?합시다|~?결정|~?확정|~?합의|~?채택|~?가시죠|~?진행할게요|~?완료|픽스|fix|agree)/i.test(
-      transcript,
-    );
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      // Skip pure time headers or timestamps
+      const contentPart = line.replace(/^\[.*?\]\s*[^:]+:\s*/, '');
 
-    if (isCasual && !hasConsensus) {
-      return {
-        found: false,
-        summary: '잡담 또는 일상 대화로 감지되어 의사결정 후보에서 제외되었습니다.',
-        decisions: [],
-      };
-    }
+      if (consensusPattern.test(contentPart) && contentPart.length >= 4) {
+        // Infer topic & decision
+        let topic = '팀 합의 사항';
+        let categoryTag: '기술' | '기능' | '타깃' | '문제정의' | 'BM' | '기타' = '기타';
 
-    for (const line of lines) {
-      if (/DB|데이터베이스|PostgreSQL|MySQL/i.test(line) && /(채택|사용|결정|쓰자|가시죠)/i.test(line)) {
+        if (/DB|데이터베이스|Postgres|MySQL|Redis|몽고|서버|프레임워크|Fastify|Express|Nest|Next|React|Vue|Vite|배포|인프라|AWS|도커/i.test(contentPart)) {
+          topic = '기술 스택 및 아키텍처';
+          categoryTag = '기술';
+        } else if (/기능|로그인|인증|카카오|구글|결제|화면|UI|UX|페이지/i.test(contentPart)) {
+          topic = '제품 기능 및 스펙';
+          categoryTag = '기능';
+        } else if (/타깃|고객|사용자|유저|연령|대상/i.test(contentPart)) {
+          topic = '타깃 고객 정의';
+          categoryTag = '타깃';
+        } else if (/문제|페인포인트|불편|원인/i.test(contentPart)) {
+          topic = '핵심 문제 정의';
+          categoryTag = '문제정의';
+        } else if (/가격|수익|BM|비즈니스|유료|구독/i.test(contentPart)) {
+          topic = '비즈니스 모델';
+          categoryTag = 'BM';
+        }
+
+        // Surrounding context as rationale
+        const prevContext = i > 0 ? lines[i - 1].replace(/^\[.*?\]\s*[^:]+:\s*/, '') : '';
+        const rationale = prevContext
+          ? `논의 배경: "${prevContext}"에 대한 합의로 채택됨.`
+          : `팀 대화 중 "${contentPart}"에 대한 상호 합의가 확인되어 도출됨.`;
+
         decisions.push({
-          topic: '데이터베이스 선정',
-          title: '메인 데이터베이스로 PostgreSQL 채택',
-          decision: '안정적인 트랜잭션 처리를 위해 메인 데이터베이스로 PostgreSQL을 채택하기로 합의함.',
-          decisionContent: 'PostgreSQL을 메인 관계형 데이터베이스로 선정하고 JSONB 지원 기능을 활용하기로 결정.',
-          rationale: '복잡한 조인 쿼리 성능과 JSONB 확장성 면에서 가장 우수하여 채택됨.',
-          alternatives: [{ option: 'MySQL 8.0', reason: 'JSONB 및 지리정보 쿼리 편의성에서 PostgreSQL이 더 적합하여 제외' }],
-          categoryTag: '기술',
-          actionItems: [{ task: 'PostgreSQL 16 컨테이너 인프라 구성', assignee: 'DevOps' }],
-          isPivot: false,
-        });
-      }
-
-      if (/서버|프레임워크|Fastify|Express/i.test(line) && /(채택|가자|쓰자|진행)/i.test(line)) {
-        decisions.push({
-          topic: '백엔드 프레임워크 선정',
-          title: 'HTTP 서버 프레임워크로 Fastify 채택',
-          decision: '고성능 비동기 처리와 TypeScript 지원을 위해 Fastify 프레임워크를 채택함.',
-          decisionContent: 'Node.js 환경에서 높은 처리량(Throughput)을 확보하기 위해 Fastify로 백엔드 구성.',
-          rationale: '벤치마크 테스트 결과 Express 대비 높은 RPS(Requests Per Second) 처리 성능 확인.',
-          alternatives: [{ option: 'Express', reason: '레거시 호환성은 좋으나 처리량 면에서 Fastify에 밀림' }],
-          categoryTag: '기술',
-          actionItems: [{ task: 'Fastify 라우터 템플릿 세팅', assignee: 'Backend' }],
-          isPivot: false,
-        });
-      }
-
-      if (/카카오|구글|로그인/i.test(line) && /(제외|빼자|먼저)/i.test(line)) {
-        decisions.push({
-          topic: '인증 공급자 선정',
-          title: 'MVP 로그인 방식으로 카카오 단독 채택',
-          decision: 'MVP 단계에서는 개발 일정 단축을 위해 카카오 소셜 로그인만 단독 구현하고 구글은 제외함.',
-          decisionContent: '일정 단축을 위해 카카오 로그인을 단독 채택하고 구글 로그인은 MVP에서 제외함.',
-          rationale: '카카오가 구현 속도가 가장 빠르며 구글 동시 도입 시 일정 지연 위험.',
-          alternatives: [{ option: '구글 로그인 동시 도입', reason: '일정이 너무 빠듯하여 MVP에서 제외됨' }],
-          categoryTag: '기능',
-          actionItems: [{ task: '카카오 로그인 SDK 연동', assignee: 'Frontend' }],
+          topic,
+          title: contentPart.length > 30 ? `${contentPart.slice(0, 30)}...` : contentPart,
+          decision: contentPart,
+          decisionContent: contentPart,
+          rationale,
+          alternatives: [],
+          categoryTag,
+          actionItems: [{ task: `${contentPart} 후속 실행 및 구현` }],
           isPivot: false,
         });
       }

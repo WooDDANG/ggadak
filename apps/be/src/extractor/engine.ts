@@ -34,10 +34,10 @@ export class BackendExtractionEngine {
 
     if (provider === 'gemini' && process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
       try {
-        logger.info('Calling Google Gemini 1.5 Flash for decision extraction...');
+        logger.info('Calling Google Gemini 2.5 Flash for decision extraction...');
         const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
         const res = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
