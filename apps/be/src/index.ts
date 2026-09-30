@@ -22,17 +22,14 @@ for (const envPath of potentialEnvPaths) {
 import { config } from './config/index.js';
 import { appLogger } from './loaders/logger.js';
 import { createServer } from './server.js';
-import { DecisionRepository } from './repositories/decision.repository.js';
 
-const DB_PATH = process.env.DATABASE_PATH || './decisions.sqlite';
-const repo = new DecisionRepository(DB_PATH);
-const server = createServer(repo);
+const server = createServer();
 
 server.listen(config.port, () => {
   appLogger.info(`
   ################################################
   🛡️  GGADDAK Decision Tracker API: ${config.port} 🛡️
-  📦  Database: ${DB_PATH}
+  📦  Database: Prisma SQLite
   🤖  AI Provider: ${config.ai.provider}
   ################################################
   `);

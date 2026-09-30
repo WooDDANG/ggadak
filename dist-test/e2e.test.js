@@ -11,7 +11,7 @@ const engine_js_1 = require("../apps/be/dist/extractor/engine.js");
 (0, node_test_1.describe)('E2E Full Pipeline: Discord Messages ➔ Backend AI Core ➔ Review Queue ➔ DB ➔ Query', () => {
     (0, node_test_1.it)('extracts multi-decision candidates in DRAFT state and confirms via Review Queue', async () => {
         // 1. Start Backend Server with Mock AI Engine
-        const repo = new db_js_1.DecisionRepository(':memory:');
+        const repo = new db_js_1.DecisionRepository();
         const extractor = new engine_js_1.BackendExtractionEngine();
         const server = (0, server_js_1.createServer)(repo, extractor);
         await new Promise(resolve => server.listen(0, resolve));
@@ -113,7 +113,7 @@ const engine_js_1 = require("../apps/be/dist/extractor/engine.js");
         repo.close();
     });
     (0, node_test_1.it)('handles casual chatter with no decisions', async () => {
-        const repo = new db_js_1.DecisionRepository(':memory:');
+        const repo = new db_js_1.DecisionRepository();
         const server = (0, server_js_1.createServer)(repo, new engine_js_1.BackendExtractionEngine());
         await new Promise(resolve => server.listen(0, resolve));
         const port = server.address().port;

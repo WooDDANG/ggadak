@@ -255,7 +255,7 @@ export function RegisterRoutes(app: Router) {
     
         const argsPolicyController_get: Record<string, TsoaRoute.ParameterSchema> = {
         };
-        app.get('/api/policy',
+        app.get('/api/config/policy',
             ...(fetchMiddlewares<RequestHandler>(PolicyController)),
             ...(fetchMiddlewares<RequestHandler>(PolicyController.prototype.get)),
 
@@ -539,7 +539,7 @@ export function RegisterRoutes(app: Router) {
         const argsCheckpointController_getByChannelId: Record<string, TsoaRoute.ParameterSchema> = {
                 channelId: {"in":"path","name":"channelId","required":true,"dataType":"string"},
         };
-        app.get('/api/checkpoints/:channelId',
+        app.get('/api/channels/:channelId/checkpoint',
             ...(fetchMiddlewares<RequestHandler>(CheckpointController)),
             ...(fetchMiddlewares<RequestHandler>(CheckpointController.prototype.getByChannelId)),
 
@@ -575,7 +575,7 @@ export function RegisterRoutes(app: Router) {
                 channelId: {"in":"path","name":"channelId","required":true,"dataType":"string"},
                 body: {"in":"body","name":"body","required":true,"ref":"SaveCheckpointDto"},
         };
-        app.post('/api/checkpoints/:channelId',
+        app.post('/api/channels/:channelId/checkpoint',
             ...(fetchMiddlewares<RequestHandler>(CheckpointController)),
             ...(fetchMiddlewares<RequestHandler>(CheckpointController.prototype.save)),
 

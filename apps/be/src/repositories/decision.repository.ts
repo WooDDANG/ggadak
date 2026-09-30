@@ -1,258 +1,161 @@
-import { DatabaseSync } from 'node:sqlite';
 import { Service } from 'typedi';
 import { Decision, ExternalFeedback, ReviewAction } from '@ggaddak/shared';
-import { DecisionMapper, FeedbackMapper } from '../mappers/index.js';
-import { DecisionDbRow, FeedbackDbRow } from '../models/index.js';
+import { PrismaService } from '../loaders/prisma.js';
 
 @Service()
 export class DecisionRepository {
-  private db: DatabaseSync;
+  private memDecisions = new Map<string, Decision>();
+  private memCheckpoints = new Map<string, string>();
+  private memFeedbacks: ExternalFeedback[] = [];
+  private memRejectedHashes = new Set<string>();
 
-  constructor(dbPath?: string) {
-    const targetPath = dbPath || process.env.DATABASE_PATH || 'decisions.sqlite';
-    this.db = new DatabaseSync(targetPath);
-    this.init();
-  }
-
-  private init() {
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS decisions (
-        id TEXT PRIMARY KEY,
-        topic TEXT NOT NULL,
-        decision TEXT NOT NULL,
-        title TEXT,
-        decision_content TEXT,
-        rationale TEXT NOT NULL,
-        alternatives TEXT NOT NULL DEFAULT '[]',
-        category_tag TEXT NOT NULL DEFAULT '기타',
-        action_items TEXT NOT NULL DEFAULT '[]',
-        state TEXT NOT NULL DEFAULT 'Draft',
-        supersedes_id TEXT,
-        is_pivot INTEGER NOT NULL DEFAULT 0,
-        approved_by TEXT,
-        decision_confirmed_date TEXT,
-        feedback_source_type TEXT,
-        feedback_source_detail TEXT,
-        feedback_received_date TEXT,
-        raw_evidence TEXT NOT NULL DEFAULT '[]',
-        evidence_hash TEXT,
-        raw_transcript TEXT,
-        source TEXT NOT NULL,
-        message_created_at TEXT,
-        created_at TEXT NOT NULL
-      );
-      CREATE INDEX IF NOT EXISTS idx_decisions_state ON decisions(state);
-      CREATE INDEX IF NOT EXISTS idx_decisions_created_at ON decisions(created_at);
-      CREATE INDEX IF NOT EXISTS idx_decisions_category ON decisions(category_tag);
-    `);
-
-    // Column migrations for existing tables
-    const optionalColumns = [
-      `title TEXT`,
-      `decision_content TEXT`,
-      `alternatives TEXT NOT NULL DEFAULT '[]'`,
-      `category_tag TEXT NOT NULL DEFAULT '기타'`,
-      `is_pivot INTEGER NOT NULL DEFAULT 0`,
-      `approved_by TEXT`,
-      `decision_confirmed_date TEXT`,
-      `feedback_source_type TEXT`,
-      `feedback_source_detail TEXT`,
-      `feedback_received_date TEXT`,
-      `raw_evidence TEXT NOT NULL DEFAULT '[]'`,
-      `evidence_hash TEXT`,
-      `raw_transcript TEXT`,
-      `source TEXT NOT NULL DEFAULT '{}'`,
-      `message_created_at TEXT`,
-    ];
-
-    for (const col of optionalColumns) {
-      try {
-        this.db.exec(`ALTER TABLE decisions ADD COLUMN ${col};`);
-      } catch {
-        // Column already exists
-      }
-    }
-
-    // Checkpoint table for incremental channel analysis
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS channel_checkpoints (
-        channel_id TEXT PRIMARY KEY,
-        last_message_id TEXT NOT NULL,
-        updated_at TEXT NOT NULL
-      );
-    `);
-
-    // External feedbacks table
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS external_feedbacks (
-        id TEXT PRIMARY KEY,
-        source TEXT NOT NULL,
-        detail TEXT,
-        content TEXT NOT NULL,
-        channel_id TEXT NOT NULL,
-        created_at TEXT NOT NULL
-      );
-      CREATE INDEX IF NOT EXISTS idx_feedbacks_channel ON external_feedbacks(channel_id);
-    `);
-
-    // Anti-recreation rejected evidence hashes table
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS rejected_evidence_hashes (
-        evidence_hash TEXT PRIMARY KEY,
-        rejected_at TEXT NOT NULL
-      );
-    `);
-  }
+  constructor(private prisma?: PrismaService) {}
 
   // --- Checkpoints ---
   getCheckpoint(channelId: string): string | null {
-    const stmt = this.db.prepare(
-      'SELECT last_message_id FROM channel_checkpoints WHERE channel_id = ?',
-    );
-    const row = stmt.get(channelId) as { last_message_id: string } | undefined;
-    return row ? row.last_message_id : null;
+    return this.memCheckpoints.get(channelId) || null;
   }
 
   saveCheckpoint(channelId: string, lastMessageId: string): void {
-    const stmt = this.db.prepare(`
-      INSERT OR REPLACE INTO channel_checkpoints (channel_id, last_message_id, updated_at)
-      VALUES (?, ?, ?)
-    `);
-    stmt.run(channelId, lastMessageId, new Date().toISOString());
+    this.memCheckpoints.set(channelId, lastMessageId);
+    if (this.prisma) {
+      this.prisma.channelCheckpoint
+        .upsert({
+          where: { channelId },
+          update: { lastMessageId, updatedAt: new Date() },
+          create: { channelId, lastMessageId },
+        })
+        .catch(() => {});
+    }
   }
 
   // --- External Feedbacks ---
   saveFeedback(fb: ExternalFeedback): void {
-    const stmt = this.db.prepare(`
-      INSERT OR REPLACE INTO external_feedbacks (
-        id, source, detail, content, channel_id, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?)
-    `);
-    stmt.run(
-      fb.id,
-      fb.source,
-      fb.detail || null,
-      fb.content,
-      fb.channelId || 'global',
-      fb.createdAt || new Date().toISOString(),
-    );
+    const idx = this.memFeedbacks.findIndex(f => f.id === fb.id);
+    if (idx >= 0) {
+      this.memFeedbacks[idx] = fb;
+    } else {
+      this.memFeedbacks.unshift(fb);
+    }
+
+    if (this.prisma) {
+      this.prisma.externalFeedback
+        .upsert({
+          where: { id: fb.id },
+          update: {
+            source: fb.source,
+            content: fb.content,
+            externalUrl: fb.detail || null,
+          },
+          create: {
+            id: fb.id,
+            decisionId: fb.channelId || 'global',
+            source: fb.source,
+            author: fb.source,
+            content: fb.content,
+            externalUrl: fb.detail || null,
+          },
+        })
+        .catch(() => {});
+    }
   }
 
   getRecentFeedbacks(channelId?: string, limit: number = 5): ExternalFeedback[] {
-    let query = 'SELECT * FROM external_feedbacks';
-    const params: any[] = [];
+    let filtered = this.memFeedbacks;
     if (channelId) {
-      query += ' WHERE channel_id = ? OR channel_id = ?';
-      params.push(channelId, 'global');
+      filtered = filtered.filter(f => f.channelId === channelId || f.channelId === 'global');
     }
-    query += ' ORDER BY created_at DESC LIMIT ?';
-    params.push(limit);
-
-    const stmt = this.db.prepare(query);
-    const rows = stmt.all(...params) as unknown as FeedbackDbRow[];
-    return rows.map(r => FeedbackMapper.toDomain(r));
+    return filtered.slice(0, limit);
   }
 
   // --- Anti-Recreation Rejected Evidence Memory ---
   recordRejectedEvidence(evidenceHash: string): void {
-    const stmt = this.db.prepare(`
-      INSERT OR IGNORE INTO rejected_evidence_hashes (evidence_hash, rejected_at)
-      VALUES (?, ?)
-    `);
-    stmt.run(evidenceHash, new Date().toISOString());
+    this.memRejectedHashes.add(evidenceHash);
+    if (this.prisma) {
+      this.prisma.rejectedEvidenceHash
+        .upsert({
+          where: { evidenceHash },
+          update: { reason: 'rejected' },
+          create: { evidenceHash, reason: 'rejected' },
+        })
+        .catch(() => {});
+    }
   }
 
   isEvidenceRejected(evidenceHash: string): boolean {
-    const stmt = this.db.prepare(
-      'SELECT evidence_hash FROM rejected_evidence_hashes WHERE evidence_hash = ?',
-    );
-    const row = stmt.get(evidenceHash);
-    return Boolean(row);
+    return this.memRejectedHashes.has(evidenceHash);
   }
 
   // --- Decisions ---
   saveDecision(decision: Decision): void {
-    const stmt = this.db.prepare(`
-      INSERT OR REPLACE INTO decisions (
-        id, topic, decision, title, decision_content, rationale,
-        alternatives, category_tag, action_items, state, supersedes_id,
-        is_pivot, approved_by, decision_confirmed_date,
-        feedback_source_type, feedback_source_detail, feedback_received_date,
-        raw_evidence, evidence_hash, raw_transcript, source,
-        message_created_at, created_at
-      ) VALUES (
-        ?, ?, ?, ?, ?, ?,
-        ?, ?, ?, ?, ?,
-        ?, ?, ?,
-        ?, ?, ?,
-        ?, ?, ?, ?,
-        ?, ?
-      )
-    `);
+    this.memDecisions.set(decision.id, decision);
 
-    stmt.run(
-      decision.id,
-      decision.topic,
-      decision.decision,
-      decision.title || decision.topic,
-      decision.decisionContent || decision.decision,
-      decision.rationale,
-      JSON.stringify(decision.alternatives || []),
-      decision.categoryTag || '기타',
-      JSON.stringify(decision.actionItems || []),
-      decision.state,
-      decision.supersedesId || null,
-      decision.isPivot ? 1 : 0,
-      decision.approvedBy || null,
-      decision.decisionConfirmedDate || null,
-      decision.feedbackSourceType || null,
-      decision.feedbackSourceDetail || null,
-      decision.feedbackReceivedDate || null,
-      JSON.stringify(decision.rawEvidence || []),
-      decision.evidenceHash || null,
-      decision.rawTranscript || null,
-      JSON.stringify(decision.source || {}),
-      decision.messageCreatedAt || null,
-      decision.createdAt || new Date().toISOString(),
-    );
-
-    // If this decision supersedes a previous one, mark the previous as Superseded
     if (decision.supersedesId) {
-      const superStmt = this.db.prepare(
-        `UPDATE decisions SET state = 'Superseded' WHERE id = ?`,
-      );
-      superStmt.run(decision.supersedesId);
+      const prev = this.memDecisions.get(decision.supersedesId);
+      if (prev) {
+        prev.state = 'Superseded';
+        this.memDecisions.set(prev.id, prev);
+      }
+    }
+
+    if (this.prisma) {
+      this.prisma.decision
+        .upsert({
+          where: { id: decision.id },
+          update: {
+            title: decision.title || decision.topic,
+            decisionSummary: decision.decision,
+            keyReason: decision.rationale,
+            status: decision.state,
+            supersedesId: decision.supersedesId || null,
+            governanceScore: decision.governanceScore || 0,
+            governanceReason: decision.governanceReason || '',
+            governancePassed: decision.governancePassed || false,
+          },
+          create: {
+            id: decision.id,
+            guildId: decision.source?.guildId || 'guild',
+            channelId: decision.source?.channelId || 'chan',
+            messageId: decision.source?.triggerMessageId || 'msg',
+            title: decision.title || decision.topic,
+            decisionSummary: decision.decision,
+            keyReason: decision.rationale,
+            status: decision.state,
+            decisionMaker: decision.approvedBy || 'AI',
+            participants: JSON.stringify(decision.source?.participants || []),
+            alternatives: JSON.stringify(decision.alternatives || []),
+            tags: JSON.stringify([decision.categoryTag || '기타']),
+            supersedesId: decision.supersedesId || null,
+            sourceJumpUrl: decision.source?.messageUrl || '',
+            evidenceSummary: decision.rawTranscript || '',
+            evidenceHash: decision.evidenceHash || '',
+            governanceScore: decision.governanceScore || 0,
+            governanceReason: decision.governanceReason || '',
+            governancePassed: decision.governancePassed || false,
+          },
+        })
+        .catch(() => {});
     }
   }
 
   getDecisionById(id: string): Decision | null {
-    const stmt = this.db.prepare('SELECT * FROM decisions WHERE id = ?');
-    const row = stmt.get(id) as unknown as DecisionDbRow | undefined;
-    if (!row) return null;
-    return DecisionMapper.toDomain(row);
+    return this.memDecisions.get(id) || null;
   }
 
   getDecisions(filter: { topic?: string; state?: string; categoryTag?: string } = {}): Decision[] {
-    let query = 'SELECT * FROM decisions WHERE 1=1';
-    const params: any[] = [];
+    let list = Array.from(this.memDecisions.values());
 
     if (filter.topic) {
-      query += ' AND topic = ?';
-      params.push(filter.topic);
+      list = list.filter(d => d.topic.includes(filter.topic!) || d.title?.includes(filter.topic!));
     }
     if (filter.state) {
-      query += ' AND state = ?';
-      params.push(filter.state);
+      list = list.filter(d => d.state === filter.state);
     }
     if (filter.categoryTag) {
-      query += ' AND category_tag = ?';
-      params.push(filter.categoryTag);
+      list = list.filter(d => d.categoryTag === filter.categoryTag);
     }
 
-    query += ' ORDER BY created_at DESC';
-    const stmt = this.db.prepare(query);
-    const rows = stmt.all(...params) as unknown as DecisionDbRow[];
-    return rows.map(r => DecisionMapper.toDomain(r));
+    return list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }
 
   reviewDecision(
@@ -292,6 +195,9 @@ export class DecisionRepository {
   }
 
   close(): void {
-    this.db.close();
+    this.memDecisions.clear();
+    this.memCheckpoints.clear();
+    this.memFeedbacks = [];
+    this.memRejectedHashes.clear();
   }
 }

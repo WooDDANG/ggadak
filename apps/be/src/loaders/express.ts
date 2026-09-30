@@ -6,23 +6,17 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import { createLogger } from '@ggaddak/shared';
-import { ApiControllers, createApiRouter } from '../api/routes/index.js';
+import { RegisterRoutes } from '../api/routes/generated/routes.js';
 import { errorHandler } from '../api/middlewares/errorHandler.js';
 import { apiLimiter } from '../api/middlewares/rateLimiter.js';
 
-export function initExpress({
-  app,
-  controllers,
-}: {
-  app: Express;
-  controllers: ApiControllers;
-}): void {
+export function initExpress({ app }: { app: Express }): void {
   const logger = createLogger('EXPRESS-LOADER');
 
   // 1. Security Headers (Helmet)
   app.use(
     helmet({
-      contentSecurityPolicy: false, // Allows flexible local FE dashboard script loading
+      contentSecurityPolicy: false,
       crossOriginEmbedderPolicy: false,
     }),
   );
@@ -33,10 +27,10 @@ export function initExpress({
   // 3. Body Parsing
   app.use(express.json({ limit: '10mb' }));
 
-  // 4. Rate Limiter for general API protection
+  // 4. Rate Limiter
   app.use('/api', apiLimiter);
 
-  // 5. Morgan Logging with Winston stream
+  // 5. Morgan Logging
   app.use(
     morgan('":method :url" :status :res[content-length] - :response-time ms', {
       stream: {
@@ -65,9 +59,8 @@ export function initExpress({
     res.status(200).json({ status: 'ok' });
   });
 
-  // 8. Mount API Sub-Routers
-  const apiRouter = createApiRouter(controllers);
-  app.use('/api', apiRouter);
+  // 8. TSOA Decorator-Driven Routes (Single Source of Truth)
+  RegisterRoutes(app);
 
   // 9. 404 Route Handler
   app.use((req, res) => {
@@ -78,5 +71,5 @@ export function initExpress({
   // 10. Centralized Error Handler Middleware (must be last)
   app.use(errorHandler);
 
-  logger.info('✌️ Express base, security (Helmet/RateLimit), routes, Swagger, and error handler configured');
+  logger.info('✌️ Express base, security, Swagger, TSOA routes, and error handler configured');
 }

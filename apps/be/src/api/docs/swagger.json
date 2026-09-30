@@ -546,7 +546,7 @@
 		"contact": {}
 	},
 	"paths": {
-		"/api/policy": {
+		"/api/config/policy": {
 			"get": {
 				"operationId": "Get",
 				"responses": {
@@ -854,7 +854,7 @@
 				}
 			}
 		},
-		"/api/checkpoints/{channelId}": {
+		"/api/channels/{channelId}/checkpoint": {
 			"get": {
 				"operationId": "GetByChannelId",
 				"responses": {

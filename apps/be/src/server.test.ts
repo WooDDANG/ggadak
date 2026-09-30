@@ -10,7 +10,7 @@ describe('BE Server & Ingestion API', () => {
   let port: number;
 
   before(async () => {
-    repo = new DecisionRepository(':memory:');
+    repo = new DecisionRepository();
     server = createServer(repo);
     await new Promise<void>(resolve => {
       server.listen(0, () => {
