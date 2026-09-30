@@ -1,15 +1,15 @@
-# 02 — AI Adapter & Domain Service Layer
+# 02 — Explicit DTOs, Database Models, Mappers & AI Adapter
 
 **What to build:**
-Isolate external AI providers (Google Gemini, OpenAI, Mock) behind a dedicated `AiAdapter` abstraction in `adapters/` and organize business logic cleanly into dedicated services (`DecisionService`, `DiscussionService`, `FeedbackService`, `CheckpointService`, `PolicyService`).
+Implement explicit DTO interfaces/schemas, database entity models, bidirectional mappers, and an isolated `AiAdapter` abstraction in `adapters/` supporting Google Gemini 1.5 Flash, OpenAI GPT-4o-mini, and deterministic Mock fallback.
 
 **Blocked by:**
-01 — NASA-Style Backend Foundation (Loaders, Config & Error Handling)
+01 — NASA-Style Backend Foundation, Security (Helmet/Rate-Limit) & Structured Logging (Winston)
 
 **Status:** ready-for-agent
 
-- [ ] `AiAdapter` interface and implementation supporting Gemini 1.5 Flash, OpenAI GPT-4o-mini, and deterministic Mock extraction.
-- [ ] `DiscussionService` utilizing `AiAdapter`, SHA-256 evidence hashing, and anti-recreation verification.
-- [ ] `DecisionService` managing state transitions (`Draft`, `Decided`, `Deferred`, `Rejected`, `Superseded`).
-- [ ] `FeedbackService` and `CheckpointService` handling external feedback context and channel watermarks.
-- [ ] Dependency injection of repository and AI adapter into services during loader initialization.
+- [ ] Explicit `dto/` definitions (`decision.dto.ts`, `discussion.dto.ts`, `feedback.dto.ts`, `checkpoint.dto.ts`, `policy.dto.ts`).
+- [ ] Explicit `models/` database entity models (`decision.entity.ts`, `feedback.entity.ts`, `checkpoint.entity.ts`, `rejected-evidence.entity.ts`).
+- [ ] `mappers/` for bidirectional conversion between DB Rows, Domain Entities, and API DTOs.
+- [ ] `adapters/ai.adapter.ts` wrapping Gemini, OpenAI, and Mock providers behind a unified AI interface.
+- [ ] `DiscussionService`, `DecisionService`, `FeedbackService`, and `CheckpointService` refactored to use DTOs and Mappers.

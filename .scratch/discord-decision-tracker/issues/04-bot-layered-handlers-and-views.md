@@ -1,10 +1,10 @@
-# 04 — Bot Layered Handlers, Services & Views Alignment
+# 04 — Bot Layered Handlers, Services & Embed Views Alignment
 
 **What to build:**
-Refactor and align the Discord bot architecture with modular event handlers (`MessageHandler`, `ReactionHandler`, `InteractionHandler`), domain services (`BackendApiService`, `HarvesterService`), and presentation views (`BotEmbedView`).
+Align the Discord bot architecture with modular event handlers (`MessageHandler`, `ReactionHandler`, `InteractionHandler`), domain services (`BackendApiService`, `HarvesterService`), and presentation views (`BotEmbedView`).
 
 **Blocked by:**
-03 — Modular API Routes & Express Controllers
+03 — Modular Express Controllers & Sub-Routers
 
 **Status:** ready-for-agent
 
