@@ -3,3 +3,4 @@ export * from './types.js';
 export * from './config.js';
 export * from './logger.js';
 export * from './score.js';
+export * from './semantic-scorer.js';

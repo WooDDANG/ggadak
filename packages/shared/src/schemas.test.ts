@@ -105,4 +105,27 @@ describe('Shared Domain Schemas', () => {
     assert.strictEqual(incomplete.score, 1.0);
     assert.strictEqual(incomplete.tier, 'Incomplete');
   });
+
+  it('evaluates semantic decision similarity for natural Korean & English agreement phrases', async () => {
+    const { evaluateSemanticDecision } = await import('./semantic-scorer.js');
+
+    // 1. Natural phrasing with semantic alignment
+    const r1 = evaluateSemanticDecision('우리 메인 DB는 PostgreSQL 도입으로 결정하시죠');
+    assert.ok(r1.isCandidate, `Expected candidate, got sim=${r1.similarity}`);
+    assert.ok(r1.similarity >= 0.35);
+
+    const r2 = evaluateSemanticDecision('서버 프레임워크는 Fastify로 확정하고 개발 진행하겠습니다');
+    assert.ok(r2.isCandidate);
+
+    const r3 = evaluateSemanticDecision('We decided to adopt PostgreSQL as primary DB');
+    assert.ok(r3.isCandidate);
+
+    // 2. Casual talk / irrelevant chatter should have low similarity and not be candidate
+    const casual1 = evaluateSemanticDecision('오늘 점심 메뉴 돈까스 어때요?');
+    assert.strictEqual(casual1.isCandidate, false);
+    assert.ok(casual1.similarity < 0.20);
+
+    const casual2 = evaluateSemanticDecision('주말에 영화 보러 가실 분 있나요');
+    assert.strictEqual(casual2.isCandidate, false);
+  });
 });

@@ -115,4 +115,36 @@ describe('DiscussionHarvester Deep Module', () => {
     assert.strictEqual(CONSENSUS_REGEX.test('날씨가 너무 춥네요'), false);
     assert.strictEqual(CONSENSUS_REGEX.test('안녕하세요 반갑습니다'), false);
   });
+
+  it('triggers message handler on semantic decision phrases even without strict keywords', async () => {
+    const { MessageHandler } = await import('./handlers/message.handler.js');
+    let triggerCount = 0;
+    let reactionCount = 0;
+
+    const handler = new MessageHandler(
+      async () => {
+        triggerCount++;
+      },
+      async (msg, emoji) => {
+        if (emoji === '👀') reactionCount++;
+      },
+    );
+
+    const semanticMsg: any = {
+      id: 'sem-1',
+      author: { bot: false },
+      channelId: 'chan-sem',
+      channel: { name: 'dev' },
+      content: '우리는 메인 데이터베이스로 PostgreSQL을 도입하기로 합의했습니다',
+    };
+
+    await handler.handleMessage(semanticMsg, {
+      ...DEFAULT_HARVESTING_POLICY,
+      debounceMs: 5,
+    });
+
+    assert.strictEqual(reactionCount, 1);
+    await new Promise(r => setTimeout(r, 20));
+    assert.strictEqual(triggerCount, 1);
+  });
 });

@@ -1,5 +1,5 @@
 import { Message } from 'discord.js';
-import { HarvestingPolicyConfig, createLogger } from '@ggaddak/shared';
+import { HarvestingPolicyConfig, createLogger, evaluateSemanticDecision } from '@ggaddak/shared';
 
 const logger = createLogger('BOT-MESSAGE-HANDLER');
 
@@ -17,9 +17,12 @@ export class MessageHandler {
   async handleMessage(message: Message, policy: HarvestingPolicyConfig): Promise<void> {
     if (message.author.bot) return;
 
-    if (CONSENSUS_REGEX.test(message.content)) {
+    const isKeywordMatch = CONSENSUS_REGEX.test(message.content);
+    const semanticMatch = evaluateSemanticDecision(message.content);
+
+    if (isKeywordMatch || semanticMatch.isCandidate) {
       logger.info(
-        `[Trigger] Consensus keyword matched in #${'name' in message.channel ? message.channel.name : message.channelId}: "${message.content.slice(0, 30)}..."`,
+        `[Trigger] Decision candidate matched (keyword=${isKeywordMatch}, semantic=${semanticMatch.similarity}) in #${'name' in message.channel ? message.channel.name : message.channelId}: "${message.content.slice(0, 30)}..."`,
       );
       await this.onAddReaction(message, '👀');
       this.enqueueChannelTrigger(message, false, policy);
