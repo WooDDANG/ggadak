@@ -52,6 +52,8 @@ export const DecisionSchema = z.object({
   title: z.string().optional(),
   decisionContent: z.string().optional(),
   rationale: z.string().min(1),
+  rationaleSummary: z.string().optional(),
+  rationaleQuotes: z.array(z.string()).default([]),
   alternatives: z.array(AlternativeOptionSchema).default([]),
   categoryTag: CategoryTagSchema.default('기타'),
   actionItems: z.array(ActionItemSchema).default([]),
@@ -104,5 +106,7 @@ export const ReviewActionSchema = z.object({
   title: z.string().optional(),
   decisionContent: z.string().optional(),
   rationale: z.string().optional(),
+  rationaleSummary: z.string().optional(),
+  rationaleQuotes: z.array(z.string()).optional(),
   categoryTag: CategoryTagSchema.optional(),
 });

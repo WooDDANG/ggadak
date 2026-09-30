@@ -132,6 +132,8 @@ export class DiscussionService {
           title: item.title || item.topic,
           decisionContent: item.decisionContent || item.decision,
           rationale: item.rationale,
+          rationaleSummary: item.rationaleSummary || undefined,
+          rationaleQuotes: item.rationaleQuotes || [],
           alternatives: item.alternatives || [],
           categoryTag: item.categoryTag || '기타',
           actionItems: item.actionItems || [],

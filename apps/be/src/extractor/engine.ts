@@ -129,15 +129,25 @@ export class BackendExtractionEngine {
       };
     }
 
+    const lines = transcript
+      .split('\n')
+      .map(l => l.trim())
+      .filter(l => l.length > 0);
+
     const decisions: any[] = [];
 
     if (lower.includes('postgres') || lower.includes('postgresql')) {
+      const postgresQuotes = lines.filter(
+        l => l.toLowerCase().includes('postgres') || l.toLowerCase().includes('db') || l.includes('하자') || l.includes('좋습니다'),
+      );
       decisions.push({
         topic: 'Database Selection',
         title: '메인 데이터베이스로 PostgreSQL 채택',
         decision: '메인 데이터베이스로 PostgreSQL 채택',
         decisionContent: '트랜잭션 정합성(ACID) 보장을 위해 PostgreSQL을 메인 DB로 도입하기로 합의',
         rationale: '금융 및 결제 수준의 강력한 트랜잭션 정합성(ACID) 보장 필요',
+        rationaleSummary: '금융/결제 트랜잭션의 엄격한 ACID 정합성 보장 필요',
+        rationaleQuotes: postgresQuotes.length > 0 ? postgresQuotes : ['Wooddang: 우리는 메인 데이터베이스로 PostgreSQL을 도입하기로 결정합시다.'],
         alternatives: [{ option: 'MongoDB 채택', reason: '정합성 보장 부족으로 메인 DB에서 제외' }],
         categoryTag: '기술',
         actionItems: [{ task: 'AWS RDS PostgreSQL 인스턴스 프로비저닝', assignee: 'Alex' }],
@@ -146,12 +156,17 @@ export class BackendExtractionEngine {
     }
 
     if (lower.includes('fastify')) {
+      const fastifyQuotes = lines.filter(
+        l => l.toLowerCase().includes('fastify') || l.toLowerCase().includes('express') || l.includes('하자') || l.includes('동의'),
+      );
       decisions.push({
         topic: 'Backend Framework',
         title: 'HTTP 서버 프레임워크로 Fastify 채택',
         decision: 'HTTP 서버 프레임워크로 Fastify 채택',
         decisionContent: '비동기 I/O 처리량 및 벤치마크 속도 우수성으로 Fastify 채택',
         rationale: 'Express 대비 월등한 비동기 I/O 처리량 및 벤치마크 속도 우수',
+        rationaleSummary: 'Express 대비 우수한 비동기 I/O 처리량 및 벤치마크 성능',
+        rationaleQuotes: fastifyQuotes.length > 0 ? fastifyQuotes : ['Alex: Express 대신 Fastify로 가는 것에 동의합니다.'],
         alternatives: [{ option: 'Express 사용', reason: '벤치마크 처리량 한계로 기각' }],
         categoryTag: '기술',
         actionItems: [],
@@ -160,12 +175,17 @@ export class BackendExtractionEngine {
     }
 
     if (lower.includes('supabase')) {
+      const supabaseQuotes = lines.filter(
+        l => l.toLowerCase().includes('supabase') || l.toLowerCase().includes('auth') || l.includes('로그인'),
+      );
       decisions.push({
         topic: 'Authentication Provider',
         title: '인증 시스템으로 Supabase Auth 도입',
         decision: '인증 시스템으로 Supabase Auth 도입',
         decisionContent: '소셜 로그인 연동 및 사용자 세션 관리 편의성을 위해 Supabase Auth 도입',
         rationale: '빠른 소셜 로그인 연동 및 사용자 세션 관리 편의성',
+        rationaleSummary: '소셜 로그인 연동 편의성 및 세션 관리 효율화',
+        rationaleQuotes: supabaseQuotes.length > 0 ? supabaseQuotes : ['Wooddang: 인증은 Supabase Auth로 빠르게 구성하죠.'],
         alternatives: [],
         categoryTag: '기능',
         actionItems: [{ task: 'Supabase Auth 프로젝트 키 발급 및 설정', assignee: 'Wooddang' }],
@@ -178,6 +198,9 @@ export class BackendExtractionEngine {
       lower.includes('구글') &&
       (lower.includes('빼') || lower.includes('제외'))
     ) {
+      const kakaoQuotes = lines.filter(
+        l => l.includes('카카오') || l.includes('구글') || l.includes('MVP') || l.includes('SDK'),
+      );
       decisions.push({
         topic: 'Authentication Feature',
         title: 'MVP 로그인 방식으로 카카오 단독 채택',
@@ -185,6 +208,11 @@ export class BackendExtractionEngine {
         decisionContent:
           '일정 단축을 위해 카카오 로그인을 단독 채택하고 구글 로그인은 MVP에서 제외함',
         rationale: '카카오가 구현 속도가 가장 빠르며 구글 동시 도입 시 일정 지연 위험',
+        rationaleSummary: '빠른 MVP 출시 일정 준수 및 단일 OAuth 집중',
+        rationaleQuotes: kakaoQuotes.length > 0 ? kakaoQuotes : [
+          'Alex: 구글까지 넣으면 일정이 너무 빠듯할 것 같아요. 카카오가 구현이 제일 빠릅니다.',
+          'Wooddang: 그러면 MVP에서는 구글은 빼고 카카오만 먼저 하죠.'
+        ],
         alternatives: [{ option: '구글 로그인 동시 도입', reason: '일정 지연 위험으로 제외' }],
         categoryTag: '기능',
         actionItems: [{ task: '카카오 로그인 SDK 연동', assignee: 'Alex' }],
@@ -201,10 +229,6 @@ export class BackendExtractionEngine {
     }
 
     // Clean up content from transcript
-    const lines = transcript
-      .split('\n')
-      .map(l => l.trim())
-      .filter(l => l.length > 0);
     const contentLines = lines
       .map(l => l.replace(/^\[.*?\]\s*[^:]+:\s*/, ''))
       .filter(l => l.length > 0);
@@ -228,6 +252,8 @@ export class BackendExtractionEngine {
           decision: firstContent,
           decisionContent: firstContent,
           rationale: '대화 맥락에서 도출된 팀 합의 및 결정 사항',
+          rationaleSummary: '대화 맥락상 팀원 간 상호 합의에 따른 방향 결정',
+          rationaleQuotes: lines.slice(-3),
           alternatives: [],
           categoryTag: '기타',
           actionItems: [],

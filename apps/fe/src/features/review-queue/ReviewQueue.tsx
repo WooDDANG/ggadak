@@ -1,6 +1,6 @@
 import React from 'react';
 import { Decision, ReviewAction } from '@ggaddak/shared';
-import { Check, Clock, X, MessageSquare, AlertTriangle, ExternalLink } from 'lucide-react';
+import { Check, Clock, X, MessageSquare, AlertTriangle, ExternalLink, Quote, Sparkles, FileText } from 'lucide-react';
 import { Badge } from '../../components/Badge';
 import { DiscordTranscriptViewer } from '../../components/DiscordTranscriptViewer';
 
@@ -106,19 +106,44 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({ decisions, onReview, i
 
             {/* Decision Content & Rationale */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 my-4 p-4 rounded-xl bg-slate-900/60 border border-slate-800">
-              <div>
-                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-1">
-                  결정 내용
-                </span>
-                <p className="text-sm text-slate-200 leading-relaxed font-medium">
+              <div className="space-y-2">
+                <div className="flex items-center space-x-1.5 text-xs font-semibold text-indigo-300 uppercase tracking-wider">
+                  <FileText className="w-3.5 h-3.5 text-indigo-400" />
+                  <span>결정 내용 요약</span>
+                </div>
+                <p className="text-sm text-slate-100 leading-relaxed font-semibold bg-slate-950/40 p-3 rounded-lg border border-slate-800/80">
                   {dec.decisionContent || dec.decision}
                 </p>
               </div>
-              <div>
-                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-1">
-                  결정 근거 및 배경
-                </span>
-                <p className="text-sm text-slate-300 leading-relaxed">{dec.rationale}</p>
+
+              <div className="space-y-2">
+                <div className="flex items-center space-x-1.5 text-xs font-semibold text-emerald-300 uppercase tracking-wider">
+                  <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>결정 근거 요약</span>
+                </div>
+                <p className="text-sm text-slate-200 leading-relaxed bg-slate-950/40 p-3 rounded-lg border border-slate-800/80">
+                  {dec.rationaleSummary || dec.rationale}
+                </p>
+
+                {/* Verbatim Evidence Quotes */}
+                {dec.rationaleQuotes && dec.rationaleQuotes.length > 0 && (
+                  <div className="pt-2">
+                    <span className="text-[11px] font-semibold text-slate-400 flex items-center space-x-1 mb-1.5">
+                      <Quote className="w-3 h-3 text-amber-400" />
+                      <span>관련 원문 근거 (발화 인용)</span>
+                    </span>
+                    <div className="space-y-1.5">
+                      {dec.rationaleQuotes.map((quote, qIdx) => (
+                        <div
+                          key={qIdx}
+                          className="text-xs text-slate-300 bg-slate-900/90 border-l-2 border-indigo-500 px-3 py-1.5 rounded-r-md font-mono text-[11px]"
+                        >
+                          {quote}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 

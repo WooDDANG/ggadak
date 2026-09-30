@@ -10,6 +10,8 @@ export class DecisionMapper {
       decision: row.decision,
       decisionContent: row.decision_content || row.decision,
       rationale: row.rationale,
+      rationaleSummary: undefined,
+      rationaleQuotes: [],
       alternatives: JSON.parse(row.alternatives || '[]'),
       categoryTag: (row.category_tag as any) || '기타',
       actionItems: JSON.parse(row.action_items || '[]'),

@@ -21,6 +21,14 @@ export const ExtractedDecisionItemSchema = z.object({
     .describe(
       'The specific reasons and context explicitly stated in the transcript. Do NOT invent rationale not in the text.',
     ),
+  rationaleSummary: z
+    .string()
+    .optional()
+    .describe('Concise one or two sentence summary of the primary reason/rationale for this decision (e.g. 트랜잭션 무결성 확보 및 빠른 개발 속도)'),
+  rationaleQuotes: z
+    .array(z.string())
+    .default([])
+    .describe('Relevant verbatim quote snippets from participants in the transcript directly justifying this decision (e.g. ["Alex: 구글까지 넣으면 일정이 너무 빠듯할 것 같아요.", "Wooddang: 그러면 MVP에서는 구글은 빼고 카카오만 먼저 하죠."])'),
   alternatives: z
     .array(AlternativeOptionSchema)
     .default([])

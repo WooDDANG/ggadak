@@ -175,6 +175,8 @@ export class DecisionRepository {
       if (params.title) existing.title = params.title;
       if (params.decisionContent) existing.decisionContent = params.decisionContent;
       if (params.rationale) existing.rationale = params.rationale;
+      if (params.rationaleSummary) existing.rationaleSummary = params.rationaleSummary;
+      if (params.rationaleQuotes) existing.rationaleQuotes = params.rationaleQuotes;
       if (params.categoryTag) existing.categoryTag = params.categoryTag;
     } else if (action === 'defer') {
       existing.state = 'Deferred';
@@ -187,6 +189,8 @@ export class DecisionRepository {
       if (params.title) existing.title = params.title;
       if (params.decisionContent) existing.decisionContent = params.decisionContent;
       if (params.rationale) existing.rationale = params.rationale;
+      if (params.rationaleSummary) existing.rationaleSummary = params.rationaleSummary;
+      if (params.rationaleQuotes) existing.rationaleQuotes = params.rationaleQuotes;
       if (params.categoryTag) existing.categoryTag = params.categoryTag;
     }
 
