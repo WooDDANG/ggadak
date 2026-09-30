@@ -7,13 +7,27 @@ import { CONSENSUS_REGEX } from '../handlers/message.handler.js';
 
 const logger = createLogger('ANALYSIS-SERVICE');
 
+export interface ScanOptions {
+  full?: boolean;
+  hours?: number;
+  limit?: number;
+  initialOnly?: boolean;
+}
+
 export class AnalysisService {
+  private static instance: AnalysisService | null = null;
   private inFlightChannels = new Set<string>();
 
   constructor(
     private backendApi: BackendApiService,
     private harvesterService: HarvesterService,
-  ) {}
+  ) {
+    AnalysisService.instance = this;
+  }
+
+  public static getInstance(): AnalysisService | null {
+    return AnalysisService.instance;
+  }
 
   async executeAnalysis(
     message: Message,
@@ -93,46 +107,145 @@ export class AnalysisService {
     }
   }
 
-  async scanAllChannels(
-    client: Client,
+  async scanChannel(
+    channel: TextChannel,
     policy: HarvestingPolicyConfig,
-    limit: number = 50,
-  ): Promise<void> {
-    logger.info(`[Scan] Performing scan across guilds with limit=${limit}...`);
-    for (const guild of client.guilds.cache.values()) {
-      for (const channel of guild.channels.cache.values()) {
-        if (!channel.isTextBased() || channel.isThread()) continue;
+    options: ScanOptions = {},
+  ): Promise<{ scannedCount: number; decisionsCount: number }> {
+    const channelName = channel.name;
+    const lastCheckpoint = await this.backendApi.getCheckpoint(channel.id);
 
-        try {
-          const textChannel = channel as TextChannel;
-          const lastCheckpoint = await this.backendApi.getCheckpoint(channel.id);
+    if (options.initialOnly && lastCheckpoint) {
+      logger.info(
+        `[Scan] Channel #${channelName} already has checkpoint ${lastCheckpoint}. Skipping initial scan.`,
+      );
+      return { scannedCount: 0, decisionsCount: 0 };
+    }
 
-          const fetchOptions: { limit: number; after?: string } = { limit };
-          if (lastCheckpoint) {
-            fetchOptions.after = lastCheckpoint;
+    const timeCutoff = options.hours ? Date.now() - options.hours * 60 * 60 * 1000 : null;
+    let fetchedMessages: Message[] = [];
+
+    // Incremental forward scan when checkpoint exists and full scan / hours not requested
+    if (!options.full && !options.hours && lastCheckpoint) {
+      let lastId = lastCheckpoint;
+      while (true) {
+        const batch = await channel.messages.fetch({ limit: 100, after: lastId });
+        if (batch.size === 0) break;
+        const sorted = Array.from(batch.values()).sort(
+          (a, b) => a.createdTimestamp - b.createdTimestamp,
+        );
+        fetchedMessages.push(...sorted);
+        lastId = sorted[sorted.length - 1].id;
+        if (options.limit && fetchedMessages.length >= options.limit) break;
+        if (batch.size < 100) break;
+      }
+    } else {
+      // Full backward history or time-windowed scan
+      let oldestId: string | undefined = undefined;
+      let reachedCutoff = false;
+
+      while (true) {
+        const fetchOpts: { limit: number; before?: string } = { limit: 100 };
+        if (oldestId) fetchOpts.before = oldestId;
+
+        const batch = await channel.messages.fetch(fetchOpts);
+        if (batch.size === 0) break;
+
+        const items = Array.from(batch.values());
+        for (const msg of items) {
+          if (timeCutoff && msg.createdTimestamp < timeCutoff) {
+            reachedCutoff = true;
+            break;
           }
+          fetchedMessages.push(msg);
+        }
 
-          const messages = await textChannel.messages.fetch(fetchOptions);
-          if (messages.size === 0) continue;
+        if (reachedCutoff) break;
+        if (options.limit && fetchedMessages.length >= options.limit) break;
+        if (batch.size < 100) break;
 
-          const sorted = Array.from(messages.values()).sort(
-            (a, b) => a.createdTimestamp - b.createdTimestamp,
-          );
-          const newestMessage = sorted[sorted.length - 1];
+        oldestId = items[items.length - 1].id;
+      }
 
-          for (const msg of sorted) {
-            if (CONSENSUS_REGEX.test(msg.content)) {
-              await this.executeAnalysis(msg, policy, true);
-              break;
-            }
-          }
+      // Sort chronologically (oldest to newest)
+      fetchedMessages.sort((a, b) => a.createdTimestamp - b.createdTimestamp);
+    }
 
-          await this.backendApi.saveCheckpoint(channel.id, newestMessage.id);
-        } catch (err: any) {
-          logger.warn(`[Scan] Skipping channel #${channel.name}: ${err.message}`);
+    if (options.limit && fetchedMessages.length > options.limit) {
+      fetchedMessages = fetchedMessages.slice(-options.limit);
+    }
+
+    if (fetchedMessages.length === 0) {
+      return { scannedCount: 0, decisionsCount: 0 };
+    }
+
+    logger.info(`[Scan] Scanning ${fetchedMessages.length} messages in #${channelName}...`);
+    let decisionsFound = 0;
+
+    for (const msg of fetchedMessages) {
+      if (CONSENSUS_REGEX.test(msg.content)) {
+        const decisions = await this.executeAnalysis(msg, policy, true);
+        if (decisions && decisions.length > 0) {
+          decisionsFound += decisions.length;
         }
       }
     }
+
+    const newestMessage = fetchedMessages[fetchedMessages.length - 1];
+    await this.backendApi.saveCheckpoint(channel.id, newestMessage.id);
+
+    return { scannedCount: fetchedMessages.length, decisionsCount: decisionsFound };
+  }
+
+  async scanGuild(
+    guild: { channels: { cache: Map<string, any> }; name: string },
+    policy: HarvestingPolicyConfig,
+    options: ScanOptions = {},
+  ): Promise<{ channelCount: number; scannedCount: number; decisionsCount: number }> {
+    let totalMessages = 0;
+    let totalDecisions = 0;
+    let channelCount = 0;
+
+    for (const channel of guild.channels.cache.values()) {
+      if (!channel.isTextBased || !channel.isTextBased() || (channel.isThread && channel.isThread()))
+        continue;
+      try {
+        const textChannel = channel as TextChannel;
+        const res = await this.scanChannel(textChannel, policy, options);
+        totalMessages += res.scannedCount;
+        totalDecisions += res.decisionsCount;
+        channelCount++;
+      } catch (err: any) {
+        logger.warn(`[Scan] Error scanning #${channel.name}: ${err.message}`);
+      }
+    }
+
+    return { channelCount, scannedCount: totalMessages, decisionsCount: totalDecisions };
+  }
+
+  async scanAllChannels(
+    client: Client,
+    policy: HarvestingPolicyConfig,
+    options: ScanOptions = {},
+  ): Promise<{ channelCount: number; scannedCount: number; decisionsCount: number }> {
+    logger.info(
+      `[Scan] Performing multi-channel scan across guilds (options=${JSON.stringify(options)})...`,
+    );
+    let totalMessages = 0;
+    let totalDecisions = 0;
+    let channelCount = 0;
+
+    for (const guild of client.guilds.cache.values()) {
+      const res = await this.scanGuild(guild, policy, options);
+      totalMessages += res.scannedCount;
+      totalDecisions += res.decisionsCount;
+      channelCount += res.channelCount;
+    }
+
+    logger.info(
+      `[Scan] Multi-channel scan complete: ${channelCount} channels, ${totalMessages} msgs, ${totalDecisions} decisions.`,
+    );
+    return { channelCount, scannedCount: totalMessages, decisionsCount: totalDecisions };
   }
 
   async addReactionSafely(message: Message, emoji: string): Promise<void> {

@@ -61,6 +61,7 @@ export class DecisionTrackerBot {
     registerEvents({
       client: this.client,
       token: config.token || process.env.DISCORD_BOT_TOKEN,
+      analysisService: this.analysisService,
       messageHandler: this.messageHandler,
       reactionHandler: this.reactionHandler,
       getPolicy: () => this.policy,
