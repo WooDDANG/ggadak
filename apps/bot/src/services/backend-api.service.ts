@@ -41,6 +41,7 @@ export class BackendApiService {
     channelName?: string;
     triggerMessageId?: string;
     messageUrl?: string;
+    isManualOverride?: boolean;
   }): Promise<any> {
     const res = await fetch(`${this.backendUrl}/api/discussions/analyze`, {
       method: 'POST',

@@ -4,7 +4,7 @@ import { HarvestingPolicyConfig, createLogger } from '@ggaddak/shared';
 const logger = createLogger('BOT-MESSAGE-HANDLER');
 
 export const CONSENSUS_REGEX =
-  /(~?합시다|~?결정|~?확정|~?합의|~?채택|~?가시죠|~?진행할게요|~?완료|픽스|fix|agree)/i;
+  /(~?합시다|~?합세|~?하자|~?하죠|~?해요|~?결정|~?확정|~?합의|~?채택|~?가시죠|~?가자|~?가요|~?진행할게요|~?완료|픽스|fix|agree|ok|ㅇㅋ|좋아요|찬성)/i;
 
 export class MessageHandler {
   private debounceTimers = new Map<string, NodeJS.Timeout>();

@@ -268,17 +268,39 @@ export class DiscussionHarvester {
 
     logger.info(`[Scan] Scanning ${fetchedMessages.length} messages in #${channelName}...`);
     let decisionsFound = 0;
+    const newestMessage = fetchedMessages[fetchedMessages.length - 1];
 
-    for (const msg of fetchedMessages) {
-      if (CONSENSUS_REGEX.test(msg.content)) {
-        const decisions = await this.processAnalysis(msg, policy, true);
-        if (decisions && decisions.length > 0) {
-          decisionsFound += decisions.length;
+    try {
+      const result = await this.backendApi.analyzeDiscussion({
+        rawMessages: fetchedMessages.map(m => ({
+          id: m.id,
+          author: m.author?.username || 'unknown',
+          content: m.content || '',
+          createdAt: (m.createdAt || new Date()).toISOString(),
+          replyingTo: m.reference?.messageId,
+        })),
+        guildId: channel.guildId || undefined,
+        channelId: channel.id,
+        channelName,
+        triggerMessageId: newestMessage.id,
+        messageUrl: newestMessage.url,
+        isManualOverride: true,
+      });
+
+      if (result.found && result.decisions && result.decisions.length > 0) {
+        decisionsFound = result.decisions.length;
+        if ('send' in channel && typeof (channel as any).send === 'function') {
+          const sendableChannel = channel as { send: (options: any) => Promise<any> };
+          for (const dec of result.decisions as Decision[]) {
+            const embed = BotEmbedView.renderCandidateEmbed(dec, fetchedMessages.length);
+            await sendableChannel.send({ embeds: [embed] });
+          }
         }
       }
+    } catch (err: any) {
+      logger.error(`[Scan] Error analyzing scanned messages for #${channelName}: ${err.message}`);
     }
 
-    const newestMessage = fetchedMessages[fetchedMessages.length - 1];
     await this.backendApi.saveCheckpoint(channel.id, newestMessage.id);
 
     return { scannedCount: fetchedMessages.length, decisionsCount: decisionsFound };
