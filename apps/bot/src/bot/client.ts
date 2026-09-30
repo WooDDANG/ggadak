@@ -7,9 +7,20 @@ import {
   ButtonStyle,
   EmbedBuilder,
   Message,
-  ButtonInteraction
+  ButtonInteraction,
+  ChatInputCommandInteraction,
+  REST,
+  Routes,
+  SlashCommandBuilder
 } from 'discord.js';
-import { Decision, createLogger } from '@ggaddak/shared';
+import {
+  Decision,
+  createLogger,
+  HarvestingPolicyConfig,
+  DEFAULT_HARVESTING_POLICY,
+  getHarvestingPolicyFromEnv,
+  FeedbackSourceType
+} from '@ggaddak/shared';
 import { RawMessageData } from '../context/builder.js';
 
 export interface BotConfig {
@@ -21,13 +32,12 @@ export interface BotConfig {
 const logger = createLogger('BOT');
 
 export const CONSENSUS_REGEX = /(~?합시다|~?결정|~?확정|~?합의|~?채택|~?가시죠|~?진행할게요|~?완료|픽스|fix|agree)/i;
-export const REACTION_THRESHOLD = 3;
-export const DEBOUNCE_MS = 15000;
 
 export class DecisionTrackerBot {
   public client: Client;
   private backendUrl: string;
   private triggerEmoji: string;
+  private policy: HarvestingPolicyConfig = DEFAULT_HARVESTING_POLICY;
   private debounceTimers = new Map<string, NodeJS.Timeout>();
   private inFlightChannels = new Set<string>();
 
@@ -48,15 +58,31 @@ export class DecisionTrackerBot {
     this.setupListeners();
   }
 
+  private async syncPolicyFromBackend(): Promise<void> {
+    try {
+      const res = await fetch(`${this.backendUrl}/api/config/policy`);
+      if (res.ok) {
+        this.policy = await res.json() as HarvestingPolicyConfig;
+        logger.info(`[Policy] Synced centralized policy: ReactionThreshold=${this.policy.reactionThreshold}, Debounce=${this.policy.debounceMs}ms, MaxWindow=${this.policy.maxMergedWindow}`);
+      } else {
+        this.policy = getHarvestingPolicyFromEnv();
+      }
+    } catch {
+      this.policy = getHarvestingPolicyFromEnv();
+    }
+  }
+
   private setupListeners() {
     this.client.on('ready', async () => {
       logger.info(`Discord Gateway connected! Logged in as ${this.client.user?.tag} (ID: ${this.client.user?.id})`);
       logger.info(`Backend AI API target: ${this.backendUrl}`);
-      logger.info(`Autonomous monitoring enabled (Keywords, Reactions >= ${REACTION_THRESHOLD}, and '${this.triggerEmoji}' Override)`);
 
-      // Execute Initial Channel Backfill Scan for all joined channels
+      await this.syncPolicyFromBackend();
+      logger.info(`Autonomous monitoring enabled (Keywords, Reactions >= ${this.policy.reactionThreshold}, and '${this.triggerEmoji}' Override)`);
+
+      // Initial channel scan across uninitialized channels
       try {
-        await this.scanAllChannels(50);
+        await this.scanAllChannels(this.policy.initialScanLimit);
       } catch (err: any) {
         logger.error(`[Initial Scan] Error during startup scan: ${err.message}`, { stack: err.stack });
       }
@@ -94,8 +120,8 @@ export class DecisionTrackerBot {
 
           // Count total reactions across all emojis on this message
           const totalReactions = message.reactions.cache.reduce((sum, r) => sum + r.count, 0);
-          if (totalReactions >= REACTION_THRESHOLD) {
-            logger.info(`[Trigger] Reaction threshold (${totalReactions} >= ${REACTION_THRESHOLD}) reached on msg ${message.id}`);
+          if (totalReactions >= this.policy.reactionThreshold) {
+            logger.info(`[Trigger] Reaction threshold (${totalReactions} >= ${this.policy.reactionThreshold}) reached on msg ${message.id}`);
             await this.addReactionSafely(message, '👀');
             this.enqueueChannelTrigger(message, false);
           }
@@ -105,15 +131,61 @@ export class DecisionTrackerBot {
       })();
     });
 
-    // 3. Global Non-blocking Button Interaction Listener (Eliminates 3-second timeout)
+    // 3. Global Interaction Listener (Buttons & Slash Commands)
     this.client.on('interactionCreate', async (interaction) => {
-      if (!interaction.isButton()) return;
-
-      const customId = interaction.customId;
-      if (customId.startsWith('conflict:')) {
-        await this.handleConflictButtonInteraction(interaction);
+      if (interaction.isButton()) {
+        const customId = interaction.customId;
+        if (customId.startsWith('conflict:')) {
+          await this.handleConflictButtonInteraction(interaction);
+        }
+      } else if (interaction.isChatInputCommand()) {
+        await this.handleSlashCommand(interaction);
       }
     });
+  }
+
+  private async handleSlashCommand(interaction: ChatInputCommandInteraction) {
+    const { commandName } = interaction;
+
+    if (commandName === '피드백입력') {
+      const source = interaction.options.getString('출처', true) as FeedbackSourceType;
+      const content = interaction.options.getString('내용', true);
+      const detail = interaction.options.getString('세부정보') || undefined;
+
+      try {
+        const res = await fetch(`${this.backendUrl}/api/feedbacks`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: `FB-${Date.now().toString().slice(-6)}`,
+            source,
+            detail,
+            content,
+            channelId: interaction.channelId,
+            createdAt: new Date().toISOString()
+          })
+        });
+
+        if (res.ok) {
+          await interaction.reply({
+            content: `✅ [외부 피드백 기록 완료]\n**출처**: ${source} ${detail ? `(${detail})` : ''}\n**내용**: ${content}\n*이 피드백은 향후 팀 논의 분석 시 참조 맥락으로 활용됩니다.*`,
+            ephemeral: false
+          });
+        } else {
+          await interaction.reply({ content: '⚠️ 피드백 저장 중 오류가 발생했습니다.', ephemeral: true });
+        }
+      } catch (err: any) {
+        await interaction.reply({ content: `⚠️ 백엔드 오류: ${err.message}`, ephemeral: true });
+      }
+    } else if (commandName === '스캔') {
+      await interaction.deferReply();
+      try {
+        await this.scanAllChannels(this.policy.initialScanLimit);
+        await interaction.editReply('✅ 모든 채널의 과거 대화 스캔 및 워터마크 갱신이 완료되었습니다.');
+      } catch (err: any) {
+        await interaction.editReply(`⚠️ 스캔 중 오류 발생: ${err.message}`);
+      }
+    }
   }
 
   private enqueueChannelTrigger(message: Message, isManualOverride: boolean) {
@@ -136,10 +208,10 @@ export class DecisionTrackerBot {
     const timer = setTimeout(async () => {
       this.debounceTimers.delete(channelId);
       await this.executeAnalysis(message, false);
-    }, DEBOUNCE_MS);
+    }, this.policy.debounceMs);
 
     this.debounceTimers.set(channelId, timer);
-    logger.info(`[Debounce] Scheduled analysis for #${channelId} in ${DEBOUNCE_MS / 1000}s`);
+    logger.info(`[Debounce] Scheduled analysis for #${channelId} in ${this.policy.debounceMs / 1000}s`);
   }
 
   private async addReactionSafely(message: Message, emoji: string) {
@@ -228,26 +300,16 @@ export class DecisionTrackerBot {
 
     this.inFlightChannels.add(channelId);
     const channelName = 'name' in channel ? (channel.name as string) : 'dm';
+    const isThread = channel.isThread();
 
     try {
-      // 1. Fetch channel checkpoint from Backend
-      let lastMessageId: string | null = null;
-      try {
-        const cpRes = await fetch(`${this.backendUrl}/api/channels/${channelId}/checkpoint`);
-        if (cpRes.ok) {
-          const cpData = await cpRes.json() as any;
-          lastMessageId = cpData.lastMessageId || null;
-        }
-      } catch (err: any) {
-        logger.warn(`[Checkpoint] Failed to fetch checkpoint for #${channelId}: ${err.message}`);
-      }
-
-      // 2. Fetch context window
       let rawMessages: RawMessageData[] = [];
-      if (lastMessageId) {
-        const fetchedAfter = await channel.messages.fetch({ limit: 50, after: lastMessageId });
-        const msgs = Array.from(fetchedAfter.values()).reverse();
-        rawMessages = msgs.map(m => ({
+
+      // 1. Thread Prioritization: If in a Discord thread, fetch thread messages from start
+      if (isThread) {
+        logger.info(`[Context] Channel #${channelName} is a Discord Thread. Harvesting thread history...`);
+        const fetchedThread = await channel.messages.fetch({ limit: this.policy.maxMergedWindow });
+        rawMessages = Array.from(fetchedThread.values()).reverse().map(m => ({
           id: m.id,
           authorId: m.author.id,
           authorName: m.author.username,
@@ -255,12 +317,23 @@ export class DecisionTrackerBot {
           createdAt: m.createdAt,
           referenceMessageId: m.reference?.messageId
         }));
-      }
+      } else {
+        // 2. Asymmetric Context Window Harvesting for standard channels (before 15, after 5)
+        const beforeCount = this.policy.contextWindowBefore;
+        const afterCount = this.policy.contextWindowAfter;
 
-      // Fallback or Initial scan
-      if (rawMessages.length < 2) {
-        const fetchedBefore = await channel.messages.fetch({ limit: 30, before: message.id });
+        const fetchedBefore = await channel.messages.fetch({ limit: beforeCount, before: message.id });
         const beforeMsgs = Array.from(fetchedBefore.values()).reverse().map(m => ({
+          id: m.id,
+          authorId: m.author.id,
+          authorName: m.author.username,
+          content: m.content,
+          createdAt: m.createdAt,
+          referenceMessageId: m.reference?.messageId
+        }));
+
+        const fetchedAfter = await channel.messages.fetch({ limit: afterCount, after: message.id });
+        const afterMsgs = Array.from(fetchedAfter.values()).reverse().map(m => ({
           id: m.id,
           authorId: m.author.id,
           authorName: m.author.username,
@@ -277,8 +350,14 @@ export class DecisionTrackerBot {
             authorName: message.author.username,
             content: message.content,
             createdAt: message.createdAt
-          }
+          },
+          ...afterMsgs
         ];
+      }
+
+      // Limit to maxMergedWindow
+      if (rawMessages.length > this.policy.maxMergedWindow) {
+        rawMessages = rawMessages.slice(-this.policy.maxMergedWindow);
       }
 
       logger.info(`[Context] Harvested ${rawMessages.length} messages for #${channelName}. Sending to Backend AI...`);
@@ -289,6 +368,7 @@ export class DecisionTrackerBot {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           rawMessages: rawMessages.map(m => ({
+            id: m.id,
             author: m.authorName,
             content: m.content,
             createdAt: m.createdAt.toISOString(),
@@ -311,21 +391,21 @@ export class DecisionTrackerBot {
       const result = await res.json() as any;
 
       if (!result.found || !result.decisions || result.decisions.length === 0) {
-        logger.info(`[Backend] No decision consensus identified in #${channelName}`);
+        logger.info(`[Backend] No decision candidate identified in #${channelName}: ${result.summary}`);
         await this.removeReactionSafely(message, '👀');
         if (isManualOverride && 'send' in channel) {
-          await channel.send('💡 이 대화 맥락에서 명확한 의사결정 사항을 발견하지 못했습니다.');
+          await channel.send(`💡 대화 분석 결과: ${result.summary || '명확한 의사결정 사항을 발견하지 못했습니다.'}`);
         }
         return null;
       }
 
-      logger.info(`[Backend] Extracted ${result.decisions.length} decisions! Updating Reaction Feedback (📝)...`);
+      logger.info(`[Backend] Extracted ${result.decisions.length} decision candidates! Updating Reaction Feedback (📝)...`);
 
       // Update reaction feedback
       await this.removeReactionSafely(message, '👀');
       await this.addReactionSafely(message, '📝');
 
-      // 4. Handle conflict or render decision embeds
+      // 4. Handle conflict or render decision candidate embeds
       if (result.hasConflict && result.conflictingDecision && 'send' in channel) {
         const primaryDecision = result.decisions[0];
         await this.sendConflictPrompt(channel as any, primaryDecision, result.conflictingDecision);
@@ -335,11 +415,21 @@ export class DecisionTrackerBot {
             ? `\n\n**📋 후속 조치:**\n` + decision.actionItems.map((a: any) => `• ${a.task} ${a.assignee ? `(@${a.assignee})` : ''}`).join('\n')
             : '';
 
+          const alternativesText = decision.alternatives && decision.alternatives.length > 0
+            ? `\n\n**🔍 검토 대안:**\n` + decision.alternatives.map((alt: any) => `• ${alt.option} (${alt.reason})`).join('\n')
+            : '';
+
+          const pivotBadge = decision.isPivot ? ' [⚠️ 피벗/변경 감지]' : '';
+
           const embed = new EmbedBuilder()
-            .setTitle(`📝 의사결정 기록 완료: [${decision.topic}]`)
-            .setDescription(`**🎯 결정:** ${decision.decision}\n**💡 근거:** ${decision.rationale}${actionItemsText}`)
-            .setFooter({ text: `ID: ${decision.id} | 상태: ${decision.state}` })
-            .setColor(0x10b981);
+            .setTitle(`📝 의사결정 후보 생성 [검수 큐 등록]${pivotBadge}`)
+            .setDescription(
+              `**🏷️ 분류:** [${decision.categoryTag || '기타'}] **${decision.title || decision.topic}**\n\n` +
+              `**🎯 결정 내용:** ${decision.decisionContent || decision.decision}\n\n` +
+              `**💡 결정 근거:** ${decision.rationale}${alternativesText}${actionItemsText}`
+            )
+            .setFooter({ text: `ID: ${decision.id} | 상태: ${decision.state} (검수 대기) | 대시보드에서 확정 가능` })
+            .setColor(decision.isPivot ? 0xf59e0b : 0x3b82f6);
 
           await channel.send({ embeds: [embed] });
         }
@@ -366,11 +456,11 @@ export class DecisionTrackerBot {
     oldDecision: Decision
   ): Promise<void> {
     const embed = new EmbedBuilder()
-      .setTitle('⚠️ 의사결정 충돌/변경 감지')
+      .setTitle('⚠️ 의사결정 충돌/피벗 감지')
       .setDescription(
-        `기존 결정 **[${oldDecision.id}]**과 유사한 새 결정이 추출되었습니다.\n\n` +
-        `**[기존 결정]**: ${oldDecision.decision}\n` +
-        `**[새로운 결정]**: ${newDecision.decision}\n\n` +
+        `기존 확정 결정 **[${oldDecision.id}]**과 상충되거나 수정하는 새 후보가 추출되었습니다.\n\n` +
+        `**[기존 결정]**: ${oldDecision.decisionContent || oldDecision.decision}\n` +
+        `**[새로운 결정]**: ${newDecision.decisionContent || newDecision.decision}\n\n` +
         `어떻게 처리할까요?`
       )
       .setColor(0xf59e0b)
@@ -424,6 +514,7 @@ export class DecisionTrackerBot {
             const newestMsg = msgs[msgs.length - 1];
 
             const rawMessages = msgs.map(m => ({
+              id: m.id,
               author: m.author.username,
               content: m.content,
               createdAt: m.createdAt.toISOString(),
@@ -456,10 +547,14 @@ export class DecisionTrackerBot {
                       : '';
 
                     const embed = new EmbedBuilder()
-                      .setTitle(`📝 [초기 스캔] 의사결정 기록: [${decision.topic}]`)
-                      .setDescription(`**🎯 결정:** ${decision.decision}\n**💡 근거:** ${decision.rationale}${actionItemsText}`)
+                      .setTitle(`📝 [초기 스캔] 의사결정 후보 생성 [검수 대기]`)
+                      .setDescription(
+                        `**🏷️ 분류:** [${decision.categoryTag || '기타'}] **${decision.title || decision.topic}**\n\n` +
+                        `**🎯 결정 내용:** ${decision.decisionContent || decision.decision}\n\n` +
+                        `**💡 결정 근거:** ${decision.rationale}${actionItemsText}`
+                      )
                       .setFooter({ text: `ID: ${decision.id} | 상태: ${decision.state}` })
-                      .setColor(0x10b981);
+                      .setColor(0x3b82f6);
 
                     await channel.send({ embeds: [embed] });
                   }

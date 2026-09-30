@@ -144,4 +144,113 @@ describe('BE Server & Ingestion API', () => {
     const data3 = await res3.json() as any;
     assert.strictEqual(data3.lastMessageId, 'msg-999');
   });
+
+  it('exposes centralized harvesting policy via GET /api/config/policy', async () => {
+    const res = await fetch(`http://localhost:${port}/api/config/policy`);
+    assert.strictEqual(res.status, 200);
+    const policy = await res.json() as any;
+    assert.strictEqual(policy.initialScanLimit, 50);
+    assert.strictEqual(policy.contextWindowBefore, 15);
+    assert.strictEqual(policy.contextWindowAfter, 5);
+    assert.strictEqual(policy.reactionThreshold, 3);
+  });
+
+  it('handles decision review workflow via POST /api/decisions/:id/review', async () => {
+    // Save draft decision
+    repo.saveDecision({
+      id: 'DEC-DRAFT-1',
+      topic: 'UI Framework',
+      decision: 'Tailwind CSS',
+      title: 'Adopt Tailwind CSS',
+      decisionContent: 'Use Tailwind CSS for styling',
+      rationale: 'Utility classes speed up frontend development',
+      alternatives: [{ option: 'Styled Components', reason: 'Runtime overhead' }],
+      categoryTag: '기술',
+      actionItems: [],
+      state: 'Draft',
+      supersedesId: null,
+      isPivot: false,
+      approvedBy: null,
+      decisionConfirmedDate: null,
+      feedbackSourceType: null,
+      feedbackSourceDetail: null,
+      feedbackReceivedDate: null,
+      rawEvidence: ['msg-1', 'msg-2'],
+      evidenceHash: 'hash-tailwind-123',
+      source: { guildId: 'g1', channelId: 'c1', triggerMessageId: 'm1', participants: [], rawMessages: [] },
+      createdAt: new Date().toISOString()
+    });
+
+    // 1. Confirm review action
+    const res = await fetch(`http://localhost:${port}/api/decisions/DEC-DRAFT-1/review`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'confirm',
+        approvedBy: 'reviewer_wooddang',
+        title: 'Adopt Tailwind CSS v4'
+      })
+    });
+    assert.strictEqual(res.status, 200);
+    const body = await res.json() as any;
+    assert.strictEqual(body.decision.state, 'Decided');
+    assert.strictEqual(body.decision.approvedBy, 'reviewer_wooddang');
+    assert.strictEqual(body.decision.title, 'Adopt Tailwind CSS v4');
+
+    // 2. Reject another draft and check anti-recreation hash
+    repo.saveDecision({
+      id: 'DEC-DRAFT-2',
+      topic: 'Invalid Proposal',
+      decision: 'Use Flash',
+      rationale: 'None',
+      alternatives: [],
+      categoryTag: '기술',
+      actionItems: [],
+      state: 'Draft',
+      supersedesId: null,
+      isPivot: false,
+      approvedBy: null,
+      decisionConfirmedDate: null,
+      feedbackSourceType: null,
+      feedbackSourceDetail: null,
+      feedbackReceivedDate: null,
+      rawEvidence: ['msg-x'],
+      evidenceHash: 'hash-rejected-999',
+      source: { guildId: 'g1', channelId: 'c1', triggerMessageId: 'mx', participants: [], rawMessages: [] },
+      createdAt: new Date().toISOString()
+    });
+
+    const resReject = await fetch(`http://localhost:${port}/api/decisions/DEC-DRAFT-2/review`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'reject' })
+    });
+    assert.strictEqual(resReject.status, 200);
+    assert.strictEqual(repo.isEvidenceRejected('hash-rejected-999'), true);
+  });
+
+  it('manages external feedback via POST and GET /api/feedbacks', async () => {
+    const feedbackPayload = {
+      id: 'FB-001',
+      source: '교수',
+      detail: '캡스톤 중간발표',
+      content: '대학생 전체보다 동아리 프로젝트 팀으로 타깃을 좁혀보세요.',
+      channelId: 'chan-feedback-1',
+      createdAt: new Date().toISOString()
+    };
+
+    const postRes = await fetch(`http://localhost:${port}/api/feedbacks`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(feedbackPayload)
+    });
+    assert.strictEqual(postRes.status, 201);
+
+    const getRes = await fetch(`http://localhost:${port}/api/feedbacks?channelId=chan-feedback-1`);
+    assert.strictEqual(getRes.status, 200);
+    const getData = await getRes.json() as any;
+    assert.strictEqual(getData.feedbacks.length, 1);
+    assert.strictEqual(getData.feedbacks[0].content, feedbackPayload.content);
+    assert.strictEqual(getData.feedbacks[0].source, '교수');
+  });
 });

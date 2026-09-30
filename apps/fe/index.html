@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>GGADDAK — 팀 의사결정 타임라인</title>
+  <title>GGADDAK — 팀 의사결정 타임라인 & 검수 큐</title>
   <style>
     :root {
       --bg: #0b0f19;
@@ -17,6 +17,7 @@
       --amber: #f59e0b;
       --red: #ef4444;
       --purple: #a855f7;
+      --blue: #38bdf8;
       --chat-bg: #0d1322;
       --chat-border: #1e293b;
     }
@@ -36,7 +37,7 @@
     }
 
     .container {
-      max-width: 1000px;
+      max-width: 1040px;
       margin: 0 auto;
     }
 
@@ -44,7 +45,7 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 28px;
+      margin-bottom: 24px;
       border-bottom: 1px solid var(--card-border);
       padding-bottom: 20px;
     }
@@ -63,14 +64,49 @@
       margin-top: 4px;
     }
 
+    .nav-tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+
+    .tab-btn {
+      background: var(--card-bg);
+      color: var(--text-muted);
+      border: 1px solid var(--card-border);
+      padding: 8px 18px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.9rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .tab-btn.active {
+      background: var(--accent);
+      color: white;
+      border-color: var(--accent);
+    }
+
+    .tab-count {
+      background: rgba(255, 255, 255, 0.2);
+      padding: 2px 7px;
+      border-radius: 999px;
+      font-size: 0.75rem;
+    }
+
     .controls {
       display: flex;
       gap: 12px;
       margin-bottom: 24px;
+      flex-wrap: wrap;
     }
 
     .search-input {
       flex: 1;
+      min-width: 250px;
       background: var(--card-bg);
       border: 1px solid var(--card-border);
       border-radius: 8px;
@@ -138,9 +174,10 @@
       border: 3px solid var(--bg);
     }
 
-    .timeline-dot.superseded {
-      background: var(--red);
-    }
+    .timeline-dot.draft { background: var(--blue); }
+    .timeline-dot.decided { background: var(--green); }
+    .timeline-dot.superseded { background: var(--red); }
+    .timeline-dot.deferred { background: var(--amber); }
 
     .card {
       background: var(--card-bg);
@@ -159,15 +196,20 @@
       justify-content: space-between;
       align-items: flex-start;
       margin-bottom: 12px;
+      gap: 12px;
+    }
+
+    .card-topic-group {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
     }
 
     .card-topic {
       font-size: 1.15rem;
       font-weight: 700;
       color: var(--text);
-      display: flex;
-      align-items: center;
-      gap: 10px;
     }
 
     .badge {
@@ -179,11 +221,15 @@
       letter-spacing: 0.5px;
     }
 
+    .badge-category { background: rgba(99, 102, 241, 0.15); color: var(--accent); border: 1px solid var(--accent); }
+    .badge-draft { background: rgba(56, 189, 248, 0.15); color: var(--blue); border: 1px solid var(--blue); }
     .badge-decided { background: rgba(16, 185, 129, 0.15); color: var(--green); border: 1px solid var(--green); }
     .badge-superseded { background: rgba(239, 68, 68, 0.15); color: var(--red); border: 1px solid var(--red); }
+    .badge-deferred { background: rgba(245, 158, 11, 0.15); color: var(--amber); border: 1px solid var(--amber); }
+    .badge-pivot { background: rgba(245, 158, 11, 0.2); color: var(--amber); border: 1px solid var(--amber); }
 
     .card-decision {
-      font-size: 1rem;
+      font-size: 1.05rem;
       font-weight: 600;
       color: #38bdf8;
       margin-bottom: 10px;
@@ -196,7 +242,17 @@
       padding: 10px 14px;
       font-size: 0.88rem;
       color: #cbd5e1;
-      margin-bottom: 14px;
+      margin-bottom: 12px;
+    }
+
+    .alternatives-section {
+      background: #111827;
+      border-left: 3px solid var(--amber);
+      border-radius: 4px;
+      padding: 8px 12px;
+      font-size: 0.82rem;
+      color: #cbd5e1;
+      margin-bottom: 12px;
     }
 
     .action-items-list {
@@ -217,6 +273,33 @@
       padding: 6px 10px;
       border-radius: 6px;
     }
+
+    .review-toolbar {
+      display: flex;
+      gap: 8px;
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .btn-review {
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid transparent;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .btn-confirm { background: var(--green); color: white; }
+    .btn-confirm:hover { opacity: 0.9; }
+    .btn-defer { background: #374151; color: var(--amber); border-color: var(--amber); }
+    .btn-defer:hover { background: #4b5563; }
+    .btn-reject { background: #374151; color: var(--red); border-color: var(--red); }
+    .btn-reject:hover { background: #4b5563; }
 
     /* Expandable Transcript Accordion */
     .transcript-accordion {
@@ -326,18 +409,41 @@
 <div class="container">
   <header>
     <div class="title-group">
-      <h1>⚡ GGADDAK 의사결정 타임라인</h1>
-      <p>디스코드 서버에서 실시간 수집 및 추출된 조직 의사결정 기록</p>
+      <h1>⚡ GGADDAK 의사결정 타임라인 & 검수 큐</h1>
+      <p>디스코드 서버에서 실시간 추출된 의사결정 후보(DRAFT) 검수 및 확정 타임라인</p>
     </div>
     <button id="btn-refresh" class="btn-refresh">🔄 새로고침</button>
   </header>
 
+  <div class="nav-tabs">
+    <button class="tab-btn active" data-tab="timeline">
+      📋 전체 타임라인
+      <span id="count-total" class="tab-count">0</span>
+    </button>
+    <button class="tab-btn" data-tab="review">
+      🔍 검수 큐 (DRAFT)
+      <span id="count-draft" class="tab-count" style="background: #3b82f6; color: white;">0</span>
+    </button>
+  </div>
+
   <div class="controls">
-    <input type="text" id="search-input" class="search-input" placeholder="안건, 결정 내용, 근거 또는 대화 원문 검색...">
+    <input type="text" id="search-input" class="search-input" placeholder="안건, 결정 내용, 근거, 대안 또는 대화 원문 검색...">
     <select id="state-filter" class="filter-select">
-      <option value="">모든 상태 (전체)</option>
+      <option value="">모든 상태</option>
+      <option value="Draft">검수 대기 (Draft)</option>
       <option value="Decided">확정됨 (Decided)</option>
+      <option value="Deferred">보류됨 (Deferred)</option>
       <option value="Superseded">대체됨 (Superseded)</option>
+      <option value="Rejected">기각됨 (Rejected)</option>
+    </select>
+    <select id="category-filter" class="filter-select">
+      <option value="">모든 카테고리</option>
+      <option value="타깃">타깃</option>
+      <option value="문제정의">문제정의</option>
+      <option value="기능">기능</option>
+      <option value="기술">기술</option>
+      <option value="BM">BM</option>
+      <option value="기타">기타</option>
     </select>
   </div>
 
@@ -347,6 +453,7 @@
 <script>
   const API_URL = 'http://localhost:3001/api/decisions';
   let allDecisions = [];
+  let currentTab = 'timeline';
 
   async function fetchDecisions() {
     try {
@@ -354,6 +461,7 @@
       if (!res.ok) throw new Error('API 응답 실패');
       const data = await res.json();
       allDecisions = data.decisions || [];
+      updateCounts();
       renderTimeline();
     } catch (err) {
       console.warn('Backend API connection failed, rendering sample or empty:', err);
@@ -363,35 +471,69 @@
     }
   }
 
+  function updateCounts() {
+    const totalCount = allDecisions.length;
+    const draftCount = allDecisions.filter(d => d.state === 'Draft').length;
+    document.getElementById('count-total').textContent = totalCount;
+    document.getElementById('count-draft').textContent = draftCount;
+  }
+
+  async function handleReviewAction(decisionId, action) {
+    try {
+      const res = await fetch(`http://localhost:3001/api/decisions/${decisionId}/review`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action,
+          approvedBy: 'Web Reviewer'
+        })
+      });
+      if (res.ok) {
+        await fetchDecisions();
+      } else {
+        alert('검수 처리 중 오류가 발생했습니다.');
+      }
+    } catch (err) {
+      alert(`백엔드 통신 오류: ${err.message}`);
+    }
+  }
+
   function renderTimeline() {
     const timelineEl = document.getElementById('timeline');
     const query = document.getElementById('search-input').value.toLowerCase().trim();
-    const stateFilter = document.getElementById('state-filter').value;
+    let stateFilter = document.getElementById('state-filter').value;
+    const categoryFilter = document.getElementById('category-filter').value;
+
+    if (currentTab === 'review') {
+      stateFilter = 'Draft';
+    }
 
     const filtered = allDecisions.filter(d => {
       const matchesSearch = 
+        (d.title && d.title.toLowerCase().includes(query)) ||
         d.topic.toLowerCase().includes(query) ||
+        (d.decisionContent && d.decisionContent.toLowerCase().includes(query)) ||
         d.decision.toLowerCase().includes(query) ||
         d.rationale.toLowerCase().includes(query) ||
         (d.rawTranscript && d.rawTranscript.toLowerCase().includes(query));
       const matchesState = !stateFilter || d.state === stateFilter;
-      return matchesSearch && matchesState;
+      const matchesCategory = !categoryFilter || d.categoryTag === categoryFilter;
+      return matchesSearch && matchesState && matchesCategory;
     });
 
     if (filtered.length === 0) {
       timelineEl.innerHTML = `
         <div class="empty-state">
-          <h3>기록된 의사결정이 없습니다</h3>
-          <p style="margin-top: 6px;">디스코드 채널에서 토론 후 📌 이모지를 달아보세요.</p>
+          <h3>표시할 의사결정 카드가 없습니다</h3>
+          <p style="margin-top: 6px;">${currentTab === 'review' ? '현재 검수 대기 중인 DRAFT 후보가 없습니다.' : '디스코드 채널에서 토론 후 합의 발화 또는 리액션을 남겨보세요.'}</p>
         </div>
       `;
       return;
     }
 
     timelineEl.innerHTML = filtered.map(d => {
-      const isSuperseded = d.state === 'Superseded';
-      const badgeClass = isSuperseded ? 'badge-superseded' : 'badge-decided';
-      const dotClass = isSuperseded ? 'superseded' : '';
+      const stateClass = d.state.toLowerCase();
+      const dotClass = stateClass;
       const dateStr = new Date(d.createdAt).toLocaleString('ko-KR');
 
       const actionItemsHtml = d.actionItems && d.actionItems.length > 0 ? `
@@ -405,7 +547,23 @@
         </div>
       ` : '';
 
-      // Render raw messages or plain transcript
+      const alternativesHtml = d.alternatives && d.alternatives.length > 0 ? `
+        <div class="alternatives-section">
+          <strong>🔍 검토 및 기각된 대안:</strong>
+          <ul style="margin-top: 4px; padding-left: 18px;">
+            ${d.alternatives.map(alt => `<li><strong>${alt.option}</strong>: ${alt.reason}</li>`).join('')}
+          </ul>
+        </div>
+      ` : '';
+
+      const reviewToolbarHtml = d.state === 'Draft' ? `
+        <div class="review-toolbar">
+          <button class="btn-review btn-confirm" onclick="handleReviewAction('${d.id}', 'confirm')">✅ 확정 승인 (Confirm)</button>
+          <button class="btn-review btn-defer" onclick="handleReviewAction('${d.id}', 'defer')">⏸️ 보류 (Defer)</button>
+          <button class="btn-review btn-reject" onclick="handleReviewAction('${d.id}', 'reject')">❌ 기각 및 삭제 (Reject)</button>
+        </div>
+      ` : '';
+
       const rawMessages = d.source?.rawMessages || [];
       let transcriptHtml = '';
 
@@ -449,25 +607,29 @@
           <div class="timeline-dot ${dotClass}"></div>
           <div class="card">
             <div class="card-header">
-              <div class="card-topic">
-                <span>[${d.topic}]</span>
-                <span class="badge ${badgeClass}">${d.state}${d.supersedesId ? ` (← ${d.supersedesId})` : ''}</span>
+              <div class="card-topic-group">
+                <span class="badge badge-category">[${d.categoryTag || '기타'}]</span>
+                <span class="card-topic">${d.title || d.topic}</span>
+                <span class="badge badge-${stateClass}">${d.state}${d.supersedesId ? ` (← ${d.supersedesId})` : ''}</span>
+                ${d.isPivot ? `<span class="badge badge-pivot">⚠️ 피벗/변경</span>` : ''}
               </div>
               <span style="font-size: 0.75rem; color: var(--text-muted);">${d.id}</span>
             </div>
 
-            <div class="card-decision">🎯 ${d.decision}</div>
+            <div class="card-decision">🎯 ${d.decisionContent || d.decision}</div>
             
             <div class="card-rationale">
               <strong>💡 결정 근거:</strong> ${d.rationale}
             </div>
 
+            ${alternativesHtml}
             ${actionItemsHtml}
             ${transcriptHtml}
+            ${reviewToolbarHtml}
 
             <div class="card-footer">
-              <span>📅 ${dateStr} ${d.source.channelName ? `· #${d.source.channelName}` : ''}</span>
-              ${d.source.messageUrl ? `<a href="${d.source.messageUrl}" target="_blank" class="discord-link">💬 디스코드 스레드로 바로가기 ➔</a>` : ''}
+              <span>📅 ${dateStr} ${d.source?.channelName ? `· #${d.source.channelName}` : ''} ${d.approvedBy ? `· 승인자: @${d.approvedBy}` : ''}</span>
+              ${d.source?.messageUrl ? `<a href="${d.source.messageUrl}" target="_blank" class="discord-link">💬 디스코드 대화 바로가기 ➔</a>` : ''}
             </div>
           </div>
         </div>
@@ -475,9 +637,20 @@
     }).join('');
   }
 
+  // Tabs
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentTab = btn.dataset.tab;
+      renderTimeline();
+    });
+  });
+
   document.getElementById('btn-refresh').addEventListener('click', fetchDecisions);
   document.getElementById('search-input').addEventListener('input', renderTimeline);
   document.getElementById('state-filter').addEventListener('change', renderTimeline);
+  document.getElementById('category-filter').addEventListener('change', renderTimeline);
 
   fetchDecisions();
 </script>

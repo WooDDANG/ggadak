@@ -1,6 +1,14 @@
 import http from 'node:http';
+import crypto from 'node:crypto';
 import morgan from 'morgan';
-import { DecisionPayloadSchema, Decision, createLogger } from '@ggaddak/shared';
+import {
+  DecisionPayloadSchema,
+  Decision,
+  createLogger,
+  getHarvestingPolicyFromEnv,
+  ExternalFeedbackSchema,
+  ReviewActionSchema
+} from '@ggaddak/shared';
 import { DecisionRepository } from './db.js';
 import { BackendExtractionEngine } from './extractor/engine.js';
 
@@ -36,6 +44,14 @@ export function createServer(repo: DecisionRepository, extractor = new BackendEx
         return;
       }
 
+      // 0. Centralized Policy Configuration API: GET /api/config/policy
+      if (req.method === 'GET' && url.pathname === '/api/config/policy') {
+        const policy = getHarvestingPolicyFromEnv();
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(policy));
+        return;
+      }
+
       // 1. Centralized AI Discussion Analysis: POST /api/discussions/analyze
       if (req.method === 'POST' && url.pathname === '/api/discussions/analyze') {
         let body = '';
@@ -51,6 +67,24 @@ export function createServer(repo: DecisionRepository, extractor = new BackendEx
               return;
             }
 
+            // Compute evidence hash for anti-recreation check
+            const evidenceString = rawMessages.map((m: any) => m.id || `${m.author}:${m.content}:${m.createdAt}`).join('|');
+            const evidenceHash = crypto.createHash('sha256').update(evidenceString).digest('hex');
+
+            if (repo.isEvidenceRejected(evidenceHash)) {
+              logger.info(`[Analyze] Skipping analysis for evidence hash [${evidenceHash.slice(0, 8)}] - Previously rejected.`);
+              res.writeHead(200, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({
+                found: false,
+                summary: '이전에 기각/삭제된 대화 구간입니다. 새 대화가 추가되면 다시 분석됩니다.',
+                decisions: []
+              }));
+              return;
+            }
+
+            // Retrieve recent external feedbacks for context injection
+            const recentFeedbacks = repo.getRecentFeedbacks(channelId, 3);
+
             // Build transcript
             const transcript = rawMessages
               .map((m: any) => {
@@ -61,7 +95,7 @@ export function createServer(repo: DecisionRepository, extractor = new BackendEx
               .join('\n');
 
             logger.info(`[Analyze] Analyzing ${rawMessages.length} messages from #${channelName || channelId}...`);
-            const extraction = await extractor.analyzeTranscript(transcript);
+            const extraction = await extractor.analyzeTranscript(transcript, recentFeedbacks);
 
             if (!extraction.found || extraction.decisions.length === 0) {
               logger.info(`[Analyze] No decisions found in discussion.`);
@@ -74,13 +108,15 @@ export function createServer(repo: DecisionRepository, extractor = new BackendEx
             let lastConflict: { hasConflict: boolean; conflictingDecision?: Decision } = { hasConflict: false };
 
             const participants = Array.from(new Set(rawMessages.map((m: any) => m.author))) as string[];
+            const rawEvidence = rawMessages.map((m: any) => m.id || m.content).filter(Boolean);
 
             for (const item of extraction.decisions) {
               const decisionId = `DEC-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 100)}`;
-              
-              // Conflict check with existing active decisions
+
+              // Conflict / Pivot check with existing active decisions
               const existingActive = repo.getDecisions({ topic: item.topic, state: 'Decided' });
               const conflicting = existingActive.length > 0 ? existingActive[0] : undefined;
+              const isPivot = Boolean(item.isPivot || conflicting);
 
               if (conflicting) {
                 lastConflict = {
@@ -93,10 +129,22 @@ export function createServer(repo: DecisionRepository, extractor = new BackendEx
                 id: decisionId,
                 topic: item.topic,
                 decision: item.decision,
+                title: item.title || item.topic,
+                decisionContent: item.decisionContent || item.decision,
                 rationale: item.rationale,
-                actionItems: item.actionItems,
-                state: 'Decided',
+                alternatives: item.alternatives || [],
+                categoryTag: item.categoryTag || '기타',
+                actionItems: item.actionItems || [],
+                state: 'Draft', // All new candidates start in Draft state
                 supersedesId: null,
+                isPivot,
+                approvedBy: null,
+                decisionConfirmedDate: null,
+                feedbackSourceType: null,
+                feedbackSourceDetail: null,
+                feedbackReceivedDate: null,
+                rawEvidence,
+                evidenceHash,
                 rawTranscript: transcript,
                 source: {
                   guildId: guildId || 'discord',
@@ -106,19 +154,21 @@ export function createServer(repo: DecisionRepository, extractor = new BackendEx
                   messageUrl: messageUrl || undefined,
                   participants,
                   rawMessages: rawMessages.map((m: any) => ({
+                    id: m.id,
                     author: m.author,
                     content: m.content,
                     createdAt: m.createdAt || new Date().toISOString(),
                     replyingTo: m.replyingTo
                   }))
                 },
+                messageCreatedAt: rawMessages[rawMessages.length - 1]?.createdAt || new Date().toISOString(),
                 createdAt: new Date().toISOString()
               };
 
               repo.saveDecision(newDecision);
               savedDecisions.push(newDecision);
 
-              logger.info(`[Analyze] Saved Decision [${newDecision.id}] Topic="${newDecision.topic}" DecisionsCount=${savedDecisions.length}`);
+              logger.info(`[Analyze] Saved DRAFT Decision [${newDecision.id}] Title="${newDecision.title}" Category="${newDecision.categoryTag}"`);
             }
 
             // Update checkpoint for channel
@@ -143,7 +193,86 @@ export function createServer(repo: DecisionRepository, extractor = new BackendEx
         return;
       }
 
-      // 2. Channel Checkpoints: GET & POST /api/channels/:channelId/checkpoint
+      // 2. Decision Review Operations: POST /api/decisions/:id/review
+      const reviewMatch = url.pathname.match(/^\/api\/decisions\/([^/]+)\/review$/);
+      if (req.method === 'POST' && reviewMatch) {
+        const decisionId = reviewMatch[1];
+        let body = '';
+        req.on('data', chunk => body += chunk);
+        req.on('end', () => {
+          try {
+            const raw = JSON.parse(body);
+            const parsed = ReviewActionSchema.safeParse(raw);
+            if (!parsed.success) {
+              res.writeHead(400, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ error: 'Invalid ReviewAction', details: parsed.error.issues }));
+              return;
+            }
+
+            const { action, approvedBy, title, decisionContent, rationale, categoryTag } = parsed.data;
+            const updated = repo.reviewDecision(decisionId, action, {
+              approvedBy,
+              title,
+              decisionContent,
+              rationale,
+              categoryTag
+            });
+
+            if (!updated) {
+              res.writeHead(404, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ error: 'Decision not found' }));
+              return;
+            }
+
+            logger.info(`[Review] Decision [${decisionId}] reviewed with action: ${action} -> state: ${updated.state}`);
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ status: 'ok', decision: updated }));
+          } catch (err: any) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: err.message }));
+          }
+        });
+        return;
+      }
+
+      // 3. External Feedbacks: GET & POST /api/feedbacks
+      if (url.pathname === '/api/feedbacks') {
+        if (req.method === 'GET') {
+          const channelId = url.searchParams.get('channelId') || undefined;
+          const limit = url.searchParams.get('limit') ? parseInt(url.searchParams.get('limit')!, 10) : 10;
+          const feedbacks = repo.getRecentFeedbacks(channelId, limit);
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ feedbacks }));
+          return;
+        }
+
+        if (req.method === 'POST') {
+          let body = '';
+          req.on('data', chunk => body += chunk);
+          req.on('end', () => {
+            try {
+              const raw = JSON.parse(body);
+              const parsed = ExternalFeedbackSchema.safeParse(raw);
+              if (!parsed.success) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Invalid ExternalFeedback', details: parsed.error.issues }));
+                return;
+              }
+
+              repo.saveFeedback(parsed.data);
+              logger.info(`[Feedback] Saved External Feedback [${parsed.data.id}] Source="${parsed.data.source}"`);
+              res.writeHead(201, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ status: 'ok', id: parsed.data.id }));
+            } catch (err: any) {
+              res.writeHead(400, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ error: err.message }));
+            }
+          });
+          return;
+        }
+      }
+
+      // 4. Channel Checkpoints: GET & POST /api/channels/:channelId/checkpoint
       const checkpointMatch = url.pathname.match(/^\/api\/channels\/([^/]+)\/checkpoint$/);
       if (checkpointMatch) {
         const channelId = checkpointMatch[1];
@@ -178,7 +307,7 @@ export function createServer(repo: DecisionRepository, extractor = new BackendEx
         }
       }
 
-      // 3. Resolve Conflict: POST /api/decisions/resolve-conflict
+      // 5. Resolve Conflict: POST /api/decisions/resolve-conflict
       if (req.method === 'POST' && url.pathname === '/api/decisions/resolve-conflict') {
         let body = '';
         req.on('data', chunk => body += chunk);
@@ -189,7 +318,8 @@ export function createServer(repo: DecisionRepository, extractor = new BackendEx
               const current = repo.getDecisionById(decisionId);
               if (current) {
                 current.supersedesId = conflictingId;
-                repo.saveDecision(current); // saveDecision automatically updates conflictingId to 'Superseded'
+                current.state = 'Decided';
+                repo.saveDecision(current);
                 logger.info(`[Conflict] Decision [${decisionId}] now supersedes [${conflictingId}]`);
               }
             }
@@ -203,7 +333,7 @@ export function createServer(repo: DecisionRepository, extractor = new BackendEx
         return;
       }
 
-      // 4. Webhook ingestion: POST /api/webhooks/decisions (backward compatibility)
+      // 6. Webhook ingestion: POST /api/webhooks/decisions (backward compatibility)
       if (req.method === 'POST' && url.pathname === '/api/webhooks/decisions') {
         let body = '';
         req.on('data', chunk => body += chunk);
@@ -234,12 +364,13 @@ export function createServer(repo: DecisionRepository, extractor = new BackendEx
         return;
       }
 
-      // 5. Query decisions: GET /api/decisions
+      // 7. Query decisions: GET /api/decisions
       if (req.method === 'GET' && url.pathname === '/api/decisions') {
         const topic = url.searchParams.get('topic') || undefined;
         const state = url.searchParams.get('state') || undefined;
+        const categoryTag = url.searchParams.get('categoryTag') || undefined;
 
-        const decisions = repo.getDecisions({ topic, state });
+        const decisions = repo.getDecisions({ topic, state, categoryTag });
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ decisions }));
         return;

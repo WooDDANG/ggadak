@@ -1,11 +1,35 @@
 import { z } from 'zod';
 
 export const DecisionStateSchema = z.enum([
+  'Draft',
   'Proposed',
   'Discussing',
   'Decided',
-  'Superseded'
+  'Deferred',
+  'Superseded',
+  'Rejected'
 ]);
+
+export const CategoryTagSchema = z.enum([
+  '타깃',
+  '문제정의',
+  '기능',
+  '기술',
+  'BM',
+  '기타'
+]);
+
+export const FeedbackSourceTypeSchema = z.enum([
+  '교수',
+  '심사위원',
+  '팀원',
+  '인터뷰이'
+]);
+
+export const AlternativeOptionSchema = z.object({
+  option: z.string(),
+  reason: z.string()
+});
 
 export const ActionItemSchema = z.object({
   task: z.string().min(1),
@@ -14,6 +38,7 @@ export const ActionItemSchema = z.object({
 });
 
 export const RawMessageEntrySchema = z.object({
+  id: z.string().optional(),
   author: z.string(),
   content: z.string(),
   createdAt: z.string(),
@@ -33,14 +58,31 @@ export const DiscordSourceSchema = z.object({
 
 export const DecisionSchema = z.object({
   id: z.string(),
+  // Core Decision Content
   topic: z.string().min(1),
   decision: z.string().min(1),
+  title: z.string().optional(),
+  decisionContent: z.string().optional(),
   rationale: z.string().min(1),
+  alternatives: z.array(AlternativeOptionSchema).default([]),
+  categoryTag: CategoryTagSchema.default('기타'),
   actionItems: z.array(ActionItemSchema).default([]),
-  state: DecisionStateSchema.default('Decided'),
+  // State Machine & Audit
+  state: DecisionStateSchema.default('Draft'),
   supersedesId: z.string().nullable().default(null),
+  isPivot: z.boolean().default(false),
+  approvedBy: z.string().nullable().default(null),
+  decisionConfirmedDate: z.string().nullable().default(null),
+  // Feedback Linkage
+  feedbackSourceType: FeedbackSourceTypeSchema.nullable().default(null),
+  feedbackSourceDetail: z.string().nullable().default(null),
+  feedbackReceivedDate: z.string().nullable().default(null),
+  // Evidence & Source
+  rawEvidence: z.array(z.string()).default([]),
+  evidenceHash: z.string().optional(),
   rawTranscript: z.string().optional(),
   source: DiscordSourceSchema,
+  messageCreatedAt: z.string().optional(),
   createdAt: z.string().datetime()
 });
 
@@ -56,3 +98,20 @@ export const ChannelCheckpointSchema = z.object({
   updatedAt: z.string()
 });
 
+export const ExternalFeedbackSchema = z.object({
+  id: z.string(),
+  source: FeedbackSourceTypeSchema,
+  detail: z.string().optional(),
+  content: z.string().min(1),
+  channelId: z.string(),
+  createdAt: z.string()
+});
+
+export const ReviewActionSchema = z.object({
+  action: z.enum(['confirm', 'defer', 'reject', 'edit']),
+  approvedBy: z.string().optional(),
+  title: z.string().optional(),
+  decisionContent: z.string().optional(),
+  rationale: z.string().optional(),
+  categoryTag: CategoryTagSchema.optional()
+});
