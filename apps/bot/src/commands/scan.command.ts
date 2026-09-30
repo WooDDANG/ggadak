@@ -59,7 +59,7 @@ export class ScanCommand {
 
     interaction: CommandInteraction,
   ): Promise<void> {
-    await interaction.deferReply();
+    await interaction.deferReply({ ephemeral: true });
 
     const analysisService = AnalysisService.getInstance();
     if (!analysisService) {

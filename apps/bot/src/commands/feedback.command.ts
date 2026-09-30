@@ -64,7 +64,7 @@ export class FeedbackCommand {
     if (saved) {
       await interaction.reply({
         content: `✅ [외부 피드백 기록 완료]\n**출처**: ${source} ${detail ? `(${detail})` : ''}\n**내용**: ${content}\n*이 피드백은 향후 팀 논의 분석 시 참조 맥락으로 활용됩니다.*`,
-        ephemeral: false,
+        ephemeral: true,
       });
       logger.info(`Recorded external feedback [${feedback.id}] via discordx slash command`);
     } else {

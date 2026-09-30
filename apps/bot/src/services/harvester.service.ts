@@ -160,23 +160,9 @@ export class DiscussionHarvester {
       await this.removeReactionSafely(message, '👀');
       await this.addReactionSafely(message, '📝');
 
-      // Post Draft candidate embeds
-      if ('send' in channel && typeof (channel as any).send === 'function') {
-        const sendableChannel = channel as { send: (options: any) => Promise<any> };
-        for (const dec of result.decisions as Decision[]) {
-          const embed = BotEmbedView.renderCandidateEmbed(dec, rawMessages.length);
-          await sendableChannel.send({ embeds: [embed] });
-        }
-
-        // Check conflict / pivot prompt
-        if (result.hasConflict && result.conflictingDecision && result.decisions.length > 0) {
-          const newDec = result.decisions[0];
-          const oldDec = result.conflictingDecision;
-          const conflictEmbed = BotEmbedView.renderConflictEmbed(newDec, oldDec);
-          const actionRow = BotEmbedView.renderConflictActionRow(newDec.id, oldDec.id);
-          await sendableChannel.send({ embeds: [conflictEmbed], components: [actionRow] });
-        }
-      }
+      logger.info(
+        `[Analyze] Successfully extracted ${result.decisions.length} decision(s) from #${channelName}. Added 📝 emoji reaction. (Silent mode: no channel message sent)`,
+      );
 
       return result.decisions;
     } catch (err: any) {
@@ -289,13 +275,6 @@ export class DiscussionHarvester {
 
       if (result.found && result.decisions && result.decisions.length > 0) {
         decisionsFound = result.decisions.length;
-        if ('send' in channel && typeof (channel as any).send === 'function') {
-          const sendableChannel = channel as { send: (options: any) => Promise<any> };
-          for (const dec of result.decisions as Decision[]) {
-            const embed = BotEmbedView.renderCandidateEmbed(dec, fetchedMessages.length);
-            await sendableChannel.send({ embeds: [embed] });
-          }
-        }
       }
     } catch (err: any) {
       logger.error(`[Scan] Error analyzing scanned messages for #${channelName}: ${err.message}`);
