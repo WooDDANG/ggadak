@@ -13,6 +13,9 @@ export interface RawMessageData {
   content: string;
   createdAt: Date;
   referenceMessageId?: string;
+  reactionCount?: number;
+  reactions?: Array<{ emoji: string; count: number }>;
+  isTrigger?: boolean;
 }
 
 export interface ScanOptions {
@@ -34,6 +37,15 @@ export class DiscussionHarvester {
     return DiscussionHarvester.instance;
   }
 
+  private extractReactions(m: any): { reactionCount: number; reactions: Array<{ emoji: string; count: number }> } {
+    const reactions = Array.from(m.reactions?.cache?.values() || []).map((r: any) => ({
+      emoji: r.emoji?.name || 'emoji',
+      count: r.count || 0,
+    }));
+    const reactionCount = reactions.reduce((sum, r) => sum + r.count, 0);
+    return { reactionCount, reactions };
+  }
+
   async harvestContextMessages(
     message: Message,
     policy: HarvestingPolicyConfig,
@@ -51,14 +63,20 @@ export class DiscussionHarvester {
       const fetchedThread = await channel.messages.fetch({ limit: policy.maxMergedWindow });
       rawMessages = Array.from(fetchedThread.values())
         .reverse()
-        .map(m => ({
-          id: m.id,
-          authorId: m.author?.id || 'unknown',
-          authorName: m.author?.username || 'unknown',
-          content: m.content || '',
-          createdAt: m.createdAt || new Date(),
-          referenceMessageId: m.reference?.messageId,
-        }));
+        .map(m => {
+          const rx = this.extractReactions(m);
+          return {
+            id: m.id,
+            authorId: m.author?.id || 'unknown',
+            authorName: m.author?.username || 'unknown',
+            content: m.content || '',
+            createdAt: m.createdAt || new Date(),
+            referenceMessageId: m.reference?.messageId,
+            reactionCount: rx.reactionCount,
+            reactions: rx.reactions,
+            isTrigger: m.id === message.id,
+          };
+        });
     } else {
       const beforeCount = policy.contextWindowBefore;
       const afterCount = policy.contextWindowAfter;
@@ -69,27 +87,40 @@ export class DiscussionHarvester {
       });
       const beforeMsgs = Array.from(fetchedBefore.values())
         .reverse()
-        .map(m => ({
-          id: m.id,
-          authorId: m.author?.id || 'unknown',
-          authorName: m.author?.username || 'unknown',
-          content: m.content || '',
-          createdAt: m.createdAt || new Date(),
-          referenceMessageId: m.reference?.messageId,
-        }));
+        .map(m => {
+          const rx = this.extractReactions(m);
+          return {
+            id: m.id,
+            authorId: m.author?.id || 'unknown',
+            authorName: m.author?.username || 'unknown',
+            content: m.content || '',
+            createdAt: m.createdAt || new Date(),
+            referenceMessageId: m.reference?.messageId,
+            reactionCount: rx.reactionCount,
+            reactions: rx.reactions,
+            isTrigger: false,
+          };
+        });
 
       const fetchedAfter = await channel.messages.fetch({ limit: afterCount, after: message.id });
       const afterMsgs = Array.from(fetchedAfter.values())
         .reverse()
-        .map(m => ({
-          id: m.id,
-          authorId: m.author?.id || 'unknown',
-          authorName: m.author?.username || 'unknown',
-          content: m.content || '',
-          createdAt: m.createdAt || new Date(),
-          referenceMessageId: m.reference?.messageId,
-        }));
+        .map(m => {
+          const rx = this.extractReactions(m);
+          return {
+            id: m.id,
+            authorId: m.author?.id || 'unknown',
+            authorName: m.author?.username || 'unknown',
+            content: m.content || '',
+            createdAt: m.createdAt || new Date(),
+            referenceMessageId: m.reference?.messageId,
+            reactionCount: rx.reactionCount,
+            reactions: rx.reactions,
+            isTrigger: false,
+          };
+        });
 
+      const triggerRx = this.extractReactions(message);
       rawMessages = [
         ...beforeMsgs,
         {
@@ -98,6 +129,10 @@ export class DiscussionHarvester {
           authorName: message.author?.username || 'unknown',
           content: message.content || '',
           createdAt: message.createdAt || new Date(),
+          referenceMessageId: message.reference?.messageId,
+          reactionCount: triggerRx.reactionCount,
+          reactions: triggerRx.reactions,
+          isTrigger: true,
         },
         ...afterMsgs,
       ];
@@ -141,6 +176,9 @@ export class DiscussionHarvester {
           content: m.content,
           createdAt: m.createdAt.toISOString(),
           replyingTo: m.referenceMessageId,
+          reactionCount: m.reactionCount || 0,
+          reactions: m.reactions || [],
+          isTrigger: m.isTrigger || false,
         })),
         guildId: message.guildId || undefined,
         channelId: message.channelId,
@@ -258,13 +296,19 @@ export class DiscussionHarvester {
 
     try {
       const result = await this.backendApi.analyzeDiscussion({
-        rawMessages: fetchedMessages.map(m => ({
-          id: m.id,
-          author: m.author?.username || 'unknown',
-          content: m.content || '',
-          createdAt: (m.createdAt || new Date()).toISOString(),
-          replyingTo: m.reference?.messageId,
-        })),
+        rawMessages: fetchedMessages.map(m => {
+          const rx = this.extractReactions(m);
+          return {
+            id: m.id,
+            author: m.author?.username || 'unknown',
+            content: m.content || '',
+            createdAt: (m.createdAt || new Date()).toISOString(),
+            replyingTo: m.reference?.messageId,
+            reactionCount: rx.reactionCount,
+            reactions: rx.reactions,
+            isTrigger: m.id === newestMessage.id,
+          };
+        }),
         guildId: channel.guildId || undefined,
         channelId: channel.id,
         channelName,

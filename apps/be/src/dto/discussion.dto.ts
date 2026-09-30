@@ -7,6 +7,9 @@ export interface RawMessageItemDto {
   content: string;
   createdAt?: string;
   replyingTo?: string;
+  reactionCount?: number;
+  reactions?: Array<{ emoji: string; count: number }>;
+  isTrigger?: boolean;
 }
 
 export const RawMessageItemDtoSchema = z.object({
@@ -15,6 +18,9 @@ export const RawMessageItemDtoSchema = z.object({
   content: z.string(),
   createdAt: z.string().optional(),
   replyingTo: z.string().optional(),
+  reactionCount: z.number().optional(),
+  reactions: z.array(z.object({ emoji: z.string(), count: z.number() })).optional(),
+  isTrigger: z.boolean().optional(),
 });
 
 export interface AnalyzeDiscussionRequestDto {

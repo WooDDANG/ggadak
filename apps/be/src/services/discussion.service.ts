@@ -91,13 +91,18 @@ export class DiscussionService {
       const participants = Array.from(new Set(sessionMessages.map((m: any) => m.author))) as string[];
       const rawEvidence = sessionMessages.map((m: any) => m.id || m.content).filter(Boolean);
 
+      const totalReactionsCount = sessionMessages.reduce(
+        (sum: number, m: any) => sum + (m.reactionCount || 0),
+        0,
+      );
+
       for (const item of extraction.decisions) {
         const decisionId = `DEC-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 100)}`;
 
-        // Calculate 4-tier governance score
+        // Calculate 4-tier governance score entirely on Backend Core
         const govResult = this.core.calculateGovernanceScore({
           participantCount: participants.length,
-          reactionsCount: item.actionItems?.length || 0,
+          reactionsCount: totalReactionsCount,
           rationale: item.rationale,
           actionItemsCount: item.actionItems?.length || 0,
           hasExternalFeedback: recentFeedbacks.length > 0,
@@ -149,6 +154,9 @@ export class DiscussionService {
               content: m.content,
               createdAt: m.createdAt || new Date().toISOString(),
               replyingTo: m.replyingTo,
+              reactionCount: m.reactionCount || 0,
+              reactions: m.reactions || [],
+              isTrigger: m.isTrigger || false,
             })),
           },
           messageCreatedAt:

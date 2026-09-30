@@ -355,6 +355,32 @@
 					},
 					"replyingTo": {
 						"type": "string"
+					},
+					"reactionCount": {
+						"type": "number",
+						"format": "double"
+					},
+					"reactions": {
+						"items": {
+							"properties": {
+								"count": {
+									"type": "number",
+									"format": "double"
+								},
+								"emoji": {
+									"type": "string"
+								}
+							},
+							"required": [
+								"count",
+								"emoji"
+							],
+							"type": "object"
+						},
+						"type": "array"
+					},
+					"isTrigger": {
+						"type": "boolean"
 					}
 				},
 				"required": [
