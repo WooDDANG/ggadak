@@ -1,43 +1,28 @@
-import { IncomingMessage, ServerResponse } from 'node:http';
+import { Request, Response } from 'express';
 import { ExternalFeedbackSchema } from '@ggaddak/shared';
 import { FeedbackService } from '../services/feedback.service.js';
 
 export class FeedbackController {
   constructor(private service: FeedbackService) {}
 
-  getFeedbacks(req: IncomingMessage, res: ServerResponse, url: URL): void {
-    const channelId = url.searchParams.get('channelId') || undefined;
-    const limit = url.searchParams.get('limit') ? parseInt(url.searchParams.get('limit')!, 10) : 10;
+  getFeedbacks = (req: Request, res: Response): void => {
+    const channelId = typeof req.query.channelId === 'string' ? req.query.channelId : undefined;
+    const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 10;
     const feedbacks = this.service.getFeedbacks(channelId, limit);
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ feedbacks }));
-  }
+    res.status(200).json({ feedbacks });
+  };
 
-  saveFeedback(req: IncomingMessage, res: ServerResponse): void {
-    let body = '';
-    req.on('data', chunk => (body += chunk));
-    req.on('end', () => {
-      try {
-        const raw = JSON.parse(body);
-        const parsed = ExternalFeedbackSchema.safeParse(raw);
-        if (!parsed.success) {
-          res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(
-            JSON.stringify({
-              error: 'Invalid ExternalFeedback',
-              details: parsed.error.issues,
-            }),
-          );
-          return;
-        }
+  saveFeedback = (req: Request, res: Response): void => {
+    const parsed = ExternalFeedbackSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({
+        error: 'Invalid ExternalFeedback',
+        details: parsed.error.issues,
+      });
+      return;
+    }
 
-        this.service.saveFeedback(parsed.data);
-        res.writeHead(201, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ status: 'ok', id: parsed.data.id }));
-      } catch (err: any) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: err.message }));
-      }
-    });
-  }
+    this.service.saveFeedback(parsed.data);
+    res.status(201).json({ status: 'ok', id: parsed.data.id });
+  };
 }

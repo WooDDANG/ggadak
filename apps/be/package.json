@@ -10,17 +10,21 @@
     "test": "node --test dist/**/*.test.js"
   },
   "dependencies": {
-    "@ggaddak/shared": "*",
-    "ai": "^3.1.10",
     "@ai-sdk/google": "^0.0.15",
     "@ai-sdk/openai": "^0.0.15",
+    "@ggaddak/shared": "*",
+    "ai": "^3.1.10",
+    "cors": "^2.8.6",
     "dotenv": "^16.4.5",
+    "express": "^5.2.1",
     "morgan": "^1.10.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {
-    "typescript": "^5.4.5",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/morgan": "^1.9.9",
     "@types/node": "^22.0.0",
-    "@types/morgan": "^1.9.9"
+    "typescript": "^5.4.5"
   }
 }

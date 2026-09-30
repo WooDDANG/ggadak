@@ -1,12 +1,11 @@
-import { IncomingMessage, ServerResponse } from 'node:http';
+import { Request, Response } from 'express';
 import { PolicyService } from '../services/policy.service.js';
 
 export class PolicyController {
   constructor(private service: PolicyService) {}
 
-  getPolicy(_req: IncomingMessage, res: ServerResponse): void {
+  getPolicy = (_req: Request, res: Response): void => {
     const policy = this.service.getPolicy();
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(policy));
-  }
+    res.status(200).json(policy);
+  };
 }

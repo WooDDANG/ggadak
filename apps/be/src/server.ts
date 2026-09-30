@@ -1,4 +1,6 @@
 import http from 'node:http';
+import express, { Express } from 'express';
+import cors from 'cors';
 import morgan from 'morgan';
 import { createLogger } from '@ggaddak/shared';
 import { DecisionRepository } from './db.js';
@@ -13,59 +15,64 @@ import { CheckpointController } from './controllers/checkpoint.controller.js';
 import { FeedbackController } from './controllers/feedback.controller.js';
 import { DecisionController } from './controllers/decision.controller.js';
 import { DiscussionController } from './controllers/discussion.controller.js';
-import { AppRouter } from './routes/router.js';
+import { createApiRouter } from './routes/router.js';
 
-export function createServer(repo: DecisionRepository, extractor = new BackendExtractionEngine()) {
+export function createApp(
+  repo: DecisionRepository,
+  extractor = new BackendExtractionEngine(),
+): Express {
   const logger = createLogger('BE');
+  const app = express();
 
-  // 1. Initialize Service Layer
+  // 1. Initialize Services
   const policyService = new PolicyService();
   const checkpointService = new CheckpointService(repo);
   const feedbackService = new FeedbackService(repo);
   const decisionService = new DecisionService(repo);
   const discussionService = new DiscussionService(repo, extractor);
 
-  // 2. Initialize Controller Layer
+  // 2. Initialize Controllers
   const policyController = new PolicyController(policyService);
   const checkpointController = new CheckpointController(checkpointService);
   const feedbackController = new FeedbackController(feedbackService);
   const decisionController = new DecisionController(decisionService);
   const discussionController = new DiscussionController(discussionService);
 
-  // 3. Initialize Router Layer
-  const router = new AppRouter({
+  // 3. Middlewares
+  app.use(cors());
+  app.use(express.json({ limit: '10mb' }));
+
+  // Morgan HTTP logging
+  app.use(
+    morgan('":method :url" :status :res[content-length] - :response-time ms', {
+      stream: {
+        write: (message: string) => logger.info(`[HTTP] ${message.trim()}`),
+      },
+    }),
+  );
+
+  // 4. Health Check
+  app.get('/health', (_req, res) => {
+    res.status(200).json({ status: 'healthy' });
+  });
+
+  // 5. Mount API Routes
+  const apiRouter = createApiRouter({
     policyController,
     checkpointController,
     feedbackController,
     decisionController,
     discussionController,
   });
+  app.use('/api', apiRouter);
 
-  // 4. Morgan HTTP logging middleware
-  const morganMiddleware = morgan(
-    '":method :url" :status :res[content-length] - :response-time ms',
-    {
-      stream: {
-        write: (message: string) => logger.info(`[HTTP] ${message.trim()}`),
-      },
-    },
-  );
+  return app;
+}
 
-  return http.createServer((req, res) => {
-    morganMiddleware(req, res, () => {
-      // Enable CORS
-      res.setHeader('Access-Control-Allow-Origin', '*');
-      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-
-      if (req.method === 'OPTIONS') {
-        res.writeHead(204);
-        res.end();
-        return;
-      }
-
-      // Delegate request handling to AppRouter
-      router.handle(req, res);
-    });
-  });
+export function createServer(
+  repo: DecisionRepository,
+  extractor = new BackendExtractionEngine(),
+): http.Server {
+  const app = createApp(repo, extractor);
+  return http.createServer(app);
 }
