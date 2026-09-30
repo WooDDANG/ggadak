@@ -1,10 +1,11 @@
+import 'reflect-metadata';
 import {
-  Client,
   GatewayIntentBits,
   Partials,
   Message,
   TextChannel,
 } from 'discord.js';
+import { Client } from 'discordx';
 import {
   Decision,
   createLogger,
@@ -18,6 +19,10 @@ import { MessageHandler, CONSENSUS_REGEX } from '../handlers/message.handler.js'
 import { ReactionHandler } from '../handlers/reaction.handler.js';
 import { InteractionHandler } from '../handlers/interaction.handler.js';
 import { registerEvents } from '../events/index.js';
+// Import discordx decorated classes so they get registered
+import '../commands/feedback.command.js';
+import '../commands/scan.command.js';
+import '../handlers/conflict.button.js';
 
 export interface BotConfig {
   token?: string;
@@ -71,6 +76,7 @@ export class DecisionTrackerBot {
         GatewayIntentBits.MessageContent,
       ],
       partials: [Partials.Message, Partials.Channel, Partials.Reaction],
+      silent: false,
     });
 
     this.setupListeners();
@@ -84,12 +90,9 @@ export class DecisionTrackerBot {
     registerEvents({
       client: this.client,
       token: process.env.DISCORD_BOT_TOKEN,
-      apiService: this.backendApi,
       messageHandler: this.messageHandler,
       reactionHandler: this.reactionHandler,
-      interactionHandler: this.interactionHandler,
       getPolicy: () => this.policy,
-      onScanChannels: limit => this.scanAllChannels(limit),
     });
   }
 
@@ -155,7 +158,6 @@ export class DecisionTrackerBot {
     }
   }
 
-  // Backward-compatible alias
   async handleReactionTrigger(message: Message, _triggeredBy?: string): Promise<Decision[] | null> {
     return this.executeAnalysis(message, true);
   }

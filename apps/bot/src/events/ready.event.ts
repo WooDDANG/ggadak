@@ -1,24 +1,17 @@
-import { Client, Events, REST, Routes } from 'discord.js';
+import { Events } from 'discord.js';
+import { Client } from 'discordx';
 import { createLogger } from '@ggaddak/shared';
-import { commandDefinitions } from '../commands/index.js';
 
 const logger = createLogger('READY-EVENT');
 
-export function handleReadyEvent(client: Client, token?: string) {
+export function handleReadyEvent(client: Client, _token?: string) {
   client.once(Events.ClientReady, async readyClient => {
     logger.info(`🤖 Logged in as ${readyClient.user.tag}`);
-
-    if (token) {
-      try {
-        const rest = new REST({ version: '10' }).setToken(token);
-        logger.info('Registering slash commands with Discord REST API...');
-        await rest.put(Routes.applicationCommands(readyClient.user.id), {
-          body: commandDefinitions,
-        });
-        logger.info('✌️ Successfully registered slash commands (/feedback, /scan)');
-      } catch (err: any) {
-        logger.error(`Failed to register slash commands: ${err.message}`);
-      }
+    try {
+      await client.initApplicationCommands();
+      logger.info('✌️ discordx automatically registered all @Slash() commands with Discord');
+    } catch (err: any) {
+      logger.warn(`Failed to auto-register discordx application commands: ${err.message}`);
     }
   });
 }
