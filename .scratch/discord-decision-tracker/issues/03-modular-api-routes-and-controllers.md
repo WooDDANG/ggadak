@@ -1,16 +1,14 @@
-# 03 — Modular Express Controllers & Sub-Routers
+# 03 — TSOA Decorator-Driven Controllers & Swagger UI Generation
 
 **What to build:**
-Implement modular Express controllers under `api/controllers/` and sub-routers under `api/routes/`, mapping incoming HTTP requests to domain services with Zod DTO schema validation and typed JSON responses.
+Refactor backend controllers using TSOA decorators (`@Route`, `@Get`, `@Post`, `@Body`, `@Query`), automatically generating type-safe Express routes and serving OpenAPI / Swagger UI at `/api-docs`.
 
 **Blocked by:**
-02 — Explicit DTOs, Database Models, Mappers & AI Adapter
+02 — TypeDI Dependency Injection Container Setup
 
 **Status:** ready-for-agent
 
-- [ ] `DecisionController` and `decision.routes.ts` (`GET /api/decisions`, `POST /api/webhooks/decisions`, `POST /api/decisions/:id/review`, `POST /api/decisions/resolve-conflict`).
-- [ ] `DiscussionController` and `discussion.routes.ts` (`POST /api/discussions/analyze`).
-- [ ] `FeedbackController` and `feedback.routes.ts` (`GET & POST /api/feedbacks`).
-- [ ] `CheckpointController` and `checkpoint.routes.ts` (`GET & POST /api/channels/:channelId/checkpoint`).
-- [ ] `PolicyController` and `policy.routes.ts` (`GET /api/config/policy`).
-- [ ] `api/routes/index.ts` consolidating sub-routers under `/api` path prefix.
+- [ ] `tsoa.json` configured pointing to controllers, outputting routes to `src/build/routes.ts` and swagger to `src/build/swagger.json`.
+- [ ] `DecisionController`, `DiscussionController`, `FeedbackController`, `CheckpointController`, and `PolicyController` rewritten with TSOA decorators and DTO types.
+- [ ] `loaders/express.ts` updated with `RegisterRoutes(app)` and `swagger-ui-express` mounted at `/api-docs`.
+- [ ] NPM scripts `swagger` (`tsoa spec-and-routes`) and `prebuild` added to `package.json`.

@@ -1,16 +1,13 @@
-# 04 — Bot Layered Handlers, Services & Embed Views Alignment
+# 04 — Bot & Web Dashboard Alignment with TSOA Endpoints
 
 **What to build:**
-Align the Discord bot architecture with modular event handlers (`MessageHandler`, `ReactionHandler`, `InteractionHandler`), domain services (`BackendApiService`, `HarvesterService`), and presentation views (`BotEmbedView`).
+Verify and ensure complete compatibility of the Discord Bot (`BackendApiService`) and Web Dashboard Review Queue with the auto-generated TSOA endpoints, rate limits, and security headers.
 
 **Blocked by:**
-03 — Modular Express Controllers & Sub-Routers
+03 — TSOA Decorator-Driven Controllers & Swagger UI Generation
 
 **Status:** ready-for-agent
 
-- [ ] `BotEmbedView` rendering color-coded Discord Embeds for DRAFT candidates, pivot warnings, and conflict prompts.
-- [ ] `BackendApiService` communicating cleanly with backend REST endpoints with fault tolerance and logging.
-- [ ] `HarvesterService` handling thread prioritization, asymmetric context window harvesting (15 before / 5 after), and interval merging.
-- [ ] `MessageHandler` with consensus regex matching and per-channel debouncing.
-- [ ] `ReactionHandler` managing 📌 manual override and reaction thresholds.
-- [ ] `InteractionHandler` handling slash commands (`/피드백입력`, `/스캔`) and button interactions.
+- [ ] `BackendApiService` verified against `/api/discussions/analyze`, `/api/feedbacks`, `/api/decisions`, and `/api/config/policy`.
+- [ ] Discord slash commands (`/피드백입력`, `/스캔`) and 📌 override verified with TSOA routes.
+- [ ] Web Dashboard Review Queue actions (Confirm, Defer, Reject) verified.

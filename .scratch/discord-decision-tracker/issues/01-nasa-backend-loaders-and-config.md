@@ -1,16 +1,14 @@
-# 01 — NASA-Style Backend Foundation, Security (Helmet/Rate-Limit) & Structured Logging (Winston)
+# 01 — Prisma ORM Integration (Schema, Client & Type-Safe Repository)
 
 **What to build:**
-Establish a hardened, modular backend foundation inspired by NASA_backEnd. Implements a central `config/` module, a modular `loaders/` bootstrap layer (Express, Database, Logger), HTTP security headers with `helmet`, API abuse and LLM cost protection via `express-rate-limit`, structured logging with `winston`, and centralized `AppError` and `errorHandler` middleware.
+Adopt Prisma ORM with SQLite, defining declarative database models (`Decision`, `ExternalFeedback`, `ChannelCheckpoint`, `RejectedEvidenceHash`) in `prisma/schema.prisma`. Replace manual SQL query strings and positional `?` placeholder bindings with type-safe Prisma client operations.
 
 **Blocked by:**
 None — can start immediately.
 
 **Status:** ready-for-agent
 
-- [ ] Central application configuration loaded in `config/index.ts` from environment variables and defaults.
-- [ ] `loaders/logger.ts` integrating Winston with daily rotating logs and contextual metadata.
-- [ ] `loaders/database.ts` for SQLite database initialization and automatic schema migrations.
-- [ ] `loaders/express.ts` configuring `helmet`, `express-rate-limit`, CORS, and JSON parsing.
-- [ ] `loaders/index.ts` providing an async loader orchestrator.
-- [ ] Custom `AppError` hierarchy and global Express `errorHandler` middleware responding with standardized error payloads.
+- [ ] `prisma/schema.prisma` defined with models and SQLite datasource (`DATABASE_URL`).
+- [ ] NPM scripts `db:generate` (`prisma generate`) and `db:push` (`prisma db push`) configured.
+- [ ] `DecisionRepository` refactored to use `PrismaClient` for all CRUD, search queries, checkpoints, external feedback, and rejected evidence memory.
+- [ ] Database loader `loaders/prisma.ts` initializing the client connection.
