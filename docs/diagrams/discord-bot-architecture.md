@@ -12,12 +12,12 @@ flowchart TD
         Chat["💬 채널 대화 발화 (실시간 채팅)"]
         Pin["📌 핀 이모지 반응 (수동 트리거)"]
         Slash["⚡ 슬래시 커맨드 (/스캔, /피드백입력)"]
-        BotReaction["👀 ➔ 📝 이모지 반응 (Silent 피드백)"]
+        BotReaction["👀 및 📝 이모지 반응 (Silent 피드백)"]
     end
 
     subgraph DiscordBot["apps/bot (Discord.js Bot Service)"]
         Client["Discord Client (Gateway Event Loop)"]
-        MsgHandler["Message Handler (정규식 + 20-Anchor Dense Embedding)"]
+        MsgHandler["Message Handler (정규식 및 20-Anchor Dense Embedding)"]
         RxnHandler["Reaction Handler (📌 감지 및 Override)"]
         CmdHandler["Command Handler (/스캔, /피드백입력)"]
         Harvester["Discussion Harvester (비대칭 윈도우 수집: Before 15 + Trigger + After 5)"]
@@ -48,13 +48,13 @@ flowchart TD
     Client --> RxnHandler
     Client --> CmdHandler
 
-    MsgHandler -->|의사결정 후보 감지 및 5초 디바운스| Harvester
+    MsgHandler -->|의사결정 후보 감지 및 디바운스| Harvester
     RxnHandler -->|강제 수집 요청| Harvester
     CmdHandler -->|수동 스캔 요청| Harvester
 
     Harvester --- LockManager
-    Harvester -->|1. 분석 시작 (👀 부착)| BotReaction
-    Harvester -->|2. POST /api/discussions/analyze| BackendClient
+    Harvester -->|1. 분석 시작: 눈 이모지 부착| BotReaction
+    Harvester -->|2. 분석 요청: POST discussions| BackendClient
 
     BackendClient --> Slicer
     Slicer --> AntiRecreate
@@ -62,8 +62,8 @@ flowchart TD
     AIEngine --> GovRubric
     GovRubric --> DB
 
-    BackendClient -->|결과 응답| Harvester
-    Harvester -->|3. 완료 (📝 부착)| BotReaction
+    BackendClient -->|분석 결과 반환| Harvester
+    Harvester -->|3. 큐 등록 완료: 메모 이모지 부착| BotReaction
 
     DB --> ReviewQueue
     DB --> Timeline
@@ -78,9 +78,9 @@ flowchart TD
 ```mermaid
 flowchart LR
     subgraph TriggerPhase["1. 트리거 감지"]
-        A1["실시간 메시지 인입"] --> B1{"합의 키워드 또는<br/>Dense 임베딩 >= 0.70?"}
+        A1["실시간 메시지 인입"] --> B1{"합의 키워드 또는<br/>임베딩 0.70 이상"}
         B1 -->|YES| C1["5초 Debounce 대기"]
-        B1 -->|NO| D1["무시 (Casual Chatter)"]
+        B1 -->|NO| D1["무시 Casual Chatter"]
         
         A2["📌 핀 이모지 추가"] --> C2["수동 Override 트리거"]
         A3["/스캔 슬래시 커맨드"] --> C3["범위 수동 스캔"]
@@ -92,8 +92,8 @@ flowchart LR
         C3 --> E
         E -->|이미 처리 중| F["중복 요청 드롭"]
         E -->|처리 가능| G["Lock 획득"]
-        G --> H["비대칭 윈도우 수집 (이전 15개 + 현재 1개 + 이후 5개)"]
-        H --> I["메시지에 👀 리액션 부착 (분석 진행 상태 표시)"]
+        G --> H["비대칭 윈도우 수집: 이전 15개 + 현재 1개 + 이후 5개"]
+        H --> I["메시지에 눈 이모지 부착: 분석 진행"]
     end
 
     subgraph BackendPhase["3. 백엔드 AI 분석 및 저장"]
@@ -106,7 +106,7 @@ flowchart LR
 
     subgraph CompletionPhase["4. 완료 및 피드백"]
         N --> O["Bot에 200 OK 응답"]
-        O --> P["메시지에 📝 리액션 부착 (검토 큐 등록 완료)"]
+        O --> P["메시지에 메모 이모지 부착: 큐 등록 완료"]
         P --> Q["In-flight Lock 해제"]
     end
 ```
