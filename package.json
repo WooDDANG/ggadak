@@ -10,6 +10,7 @@
     "dev:be": "npm run dev --workspace=@ggaddak/be",
     "dev:fe": "npm run dev --workspace=@ggaddak/fe",
     "build": "npm run build --workspaces --if-present",
+    "api:sync": "npm run swagger --workspace=@ggaddak/be && npm run codegen --workspace=@ggaddak/fe",
     "test": "npm run build && npm run test --workspaces --if-present && tsc -p tsconfig.test.json && node --test dist-test/e2e.test.js",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",

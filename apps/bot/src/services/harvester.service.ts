@@ -60,7 +60,8 @@ export class DiscussionHarvester {
 
     if (isThread) {
       logger.info(`[Context] Channel #${channelName} is a Discord Thread. Harvesting thread history...`);
-      const fetchedThread = await channel.messages.fetch({ limit: policy.maxMergedWindow });
+      const threadLimit = Math.max(policy.maxMergedWindow, 100);
+      const fetchedThread = await channel.messages.fetch({ limit: threadLimit });
       rawMessages = Array.from(fetchedThread.values())
         .reverse()
         .map(m => {
@@ -138,8 +139,9 @@ export class DiscussionHarvester {
       ];
     }
 
-    if (rawMessages.length > policy.maxMergedWindow) {
-      rawMessages = rawMessages.slice(-policy.maxMergedWindow);
+    const maxLimit = isThread ? 100 : policy.maxMergedWindow;
+    if (rawMessages.length > maxLimit) {
+      rawMessages = rawMessages.slice(-maxLimit);
     }
 
     return rawMessages;
@@ -160,6 +162,12 @@ export class DiscussionHarvester {
     }
 
     this.inFlightChannels.add(channelId);
+    const lockSafetyTimeout = setTimeout(() => {
+      if (this.inFlightChannels.has(channelId)) {
+        logger.warn(`[Lock] Channel #${channelId} in-flight lock exceeded 60s safety TTL. Releasing.`);
+        this.inFlightChannels.delete(channelId);
+      }
+    }, 60000);
     const channelName = 'name' in channel ? (channel.name as string) : 'dm';
 
     try {
@@ -195,6 +203,7 @@ export class DiscussionHarvester {
         channelName,
         triggerMessageId: message.id,
         messageUrl: message.url,
+        isManualOverride,
         score: scoreResult.score,
         participantCount: participants.length,
         reactionsCount: totalReactions,
@@ -221,6 +230,7 @@ export class DiscussionHarvester {
       await this.removeReactionSafely(message, '👀');
       return null;
     } finally {
+      clearTimeout(lockSafetyTimeout);
       this.inFlightChannels.delete(channelId);
     }
   }

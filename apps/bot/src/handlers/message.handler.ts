@@ -1,13 +1,14 @@
 import { Message } from 'discord.js';
-import { HarvestingPolicyConfig, createLogger, evaluateSemanticDecision } from '@ggaddak/shared';
+import { HarvestingPolicyConfig, createLogger, evaluateSemanticDecision, CONSENSUS_REGEX } from '@ggaddak/shared';
 
 const logger = createLogger('BOT-MESSAGE-HANDLER');
 
-export const CONSENSUS_REGEX =
-  /(~?합시다|~?합세|~?하자|~?하죠|~?해요|~?결정|~?확정|~?합의|~?채택|~?가시죠|~?가자|~?가요|~?진행할게요|~?완료|픽스|fix|agree|ok|ㅇㅋ|좋아요|찬성)/i;
+export { CONSENSUS_REGEX };
 
 export class MessageHandler {
   private debounceTimers = new Map<string, NodeJS.Timeout>();
+  private firstTriggerTimes = new Map<string, number>();
+  private readonly maxDebounceMs = 60000; // 최대 60초 슬라이딩 상한
 
   constructor(
     private onExecuteAnalysis: (message: Message, isManualOverride: boolean) => Promise<any>,
@@ -42,8 +43,29 @@ export class MessageHandler {
         clearTimeout(existing);
         this.debounceTimers.delete(channelId);
       }
+      this.firstTriggerTimes.delete(channelId);
       this.onExecuteAnalysis(message, true);
       return;
+    }
+
+    const now = Date.now();
+    const firstTrigger = this.firstTriggerTimes.get(channelId);
+
+    // If max debounce time (60s) reached, execute immediately without further delay
+    if (firstTrigger && now - firstTrigger >= this.maxDebounceMs) {
+      const existing = this.debounceTimers.get(channelId);
+      if (existing) {
+        clearTimeout(existing);
+        this.debounceTimers.delete(channelId);
+      }
+      this.firstTriggerTimes.delete(channelId);
+      logger.info(`[Debounce] Max debounce limit reached (60s) for #${channelId}. Executing immediately.`);
+      this.onExecuteAnalysis(message, false);
+      return;
+    }
+
+    if (!firstTrigger) {
+      this.firstTriggerTimes.set(channelId, now);
     }
 
     if (this.debounceTimers.has(channelId)) {
@@ -52,6 +74,7 @@ export class MessageHandler {
 
     const timer = setTimeout(async () => {
       this.debounceTimers.delete(channelId);
+      this.firstTriggerTimes.delete(channelId);
       await this.onExecuteAnalysis(message, false);
     }, policy.debounceMs);
 

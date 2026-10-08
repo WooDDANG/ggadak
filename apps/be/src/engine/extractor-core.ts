@@ -1,5 +1,5 @@
 import { Service } from 'typedi';
-import { createLogger } from '@ggaddak/shared';
+import { createLogger, extractFeatures, computeCosineSimilarity } from '@ggaddak/shared';
 
 const logger = createLogger('BE-EXTRACTOR-CORE');
 
@@ -58,6 +58,94 @@ export class DecisionExtractorCore {
 
     logger.info(`[SessionSlicer] Split ${messages.length} messages into ${sessions.length} sessions (gap threshold: ${gapMinutes}m)`);
     return sessions;
+  }
+
+  /**
+   * Slices messages into distinct sessions using hybrid 30-minute idle gap
+   * and block-level TextTiling topic drift detection (depth score >= 0.35).
+   * Enforces min 1 and max 100 message guardrails.
+   */
+  sliceSessionWithTopicDrift<T extends { createdAt: string | Date; content?: string; id?: string }>(
+    messages: T[],
+    gapMinutes: number = 30,
+    depthThreshold: number = 0.35,
+  ): T[][] {
+    if (!messages || messages.length === 0) return [];
+
+    // 1. Initial idle gap slicing (30 min)
+    const baseSessions = this.sliceMessagesByIdleGap(messages, gapMinutes);
+    const resultSessions: T[][] = [];
+
+    for (const session of baseSessions) {
+      if (session.length <= 15) {
+        if (session.length > 100) {
+          for (let i = 0; i < session.length; i += 100) {
+            resultSessions.push(session.slice(i, i + 100));
+          }
+        } else {
+          resultSessions.push(session);
+        }
+        continue;
+      }
+
+      // 2. Block-level TextTiling for long sessions (>= 16 messages)
+      const blockSize = 3;
+      const blocks: { text: string; startIndex: number; endIndex: number }[] = [];
+      for (let i = 0; i < session.length; i += blockSize) {
+        const slice = session.slice(i, i + blockSize);
+        const text = slice.map(m => m.content || '').join(' ');
+        blocks.push({ text, startIndex: i, endIndex: i + slice.length });
+      }
+
+      const blockVectors = blocks.map(b => extractFeatures(b.text));
+      const similarities: number[] = [];
+      for (let i = 0; i < blockVectors.length - 1; i++) {
+        const sim = computeCosineSimilarity(blockVectors[i], blockVectors[i + 1]);
+        similarities.push(sim);
+      }
+
+      // Compute TextTiling Depth Scores
+      const splitIndices = new Set<number>();
+      for (let i = 0; i < similarities.length; i++) {
+        const prevSim = i > 0 ? similarities[i - 1] : similarities[i];
+        const nextSim = i < similarities.length - 1 ? similarities[i + 1] : similarities[i];
+        const currSim = similarities[i];
+        const depth = (prevSim - currSim) + (nextSim - currSim);
+
+        if (depth >= depthThreshold || currSim < 0.20) {
+          splitIndices.add(blocks[i + 1].startIndex);
+        }
+      }
+
+      if (splitIndices.size === 0) {
+        if (session.length > 100) {
+          for (let i = 0; i < session.length; i += 100) {
+            resultSessions.push(session.slice(i, i + 100));
+          }
+        } else {
+          resultSessions.push(session);
+        }
+      } else {
+        const sortedSplits = Array.from(splitIndices).sort((a, b) => a - b);
+        let lastIdx = 0;
+        for (const splitIdx of sortedSplits) {
+          if (splitIdx > lastIdx) {
+            const sub = session.slice(lastIdx, splitIdx);
+            if (sub.length > 0) resultSessions.push(sub);
+            lastIdx = splitIdx;
+          }
+        }
+        if (lastIdx < session.length) {
+          const sub = session.slice(lastIdx);
+          if (sub.length > 0) resultSessions.push(sub);
+        }
+        logger.info(
+          `[TopicSlicer] Sliced long session (${session.length} msgs) into ${resultSessions.length} topic chunks via TextTiling`,
+        );
+      }
+    }
+
+    return resultSessions;
   }
 
   /**

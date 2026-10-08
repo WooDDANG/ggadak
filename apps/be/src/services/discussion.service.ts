@@ -64,15 +64,84 @@ export class DiscussionService {
     // 2. Retrieve recent external feedbacks for context injection
     const recentFeedbacks = this.repo.getRecentFeedbacks(channelId, 3);
 
-    // 3. Slice messages into distinct sessions by 30-minute idle gap
-    const slicedSessions = this.core.sliceMessagesByIdleGap(rawMessages, 30);
+    // 2.5. Tier 1 Zero-Cost Rule Filtering & Synthetic Reaction Absorption
+    const { filterTier1Messages } = await import('@ggaddak/shared');
+    const tier1Result = filterTier1Messages(
+      rawMessages.map((m: any) => ({
+        id: m.id,
+        author: m.author || m.authorName || 'unknown',
+        authorId: m.authorId,
+        content: m.content || '',
+        createdAt: m.createdAt,
+        isBot: m.isBot || m.author?.bot,
+        replyingTo: m.replyingTo || m.referenceMessageId,
+        attachments: m.attachments,
+        reactionCount: m.reactionCount || 0,
+        reactions: m.reactions,
+        isTrigger: m.isTrigger,
+      })),
+    );
+
+    if (tier1Result.cleanMessages.length === 0) {
+      logger.info(`[Analyze] All ${rawMessages.length} messages filtered out by Tier 1 rule filter.`);
+      return {
+        found: false,
+        summary: '의사결정 신호가 없는 일상 잡담/명령어 구간입니다.',
+        decisions: [],
+      };
+    }
+
+    logger.info(
+      `[Analyze] Tier 1 filter: ${rawMessages.length} raw -> ${tier1Result.cleanMessages.length} clean (${tier1Result.filteredCount} filtered, ${Object.keys(tier1Result.syntheticReactions).length} synthetic reactions absorbed)`,
+    );
+
+    // 3. Conversation Disentanglement (Directed Forest & Burst Merging)
+    const { disentangleConversations, CONSENSUS_REGEX } = await import('@ggaddak/shared');
+    const threads = disentangleConversations(tier1Result.cleanMessages, {
+      channelId,
+      syntheticReactions: tier1Result.syntheticReactions,
+    });
+
+    // 4. Session Slicing with 30-min Idle Gap & TextTiling Topic Drift
+    const candidateSessions: Array<typeof tier1Result.cleanMessages> = [];
+    for (const thread of threads) {
+      const topicChunks = this.core.sliceSessionWithTopicDrift(thread.messages, 30, 0.35);
+      for (const chunk of topicChunks) {
+        if (chunk.length > 0) {
+          candidateSessions.push(chunk);
+        }
+      }
+    }
+
     const allExtractedDecisions: Decision[] = [];
     let lastSummary = '대화가 분석되었습니다.';
     let lastConflict: { hasConflict: boolean; conflictingDecision?: Decision } = {
       hasConflict: false,
     };
 
-    for (const sessionMessages of slicedSessions) {
+    for (const sessionMessages of candidateSessions) {
+      // 5. Stage 5: Decision Signal Escalation Gate (Union 3-way gate)
+      // Signal A: Manual 📌 Pin / Explicit scan override
+      const hasManualOverride = Boolean(isManualOverride);
+      // Signal B: Reaction count >= 3
+      const totalReactionsCount = sessionMessages.reduce(
+        (sum: number, m: any) => sum + (m.reactionCount || 0),
+        0,
+      );
+      const hasReactionSignal = totalReactionsCount >= 3;
+      // Signal C: Decision consensus suffix matching
+      const hasConsensusSuffix = sessionMessages.some(m => CONSENSUS_REGEX.test(m.content || ''));
+
+      // Union Gate: At least one signal must be present to escalate to LLM
+      const passesGate = hasManualOverride || hasReactionSignal || hasConsensusSuffix;
+
+      if (!passesGate) {
+        logger.info(
+          `[Analyze] Session (${sessionMessages.length} msgs) dropped by Union 3-Way Gate (override=${hasManualOverride}, rx=${totalReactionsCount}, suffix=${hasConsensusSuffix}). Silent cleanup.`,
+        );
+        continue;
+      }
+
       const transcript = sessionMessages
         .map((m: any) => {
           const time = m.createdAt ? new Date(m.createdAt).toISOString().substring(11, 19) : '';
@@ -82,7 +151,7 @@ export class DiscussionService {
         .join('\n');
 
       logger.info(
-        `[Analyze] Analyzing session (${sessionMessages.length} msgs) from #${channelName || channelId}...`,
+        `[Analyze] Escalating session (${sessionMessages.length} msgs) to AI Core from #${channelName || channelId}...`,
       );
       const extraction = await this.extractor.analyzeTranscript(transcript, recentFeedbacks);
 
@@ -93,11 +162,6 @@ export class DiscussionService {
       lastSummary = extraction.summary;
       const participants = Array.from(new Set(sessionMessages.map((m: any) => m.author))) as string[];
       const rawEvidence = sessionMessages.map((m: any) => m.id || m.content).filter(Boolean);
-
-      const totalReactionsCount = sessionMessages.reduce(
-        (sum: number, m: any) => sum + (m.reactionCount || 0),
-        0,
-      );
 
       for (const item of extraction.decisions) {
         const decisionId = `DEC-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 100)}`;
@@ -123,7 +187,7 @@ export class DiscussionService {
           };
         }
 
-        const finalScore = params.score !== undefined ? params.score : govResult.score;
+        const finalScore = govResult.score;
 
         const newDecision: Decision = {
           id: decisionId,
@@ -166,8 +230,9 @@ export class DiscussionService {
               isTrigger: m.isTrigger || false,
             })),
           },
-          messageCreatedAt:
-            sessionMessages[sessionMessages.length - 1]?.createdAt || new Date().toISOString(),
+          messageCreatedAt: sessionMessages[sessionMessages.length - 1]?.createdAt
+            ? new Date(sessionMessages[sessionMessages.length - 1].createdAt).toISOString()
+            : new Date().toISOString(),
           createdAt: new Date().toISOString(),
           governanceScore: finalScore,
           governanceReason: govResult.reason,
