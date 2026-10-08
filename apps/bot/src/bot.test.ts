@@ -121,11 +121,16 @@ describe('DiscussionHarvester Deep Module', () => {
     let triggerCount = 0;
     let reactionCount = 0;
 
-    const handler = new MessageHandler(
-      async () => {
+    const fakeEngine = {
+      harvest: async () => {
         triggerCount++;
+        return { success: true, decisions: [], decisionsCount: 0, messageCount: 1 };
       },
-      async (msg, emoji) => {
+    };
+
+    const handler = new MessageHandler(
+      fakeEngine as any,
+      async (_msg: any, emoji: string) => {
         if (emoji === '👀') reactionCount++;
       },
     );
@@ -144,17 +149,16 @@ describe('DiscussionHarvester Deep Module', () => {
     });
 
     assert.strictEqual(reactionCount, 1);
-    await new Promise(r => setTimeout(r, 20));
     assert.strictEqual(triggerCount, 1);
   });
 
-  it('DecisionHarvestingEngine provides single harvest() entrypoint and locks concurrent channel events', async () => {
+  it('DecisionHarvestingEngine encapsulates debounce and locks concurrent channel events', async () => {
     const { DecisionHarvestingEngine } = await import('./services/decision-harvesting-engine.js');
     let sinkCalls = 0;
     const fakeSink = {
       analyzeDiscussion: async () => {
         sinkCalls++;
-        await new Promise(r => setTimeout(r, 40));
+        await new Promise(r => setTimeout(r, 20));
         return { found: true, decisions: [{ id: 'DEC-ENG-1' }] };
       },
     };
@@ -167,17 +171,45 @@ describe('DiscussionHarvester Deep Module', () => {
       content: '테스트 합의 문장',
     };
 
-    // First call acquires in-flight lock
-    const p1 = engine.harvest({ type: 'EVENT', message: testMsg });
+    // First call acquires in-flight lock (manual override to bypass debounce)
+    const p1 = engine.harvest({ type: 'EVENT', message: testMsg, isManualOverride: true });
     // Second concurrent call on same channel is deduplicated/locked
-    const p2 = engine.harvest({ type: 'EVENT', message: testMsg });
+    const p2 = engine.harvest({ type: 'EVENT', message: testMsg, isManualOverride: false });
 
     const [res1, res2] = await Promise.all([p1, p2]);
 
     assert.strictEqual(res1.success, true);
-    assert.strictEqual(res1.decisions.length, 1);
+    assert.strictEqual(res1.decisionsCount, 1);
     assert.strictEqual(res2.success, false);
     assert.strictEqual(res2.summary, 'in-flight locked');
+    assert.strictEqual(sinkCalls, 1);
+  });
+
+  it('DecisionHarvestingEngine properly resolves debounce timer on normal event triggers', async () => {
+    const { DecisionHarvestingEngine } = await import('./services/decision-harvesting-engine.js');
+    let sinkCalls = 0;
+    const fakeSink = {
+      analyzeDiscussion: async () => {
+        sinkCalls++;
+        return { found: true, decisions: [{ id: 'DEC-DEBOUNCE' }] };
+      },
+    };
+
+    const engine = new DecisionHarvestingEngine(fakeSink);
+    const testMsg: any = {
+      id: 'msg-debounce-1',
+      channelId: 'chan-debounce-test',
+      content: '디바운스 테스트 문장',
+    };
+
+    const promise = engine.harvest(
+      { type: 'EVENT', message: testMsg },
+      { ...DEFAULT_HARVESTING_POLICY, debounceMs: 10 },
+    );
+
+    const result = await promise;
+    assert.strictEqual(result.success, true);
+    assert.strictEqual(result.decisionsCount, 1);
     assert.strictEqual(sinkCalls, 1);
   });
 });

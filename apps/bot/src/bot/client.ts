@@ -37,16 +37,13 @@ export class DecisionTrackerBot {
     this.engine = new DecisionHarvestingEngine(this.backendApi, this.analysisService);
 
     this.messageHandler = new MessageHandler(
-      (msg: Message, override: boolean, traceId?: string) =>
-        this.engine.harvest({ type: 'EVENT', message: msg, isManualOverride: override, traceId }, this.policy),
+      this.engine,
       (msg: Message, emoji: string) => this.analysisService.addReactionSafely(msg, emoji),
     );
 
     this.reactionHandler = new ReactionHandler(
       triggerEmoji,
-      this.messageHandler,
-      (msg: Message, override: boolean) =>
-        this.engine.harvest({ type: 'EVENT', message: msg, isManualOverride: override }, this.policy),
+      this.engine,
       (msg: Message, emoji: string) => this.analysisService.addReactionSafely(msg, emoji),
     );
 

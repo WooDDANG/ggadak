@@ -4,12 +4,12 @@ import { ScanOptions } from './harvester.service.js';
 
 export type HarvestTrigger =
   | { type: 'EVENT'; message: Message; isManualOverride?: boolean; traceId?: string }
-  | { type: 'SCAN_CHANNEL'; channel: TextChannel; options?: ScanOptions; traceId?: string }
-  | { type: 'SCAN_GUILD'; guild: Guild; options?: ScanOptions; traceId?: string };
+  | { type: 'SCAN'; target: TextChannel | Guild; options?: ScanOptions; traceId?: string };
 
 export interface HarvestResult {
   success: boolean;
   decisions: Decision[];
+  decisionsCount: number;
   messageCount: number;
   summary?: string;
   traceId?: string;
