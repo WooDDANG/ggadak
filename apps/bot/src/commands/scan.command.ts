@@ -2,7 +2,7 @@ import { CommandInteraction, ApplicationCommandOptionType, TextChannel } from 'd
 import { Discord, Slash, SlashOption, SlashChoice } from 'discordx';
 import { DEFAULT_HARVESTING_POLICY, createLogger } from '@ggaddak/shared';
 import { BackendApiService } from '../services/backend-api.service.js';
-import { AnalysisService } from '../services/analysis.service.js';
+import { AnalysisService, DecisionHarvestingEngine } from '../services/analysis.service.js';
 
 const logger = createLogger('SCAN-CMD');
 
@@ -93,11 +93,21 @@ export class ScanCommand {
           `🔍 **[서버 전체 스캔 시작]** ${timeText} 대화를 탐색 중입니다... (채널 수에 따라 수초 소요될 수 있습니다)`,
         );
 
-        const res = await analysisService.scanGuild(interaction.guild, policy, scanOptions);
-
-        await interaction.editReply(
-          `✅ **[서버 전체 스캔 완료]**\n- 📂 대상 채널: **${res.channelCount}개**\n- 💬 검사한 메시지: **${res.scannedCount}개**\n- 📌 추출된 의사결정: **${res.decisionsCount}건**`,
-        );
+        const engine = DecisionHarvestingEngine.getInstance();
+        if (engine) {
+          const res = await engine.harvest(
+            { type: 'SCAN_GUILD', guild: interaction.guild, options: scanOptions },
+            policy,
+          );
+          await interaction.editReply(
+            `✅ **[서버 전체 스캔 완료]**\n- 📂 대상 채널: **${res.channelCount || 0}개**\n- 💬 검사한 메시지: **${res.messageCount}개**\n- 📌 추출된 의사결정: **${res.decisions.length}건**`,
+          );
+        } else {
+          const res = await analysisService.scanGuild(interaction.guild, policy, scanOptions);
+          await interaction.editReply(
+            `✅ **[서버 전체 스캔 완료]**\n- 📂 대상 채널: **${res.channelCount}개**\n- 💬 검사한 메시지: **${res.scannedCount}개**\n- 📌 추출된 의사결정: **${res.decisionsCount}건**`,
+          );
+        }
       } else {
         const channel = interaction.channel;
         if (!channel || !channel.isTextBased() || channel.isThread()) {
@@ -109,11 +119,21 @@ export class ScanCommand {
           `🔍 **[채널 스캔 시작]** #${'name' in channel ? channel.name : 'channel'}의 ${timeText} 대화를 탐색 중입니다...`,
         );
 
-        const res = await analysisService.scanChannel(channel as TextChannel, policy, scanOptions);
-
-        await interaction.editReply(
-          `✅ **[채널 스캔 완료]**\n- 📂 채널: **#${'name' in channel ? channel.name : 'channel'}**\n- 💬 검사한 메시지: **${res.scannedCount}개**\n- 📌 추출된 의사결정: **${res.decisionsCount}건**`,
-        );
+        const engine = DecisionHarvestingEngine.getInstance();
+        if (engine) {
+          const res = await engine.harvest(
+            { type: 'SCAN_CHANNEL', channel: channel as TextChannel, options: scanOptions },
+            policy,
+          );
+          await interaction.editReply(
+            `✅ **[채널 스캔 완료]**\n- 📂 채널: **#${'name' in channel ? channel.name : 'channel'}**\n- 💬 검사한 메시지: **${res.messageCount}개**\n- 📌 추출된 의사결정: **${res.decisions.length}건**`,
+          );
+        } else {
+          const res = await analysisService.scanChannel(channel as TextChannel, policy, scanOptions);
+          await interaction.editReply(
+            `✅ **[채널 스캔 완료]**\n- 📂 채널: **#${'name' in channel ? channel.name : 'channel'}**\n- 💬 검사한 메시지: **${res.scannedCount}개**\n- 📌 추출된 의사결정: **${res.decisionsCount}건**`,
+          );
+        }
       }
     } catch (err: any) {
       logger.error(`Error during scan command: ${err.message}`, { stack: err.stack });

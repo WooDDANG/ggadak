@@ -147,4 +147,37 @@ describe('DiscussionHarvester Deep Module', () => {
     await new Promise(r => setTimeout(r, 20));
     assert.strictEqual(triggerCount, 1);
   });
+
+  it('DecisionHarvestingEngine provides single harvest() entrypoint and locks concurrent channel events', async () => {
+    const { DecisionHarvestingEngine } = await import('./services/decision-harvesting-engine.js');
+    let sinkCalls = 0;
+    const fakeSink = {
+      analyzeDiscussion: async () => {
+        sinkCalls++;
+        await new Promise(r => setTimeout(r, 40));
+        return { found: true, decisions: [{ id: 'DEC-ENG-1' }] };
+      },
+    };
+
+    const engine = new DecisionHarvestingEngine(fakeSink);
+
+    const testMsg: any = {
+      id: 'msg-eng-1',
+      channelId: 'chan-deep-engine',
+      content: '테스트 합의 문장',
+    };
+
+    // First call acquires in-flight lock
+    const p1 = engine.harvest({ type: 'EVENT', message: testMsg });
+    // Second concurrent call on same channel is deduplicated/locked
+    const p2 = engine.harvest({ type: 'EVENT', message: testMsg });
+
+    const [res1, res2] = await Promise.all([p1, p2]);
+
+    assert.strictEqual(res1.success, true);
+    assert.strictEqual(res1.decisions.length, 1);
+    assert.strictEqual(res2.success, false);
+    assert.strictEqual(res2.summary, 'in-flight locked');
+    assert.strictEqual(sinkCalls, 1);
+  });
 });

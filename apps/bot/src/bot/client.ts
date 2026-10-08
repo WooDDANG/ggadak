@@ -4,6 +4,7 @@ import { Client } from 'discordx';
 import { Decision, createLogger, HarvestingPolicyConfig, DEFAULT_HARVESTING_POLICY } from '@ggaddak/shared';
 import { BackendApiService } from '../services/backend-api.service.js';
 import { DiscussionHarvester } from '../services/harvester.service.js';
+import { DecisionHarvestingEngine } from '../services/decision-harvesting-engine.js';
 import { MessageHandler, CONSENSUS_REGEX } from '../handlers/message.handler.js';
 import { ReactionHandler } from '../handlers/reaction.handler.js';
 import { registerEvents } from '../events/index.js';
@@ -24,6 +25,7 @@ export class DecisionTrackerBot {
   public client: Client;
   private backendApi: BackendApiService;
   private analysisService: DiscussionHarvester;
+  private engine: DecisionHarvestingEngine;
   private messageHandler: MessageHandler;
   private reactionHandler: ReactionHandler;
   private policy: HarvestingPolicyConfig = DEFAULT_HARVESTING_POLICY;
@@ -32,17 +34,20 @@ export class DecisionTrackerBot {
     const triggerEmoji = config.triggerEmoji || '📌';
     this.backendApi = new BackendApiService(config.backendUrl);
     this.analysisService = new DiscussionHarvester(this.backendApi);
+    this.engine = new DecisionHarvestingEngine(this.backendApi, this.analysisService);
 
     this.messageHandler = new MessageHandler(
-      (msg, override) => this.analysisService.executeAnalysis(msg, this.policy, override),
-      (msg, emoji) => this.analysisService.addReactionSafely(msg, emoji),
+      (msg: Message, override: boolean, traceId?: string) =>
+        this.engine.harvest({ type: 'EVENT', message: msg, isManualOverride: override, traceId }, this.policy),
+      (msg: Message, emoji: string) => this.analysisService.addReactionSafely(msg, emoji),
     );
 
     this.reactionHandler = new ReactionHandler(
       triggerEmoji,
       this.messageHandler,
-      (msg, override) => this.analysisService.executeAnalysis(msg, this.policy, override),
-      (msg, emoji) => this.analysisService.addReactionSafely(msg, emoji),
+      (msg: Message, override: boolean) =>
+        this.engine.harvest({ type: 'EVENT', message: msg, isManualOverride: override }, this.policy),
+      (msg: Message, emoji: string) => this.analysisService.addReactionSafely(msg, emoji),
     );
 
     this.client = new Client({
