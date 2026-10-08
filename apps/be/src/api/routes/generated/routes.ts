@@ -170,6 +170,7 @@ const models: TsoaRoute.Models = {
             "triggerMessageId": {"dataType":"string"},
             "messageUrl": {"dataType":"string"},
             "isManualOverride": {"dataType":"boolean"},
+            "traceId": {"dataType":"string"},
             "score": {"dataType":"double"},
             "participantCount": {"dataType":"double"},
             "reactionsCount": {"dataType":"double"},
@@ -367,6 +368,7 @@ export function RegisterRoutes(app: Router) {
         // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
         const argsDiscussionController_analyze: Record<string, TsoaRoute.ParameterSchema> = {
                 body: {"in":"body","name":"body","required":true,"ref":"AnalyzeDiscussionRequestDto"},
+                traceIdHeader: {"in":"header","name":"X-Trace-Id","dataType":"string"},
         };
         app.post('/api/discussions/analyze',
             ...(fetchMiddlewares<RequestHandler>(DiscussionController)),

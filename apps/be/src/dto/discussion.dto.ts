@@ -31,6 +31,7 @@ export interface AnalyzeDiscussionRequestDto {
   triggerMessageId?: string;
   messageUrl?: string;
   isManualOverride?: boolean;
+  traceId?: string;
   score?: number;
   participantCount?: number;
   reactionsCount?: number;
@@ -44,6 +45,7 @@ export const AnalyzeDiscussionRequestDtoSchema = z.object({
   triggerMessageId: z.string().optional(),
   messageUrl: z.string().optional(),
   isManualOverride: z.boolean().optional(),
+  traceId: z.string().optional(),
   score: z.number().optional(),
   participantCount: z.number().optional(),
   reactionsCount: z.number().optional(),

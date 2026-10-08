@@ -151,27 +151,46 @@ export class DiscussionHarvester {
     message: Message,
     policy: HarvestingPolicyConfig,
     isManualOverride: boolean = false,
+    traceId?: string,
   ): Promise<Decision[] | null> {
     const channel = message.channel;
     if (!channel || !channel.isTextBased()) return null;
 
+    const currentTraceId = traceId || `trc-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+    const startTime = Date.now();
     const channelId = channel.id;
+    const channelName = 'name' in channel ? (channel.name as string) : 'dm';
+
     if (this.inFlightChannels.has(channelId) && !isManualOverride) {
-      logger.info(`[Lock] Channel #${channelId} is already in-flight. Skipping duplicate trigger.`);
+      logger.info(`Channel #${channelId} is already in-flight. Skipping duplicate trigger.`, {
+        stage: 'LOCK',
+        traceId: currentTraceId,
+        channel: channelName,
+      });
       return null;
     }
 
     this.inFlightChannels.add(channelId);
+    logger.info(`Acquired in-flight processing lock for #${channelName}`, {
+      stage: 'LOCK',
+      traceId: currentTraceId,
+      channel: channelName,
+    });
+
     const lockSafetyTimeout = setTimeout(() => {
       if (this.inFlightChannels.has(channelId)) {
-        logger.warn(`[Lock] Channel #${channelId} in-flight lock exceeded 60s safety TTL. Releasing.`);
+        logger.warn(`Channel #${channelName} lock exceeded 60s safety TTL. Force releasing.`, {
+          stage: 'LOCK',
+          traceId: currentTraceId,
+        });
         this.inFlightChannels.delete(channelId);
       }
     }, 60000);
-    const channelName = 'name' in channel ? (channel.name as string) : 'dm';
 
     try {
+      const harvestStart = Date.now();
       const rawMessages = await this.harvestContextMessages(message, policy);
+      const harvestDuration = Date.now() - harvestStart;
       const participants = Array.from(new Set(rawMessages.map(m => m.authorName)));
       const totalReactions = rawMessages.reduce((sum, m) => sum + (m.reactionCount || 0), 0);
       const hasConsensusKeyword = rawMessages.some(m => CONSENSUS_REGEX.test(m.content));
@@ -184,9 +203,17 @@ export class DiscussionHarvester {
       });
 
       logger.info(
-        `[Context] Harvested ${rawMessages.length} msgs for #${channelName}. Bot calculated score: ${scoreResult.score}/4.0 (${scoreResult.tier})`,
+        `Harvested ${rawMessages.length} msgs for #${channelName} (Participants=${participants.length}, Rx=${totalReactions})`,
+        {
+          stage: 'HARVEST',
+          traceId: currentTraceId,
+          durationMs: harvestDuration,
+          channel: channelName,
+          score: scoreResult.score,
+        },
       );
 
+      const beStart = Date.now();
       const result = await this.backendApi.analyzeDiscussion({
         rawMessages: rawMessages.map(m => ({
           id: m.id,
@@ -204,14 +231,22 @@ export class DiscussionHarvester {
         triggerMessageId: message.id,
         messageUrl: message.url,
         isManualOverride,
+        traceId: currentTraceId,
         score: scoreResult.score,
         participantCount: participants.length,
         reactionsCount: totalReactions,
       });
+      const beDuration = Date.now() - beStart;
 
       if (!result.found || !result.decisions || result.decisions.length === 0) {
         logger.info(
-          `[Analyze] No new decision candidate found in #${channelName}. (${result.summary})`,
+          `No decision candidate confirmed in #${channelName} (${result.summary}). Silent cleanup 👀 emoji.`,
+          {
+            stage: 'HARVEST',
+            traceId: currentTraceId,
+            durationMs: beDuration,
+            summary: result.summary,
+          },
         );
         await this.removeReactionSafely(message, '👀');
         return null;
@@ -220,18 +255,34 @@ export class DiscussionHarvester {
       await this.removeReactionSafely(message, '👀');
       await this.addReactionSafely(message, '📝');
 
+      const totalDuration = Date.now() - startTime;
       logger.info(
-        `[Analyze] Successfully extracted ${result.decisions.length} decision(s) from #${channelName}. Added 📝 emoji reaction. (Silent mode: no channel message sent)`,
+        `Extracted ${result.decisions.length} decision(s) from #${channelName}. Added 📝 emoji reaction.`,
+        {
+          stage: 'HARVEST',
+          traceId: currentTraceId,
+          durationMs: totalDuration,
+          decisionCount: result.decisions.length,
+          decisions: result.decisions.map((d: any) => d.title || d.topic),
+        },
       );
 
       return result.decisions;
     } catch (err: any) {
-      logger.error(`[Execution] Error during analysis: ${err.message}`, { stack: err.stack });
+      logger.error(`Error during discussion analysis: ${err.message}`, {
+        stage: 'HARVEST',
+        traceId: currentTraceId,
+        stack: err.stack,
+      });
       await this.removeReactionSafely(message, '👀');
       return null;
     } finally {
       clearTimeout(lockSafetyTimeout);
       this.inFlightChannels.delete(channelId);
+      logger.info(`Released processing lock for #${channelName}`, {
+        stage: 'LOCK',
+        traceId: currentTraceId,
+      });
     }
   }
 
@@ -240,8 +291,9 @@ export class DiscussionHarvester {
     message: Message,
     policy: HarvestingPolicyConfig,
     isManualOverride: boolean = false,
+    traceId?: string,
   ): Promise<Decision[] | null> {
-    return this.processAnalysis(message, policy, isManualOverride);
+    return this.processAnalysis(message, policy, isManualOverride, traceId);
   }
 
   async scanChannel(

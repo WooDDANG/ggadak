@@ -42,13 +42,19 @@ export class BackendApiService {
     triggerMessageId?: string;
     messageUrl?: string;
     isManualOverride?: boolean;
+    traceId?: string;
     score?: number;
     participantCount?: number;
     reactionsCount?: number;
   }): Promise<any> {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (payload.traceId) {
+      headers['X-Trace-Id'] = payload.traceId;
+    }
+
     const res = await fetch(`${this.backendUrl}/api/discussions/analyze`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(payload),
     });
 

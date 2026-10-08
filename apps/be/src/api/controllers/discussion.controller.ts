@@ -1,4 +1,4 @@
-import { Controller, Route, Tags, Post, Body } from 'tsoa';
+import { Controller, Route, Tags, Post, Body, Header } from 'tsoa';
 import { Service } from 'typedi';
 import { DiscussionService } from '../../services/discussion.service.js';
 import {
@@ -17,7 +17,12 @@ export class DiscussionController extends Controller {
   @Post('analyze')
   public async analyze(
     @Body() body: AnalyzeDiscussionRequestDto,
+    @Header('X-Trace-Id') traceIdHeader?: string,
   ): Promise<AnalyzeDiscussionResponseDto> {
-    return this.service.analyzeDiscussion(body);
+    const effectiveBody = {
+      ...body,
+      traceId: traceIdHeader || body.traceId,
+    };
+    return this.service.analyzeDiscussion(effectiveBody);
   }
 }

@@ -11,7 +11,7 @@ export class MessageHandler {
   private readonly maxDebounceMs = 60000; // 최대 60초 슬라이딩 상한
 
   constructor(
-    private onExecuteAnalysis: (message: Message, isManualOverride: boolean) => Promise<any>,
+    private onExecuteAnalysis: (message: Message, isManualOverride: boolean, traceId?: string) => Promise<any>,
     private onAddReaction: (message: Message, emoji: string) => Promise<void>,
   ) {}
 
@@ -22,11 +22,21 @@ export class MessageHandler {
     const semanticMatch = evaluateSemanticDecision(message.content);
 
     if (isKeywordMatch || semanticMatch.isCandidate) {
+      const traceId = `trc-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+      const channelName = 'name' in message.channel ? (message.channel.name as string) : message.channelId;
+
       logger.info(
-        `[Trigger] Decision candidate matched (keyword=${isKeywordMatch}, semantic=${semanticMatch.similarity}) in #${'name' in message.channel ? message.channel.name : message.channelId}: "${message.content.slice(0, 30)}..."`,
+        `Decision candidate trigger matched in #${channelName}: "${message.content.slice(0, 30)}..."`,
+        {
+          stage: 'HARVEST',
+          traceId,
+          keyword: isKeywordMatch,
+          semanticSimilarity: semanticMatch.similarity,
+          author: message.author.username,
+        },
       );
       await this.onAddReaction(message, '👀');
-      this.enqueueChannelTrigger(message, false, policy);
+      this.enqueueChannelTrigger(message, false, policy, traceId);
     }
   }
 
@@ -34,8 +44,10 @@ export class MessageHandler {
     message: Message,
     isManualOverride: boolean,
     policy: HarvestingPolicyConfig,
+    traceId?: string,
   ): void {
     const channelId = message.channelId;
+    const currentTraceId = traceId || `trc-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
 
     if (isManualOverride) {
       const existing = this.debounceTimers.get(channelId);
@@ -44,7 +56,7 @@ export class MessageHandler {
         this.debounceTimers.delete(channelId);
       }
       this.firstTriggerTimes.delete(channelId);
-      this.onExecuteAnalysis(message, true);
+      this.onExecuteAnalysis(message, true, currentTraceId);
       return;
     }
 
@@ -59,8 +71,11 @@ export class MessageHandler {
         this.debounceTimers.delete(channelId);
       }
       this.firstTriggerTimes.delete(channelId);
-      logger.info(`[Debounce] Max debounce limit reached (60s) for #${channelId}. Executing immediately.`);
-      this.onExecuteAnalysis(message, false);
+      logger.info(
+        `Max debounce limit reached (60s) for #${channelId}. Executing immediately.`,
+        { stage: 'DEBOUNCE', traceId: currentTraceId },
+      );
+      this.onExecuteAnalysis(message, false, currentTraceId);
       return;
     }
 
@@ -75,10 +90,13 @@ export class MessageHandler {
     const timer = setTimeout(async () => {
       this.debounceTimers.delete(channelId);
       this.firstTriggerTimes.delete(channelId);
-      await this.onExecuteAnalysis(message, false);
+      await this.onExecuteAnalysis(message, false, currentTraceId);
     }, policy.debounceMs);
 
     this.debounceTimers.set(channelId, timer);
-    logger.info(`[Debounce] Scheduled analysis for #${channelId} in ${policy.debounceMs / 1000}s`);
+    logger.info(
+      `Scheduled analysis for #${channelId} in ${policy.debounceMs / 1000}s`,
+      { stage: 'DEBOUNCE', traceId: currentTraceId, debounceMs: policy.debounceMs },
+    );
   }
 }

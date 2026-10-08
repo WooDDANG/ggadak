@@ -416,6 +416,9 @@
 					"isManualOverride": {
 						"type": "boolean"
 					},
+					"traceId": {
+						"type": "string"
+					},
 					"score": {
 						"type": "number",
 						"format": "double"
@@ -710,7 +713,16 @@
 					"Discussions"
 				],
 				"security": [],
-				"parameters": [],
+				"parameters": [
+					{
+						"in": "header",
+						"name": "X-Trace-Id",
+						"required": false,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
 				"requestBody": {
 					"required": true,
 					"content": {
