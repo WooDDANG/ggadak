@@ -1,31 +1,8 @@
-import winston from 'winston';
-
-const { combine, timestamp, printf, colorize } = winston.format;
-
-const customFormat = printf(({ level, message, timestamp: time, ...meta }) => {
-  const metaStr = Object.keys(meta).length ? ` ${JSON.stringify(meta)}` : '';
-  return `[${time}] [${level}]: ${message}${metaStr}`;
-});
+import { createLogger } from '@ggaddak/shared';
 
 export function createWinstonLogger(serviceName = 'BE') {
-  return winston.createLogger({
-    level: process.env.LOG_LEVEL || 'info',
-    format: combine(
-      timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
-      customFormat,
-    ),
-    defaultMeta: { service: serviceName },
-    transports: [
-      new winston.transports.Console({
-        format: combine(
-          colorize(),
-          timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
-          customFormat,
-        ),
-      }),
-    ],
-  });
+  return createLogger(serviceName);
 }
 
-export const appLogger = createWinstonLogger('BE');
+export const appLogger = createLogger('BE');
 export default appLogger;
