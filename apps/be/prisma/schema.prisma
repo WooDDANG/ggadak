@@ -64,3 +64,37 @@ model RejectedEvidenceHash {
   reason       String
   createdAt    DateTime @default(now())
 }
+
+model AnalysisRequest {
+  id String @id
+  fingerprint String
+  guildId String
+  channelId String
+  manual Boolean
+  state String
+  owner String?
+  leaseUntil DateTime?
+  resultJson String?
+  createdAt DateTime @default(now())
+  completedAt DateTime?
+}
+
+model CandidateIdentity {
+  key String @id
+  decisionId String
+  guildId String
+  channelId String
+  evidenceJson String
+  normalizedContent String
+  @@index([decisionId])
+  @@index([guildId, channelId])
+}
+
+model CandidateAnalysis {
+  requestId String
+  decisionId String
+  relatedJson String
+  previousRequestsJson String
+  @@id([requestId, decisionId])
+  @@index([decisionId])
+}

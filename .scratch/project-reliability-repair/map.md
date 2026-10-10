@@ -15,6 +15,8 @@ Whole-project review identified persistence, checkpoint, semantic admission, con
 
 - Database authority resolved: async persistent reads/writes, restart-safe full domain, additive legacy migration and safe conflict-reporting tools. [Ticket 01](issues/01-database-authority-and-migration.md).
 
+- Idempotent analysis resolved: durable request replay/fenced claims, atomic candidates and completion, exact reuse preserving review state, original evidence/reply identity and manual/overlap history. [Ticket 02](issues/02-idempotent-analysis-and-candidate-history.md).
+
 ## Implementation map
 
 - [01 — Database authority and migration](./issues/01-database-authority-and-migration.md)
