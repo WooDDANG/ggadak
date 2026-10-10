@@ -7,6 +7,11 @@ export interface AlternativeItemDto {
 }
 
 export interface ActionItemDto {
+  id?: string;
+  state?: 'unknown' | 'open' | 'completed' | 'canceled' | 'transferred';
+  transferredFromDecisionId?: string;
+  transferredFromActionItemId?: string;
+  transferredToDecisionId?: string;
   task: string;
   assignee?: string;
   dueDate?: string;
@@ -14,6 +19,8 @@ export interface ActionItemDto {
 
 export interface DecisionItemDto {
   id: string;
+  version?: number;
+  supersededById?: string | null;
   topic: string;
   decision: string;
   title?: string;
@@ -53,6 +60,17 @@ export const ReviewDecisionDtoSchema = ReviewActionSchema;
 
 export interface ReviewDecisionDto {
   action: 'confirm' | 'defer' | 'reject' | 'edit';
+  expectedVersion: number;
+  resolution?: 'independent' | 'replace';
+  predecessorId?: string;
+  predecessorVersion?: number;
+  taskDispositions?: {
+    actionItemId: string;
+    classification?: 'open' | 'completed';
+    disposition?: 'cancel' | 'transfer';
+  }[];
+  rationaleSummary?: string;
+  rationaleQuotes?: string[];
   approvedBy?: string;
   title?: string;
   decisionContent?: string;
@@ -64,12 +82,18 @@ export const ResolveConflictDtoSchema = z.object({
   decisionId: z.string(),
   conflictingId: z.string(),
   resolution: z.enum(['supersede', 'coexist']),
+  expectedVersion: z.number().int().positive(),
+  predecessorVersion: z.number().int().positive().optional(),
+  taskDispositions: ReviewActionSchema.shape.taskDispositions,
 });
 
 export interface ResolveConflictDto {
   decisionId: string;
   conflictingId: string;
   resolution: 'supersede' | 'coexist';
+  expectedVersion: number;
+  predecessorVersion?: number;
+  taskDispositions?: ReviewDecisionDto['taskDispositions'];
 }
 
 export const DecisionWebhookDtoSchema = DecisionPayloadSchema;

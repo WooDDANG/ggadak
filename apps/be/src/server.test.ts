@@ -197,6 +197,7 @@ describe('BE Server & Ingestion API', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         action: 'confirm',
+        expectedVersion: 1,
         approvedBy: 'reviewer_wooddang',
         title: 'Adopt Tailwind CSS v4',
       }),
@@ -240,7 +241,7 @@ describe('BE Server & Ingestion API', () => {
     const resReject = await fetch(`http://localhost:${port}/api/decisions/DEC-DRAFT-2/review`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'reject' }),
+      body: JSON.stringify({ action: 'reject', expectedVersion: 1 }),
     });
     assert.strictEqual(resReject.status, 200);
     assert.strictEqual(await repo.isEvidenceRejected('hash-rejected-999'), true);
