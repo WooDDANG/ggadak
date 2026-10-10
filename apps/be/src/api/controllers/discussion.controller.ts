@@ -1,6 +1,7 @@
-import { Controller, Route, Tags, Post, Body, Header } from 'tsoa';
+import { Controller, Route, Tags, Post, Body, Header, Get, Path } from 'tsoa';
 import { Service } from 'typedi';
 import { DiscussionService } from '../../services/discussion.service.js';
+import { CandidateHistoryEntry } from '../../repositories/analysis-request.repository.js';
 import {
   AnalyzeDiscussionRequestDto,
   AnalyzeDiscussionResponseDto,
@@ -12,6 +13,11 @@ import {
 export class DiscussionController extends Controller {
   constructor(private service: DiscussionService) {
     super();
+  }
+
+  @Get('history/{decisionId}')
+  public async history(@Path() decisionId: string): Promise<CandidateHistoryEntry[]> {
+    return this.service.getCandidateHistory(decisionId);
   }
 
   @Post('analyze')

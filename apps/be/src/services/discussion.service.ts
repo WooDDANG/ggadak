@@ -1,13 +1,21 @@
 import crypto from 'node:crypto';
-import { Service } from 'typedi';
+import { Inject, Service } from 'typedi';
 import { Decision, createLogger } from '@ggaddak/shared';
 import { DecisionRepository } from '../repositories/decision.repository.js';
-import { AiAdapter } from '../adapters/ai.adapter.js';
+import { AiAdapter, IAiAdapter } from '../adapters/ai.adapter.js';
 import { DecisionExtractorCore } from '../engine/extractor-core.js';
+
+import {
+  AnalysisRequestRepository,
+  CandidateDraft,
+  hash,
+  stableJson,
+} from '../repositories/analysis-request.repository.js';
 
 const logger = createLogger('BE-DISCUSSION-SERVICE');
 
 export interface AnalyzeDiscussionParams {
+  requestId: string;
   rawMessages: any[];
   guildId?: string;
   channelId?: string;
@@ -33,11 +41,42 @@ export interface AnalyzeDiscussionResult {
 export class DiscussionService {
   constructor(
     private repo: DecisionRepository,
-    private extractor: AiAdapter,
+    @Inject(() => AiAdapter) private extractor: IAiAdapter,
     private core: DecisionExtractorCore,
   ) {}
 
   async analyzeDiscussion(params: AnalyzeDiscussionParams): Promise<AnalyzeDiscussionResult> {
+    const requests = new AnalysisRequestRepository(this.repo);
+    const claim = await requests.claim(params);
+    if (claim.result) return claim.result;
+    const drafts: CandidateDraft[] = [];
+    let leaseFailure: unknown;
+    const heartbeat = setInterval(() => {
+      void requests.renew(params.requestId, claim.owner).catch(error => {
+        leaseFailure = error;
+      });
+    }, 20_000);
+    heartbeat.unref();
+    try {
+      const result = await this.extractDiscussion(params, drafts);
+      if (leaseFailure) throw leaseFailure;
+      return await requests.complete(params, claim.owner, result, drafts);
+    } catch (error) {
+      await requests.release(params.requestId, claim.owner);
+      throw error;
+    } finally {
+      clearInterval(heartbeat);
+    }
+  }
+
+  async getCandidateHistory(decisionId: string) {
+    return new AnalysisRequestRepository(this.repo).history(decisionId);
+  }
+
+  private async extractDiscussion(
+    params: AnalyzeDiscussionParams,
+    drafts: CandidateDraft[],
+  ): Promise<AnalyzeDiscussionResult> {
     const {
       rawMessages,
       guildId,
@@ -54,25 +93,6 @@ export class DiscussionService {
 
     if (!rawMessages || rawMessages.length === 0) {
       return { found: false, summary: '분석할 메시지가 없습니다.', decisions: [] };
-    }
-
-    // 1. Compute evidence hash for anti-recreation check
-    const evidenceString = rawMessages
-      .map((m: any) => m.id || `${m.author}:${m.content}:${m.createdAt}`)
-      .join('|');
-    const evidenceHash = crypto.createHash('sha256').update(evidenceString).digest('hex');
-
-    // Anti-recreation check: Skip if rejected UNLESS manually overridden (📌 or /스캔)
-    if ((await this.repo.isEvidenceRejected(evidenceHash)) && !isManualOverride) {
-      logger.info(
-        `Skipping analysis for evidence hash [${evidenceHash.slice(0, 8)}] - Previously rejected (override=${isManualOverride}).`,
-        { stage: 'REVIEW', traceId: currentTraceId, evidenceHash: evidenceHash.slice(0, 8) },
-      );
-      return {
-        found: false,
-        summary: '이전에 기각/삭제된 대화 구간입니다. (📌 핀 또는 수동 스캔으로 강제 재분석 가능)',
-        decisions: [],
-      };
     }
 
     // 2. Retrieve recent external feedbacks for context injection
@@ -175,7 +195,7 @@ export class DiscussionService {
 
     const allExtractedDecisions: Decision[] = [];
     let lastSummary = '대화가 분석되었습니다.';
-    let lastConflict: { hasConflict: boolean; conflictingDecision?: Decision } = {
+    const lastConflict: { hasConflict: boolean; conflictingDecision?: Decision } = {
       hasConflict: false,
     };
 
@@ -218,11 +238,35 @@ export class DiscussionService {
         continue;
       }
 
-      const transcript = sessionMessages
+      const originalIds = new Set(
+        sessionMessages.flatMap(m => m.originalMessages?.map(original => original.id) ?? [m.id]),
+      );
+      const originalMessages = rawMessages
+        .filter(m => originalIds.has(m.id))
+        .map(m => ({
+          id: m.id,
+          author: m.author || m.authorName || 'unknown',
+          content: m.content || '',
+          createdAt: m.createdAt || '1970-01-01T00:00:00.000Z',
+          ...(m.replyingTo || m.referenceMessageId
+            ? { replyingTo: m.replyingTo || m.referenceMessageId }
+            : {}),
+        }))
+        .sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
+      const rawEvidence = originalMessages.map(m => m.id);
+      const evidenceJson = stableJson({
+        guildId: guildId || 'discord',
+        channelId: channelId || 'channel',
+        messages: originalMessages,
+      });
+      const evidenceHash = hash(JSON.parse(evidenceJson));
+      const legacyHash = crypto.createHash('sha256').update(rawEvidence.join('|')).digest('hex');
+
+      const transcript = originalMessages
         .map((m: any) => {
           const time = m.createdAt ? new Date(m.createdAt).toISOString().substring(11, 19) : '';
           const reply = m.replyingTo ? ` (replying to ${m.replyingTo})` : '';
-          return `[${time}] ${m.author}${reply}: ${m.content}`;
+          return `[${m.id}] [${time}] ${m.author}${reply}: ${m.content}`;
         })
         .join('\n');
 
@@ -256,10 +300,8 @@ export class DiscussionService {
       const participants = Array.from(
         new Set(sessionMessages.map((m: any) => m.author)),
       ) as string[];
-      const rawEvidence = sessionMessages.map((m: any) => m.id || m.content).filter(Boolean);
-
       for (const item of extraction.decisions) {
-        const decisionId = `DEC-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 100)}`;
+        const decisionId = `DEC-${crypto.randomUUID()}`;
 
         // Calculate 4-tier governance score entirely on Backend Core
         const govResult = this.core.calculateGovernanceScore({
@@ -270,20 +312,8 @@ export class DiscussionService {
           hasExternalFeedback: recentFeedbacks.length > 0,
         });
 
-        // Conflict / Pivot check with existing active decisions
-        const existingActive = await this.repo.getDecisions({
-          topic: item.topic,
-          state: 'Decided',
-        });
-        const conflicting = existingActive.length > 0 ? existingActive[0] : undefined;
-        const isPivot = Boolean(item.isPivot || conflicting);
-
-        if (conflicting) {
-          lastConflict = {
-            hasConflict: true,
-            conflictingDecision: conflicting,
-          };
-        }
+        // Only explicit extraction evidence identifies a strategic Pivot. Topic matches are review comparisons.
+        const isPivot = Boolean(item.isPivot);
 
         const finalScore = govResult.score;
 
@@ -317,16 +347,7 @@ export class DiscussionService {
             triggerMessageId: triggerMessageId || 'msg-unknown',
             messageUrl: messageUrl || undefined,
             participants,
-            rawMessages: sessionMessages.map((m: any) => ({
-              id: m.id,
-              author: m.author,
-              content: m.content,
-              createdAt: m.createdAt || new Date().toISOString(),
-              replyingTo: m.replyingTo,
-              reactionCount: m.reactionCount || 0,
-              reactions: m.reactions || [],
-              isTrigger: m.isTrigger || false,
-            })),
+            rawMessages: originalMessages,
           },
           messageCreatedAt: sessionMessages[sessionMessages.length - 1]?.createdAt
             ? new Date(sessionMessages[sessionMessages.length - 1].createdAt).toISOString()
@@ -337,11 +358,11 @@ export class DiscussionService {
           governancePassed: finalScore >= 3.0,
         };
 
-        await this.repo.saveDecision(newDecision);
+        drafts.push({ decision: newDecision, evidenceJson, legacyHash });
         allExtractedDecisions.push(newDecision);
 
         logger.info(
-          `Saved DRAFT Candidate [${newDecision.id}] Score=${finalScore} (${govResult.strength}) Title="${newDecision.title}"`,
+          `Staged DRAFT Candidate [${newDecision.id}] Score=${finalScore} (${govResult.strength}) Title="${newDecision.title}"`,
           {
             stage: 'GOVERNANCE',
             traceId: currentTraceId,
@@ -365,11 +386,6 @@ export class DiscussionService {
         decisionsCount: allExtractedDecisions.length,
       },
     );
-
-    // Update checkpoint for channel
-    if (channelId && triggerMessageId) {
-      await this.repo.saveCheckpoint(channelId, triggerMessageId);
-    }
 
     if (allExtractedDecisions.length === 0) {
       return {

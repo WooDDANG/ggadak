@@ -7,6 +7,7 @@
 import type { RawMessageItemDto } from './rawMessageItemDto';
 
 export interface AnalyzeDiscussionRequestDto {
+  requestId: string;
   rawMessages: RawMessageItemDto[];
   guildId?: string;
   channelId?: string;

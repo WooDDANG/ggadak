@@ -76,6 +76,18 @@ const models: TsoaRoute.Models = {
         "additionalProperties": false,
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "CandidateHistoryEntry": {
+        "dataType": "refObject",
+        "properties": {
+            "requestId": {"dataType":"string","required":true},
+            "isManualOverride": {"dataType":"boolean","required":true},
+            "previousRequestIds": {"dataType":"array","array":{"dataType":"string"},"required":true},
+            "relatedCandidateIds": {"dataType":"array","array":{"dataType":"string"},"required":true},
+            "createdAt": {"dataType":"string","required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "AlternativeItemDto": {
         "dataType": "refObject",
         "properties": {
@@ -172,6 +184,7 @@ const models: TsoaRoute.Models = {
     "AnalyzeDiscussionRequestDto": {
         "dataType": "refObject",
         "properties": {
+            "requestId": {"dataType":"string","required":true},
             "rawMessages": {"dataType":"array","array":{"dataType":"refObject","ref":"RawMessageItemDto"},"required":true},
             "guildId": {"dataType":"string"},
             "channelId": {"dataType":"string"},
@@ -379,6 +392,41 @@ export function RegisterRoutes(app: Router) {
                 next,
                 validatedArgs,
                 successStatus: 201,
+              });
+            } catch (err) {
+                return next(err);
+            }
+        });
+        // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+        const argsDiscussionController_history: Record<string, TsoaRoute.ParameterSchema> = {
+                decisionId: {"in":"path","name":"decisionId","required":true,"dataType":"string"},
+        };
+        app.get('/api/discussions/history/:decisionId',
+            ...(fetchMiddlewares<RequestHandler>(DiscussionController)),
+            ...(fetchMiddlewares<RequestHandler>(DiscussionController.prototype.history)),
+
+            async function DiscussionController_history(request: ExRequest, response: ExResponse, next: any) {
+
+            // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+
+            let validatedArgs: any[] = [];
+            try {
+                validatedArgs = templateService.getValidatedArgs({ args: argsDiscussionController_history, request, response });
+
+                const container: IocContainer = typeof iocContainer === 'function' ? (iocContainer as IocContainerFactory)(request) : iocContainer;
+
+                const controller: any = await container.get<DiscussionController>(DiscussionController);
+                if (typeof controller['setStatus'] === 'function') {
+                controller.setStatus(undefined);
+                }
+
+              await templateService.apiHandler({
+                methodName: 'history',
+                controller,
+                response,
+                next,
+                validatedArgs,
+                successStatus: undefined,
               });
             } catch (err) {
                 return next(err);

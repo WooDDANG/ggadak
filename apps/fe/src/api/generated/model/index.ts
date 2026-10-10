@@ -10,6 +10,7 @@ export * from './actionItemDtoState';
 export * from './alternativeItemDto';
 export * from './analyzeDiscussionRequestDto';
 export * from './analyzeDiscussionResponseDto';
+export * from './candidateHistoryEntry';
 export * from './checkpointResponseDto';
 export * from './createFeedback201';
 export * from './createFeedbackDto';

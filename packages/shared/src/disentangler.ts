@@ -46,6 +46,11 @@ export function disentangleConversations(
 
     if (prev.author === m.author && timeDiff <= 60000 && !isExplicitReply) {
       // Merge into previous utterance
+      prev.originalMessages = [
+        ...(prev.originalMessages ?? [{ ...prev, originalMessages: undefined }]),
+        ...(m.originalMessages ?? [{ ...m }]),
+      ];
+      prev.isTrigger = prev.isTrigger || m.isTrigger;
       prev.content = `${prev.content}\n${m.content}`;
       prev.reactionCount = (prev.reactionCount || 0) + (m.reactionCount || 0);
       if (m.reactions && m.reactions.length > 0) {
@@ -56,6 +61,12 @@ export function disentangleConversations(
     }
   }
 
+  const mergedId = new Map<string, string>();
+  for (const message of burstMerged) {
+    mergedId.set(message.id, message.id);
+    for (const original of message.originalMessages ?? []) mergedId.set(original.id, message.id);
+  }
+
   // 2. Build graph edges (parent -> child)
   const parentOf = new Map<string, string>(); // childId -> parentId
   const hasChildren = new Set<string>(); // parentIds that have explicit children
@@ -63,9 +74,14 @@ export function disentangleConversations(
   // Pass 2A: Identify explicit links (reply-to, same-author burst)
   for (let i = 0; i < burstMerged.length; i++) {
     const m = burstMerged[i];
-    const explicitParent = m.referenceMessageId || m.replyingTo;
+    const originalParent = m.referenceMessageId || m.replyingTo;
+    const explicitParent = originalParent ? mergedId.get(originalParent) : undefined;
 
-    if (explicitParent && burstMerged.some(msg => msg.id === explicitParent)) {
+    if (
+      explicitParent &&
+      explicitParent !== m.id &&
+      burstMerged.some(msg => msg.id === explicitParent)
+    ) {
       parentOf.set(m.id, explicitParent);
       hasChildren.add(explicitParent);
       continue;
@@ -124,9 +140,7 @@ export function disentangleConversations(
   // 4. Construct DisentangledThread objects
   const threads: DisentangledThread[] = [];
   for (const [rootId, threadMsgs] of componentMap.entries()) {
-    threadMsgs.sort(
-      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
-    );
+    threadMsgs.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
     const participants = Array.from(new Set(threadMsgs.map(m => m.author)));
     const startTime = new Date(threadMsgs[0].createdAt).getTime();
     const endTime = new Date(threadMsgs[threadMsgs.length - 1].createdAt).getTime();

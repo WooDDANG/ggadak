@@ -11,6 +11,7 @@ export interface RawMessageItem {
   reactionCount?: number;
   reactions?: Array<{ emoji: string; count: number }>;
   isTrigger?: boolean;
+  originalMessages?: RawMessageItem[];
 }
 
 export interface CleanMessageItem extends RawMessageItem {
@@ -75,6 +76,10 @@ export function filterTier1Messages(messages: RawMessageItem[]): Tier1FilterResu
       if (cleanMessages.length > 0) {
         const lastMsg = cleanMessages[cleanMessages.length - 1];
         syntheticReactions[lastMsg.id] = (syntheticReactions[lastMsg.id] || 0) + 1;
+        lastMsg.originalMessages = [
+          ...(lastMsg.originalMessages ?? [{ ...lastMsg, originalMessages: undefined }]),
+          { ...m },
+        ];
         lastMsg.reactionCount = (lastMsg.reactionCount || 0) + 1;
       }
       continue;
@@ -98,6 +103,7 @@ export function filterTier1Messages(messages: RawMessageItem[]): Tier1FilterResu
 
     cleanMessages.push({
       ...m,
+      originalMessages: [{ ...m }],
       content: normalizedContent,
       reactionCount: m.reactionCount || 0,
     });
