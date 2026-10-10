@@ -3,15 +3,18 @@ import assert from 'node:assert';
 import http from 'node:http';
 import { createServer } from './server.js';
 import { DecisionRepository } from './db.js';
+import { isolatedRepository } from './repositories/test-database.js';
 
 describe('BE Server & Ingestion API', () => {
   let server: http.Server;
   let repo: DecisionRepository;
   let port: number;
+  let database: Awaited<ReturnType<typeof isolatedRepository>>;
 
   before(async () => {
-    repo = new DecisionRepository();
-    server = createServer(repo);
+    database = await isolatedRepository();
+    repo = database.repo;
+    server = await createServer(repo);
     await new Promise<void>(resolve => {
       server.listen(0, () => {
         const addr = server.address() as any;
@@ -24,10 +27,10 @@ describe('BE Server & Ingestion API', () => {
   after(async () => {
     await new Promise<void>(resolve => {
       server.close(() => {
-        repo.close();
         resolve();
       });
     });
+    await database.cleanup();
   });
 
   it('ingests a valid decision webhook via POST /api/webhooks/decisions', async () => {
@@ -64,7 +67,7 @@ describe('BE Server & Ingestion API', () => {
     assert.strictEqual(body.id, 'DEC-101');
 
     // Verify stored
-    const stored = repo.getDecisionById('DEC-101');
+    const stored = await repo.getDecisionById('DEC-101');
     assert.ok(stored);
     assert.strictEqual(stored.decision, 'Split into 3-tier monorepo');
   });
@@ -77,7 +80,7 @@ describe('BE Server & Ingestion API', () => {
     assert.strictEqual(data.decisions.length, 1);
   });
 
-  it('handles superseding previous decisions when a supersedesId is provided', async () => {
+  it('does not replace existing decisions through ordinary ingestion', async () => {
     const payload2 = {
       event: 'decision.recorded',
       version: '1.0.0',
@@ -107,9 +110,9 @@ describe('BE Server & Ingestion API', () => {
     assert.strictEqual(res.status, 201);
 
     // Verify DEC-101 is now Superseded and DEC-102 is Decided
-    const dec1 = repo.getDecisionById('DEC-101');
-    const dec2 = repo.getDecisionById('DEC-102');
-    assert.strictEqual(dec1?.state, 'Superseded');
+    const dec1 = await repo.getDecisionById('DEC-101');
+    const dec2 = await repo.getDecisionById('DEC-102');
+    assert.strictEqual(dec1?.state, 'Decided');
     assert.strictEqual(dec2?.state, 'Decided');
   });
 
@@ -157,7 +160,7 @@ describe('BE Server & Ingestion API', () => {
 
   it('handles decision review workflow via POST /api/decisions/:id/review', async () => {
     // Save draft decision
-    repo.saveDecision({
+    await repo.saveDecision({
       id: 'DEC-DRAFT-1',
       topic: 'UI Framework',
       decision: 'Tailwind CSS',
@@ -205,7 +208,7 @@ describe('BE Server & Ingestion API', () => {
     assert.strictEqual(body.decision.title, 'Adopt Tailwind CSS v4');
 
     // 2. Reject another draft and check anti-recreation hash
-    repo.saveDecision({
+    await repo.saveDecision({
       id: 'DEC-DRAFT-2',
       topic: 'Invalid Proposal',
       decision: 'Use Flash',
@@ -240,7 +243,7 @@ describe('BE Server & Ingestion API', () => {
       body: JSON.stringify({ action: 'reject' }),
     });
     assert.strictEqual(resReject.status, 200);
-    assert.strictEqual(repo.isEvidenceRejected('hash-rejected-999'), true);
+    assert.strictEqual(await repo.isEvidenceRejected('hash-rejected-999'), true);
   });
 
   it('manages external feedback via POST and GET /api/feedbacks', async () => {

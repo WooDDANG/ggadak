@@ -14,24 +14,24 @@ export interface QueryDecisionsFilter {
 export class DecisionService {
   constructor(private repo: DecisionRepository) {}
 
-  getDecisions(filter: QueryDecisionsFilter): Decision[] {
+  async getDecisions(filter: QueryDecisionsFilter): Promise<Decision[]> {
     return this.repo.getDecisions(filter);
   }
 
-  getDecisionById(id: string): Decision | null {
+  async getDecisionById(id: string): Promise<Decision | null> {
     return this.repo.getDecisionById(id);
   }
 
-  saveDecision(decision: Decision): void {
-    this.repo.saveDecision(decision);
+  async saveDecision(decision: Decision): Promise<void> {
+    await this.repo.saveDecision(decision);
   }
 
-  reviewDecision(
+  async reviewDecision(
     decisionId: string,
     action: ReviewAction['action'],
     params: Omit<ReviewAction, 'action'>,
-  ): Decision | null {
-    const updated = this.repo.reviewDecision(decisionId, action, params);
+  ): Promise<Decision | null> {
+    const updated = await this.repo.reviewDecision(decisionId, action, params);
     if (updated) {
       logger.info(
         `[Review] Decision [${decisionId}] reviewed with action: ${action} -> state: ${updated.state}`,
@@ -40,13 +40,17 @@ export class DecisionService {
     return updated;
   }
 
-  resolveConflict(decisionId: string, conflictingId: string, resolution: string): boolean {
+  async resolveConflict(
+    decisionId: string,
+    conflictingId: string,
+    resolution: string,
+  ): Promise<boolean> {
     if (resolution === 'supersede' && conflictingId && decisionId) {
-      const current = this.repo.getDecisionById(decisionId);
+      const current = await this.repo.getDecisionById(decisionId);
       if (current) {
         current.supersedesId = conflictingId;
         current.state = 'Decided';
-        this.repo.saveDecision(current);
+        await this.repo.saveDecision(current);
         logger.info(`[Conflict] Decision [${decisionId}] now supersedes [${conflictingId}]`);
         return true;
       }

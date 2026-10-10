@@ -9,6 +9,8 @@ generator client {
 
 model Decision {
   id              String   @id
+  domainJson      String?
+  version         Int      @default(1)
   guildId         String
   channelId       String
   messageId       String
@@ -39,6 +41,8 @@ model Decision {
 
 model ExternalFeedback {
   id           String   @id
+  domainJson   String?
+  channelId    String?
   decisionId   String
   source       String   // "slack" | "jira" | "github" | "manual"
   author       String
