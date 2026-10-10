@@ -82,6 +82,7 @@ test('review edits persist approval, category and original timestamps after rest
       }),
     );
     const edited = await db.repo.reviewDecision('edit', 'confirm', {
+      expectedVersion: 1,
       decisionContent: 'Reviewed content',
       categoryTag: '기술',
       approvedBy: 'Kim',
@@ -114,4 +115,304 @@ test('database write failures propagate and failed startup cannot return a ready
   const { createServer } = await import('../server.js');
   await assert.rejects(createServer(repo));
   await client.$disconnect();
+});
+
+test('stale review conflicts without changing a decision', async () => {
+  const db = await isolatedRepository();
+  try {
+    await db.repo.saveDecision(
+      DecisionSchema.parse({
+        id: 'stale',
+        topic: 'Storage',
+        decision: 'SQLite',
+        rationale: 'Local',
+        source: { guildId: 'g', channelId: 'c', triggerMessageId: '1' },
+        createdAt: '2020-01-01T00:00:00.000Z',
+      }),
+    );
+    await db.repo.reviewDecision('stale', 'confirm', { expectedVersion: 1 });
+    await assert.rejects(
+      db.repo.reviewDecision('stale', 'reject', { expectedVersion: 1 }),
+      /version|stale/i,
+    );
+    assert.equal((await db.repo.getDecisionById('stale'))?.state, 'Decided');
+  } finally {
+    await db.cleanup();
+  }
+});
+
+test('replacement transfers open work, preserves completed history and commits both versions', async () => {
+  const db = await isolatedRepository();
+  try {
+    const base = {
+      topic: 'Storage',
+      decision: 'SQLite',
+      rationale: 'Local',
+      source: { guildId: 'g', channelId: 'c', triggerMessageId: '1' },
+      createdAt: '2020-01-01T00:00:00.000Z',
+    };
+    await db.repo.saveDecision(
+      DecisionSchema.parse({
+        ...base,
+        id: 'old',
+        state: 'Decided',
+        actionItems: [
+          { id: 'todo', task: 'Migrate', state: 'open' },
+          { id: 'done', task: 'Research', state: 'completed' },
+        ],
+      }),
+    );
+    await db.repo.saveDecision(DecisionSchema.parse({ ...base, id: 'new', supersedesId: 'old' }));
+    assert.equal((await db.repo.getDecisionById('old'))?.state, 'Decided');
+    const next = await db.repo.reviewDecision('new', 'confirm', {
+      expectedVersion: 1,
+      resolution: 'replace',
+      predecessorId: 'old',
+      predecessorVersion: 1,
+      taskDispositions: [{ actionItemId: 'todo', disposition: 'transfer' }],
+    });
+    const old = await db.repo.getDecisionById('old');
+    assert.equal(old?.state, 'Superseded');
+    assert.equal(old?.supersededById, 'new');
+    assert.equal(old?.actionItems[1]?.state, 'completed');
+    assert.equal(next?.actionItems[0]?.transferredFromActionItemId, 'todo');
+    assert.equal(next?.isPivot, false);
+  } finally {
+    await db.cleanup();
+  }
+});
+
+test('invalid replacement rolls back edits, classifies legacy tasks explicitly and retains independent decisions', async () => {
+  const db = await isolatedRepository();
+  try {
+    const base = {
+      topic: 'Storage',
+      decision: 'SQLite',
+      rationale: 'Local',
+      source: { guildId: 'g', channelId: 'c', triggerMessageId: '1' },
+      createdAt: '2020-01-01T00:00:00.000Z',
+    };
+    await db.repo.saveDecision(
+      DecisionSchema.parse({
+        ...base,
+        id: 'pre',
+        state: 'Decided',
+        actionItems: [{ id: 'legacy', task: 'Audit' }],
+      }),
+    );
+    await db.repo.saveDecision(DecisionSchema.parse({ ...base, id: 'candidate' }));
+    await assert.rejects(
+      db.repo.reviewDecision('candidate', 'confirm', {
+        expectedVersion: 1,
+        resolution: 'replace',
+        predecessorId: 'pre',
+        predecessorVersion: 1,
+        title: 'Edited',
+      }),
+      /Classify/,
+    );
+    assert.equal((await db.repo.getDecisionById('pre'))?.state, 'Decided');
+    assert.equal((await db.repo.getDecisionById('candidate'))?.version, 1);
+    const next = await db.repo.reviewDecision('candidate', 'confirm', {
+      expectedVersion: 1,
+      resolution: 'replace',
+      predecessorId: 'pre',
+      predecessorVersion: 1,
+      taskDispositions: [{ actionItemId: 'legacy', classification: 'completed' }],
+    });
+    assert.equal(next?.state, 'Decided');
+    assert.equal((await db.repo.getDecisionById('pre'))?.actionItems[0]?.state, 'completed');
+    await db.repo.saveDecision(
+      DecisionSchema.parse({ ...base, id: 'independent', supersedesId: 'candidate' }),
+    );
+    await db.repo.reviewDecision('independent', 'confirm', {
+      expectedVersion: 1,
+      resolution: 'independent',
+    });
+    assert.equal((await db.repo.getDecisionById('candidate'))?.state, 'Decided');
+    assert.equal((await db.repo.getDecisionById('independent'))?.supersedesId, null);
+  } finally {
+    await db.cleanup();
+  }
+});
+
+test('concurrent replacement accepts one successor and leaves the losing candidate untouched', async () => {
+  const db = await isolatedRepository();
+  try {
+    const base = {
+      topic: 'Storage',
+      decision: 'SQLite',
+      rationale: 'Local',
+      source: { guildId: 'g', channelId: 'c', triggerMessageId: '1' },
+      createdAt: '2020-01-01T00:00:00.000Z',
+    };
+    for (const id of ['pre', 'a', 'b'])
+      await db.repo.saveDecision(
+        DecisionSchema.parse({ ...base, id, state: id === 'pre' ? 'Decided' : 'Draft' }),
+      );
+    const results = await Promise.allSettled(
+      ['a', 'b'].map(id =>
+        db.repo.reviewDecision(id, 'confirm', {
+          expectedVersion: 1,
+          resolution: 'replace',
+          predecessorId: 'pre',
+          predecessorVersion: 1,
+        }),
+      ),
+    );
+    assert.equal(results.filter(result => result.status === 'fulfilled').length, 1);
+    const rejection = results.find(result => result.status === 'rejected') as PromiseRejectedResult;
+    assert.equal(rejection.reason.statusCode, 409);
+    const decisions = await db.repo.getDecisions();
+    assert.equal(decisions.filter(d => d.state === 'Draft').length, 1);
+  } finally {
+    await db.cleanup();
+  }
+});
+
+test('replacement rejects cross guild or inactive predecessors and stale predecessor versions', async () => {
+  const db = await isolatedRepository();
+  try {
+    const base = {
+      topic: 'Storage',
+      decision: 'SQLite',
+      rationale: 'Local',
+      source: { guildId: 'g', channelId: 'c', triggerMessageId: '1' },
+      createdAt: '2020-01-01T00:00:00.000Z',
+    };
+    await db.repo.saveDecision(DecisionSchema.parse({ ...base, id: 'candidate' }));
+    await db.repo.saveDecision(
+      DecisionSchema.parse({
+        ...base,
+        id: 'cross',
+        state: 'Decided',
+        source: { ...base.source, guildId: 'other' },
+      }),
+    );
+    await assert.rejects(
+      db.repo.reviewDecision('candidate', 'confirm', {
+        expectedVersion: 1,
+        resolution: 'replace',
+        predecessorId: 'cross',
+        predecessorVersion: 1,
+      }),
+      /same guild/,
+    );
+    await db.repo.saveDecision(DecisionSchema.parse({ ...base, id: 'pre', state: 'Decided' }));
+    await assert.rejects(
+      db.repo.reviewDecision('candidate', 'confirm', {
+        expectedVersion: 1,
+        resolution: 'replace',
+        predecessorId: 'pre',
+        predecessorVersion: 2,
+      }),
+      /Stale/,
+    );
+    assert.equal((await db.repo.getDecisionById('candidate'))?.version, 1);
+  } finally {
+    await db.cleanup();
+  }
+});
+
+test('compatibility conflict controller rejects invalid replacements and persists cancellation after restart', async () => {
+  const db = await isolatedRepository();
+  try {
+    const base = {
+      topic: 'Storage',
+      decision: 'SQLite',
+      rationale: 'Local',
+      source: { guildId: 'g', channelId: 'c', triggerMessageId: '1' },
+      createdAt: '2020-01-01T00:00:00.000Z',
+    };
+    await db.repo.saveDecision(
+      DecisionSchema.parse({
+        ...base,
+        id: 'pre',
+        state: 'Decided',
+        actionItems: [{ id: 'todo', task: 'Migrate', state: 'open' }],
+      }),
+    );
+    await db.repo.saveDecision(DecisionSchema.parse({ ...base, id: 'candidate' }));
+    const { DecisionController } = await import('../api/controllers/decision.controller.js');
+    const { DecisionService } = await import('../services/decision.service.js');
+    const controller = new DecisionController(new DecisionService(db.repo));
+    await assert.rejects(
+      controller.resolve({
+        decisionId: 'candidate',
+        conflictingId: 'pre',
+        resolution: 'supersede',
+        expectedVersion: 1,
+        predecessorVersion: 1,
+      }),
+      /unfinished/,
+    );
+    await controller.resolve({
+      decisionId: 'candidate',
+      conflictingId: 'pre',
+      resolution: 'supersede',
+      expectedVersion: 1,
+      predecessorVersion: 1,
+      taskDispositions: [{ actionItemId: 'todo', disposition: 'cancel' }],
+    });
+    await db.client.$disconnect();
+    const client = new PrismaClient({ datasources: { db: { url: db.url } } });
+    const restarted = new DecisionRepository(client);
+    assert.equal((await restarted.getDecisionById('pre'))?.actionItems[0]?.state, 'canceled');
+    assert.equal((await restarted.getDecisionById('candidate'))?.supersedesId, 'pre');
+    await client.$disconnect();
+  } finally {
+    await db.cleanup();
+  }
+});
+
+test('database failure after predecessor update rolls the entire replacement back', async () => {
+  const db = await isolatedRepository();
+  try {
+    const base = {
+      topic: 'Storage',
+      decision: 'SQLite',
+      rationale: 'Local',
+      source: { guildId: 'g', channelId: 'c', triggerMessageId: '1' },
+      createdAt: '2020-01-01T00:00:00.000Z',
+    };
+    await db.repo.saveDecision(DecisionSchema.parse({ ...base, id: 'pre', state: 'Decided' }));
+    await db.repo.saveDecision(DecisionSchema.parse({ ...base, id: 'candidate' }));
+    // SQLite failure injection at the agreed real-database boundary.
+    await db.client.$executeRawUnsafe(
+      "CREATE TRIGGER fail_candidate BEFORE UPDATE ON Decision WHEN NEW.id = 'candidate' BEGIN SELECT RAISE(ABORT, 'injected write failure'); END",
+    );
+    await assert.rejects(
+      db.repo.reviewDecision('candidate', 'confirm', {
+        expectedVersion: 1,
+        resolution: 'replace',
+        predecessorId: 'pre',
+        predecessorVersion: 1,
+      }),
+    );
+    assert.equal((await db.repo.getDecisionById('pre'))?.state, 'Decided');
+    assert.equal((await db.repo.getDecisionById('pre'))?.version, 1);
+    assert.equal((await db.repo.getDecisionById('candidate'))?.state, 'Draft');
+  } finally {
+    await db.cleanup();
+  }
+});
+
+test('generic save cannot bypass versioned review transitions', async () => {
+  const db = await isolatedRepository();
+  try {
+    const value = DecisionSchema.parse({
+      id: 'draft',
+      topic: 'Storage',
+      decision: 'SQLite',
+      rationale: 'Local',
+      source: { guildId: 'g', channelId: 'c', triggerMessageId: '1' },
+      createdAt: '2020-01-01T00:00:00.000Z',
+    });
+    await db.repo.saveDecision(value);
+    const saved = (await db.repo.getDecisionById('draft'))!;
+    await assert.rejects(db.repo.saveDecision({ ...saved, state: 'Decided' }), /review/);
+    assert.equal((await db.repo.getDecisionById('draft'))?.state, 'Draft');
+  } finally {
+    await db.cleanup();
+  }
 });

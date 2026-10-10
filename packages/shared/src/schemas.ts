@@ -109,6 +109,19 @@ export const ExternalFeedbackSchema = z.object({
 
 export const ReviewActionSchema = z.object({
   action: z.enum(['confirm', 'defer', 'reject', 'edit']),
+  expectedVersion: z.number().int().positive(),
+  resolution: z.enum(['independent', 'replace']).optional(),
+  predecessorId: z.string().optional(),
+  predecessorVersion: z.number().int().positive().optional(),
+  taskDispositions: z
+    .array(
+      z.object({
+        actionItemId: z.string(),
+        classification: z.enum(['open', 'completed']).optional(),
+        disposition: z.enum(['cancel', 'transfer']).optional(),
+      }),
+    )
+    .optional(),
   approvedBy: z.string().optional(),
   title: z.string().optional(),
   decisionContent: z.string().optional(),

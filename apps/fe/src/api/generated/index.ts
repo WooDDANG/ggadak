@@ -26,6 +26,7 @@ import type {
 import type {
   AnalyzeDiscussionRequestDto,
   AnalyzeDiscussionResponseDto,
+  CandidateHistoryEntry,
   CheckpointResponseDto,
   CreateFeedback201,
   CreateFeedbackDto,
@@ -398,6 +399,120 @@ const {mutation: mutationOptions, fetch: fetchOptions} = options ?
       > => {
       return useMutation(getCreateFeedbackMutationOptions(options), queryClient);
     }
+
+export type historyResponse200 = {
+  data: CandidateHistoryEntry[]
+  status: 200
+}
+
+export type historyResponseSuccess = (historyResponse200) & {
+  headers: Headers;
+};
+;
+
+export type historyResponse = (historyResponseSuccess)
+
+export const getHistoryUrl = (decisionId: string,) => {
+
+
+
+
+  return `/api/discussions/history/${decisionId}`
+}
+
+export const history = async (decisionId: string, options?: RequestInit): Promise<historyResponse> => {
+
+  const res = await fetch(getHistoryUrl(decisionId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: historyResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as historyResponse
+}
+
+
+
+
+
+export const getHistoryQueryKey = (decisionId: string,) => {
+    return [
+    `/api/discussions/history/${decisionId}`
+    ] as const;
+    }
+
+
+export const getHistoryQueryOptions = <TData = Awaited<ReturnType<typeof history>>, TError = unknown>(decisionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof history>>, TError, TData>>, fetch?: RequestInit}
+) => {
+
+const {query: queryOptions, fetch: fetchOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getHistoryQueryKey(decisionId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof history>>> = ({ signal }) => history(decisionId, { signal, ...fetchOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: decisionId !== null && decisionId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof history>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type HistoryQueryResult = NonNullable<Awaited<ReturnType<typeof history>>>
+export type HistoryQueryError = unknown
+
+
+export function useHistory<TData = Awaited<ReturnType<typeof history>>, TError = unknown>(
+ decisionId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof history>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof history>>,
+          TError,
+          Awaited<ReturnType<typeof history>>
+        > , 'initialData'
+      >, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useHistory<TData = Awaited<ReturnType<typeof history>>, TError = unknown>(
+ decisionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof history>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof history>>,
+          TError,
+          Awaited<ReturnType<typeof history>>
+        > , 'initialData'
+      >, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useHistory<TData = Awaited<ReturnType<typeof history>>, TError = unknown>(
+ decisionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof history>>, TError, TData>>, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+
+export function useHistory<TData = Awaited<ReturnType<typeof history>>, TError = unknown>(
+ decisionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof history>>, TError, TData>>, fetch?: RequestInit}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getHistoryQueryOptions(decisionId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export type analyzeResponse200 = {
   data: AnalyzeDiscussionResponseDto

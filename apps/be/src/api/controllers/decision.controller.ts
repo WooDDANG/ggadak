@@ -36,14 +36,8 @@ export class DecisionController extends Controller {
     @Path() id: string,
     @Body() body: ReviewDecisionDto,
   ): Promise<ReviewDecisionResponseDto> {
-    const { action, approvedBy, title, decisionContent, rationale, categoryTag } = body;
-    const updated = await this.service.reviewDecision(id, action, {
-      approvedBy,
-      title,
-      decisionContent,
-      rationale,
-      categoryTag,
-    });
+    const { action, ...params } = body;
+    const updated = await this.service.reviewDecision(id, action, params);
     if (!updated) {
       throw new NotFoundError(`Decision [${id}] not found`);
     }
@@ -52,7 +46,7 @@ export class DecisionController extends Controller {
 
   @Post('decisions/conflict')
   public async resolve(@Body() body: ResolveConflictDto): Promise<{ status: string }> {
-    await this.service.resolveConflict(body.decisionId, body.conflictingId, body.resolution);
+    await this.service.resolveConflict(body);
     return { status: 'ok' };
   }
 

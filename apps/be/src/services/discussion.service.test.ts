@@ -189,18 +189,17 @@ test('exact reanalysis preserves reviewer edits and rejection while unrelated de
   try {
     const first = await service.analyzeDiscussion(input);
     const original = first.decisions[0];
-    await db.repo.saveDecision({
-      ...original,
-      state: 'Decided',
+    await db.repo.reviewDecision(original.id, 'edit', {
+      expectedVersion: original.version!,
       decisionContent: 'Reviewer edited text',
-      approvedBy: 'Kim',
     });
     const manual = await service.analyzeDiscussion({ ...input, requestId: 'manual-two' });
     assert.equal(manual.decisions[0].id, original.id);
-    assert.equal(manual.decisions[0].state, 'Decided');
+    assert.equal(manual.decisions[0].state, 'Draft');
     assert.equal(manual.decisions[0].decisionContent, 'Reviewer edited text');
-    await db.repo.saveDecision({ ...manual.decisions[0], state: 'Rejected' });
-    await db.repo.recordRejectedEvidence(original.evidenceHash!);
+    await db.repo.reviewDecision(original.id, 'reject', {
+      expectedVersion: manual.decisions[0].version!,
+    });
     output = ExtractionResultSchema.parse({
       found: true,
       summary: 'Two decisions',
@@ -213,9 +212,14 @@ test('exact reanalysis preserves reviewer edits and rejection while unrelated de
     });
     assert.equal(automatic.decisions.length, 1);
     assert.equal(automatic.decisions[0].decision, 'Deploy on Monday');
+    await db.repo.reviewDecision(automatic.decisions[0].id, 'confirm', {
+      expectedVersion: automatic.decisions[0].version!,
+      approvedBy: 'Kim',
+    });
     const changed = await service.analyzeDiscussion({ ...input, requestId: 'manual-four' });
     assert.equal(changed.decisions.length, 2);
     assert.equal(changed.decisions.find(d => d.id === original.id)?.state, 'Rejected');
+    assert.equal(changed.decisions.find(d => d.id === automatic.decisions[0].id)?.state, 'Decided');
     const history = await service.getCandidateHistory(automatic.decisions[0].id);
     assert.ok(history.some(h => h.previousRequestIds.includes('manual-two')));
     assert.ok(history.some(h => h.relatedCandidateIds.includes(original.id)));

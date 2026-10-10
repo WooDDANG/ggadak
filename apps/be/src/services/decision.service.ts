@@ -41,20 +41,17 @@ export class DecisionService {
   }
 
   async resolveConflict(
-    decisionId: string,
-    conflictingId: string,
-    resolution: string,
+    body: import('../dto/decision.dto.js').ResolveConflictDto,
   ): Promise<boolean> {
-    if (resolution === 'supersede' && conflictingId && decisionId) {
-      const current = await this.repo.getDecisionById(decisionId);
-      if (current) {
-        current.supersedesId = conflictingId;
-        current.state = 'Decided';
-        await this.repo.saveDecision(current);
-        logger.info(`[Conflict] Decision [${decisionId}] now supersedes [${conflictingId}]`);
-        return true;
-      }
-    }
-    return false;
+    const updated = await this.repo.reviewDecision(body.decisionId, 'confirm', {
+      expectedVersion: body.expectedVersion,
+      resolution: body.resolution === 'supersede' ? 'replace' : 'independent',
+      predecessorId: body.conflictingId,
+      predecessorVersion: body.predecessorVersion,
+      taskDispositions: body.taskDispositions,
+    });
+    if (!updated)
+      throw new (await import('../errors/AppError.js')).NotFoundError('Decision not found');
+    return true;
   }
 }

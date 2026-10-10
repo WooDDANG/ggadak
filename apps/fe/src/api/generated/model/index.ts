@@ -6,9 +6,11 @@
  */
 
 export * from './actionItemDto';
+export * from './actionItemDtoState';
 export * from './alternativeItemDto';
 export * from './analyzeDiscussionRequestDto';
 export * from './analyzeDiscussionResponseDto';
+export * from './candidateHistoryEntry';
 export * from './checkpointResponseDto';
 export * from './createFeedback201';
 export * from './createFeedbackDto';
@@ -29,9 +31,16 @@ export * from './recordStringAny';
 export * from './resolve200';
 export * from './resolveConflictDto';
 export * from './resolveConflictDtoResolution';
+export * from './resolveConflictDtoTaskDispositionsItem';
+export * from './resolveConflictDtoTaskDispositionsItemClassification';
+export * from './resolveConflictDtoTaskDispositionsItemDisposition';
 export * from './reviewDecisionDto';
 export * from './reviewDecisionDtoAction';
 export * from './reviewDecisionDtoCategoryTag';
+export * from './reviewDecisionDtoResolution';
+export * from './reviewDecisionDtoTaskDispositionsItem';
+export * from './reviewDecisionDtoTaskDispositionsItemClassification';
+export * from './reviewDecisionDtoTaskDispositionsItemDisposition';
 export * from './reviewDecisionResponseDto';
 export * from './reviewDecisionResponseDtoStatus';
 export * from './save200';

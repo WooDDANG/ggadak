@@ -6,14 +6,15 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const node_test_1 = require("node:test");
 const node_assert_1 = __importDefault(require("node:assert"));
 const server_js_1 = require("../apps/be/dist/server.js");
-const db_js_1 = require("../apps/be/dist/db.js");
+const test_database_js_1 = require("../apps/be/dist/repositories/test-database.js");
 const engine_js_1 = require("../apps/be/dist/extractor/engine.js");
 (0, node_test_1.describe)('E2E Full Pipeline: Discord Messages ➔ Backend AI Core ➔ Review Queue ➔ DB ➔ Query', () => {
     (0, node_test_1.it)('extracts multi-decision candidates in DRAFT state and confirms via Review Queue', async () => {
         // 1. Start Backend Server with Mock AI Engine
-        const repo = new db_js_1.DecisionRepository();
+        const database = await (0, test_database_js_1.isolatedRepository)();
+        const repo = database.repo;
         const extractor = new engine_js_1.BackendExtractionEngine();
-        const server = (0, server_js_1.createServer)(repo, extractor);
+        const server = await (0, server_js_1.createServer)(repo, extractor);
         await new Promise(resolve => server.listen(0, resolve));
         const port = server.address().port;
         // 2. Centralized Policy verification
@@ -77,6 +78,7 @@ const engine_js_1 = require("../apps/be/dist/extractor/engine.js");
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 action: 'confirm',
+                expectedVersion: postgresDec.version,
                 approvedBy: 'reviewer_wooddang',
             }),
         });
@@ -94,7 +96,7 @@ const engine_js_1 = require("../apps/be/dist/extractor/engine.js");
         const rejectRes = await fetch(`http://localhost:${port}/api/decisions/${fastifyDec.id}/review`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'reject' }),
+            body: JSON.stringify({ action: 'reject', expectedVersion: fastifyDec.version }),
         });
         node_assert_1.default.strictEqual(rejectRes.status, 200);
         // Re-analyzing the same messages passively should be skipped by anti-recreation hash
@@ -127,11 +129,12 @@ const engine_js_1 = require("../apps/be/dist/extractor/engine.js");
         node_assert_1.default.strictEqual(manualOverrideData.found, true);
         node_assert_1.default.ok(manualOverrideData.decisions.length > 0);
         server.close();
-        repo.close();
+        await database.cleanup();
     });
     (0, node_test_1.it)('handles casual chatter with no decisions', async () => {
-        const repo = new db_js_1.DecisionRepository();
-        const server = (0, server_js_1.createServer)(repo, new engine_js_1.BackendExtractionEngine());
+        const database = await (0, test_database_js_1.isolatedRepository)();
+        const repo = database.repo;
+        const server = await (0, server_js_1.createServer)(repo, new engine_js_1.BackendExtractionEngine());
         await new Promise(resolve => server.listen(0, resolve));
         const port = server.address().port;
         const res = await fetch(`http://localhost:${port}/api/discussions/analyze`, {
@@ -152,6 +155,6 @@ const engine_js_1 = require("../apps/be/dist/extractor/engine.js");
         node_assert_1.default.strictEqual(data.found, false);
         node_assert_1.default.strictEqual(data.decisions.length, 0);
         server.close();
-        repo.close();
+        await database.cleanup();
     });
 });
