@@ -1,15 +1,16 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import { createServer } from '../apps/be/dist/server.js';
-import { DecisionRepository } from '../apps/be/dist/db.js';
+import { isolatedRepository } from '../apps/be/dist/repositories/test-database.js';
 import { BackendExtractionEngine } from '../apps/be/dist/extractor/engine.js';
 
 describe('E2E Full Pipeline: Discord Messages ➔ Backend AI Core ➔ Review Queue ➔ DB ➔ Query', () => {
   it('extracts multi-decision candidates in DRAFT state and confirms via Review Queue', async () => {
     // 1. Start Backend Server with Mock AI Engine
-    const repo = new DecisionRepository();
+    const database = await isolatedRepository();
+    const repo = database.repo;
     const extractor = new BackendExtractionEngine();
-    const server = createServer(repo, extractor);
+    const server = await createServer(repo, extractor);
 
     await new Promise<void>(resolve => server.listen(0, resolve));
     const port = (server.address() as any).port;
@@ -143,12 +144,13 @@ describe('E2E Full Pipeline: Discord Messages ➔ Backend AI Core ➔ Review Que
     assert.ok(manualOverrideData.decisions.length > 0);
 
     server.close();
-    repo.close();
+    await database.cleanup();
   });
 
   it('handles casual chatter with no decisions', async () => {
-    const repo = new DecisionRepository();
-    const server = createServer(repo, new BackendExtractionEngine());
+    const database = await isolatedRepository();
+    const repo = database.repo;
+    const server = await createServer(repo, new BackendExtractionEngine());
     await new Promise<void>(resolve => server.listen(0, resolve));
     const port = (server.address() as any).port;
 
@@ -172,6 +174,6 @@ describe('E2E Full Pipeline: Discord Messages ➔ Backend AI Core ➔ Review Que
     assert.strictEqual(data.decisions.length, 0);
 
     server.close();
-    repo.close();
+    await database.cleanup();
   });
 });

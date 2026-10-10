@@ -38,8 +38,18 @@ export class DiscussionService {
   ) {}
 
   async analyzeDiscussion(params: AnalyzeDiscussionParams): Promise<AnalyzeDiscussionResult> {
-    const { rawMessages, guildId, channelId, channelName, triggerMessageId, messageUrl, isManualOverride, traceId } = params;
-    const currentTraceId = traceId || `trc-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+    const {
+      rawMessages,
+      guildId,
+      channelId,
+      channelName,
+      triggerMessageId,
+      messageUrl,
+      isManualOverride,
+      traceId,
+    } = params;
+    const currentTraceId =
+      traceId || `trc-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
     const pipelineStartTime = Date.now();
 
     if (!rawMessages || rawMessages.length === 0) {
@@ -53,7 +63,7 @@ export class DiscussionService {
     const evidenceHash = crypto.createHash('sha256').update(evidenceString).digest('hex');
 
     // Anti-recreation check: Skip if rejected UNLESS manually overridden (📌 or /스캔)
-    if (this.repo.isEvidenceRejected(evidenceHash) && !isManualOverride) {
+    if ((await this.repo.isEvidenceRejected(evidenceHash)) && !isManualOverride) {
       logger.info(
         `Skipping analysis for evidence hash [${evidenceHash.slice(0, 8)}] - Previously rejected (override=${isManualOverride}).`,
         { stage: 'REVIEW', traceId: currentTraceId, evidenceHash: evidenceHash.slice(0, 8) },
@@ -66,7 +76,7 @@ export class DiscussionService {
     }
 
     // 2. Retrieve recent external feedbacks for context injection
-    const recentFeedbacks = this.repo.getRecentFeedbacks(channelId, 3);
+    const recentFeedbacks = await this.repo.getRecentFeedbacks(channelId, 3);
 
     // 2.5. Stage 2: Tier 1 Zero-Cost Rule Filtering & Synthetic Reaction Absorption
     const tier1Start = Date.now();
@@ -243,7 +253,9 @@ export class DiscussionService {
       );
 
       lastSummary = extraction.summary;
-      const participants = Array.from(new Set(sessionMessages.map((m: any) => m.author))) as string[];
+      const participants = Array.from(
+        new Set(sessionMessages.map((m: any) => m.author)),
+      ) as string[];
       const rawEvidence = sessionMessages.map((m: any) => m.id || m.content).filter(Boolean);
 
       for (const item of extraction.decisions) {
@@ -259,7 +271,10 @@ export class DiscussionService {
         });
 
         // Conflict / Pivot check with existing active decisions
-        const existingActive = this.repo.getDecisions({ topic: item.topic, state: 'Decided' });
+        const existingActive = await this.repo.getDecisions({
+          topic: item.topic,
+          state: 'Decided',
+        });
         const conflicting = existingActive.length > 0 ? existingActive[0] : undefined;
         const isPivot = Boolean(item.isPivot || conflicting);
 
@@ -322,7 +337,7 @@ export class DiscussionService {
           governancePassed: finalScore >= 3.0,
         };
 
-        this.repo.saveDecision(newDecision);
+        await this.repo.saveDecision(newDecision);
         allExtractedDecisions.push(newDecision);
 
         logger.info(
@@ -353,7 +368,7 @@ export class DiscussionService {
 
     // Update checkpoint for channel
     if (channelId && triggerMessageId) {
-      this.repo.saveCheckpoint(channelId, triggerMessageId);
+      await this.repo.saveCheckpoint(channelId, triggerMessageId);
     }
 
     if (allExtractedDecisions.length === 0) {

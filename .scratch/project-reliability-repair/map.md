@@ -13,6 +13,8 @@ Whole-project review identified persistence, checkpoint, semantic admission, con
 - Delivery and scan coverage: [ADR-0020](../../docs/adr/0020-analysis-delivery-and-scan-coverage.md).
 - Round 3: user approved later-range processing without advancing past gaps, conservative candidate reuse requiring identical evidence and content, explicit manual reanalysis preserving rejection/confirmation history, and stale-review rejection with transactional predecessor checks.
 
+- Database authority resolved: async persistent reads/writes, restart-safe full domain, additive legacy migration and safe conflict-reporting tools. [Ticket 01](issues/01-database-authority-and-migration.md).
+
 ## Implementation map
 
 - [01 — Database authority and migration](./issues/01-database-authority-and-migration.md)

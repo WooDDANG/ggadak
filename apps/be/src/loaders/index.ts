@@ -15,7 +15,7 @@ import { FeedbackController } from '../api/controllers/feedback.controller.js';
 import { DecisionController } from '../api/controllers/decision.controller.js';
 import { DiscussionController } from '../api/controllers/discussion.controller.js';
 import { initExpress } from './express.js';
-import { initPrisma, PrismaService } from './prisma.js';
+import { initPrisma } from './prisma.js';
 import { appLogger } from './logger.js';
 
 export interface LoaderOptions {
@@ -28,12 +28,21 @@ export async function initLoaders({
   expressApp,
   repo: customRepo,
   aiAdapter: customAiAdapter,
-}: LoaderOptions): Promise<{ repo: DecisionRepository; aiAdapter: IAiAdapter; prisma: PrismaService }> {
+}: LoaderOptions): Promise<{
+  repo: DecisionRepository;
+  aiAdapter: IAiAdapter;
+  prisma: import('@prisma/client').PrismaClient;
+}> {
   // 1. Prisma Client Loader
-  const prisma = initPrisma();
-  await prisma.connect().catch((err: any) => {
-    appLogger.warn(`Prisma connect warning: ${err.message}`);
-  });
+  const prisma = customRepo?.prisma ?? initPrisma();
+  await prisma.$connect();
+  // Ensure migrated domain tables are queryable before routes become ready.
+  await Promise.all([
+    prisma.decision.findFirst(),
+    prisma.externalFeedback.findFirst(),
+    prisma.channelCheckpoint.findFirst(),
+    prisma.rejectedEvidenceHash.findFirst(),
+  ]);
 
   // 2. Database Loader
   const repo = customRepo || new DecisionRepository(prisma);

@@ -1,207 +1,217 @@
 import { Service } from 'typedi';
-import { Decision, ExternalFeedback, ReviewAction } from '@ggaddak/shared';
-import { PrismaService } from '../loaders/prisma.js';
+import { PrismaClient, Prisma } from '@prisma/client';
+import { randomUUID } from 'node:crypto';
+import { Decision, DecisionSchema, ExternalFeedback, ReviewAction } from '@ggaddak/shared';
 
+/** Database is authoritative. Every mutation is awaited; no memory fallback exists. */
 @Service()
 export class DecisionRepository {
-  private memDecisions = new Map<string, Decision>();
-  private memCheckpoints = new Map<string, string>();
-  private memFeedbacks: ExternalFeedback[] = [];
-  private memRejectedHashes = new Set<string>();
+  constructor(public readonly prisma: PrismaClient) {}
 
-  constructor(private prisma?: PrismaService) {}
-
-  // --- Checkpoints ---
-  getCheckpoint(channelId: string): string | null {
-    return this.memCheckpoints.get(channelId) || null;
+  async getCheckpoint(channelId: string): Promise<string | null> {
+    return (
+      (await this.prisma.channelCheckpoint.findUnique({ where: { channelId } }))?.lastMessageId ??
+      null
+    );
   }
-
-  saveCheckpoint(channelId: string, lastMessageId: string): void {
-    this.memCheckpoints.set(channelId, lastMessageId);
-    if (this.prisma) {
-      this.prisma.channelCheckpoint
-        .upsert({
-          where: { channelId },
-          update: { lastMessageId, updatedAt: new Date() },
-          create: { channelId, lastMessageId },
-        })
-        .catch(() => {});
-    }
+  async saveCheckpoint(channelId: string, lastMessageId: string): Promise<void> {
+    await this.prisma.channelCheckpoint.upsert({
+      where: { channelId },
+      update: { lastMessageId, updatedAt: new Date() },
+      create: { channelId, lastMessageId },
+    });
   }
-
-  // --- External Feedbacks ---
-  saveFeedback(fb: ExternalFeedback): void {
-    const idx = this.memFeedbacks.findIndex(f => f.id === fb.id);
-    if (idx >= 0) {
-      this.memFeedbacks[idx] = fb;
-    } else {
-      this.memFeedbacks.unshift(fb);
-    }
-
-    if (this.prisma) {
-      this.prisma.externalFeedback
-        .upsert({
-          where: { id: fb.id },
-          update: {
-            source: fb.source,
-            content: fb.content,
-            externalUrl: fb.detail || null,
-          },
-          create: {
-            id: fb.id,
-            decisionId: fb.channelId || 'global',
-            source: fb.source,
-            author: fb.source,
-            content: fb.content,
-            externalUrl: fb.detail || null,
-          },
-        })
-        .catch(() => {});
-    }
+  async saveFeedback(fb: ExternalFeedback): Promise<void> {
+    const data = {
+      decisionId: fb.channelId,
+      channelId: fb.channelId,
+      source: fb.source,
+      author: fb.source,
+      content: fb.content,
+      externalUrl: fb.detail ?? null,
+      domainJson: JSON.stringify(fb),
+      createdAt: new Date(fb.createdAt),
+    };
+    await this.prisma.externalFeedback.upsert({
+      where: { id: fb.id },
+      update: data,
+      create: { id: fb.id, ...data },
+    });
   }
-
-  getRecentFeedbacks(channelId?: string, limit: number = 5): ExternalFeedback[] {
-    let filtered = this.memFeedbacks;
-    if (channelId) {
-      filtered = filtered.filter(f => f.channelId === channelId || f.channelId === 'global');
-    }
-    return filtered.slice(0, limit);
+  async getRecentFeedbacks(channelId?: string, limit = 5): Promise<ExternalFeedback[]> {
+    const records = await this.prisma.externalFeedback.findMany({ orderBy: { createdAt: 'desc' } });
+    return records
+      .map(row =>
+        row.domainJson
+          ? (JSON.parse(row.domainJson) as ExternalFeedback)
+          : {
+              id: row.id,
+              channelId: row.channelId ?? row.decisionId,
+              source: row.source as ExternalFeedback['source'],
+              content: row.content,
+              ...(row.externalUrl ? { detail: row.externalUrl } : {}),
+              createdAt: row.createdAt.toISOString(),
+            },
+      )
+      .filter(fb => !channelId || fb.channelId === channelId || fb.channelId === 'global')
+      .slice(0, limit);
   }
-
-  // --- Anti-Recreation Rejected Evidence Memory ---
-  recordRejectedEvidence(evidenceHash: string): void {
-    this.memRejectedHashes.add(evidenceHash);
-    if (this.prisma) {
-      this.prisma.rejectedEvidenceHash
-        .upsert({
-          where: { evidenceHash },
-          update: { reason: 'rejected' },
-          create: { evidenceHash, reason: 'rejected' },
-        })
-        .catch(() => {});
-    }
+  async recordRejectedEvidence(evidenceHash: string): Promise<void> {
+    await this.prisma.rejectedEvidenceHash.upsert({
+      where: { evidenceHash },
+      update: {},
+      create: { evidenceHash, reason: 'rejected' },
+    });
   }
-
-  isEvidenceRejected(evidenceHash: string): boolean {
-    return this.memRejectedHashes.has(evidenceHash);
+  async isEvidenceRejected(evidenceHash: string): Promise<boolean> {
+    return Boolean(await this.prisma.rejectedEvidenceHash.findUnique({ where: { evidenceHash } }));
   }
-
-  // --- Decisions ---
-  saveDecision(decision: Decision): void {
-    this.memDecisions.set(decision.id, decision);
-
-    if (decision.supersedesId) {
-      const prev = this.memDecisions.get(decision.supersedesId);
-      if (prev) {
-        prev.state = 'Superseded';
-        this.memDecisions.set(prev.id, prev);
-      }
-    }
-
-    if (this.prisma) {
-      this.prisma.decision
-        .upsert({
-          where: { id: decision.id },
-          update: {
-            title: decision.title || decision.topic,
-            decisionSummary: decision.decision,
-            keyReason: decision.rationale,
-            status: decision.state,
-            supersedesId: decision.supersedesId || null,
-            governanceScore: decision.governanceScore || 0,
-            governanceReason: decision.governanceReason || '',
-            governancePassed: decision.governancePassed || false,
-          },
-          create: {
-            id: decision.id,
-            guildId: decision.source?.guildId || 'guild',
-            channelId: decision.source?.channelId || 'chan',
-            messageId: decision.source?.triggerMessageId || 'msg',
-            title: decision.title || decision.topic,
-            decisionSummary: decision.decision,
-            keyReason: decision.rationale,
-            status: decision.state,
-            decisionMaker: decision.approvedBy || 'AI',
-            participants: JSON.stringify(decision.source?.participants || []),
-            alternatives: JSON.stringify(decision.alternatives || []),
-            tags: JSON.stringify([decision.categoryTag || '기타']),
-            supersedesId: decision.supersedesId || null,
-            sourceJumpUrl: decision.source?.messageUrl || '',
-            evidenceSummary: decision.rawTranscript || '',
-            evidenceHash: decision.evidenceHash || '',
-            governanceScore: decision.governanceScore || 0,
-            governanceReason: decision.governanceReason || '',
-            governancePassed: decision.governancePassed || false,
-          },
-        })
-        .catch(() => {});
-    }
+  decodeDecision(row: Prisma.DecisionGetPayload<object>): Decision {
+    if (row.domainJson) return { ...JSON.parse(row.domainJson), version: row.version };
+    const states: Record<string, Decision['state']> = {
+      proposed: 'Proposed',
+      confirmed: 'Decided',
+      rejected: 'Rejected',
+    };
+    return {
+      id: row.id,
+      version: row.version,
+      topic: row.title,
+      title: row.title,
+      decision: row.decisionSummary,
+      rationale: row.keyReason,
+      state: states[row.status] ?? (row.status as Decision['state']),
+      supersedesId: row.supersedesId,
+      supersededById: row.supersededById,
+      rationaleQuotes: [],
+      alternatives: JSON.parse(row.alternatives),
+      categoryTag: JSON.parse(row.tags)[0] ?? '기타',
+      actionItems: [],
+      isPivot: false,
+      approvedBy: row.decisionMaker === 'AI' ? null : row.decisionMaker || null,
+      decisionConfirmedDate: null,
+      feedbackSourceType: null,
+      feedbackSourceDetail: null,
+      feedbackReceivedDate: null,
+      rawEvidence: [],
+      evidenceHash: row.evidenceHash || undefined,
+      rawTranscript: row.evidenceSummary || undefined,
+      source: {
+        guildId: row.guildId,
+        channelId: row.channelId,
+        triggerMessageId: row.messageId,
+        participants: JSON.parse(row.participants),
+        rawMessages: [],
+        ...(row.sourceJumpUrl ? { messageUrl: row.sourceJumpUrl } : {}),
+      },
+      createdAt: row.createdAt.toISOString(),
+      governanceScore: row.governanceScore,
+      governanceReason: row.governanceReason,
+      governancePassed: row.governancePassed,
+    };
   }
-
-  getDecisionById(id: string): Decision | null {
-    return this.memDecisions.get(id) || null;
+  decisionData(decision: Decision) {
+    return {
+      guildId: decision.source.guildId,
+      channelId: decision.source.channelId,
+      messageId: decision.source.triggerMessageId,
+      title: decision.title ?? decision.topic,
+      decisionSummary: decision.decisionContent ?? decision.decision,
+      keyReason: decision.rationale,
+      status: decision.state,
+      decisionMaker: decision.approvedBy ?? '',
+      participants: JSON.stringify(decision.source.participants),
+      alternatives: JSON.stringify(decision.alternatives),
+      tags: JSON.stringify([decision.categoryTag]),
+      supersedesId: decision.supersedesId,
+      supersededById: decision.supersededById ?? null,
+      sourceJumpUrl: decision.source.messageUrl ?? '',
+      evidenceSummary: decision.rawTranscript ?? '',
+      evidenceHash: decision.evidenceHash ?? '',
+      governanceScore: decision.governanceScore ?? 0,
+      governanceReason: decision.governanceReason ?? '',
+      governancePassed: decision.governancePassed ?? false,
+      createdAt: new Date(decision.createdAt),
+      domainJson: JSON.stringify(decision),
+      version: decision.version ?? 1,
+    };
   }
-
-  getDecisions(filter: { topic?: string; state?: string; categoryTag?: string } = {}): Decision[] {
-    let list = Array.from(this.memDecisions.values());
-
-    if (filter.topic) {
-      list = list.filter(d => d.topic.includes(filter.topic!) || d.title?.includes(filter.topic!));
-    }
-    if (filter.state) {
-      list = list.filter(d => d.state === filter.state);
-    }
-    if (filter.categoryTag) {
-      list = list.filter(d => d.categoryTag === filter.categoryTag);
-    }
-
-    return list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  async saveDecision(decision: Decision): Promise<void> {
+    decision = DecisionSchema.parse(decision);
+    const existing = await this.getDecisionById(decision.id);
+    const stored = {
+      ...decision,
+      createdAt: existing?.createdAt ?? decision.createdAt,
+      version: existing ? (existing.version ?? 1) + 1 : (decision.version ?? 1),
+      actionItems: decision.actionItems.map((item, index) => ({
+        ...item,
+        id: item.id ?? existing?.actionItems[index]?.id ?? randomUUID(),
+        state: item.state ?? existing?.actionItems[index]?.state ?? ('unknown' as const),
+      })),
+    };
+    const data = this.decisionData(stored);
+    await this.prisma.decision.upsert({
+      where: { id: decision.id },
+      update: data,
+      create: { id: decision.id, ...data },
+    });
   }
-
-  reviewDecision(
+  async getDecisionById(id: string): Promise<Decision | null> {
+    const row = await this.prisma.decision.findUnique({ where: { id } });
+    return row ? this.decodeDecision(row) : null;
+  }
+  async getDecisions(
+    filter: { topic?: string; state?: string; categoryTag?: string } = {},
+  ): Promise<Decision[]> {
+    return (await this.prisma.decision.findMany({ orderBy: { createdAt: 'desc' } }))
+      .map(row => this.decodeDecision(row))
+      .filter(
+        d =>
+          (!filter.topic || d.topic.includes(filter.topic) || d.title?.includes(filter.topic)) &&
+          (!filter.state || d.state === filter.state) &&
+          (!filter.categoryTag || d.categoryTag === filter.categoryTag),
+      );
+  }
+  async reviewDecision(
     id: string,
     action: ReviewAction['action'],
     params: Omit<ReviewAction, 'action'> = {},
-  ): Decision | null {
-    const existing = this.getDecisionById(id);
+  ): Promise<Decision | null> {
+    const existing = await this.getDecisionById(id);
     if (!existing) return null;
-
-    const now = new Date().toISOString();
-
-    if (action === 'confirm') {
-      existing.state = 'Decided';
-      existing.approvedBy = params.approvedBy || 'Reviewer';
-      existing.decisionConfirmedDate = now;
-      if (params.title) existing.title = params.title;
-      if (params.decisionContent) existing.decisionContent = params.decisionContent;
-      if (params.rationale) existing.rationale = params.rationale;
-      if (params.rationaleSummary) existing.rationaleSummary = params.rationaleSummary;
-      if (params.rationaleQuotes) existing.rationaleQuotes = params.rationaleQuotes;
-      if (params.categoryTag) existing.categoryTag = params.categoryTag;
-    } else if (action === 'defer') {
-      existing.state = 'Deferred';
-    } else if (action === 'reject') {
-      existing.state = 'Rejected';
-      if (existing.evidenceHash) {
-        this.recordRejectedEvidence(existing.evidenceHash);
+    const updated = { ...existing };
+    if (action === 'confirm' || action === 'edit') {
+      for (const field of [
+        'title',
+        'decisionContent',
+        'rationale',
+        'rationaleSummary',
+        'rationaleQuotes',
+        'categoryTag',
+      ] as const) {
+        if (params[field] !== undefined) Object.assign(updated, { [field]: params[field] });
       }
-    } else if (action === 'edit') {
-      if (params.title) existing.title = params.title;
-      if (params.decisionContent) existing.decisionContent = params.decisionContent;
-      if (params.rationale) existing.rationale = params.rationale;
-      if (params.rationaleSummary) existing.rationaleSummary = params.rationaleSummary;
-      if (params.rationaleQuotes) existing.rationaleQuotes = params.rationaleQuotes;
-      if (params.categoryTag) existing.categoryTag = params.categoryTag;
     }
-
-    this.saveDecision(existing);
-    return existing;
+    if (action === 'confirm') {
+      updated.state = 'Decided';
+      updated.approvedBy = params.approvedBy ?? 'Reviewer';
+      updated.decisionConfirmedDate = new Date().toISOString();
+    }
+    if (action === 'defer') updated.state = 'Deferred';
+    if (action === 'reject') updated.state = 'Rejected';
+    await this.prisma.$transaction(async tx => {
+      const data = this.decisionData({ ...updated, version: (existing.version ?? 1) + 1 });
+      await tx.decision.update({ where: { id }, data });
+      if (action === 'reject' && updated.evidenceHash)
+        await tx.rejectedEvidenceHash.upsert({
+          where: { evidenceHash: updated.evidenceHash },
+          update: {},
+          create: { evidenceHash: updated.evidenceHash, reason: 'rejected' },
+        });
+    });
+    return this.getDecisionById(id);
   }
-
-  close(): void {
-    this.memDecisions.clear();
-    this.memCheckpoints.clear();
-    this.memFeedbacks = [];
-    this.memRejectedHashes.clear();
+  async close(): Promise<void> {
+    await this.prisma.$disconnect();
   }
 }

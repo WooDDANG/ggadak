@@ -20,6 +20,11 @@ export const AlternativeOptionSchema = z.object({
 });
 
 export const ActionItemSchema = z.object({
+  id: z.string().optional(),
+  state: z.enum(['unknown', 'open', 'completed', 'canceled', 'transferred']).optional(),
+  transferredFromDecisionId: z.string().optional(),
+  transferredFromActionItemId: z.string().optional(),
+  transferredToDecisionId: z.string().optional(),
   task: z.string().min(1),
   assignee: z.string().optional(),
   dueDate: z.string().optional(),
@@ -46,6 +51,8 @@ export const DiscordSourceSchema = z.object({
 
 export const DecisionSchema = z.object({
   id: z.string(),
+  version: z.number().int().positive().optional(),
+  supersededById: z.string().nullable().optional(),
   // Core Decision Content
   topic: z.string().min(1),
   decision: z.string().min(1),

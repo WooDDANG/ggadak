@@ -27,7 +27,7 @@ export class DecisionController extends Controller {
     @Query() state?: string,
     @Query() categoryTag?: string,
   ): Promise<DecisionListResponseDto> {
-    const decisions = this.service.getDecisions({ topic, state, categoryTag });
+    const decisions = await this.service.getDecisions({ topic, state, categoryTag });
     return { decisions };
   }
 
@@ -37,7 +37,7 @@ export class DecisionController extends Controller {
     @Body() body: ReviewDecisionDto,
   ): Promise<ReviewDecisionResponseDto> {
     const { action, approvedBy, title, decisionContent, rationale, categoryTag } = body;
-    const updated = this.service.reviewDecision(id, action, {
+    const updated = await this.service.reviewDecision(id, action, {
       approvedBy,
       title,
       decisionContent,
@@ -51,20 +51,16 @@ export class DecisionController extends Controller {
   }
 
   @Post('decisions/conflict')
-  public async resolve(
-    @Body() body: ResolveConflictDto,
-  ): Promise<{ status: string }> {
-    this.service.resolveConflict(body.decisionId, body.conflictingId, body.resolution);
+  public async resolve(@Body() body: ResolveConflictDto): Promise<{ status: string }> {
+    await this.service.resolveConflict(body.decisionId, body.conflictingId, body.resolution);
     return { status: 'ok' };
   }
 
   @Post('webhooks/decisions')
   @SuccessResponse(201, 'Created')
-  public async webhook(
-    @Body() body: DecisionWebhookDto,
-  ): Promise<{ status: string; id: string }> {
+  public async webhook(@Body() body: DecisionWebhookDto): Promise<{ status: string; id: string }> {
     const decision = body.payload;
-    this.service.saveDecision(decision);
+    await this.service.saveDecision(decision);
     logger.info(`[Webhook] Successfully saved decision [${decision.id}] Topic="${decision.topic}"`);
     return { status: 'ok', id: decision.id };
   }

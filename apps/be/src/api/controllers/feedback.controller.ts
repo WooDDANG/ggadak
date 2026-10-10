@@ -1,10 +1,7 @@
 import { Controller, Route, Tags, Get, Post, Body, Query, SuccessResponse } from 'tsoa';
 import { Service } from 'typedi';
 import { FeedbackService } from '../../services/feedback.service.js';
-import {
-  CreateFeedbackDto,
-  FeedbackListResponseDto,
-} from '../../dto/feedback.dto.js';
+import { CreateFeedbackDto, FeedbackListResponseDto } from '../../dto/feedback.dto.js';
 
 @Tags('Feedbacks')
 @Route('api/feedbacks')
@@ -19,7 +16,7 @@ export class FeedbackController extends Controller {
     @Query() channelId?: string,
     @Query() limit?: number,
   ): Promise<FeedbackListResponseDto> {
-    const feedbacks = this.service.getFeedbacks(channelId, limit || 10);
+    const feedbacks = await this.service.getFeedbacks(channelId, limit || 10);
     return { feedbacks };
   }
 
@@ -28,7 +25,7 @@ export class FeedbackController extends Controller {
   public async createFeedback(
     @Body() body: CreateFeedbackDto,
   ): Promise<{ status: string; id: string }> {
-    this.service.saveFeedback(body);
+    await this.service.saveFeedback(body);
     return { status: 'ok', id: body.id };
   }
 }
