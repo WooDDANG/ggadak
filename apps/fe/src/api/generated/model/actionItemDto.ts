@@ -4,8 +4,14 @@
  * @ggaddak/be
  * OpenAPI spec version: 1.0.0
  */
+import type { ActionItemDtoState } from './actionItemDtoState';
 
 export interface ActionItemDto {
+  id?: string;
+  state?: ActionItemDtoState;
+  transferredFromDecisionId?: string;
+  transferredFromActionItemId?: string;
+  transferredToDecisionId?: string;
   task: string;
   assignee?: string;
   dueDate?: string;

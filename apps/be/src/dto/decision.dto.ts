@@ -26,6 +26,8 @@ export interface DecisionItemDto {
   title?: string;
   decisionContent?: string;
   rationale: string;
+  rationaleSummary?: string;
+  rationaleQuotes?: string[];
   alternatives?: AlternativeItemDto[];
   categoryTag?: '타깃' | '문제정의' | '기능' | '기술' | 'BM' | '기타';
   actionItems?: ActionItemDto[];

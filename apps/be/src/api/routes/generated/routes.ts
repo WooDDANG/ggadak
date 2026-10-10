@@ -116,6 +116,8 @@ const models: TsoaRoute.Models = {
             "title": {"dataType":"string"},
             "decisionContent": {"dataType":"string"},
             "rationale": {"dataType":"string","required":true},
+            "rationaleSummary": {"dataType":"string"},
+            "rationaleQuotes": {"dataType":"array","array":{"dataType":"string"}},
             "alternatives": {"dataType":"array","array":{"dataType":"refObject","ref":"AlternativeItemDto"}},
             "categoryTag": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["타깃"]},{"dataType":"enum","enums":["문제정의"]},{"dataType":"enum","enums":["기능"]},{"dataType":"enum","enums":["기술"]},{"dataType":"enum","enums":["BM"]},{"dataType":"enum","enums":["기타"]}]},
             "actionItems": {"dataType":"array","array":{"dataType":"refObject","ref":"ActionItemDto"}},

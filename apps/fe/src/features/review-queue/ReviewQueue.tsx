@@ -1,6 +1,16 @@
 import React from 'react';
 import { Decision, ReviewAction } from '@ggaddak/shared';
-import { Check, Clock, X, MessageSquare, AlertTriangle, ExternalLink, Quote, Sparkles, FileText } from 'lucide-react';
+import {
+  Check,
+  Clock,
+  X,
+  MessageSquare,
+  AlertTriangle,
+  ExternalLink,
+  Quote,
+  Sparkles,
+  FileText,
+} from 'lucide-react';
 import { Badge } from '../../components/Badge';
 import { DiscordTranscriptViewer } from '../../components/DiscordTranscriptViewer';
 
@@ -30,7 +40,8 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({ decisions, onReview, i
         </div>
         <h3 className="text-lg font-bold text-white mb-1">검토 대기 중인 의사결정이 없습니다</h3>
         <p className="text-sm text-slate-400 mb-6">
-          Discord 채널에서 📌 이모지를 달거나 합의 키워드(~합시다, 결정 등)가 나오면 AI가 자동으로 후보를 추출합니다.
+          Discord 채널에서 📌 이모지를 달거나 합의 키워드(~합시다, 결정 등)가 나오면 AI가 자동으로
+          후보를 추출합니다.
         </p>
       </div>
     );
@@ -42,7 +53,8 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({ decisions, onReview, i
         <div>
           <h2 className="text-xl font-bold text-white tracking-tight">PM 검토 대기 큐</h2>
           <p className="text-sm text-slate-400">
-            AI가 Discord 대화에서 추출한 결정 후보입니다. 검토 후 확정(Confirm), 보류(Defer), 또는 반려(Reject)하세요.
+            AI가 Discord 대화에서 추출한 결정 후보입니다. 검토 후 확정(Confirm), 보류(Defer), 또는
+            반려(Reject)하세요.
           </p>
         </div>
         <Badge variant="draft">{draftDecisions.length}건 대기 중</Badge>
@@ -78,7 +90,11 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({ decisions, onReview, i
               {/* Action Buttons */}
               <div className="flex items-center space-x-2">
                 <button
-                  onClick={() => onReview(dec.id, { action: 'confirm' })}
+                  disabled={dec.version === undefined}
+                  onClick={() => {
+                    if (dec.version !== undefined)
+                      return onReview(dec.id, { action: 'confirm', expectedVersion: dec.version });
+                  }}
                   className="flex items-center space-x-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold shadow-lg shadow-emerald-600/20 transition duration-150"
                   title="의사결정 확정"
                 >
@@ -86,7 +102,11 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({ decisions, onReview, i
                   <span>승인 (Confirm)</span>
                 </button>
                 <button
-                  onClick={() => onReview(dec.id, { action: 'defer' })}
+                  disabled={dec.version === undefined}
+                  onClick={() => {
+                    if (dec.version !== undefined)
+                      return onReview(dec.id, { action: 'defer', expectedVersion: dec.version });
+                  }}
                   className="flex items-center space-x-1.5 px-3.5 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-xl text-xs font-semibold transition duration-150"
                   title="추가 논의를 위해 보류"
                 >
@@ -94,7 +114,11 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({ decisions, onReview, i
                   <span>보류 (Defer)</span>
                 </button>
                 <button
-                  onClick={() => onReview(dec.id, { action: 'reject' })}
+                  disabled={dec.version === undefined}
+                  onClick={() => {
+                    if (dec.version !== undefined)
+                      return onReview(dec.id, { action: 'reject', expectedVersion: dec.version });
+                  }}
                   className="flex items-center space-x-1.5 px-3.5 py-2 bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 rounded-xl text-xs font-semibold transition duration-150"
                   title="결정 후보 반려 (동일 근거 재추출 방지)"
                 >
@@ -173,8 +197,11 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({ decisions, onReview, i
                 <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
                 <div>
                   <span className="font-bold">
-                    거버넌스 합의 평가 (점수: {typeof dec.governanceScore === 'number' ? dec.governanceScore.toFixed(1) : 'N/A'}/4.0) —{' '}
-                    {dec.governancePassed ? '합의 통과' : '주의/검토 필요'}:
+                    거버넌스 합의 평가 (점수:{' '}
+                    {typeof dec.governanceScore === 'number'
+                      ? dec.governanceScore.toFixed(1)
+                      : 'N/A'}
+                    /4.0) — {dec.governancePassed ? '합의 통과' : '주의/검토 필요'}:
                   </span>{' '}
                   {dec.governanceReason}
                 </div>
@@ -188,9 +215,7 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({ decisions, onReview, i
             <div className="mt-4 pt-3 border-t border-slate-700/50 flex items-center justify-between text-xs text-slate-400">
               <div className="flex items-center space-x-4">
                 <span>추출 시각: {new Date(dec.createdAt).toLocaleString()}</span>
-                {dec.source?.channelName && (
-                  <span>채널: #{dec.source.channelName}</span>
-                )}
+                {dec.source?.channelName && <span>채널: #{dec.source.channelName}</span>}
               </div>
               {dec.source?.messageUrl && (
                 <a

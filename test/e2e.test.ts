@@ -85,6 +85,7 @@ describe('E2E Full Pipeline: Discord Messages ➔ Backend AI Core ➔ Review Que
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'confirm',
+          expectedVersion: postgresDec.version,
           approvedBy: 'reviewer_wooddang',
         }),
       },
@@ -107,7 +108,7 @@ describe('E2E Full Pipeline: Discord Messages ➔ Backend AI Core ➔ Review Que
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'reject' }),
+        body: JSON.stringify({ action: 'reject', expectedVersion: fastifyDec.version }),
       },
     );
     assert.strictEqual(rejectRes.status, 200);
