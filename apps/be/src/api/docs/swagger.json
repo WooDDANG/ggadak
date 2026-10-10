@@ -159,6 +159,28 @@
 			},
 			"ActionItemDto": {
 				"properties": {
+					"id": {
+						"type": "string"
+					},
+					"state": {
+						"type": "string",
+						"enum": [
+							"unknown",
+							"open",
+							"completed",
+							"canceled",
+							"transferred"
+						]
+					},
+					"transferredFromDecisionId": {
+						"type": "string"
+					},
+					"transferredFromActionItemId": {
+						"type": "string"
+					},
+					"transferredToDecisionId": {
+						"type": "string"
+					},
 					"task": {
 						"type": "string"
 					},
@@ -186,6 +208,14 @@
 					"id": {
 						"type": "string"
 					},
+					"version": {
+						"type": "number",
+						"format": "double"
+					},
+					"supersededById": {
+						"type": "string",
+						"nullable": true
+					},
 					"topic": {
 						"type": "string"
 					},
@@ -200,6 +230,15 @@
 					},
 					"rationale": {
 						"type": "string"
+					},
+					"rationaleSummary": {
+						"type": "string"
+					},
+					"rationaleQuotes": {
+						"items": {
+							"type": "string"
+						},
+						"type": "array"
 					},
 					"alternatives": {
 						"items": {
@@ -484,6 +523,61 @@
 							"edit"
 						]
 					},
+					"expectedVersion": {
+						"type": "number",
+						"format": "double"
+					},
+					"resolution": {
+						"type": "string",
+						"enum": [
+							"independent",
+							"replace"
+						]
+					},
+					"predecessorId": {
+						"type": "string"
+					},
+					"predecessorVersion": {
+						"type": "number",
+						"format": "double"
+					},
+					"taskDispositions": {
+						"items": {
+							"properties": {
+								"disposition": {
+									"type": "string",
+									"enum": [
+										"cancel",
+										"transfer"
+									]
+								},
+								"classification": {
+									"type": "string",
+									"enum": [
+										"open",
+										"completed"
+									]
+								},
+								"actionItemId": {
+									"type": "string"
+								}
+							},
+							"required": [
+								"actionItemId"
+							],
+							"type": "object"
+						},
+						"type": "array"
+					},
+					"rationaleSummary": {
+						"type": "string"
+					},
+					"rationaleQuotes": {
+						"items": {
+							"type": "string"
+						},
+						"type": "array"
+					},
 					"approvedBy": {
 						"type": "string"
 					},
@@ -509,7 +603,8 @@
 					}
 				},
 				"required": [
-					"action"
+					"action",
+					"expectedVersion"
 				],
 				"type": "object",
 				"additionalProperties": false
@@ -528,12 +623,49 @@
 							"supersede",
 							"coexist"
 						]
+					},
+					"expectedVersion": {
+						"type": "number",
+						"format": "double"
+					},
+					"predecessorVersion": {
+						"type": "number",
+						"format": "double"
+					},
+					"taskDispositions": {
+						"items": {
+							"properties": {
+								"disposition": {
+									"type": "string",
+									"enum": [
+										"cancel",
+										"transfer"
+									]
+								},
+								"classification": {
+									"type": "string",
+									"enum": [
+										"open",
+										"completed"
+									]
+								},
+								"actionItemId": {
+									"type": "string"
+								}
+							},
+							"required": [
+								"actionItemId"
+							],
+							"type": "object"
+						},
+						"type": "array"
 					}
 				},
 				"required": [
 					"decisionId",
 					"conflictingId",
-					"resolution"
+					"resolution",
+					"expectedVersion"
 				],
 				"type": "object",
 				"additionalProperties": false

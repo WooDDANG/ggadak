@@ -1,7 +1,14 @@
 import { Service } from 'typedi';
 import { PrismaClient, Prisma } from '@prisma/client';
+import { BadRequestError, ConflictError } from '../errors/AppError.js';
 import { randomUUID } from 'node:crypto';
-import { Decision, DecisionSchema, ExternalFeedback, ReviewAction } from '@ggaddak/shared';
+import {
+  Decision,
+  DecisionSchema,
+  ExternalFeedback,
+  ReviewAction,
+  ReviewActionSchema,
+} from '@ggaddak/shared';
 
 /** Database is authoritative. Every mutation is awaited; no memory fallback exists. */
 @Service()
@@ -139,6 +146,14 @@ export class DecisionRepository {
   async saveDecision(decision: Decision): Promise<void> {
     decision = DecisionSchema.parse(decision);
     const existing = await this.getDecisionById(decision.id);
+    if (
+      existing &&
+      (existing.version !== decision.version ||
+        existing.state !== decision.state ||
+        existing.supersededById !== decision.supersededById ||
+        existing.supersedesId !== decision.supersedesId)
+    )
+      throw new ConflictError('Use versioned review for decision transitions');
     const stored = {
       ...decision,
       createdAt: existing?.createdAt ?? decision.createdAt,
@@ -150,11 +165,15 @@ export class DecisionRepository {
       })),
     };
     const data = this.decisionData(stored);
-    await this.prisma.decision.upsert({
-      where: { id: decision.id },
-      update: data,
-      create: { id: decision.id, ...data },
-    });
+    if (existing) {
+      const result = await this.prisma.decision.updateMany({
+        where: { id: decision.id, version: existing.version },
+        data,
+      });
+      if (result.count !== 1) throw new ConflictError('Stale saved decision version');
+    } else {
+      await this.prisma.decision.create({ data: { id: decision.id, ...data } });
+    }
   }
   async getDecisionById(id: string): Promise<Decision | null> {
     const row = await this.prisma.decision.findUnique({ where: { id } });
@@ -175,10 +194,20 @@ export class DecisionRepository {
   async reviewDecision(
     id: string,
     action: ReviewAction['action'],
-    params: Omit<ReviewAction, 'action'> = {},
+    params: Omit<ReviewAction, 'action'>,
   ): Promise<Decision | null> {
+    const parsed = ReviewActionSchema.safeParse({ action, ...params });
+    if (!parsed.success)
+      throw new BadRequestError('Invalid versioned review', parsed.error.flatten());
+    params = parsed.data;
     const existing = await this.getDecisionById(id);
     if (!existing) return null;
+    if (params.expectedVersion !== existing.version)
+      throw new ConflictError('Stale candidate version');
+    if (!['Draft', 'Proposed', 'Discussing', 'Deferred'].includes(existing.state))
+      throw new ConflictError('Decision is no longer reviewable');
+    if (params.resolution === 'replace' && action !== 'confirm')
+      throw new BadRequestError('Replacement requires confirmation');
     const updated = { ...existing };
     if (action === 'confirm' || action === 'edit') {
       for (const field of [
@@ -199,16 +228,103 @@ export class DecisionRepository {
     }
     if (action === 'defer') updated.state = 'Deferred';
     if (action === 'reject') updated.state = 'Rejected';
-    await this.prisma.$transaction(async tx => {
-      const data = this.decisionData({ ...updated, version: (existing.version ?? 1) + 1 });
-      await tx.decision.update({ where: { id }, data });
-      if (action === 'reject' && updated.evidenceHash)
-        await tx.rejectedEvidenceHash.upsert({
-          where: { evidenceHash: updated.evidenceHash },
-          update: {},
-          create: { evidenceHash: updated.evidenceHash, reason: 'rejected' },
+    // A saved suggestion is not a replacement link until explicitly approved.
+    if (action === 'confirm' && params.resolution !== 'replace') updated.supersedesId = null;
+    await this.prisma
+      .$transaction(async tx => {
+        if (params.resolution === 'replace') {
+          if (!params.predecessorId || !params.predecessorVersion || params.predecessorId === id)
+            throw new BadRequestError('A distinct predecessor and its version are required');
+          const row = await tx.decision.findUnique({ where: { id: params.predecessorId } });
+          if (!row) throw new ConflictError('Predecessor no longer exists');
+          const predecessor = this.decodeDecision(row);
+          if (
+            predecessor.version !== params.predecessorVersion ||
+            predecessor.state !== 'Decided' ||
+            predecessor.supersededById
+          )
+            throw new ConflictError('Stale or inactive predecessor');
+          if (predecessor.source.guildId !== existing.source.guildId)
+            throw new BadRequestError('Predecessor must belong to the same guild');
+          const choices = new Map(
+            (params.taskDispositions ?? []).map(choice => [choice.actionItemId, choice]),
+          );
+          if (
+            choices.size !== (params.taskDispositions ?? []).length ||
+            [...choices.keys()].some(key => !predecessor.actionItems.some(item => item.id === key))
+          )
+            throw new BadRequestError('Invalid or duplicate Action Item disposition');
+          predecessor.actionItems = predecessor.actionItems.map(item => {
+            const choice = item.id ? choices.get(item.id) : undefined;
+            let state = item.state ?? 'unknown';
+            if (state === 'unknown') {
+              if (!choice?.classification)
+                throw new BadRequestError('Classify unknown Action Item completion');
+              state = choice.classification;
+            } else if (choice?.classification && choice.classification !== state) {
+              throw new BadRequestError('Only unknown Action Items require classification');
+            }
+            if (state !== 'open') {
+              if (choice?.disposition)
+                throw new BadRequestError('Only unfinished Action Items can be disposed');
+              return { ...item, state };
+            }
+            if (!choice?.disposition)
+              throw new BadRequestError('Every unfinished Action Item needs cancel or transfer');
+            if (choice.disposition === 'transfer') {
+              updated.actionItems = [
+                ...updated.actionItems,
+                {
+                  ...item,
+                  id: randomUUID(),
+                  state: 'open',
+                  transferredFromDecisionId: predecessor.id,
+                  transferredFromActionItemId: item.id,
+                  transferredToDecisionId: undefined,
+                },
+              ];
+              return { ...item, state: 'transferred' as const, transferredToDecisionId: id };
+            }
+            return { ...item, state: 'canceled' as const };
+          });
+          predecessor.state = 'Superseded';
+          predecessor.supersededById = id;
+          predecessor.version = params.predecessorVersion + 1;
+          const replaced = await tx.decision.updateMany({
+            where: {
+              id: predecessor.id,
+              version: params.predecessorVersion,
+              status: 'Decided',
+              supersededById: null,
+            },
+            data: this.decisionData(predecessor),
+          });
+          if (replaced.count !== 1) throw new ConflictError('Predecessor was already replaced');
+          updated.supersedesId = predecessor.id;
+        }
+        const data = this.decisionData({ ...updated, version: (existing.version ?? 1) + 1 });
+        const result = await tx.decision.updateMany({
+          where: { id, version: params.expectedVersion },
+          data,
         });
-    });
+        if (result.count !== 1) throw new ConflictError('Stale candidate version');
+        if (action === 'reject' && updated.evidenceHash)
+          await tx.rejectedEvidenceHash.upsert({
+            where: { evidenceHash: updated.evidenceHash },
+            update: {},
+            create: { evidenceHash: updated.evidenceHash, reason: 'rejected' },
+          });
+      })
+      .catch(error => {
+        if (
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          ['P2028', 'P2034', 'P1008'].includes(error.code)
+        )
+          throw new ConflictError(
+            'Concurrent review changed this decision; reload before reviewing',
+          );
+        throw error;
+      });
     return this.getDecisionById(id);
   }
   async close(): Promise<void> {

@@ -14,6 +14,7 @@ export interface AnalyzeDiscussionRequestDto {
   triggerMessageId?: string;
   messageUrl?: string;
   isManualOverride?: boolean;
+  traceId?: string;
   score?: number;
   participantCount?: number;
   reactionsCount?: number;

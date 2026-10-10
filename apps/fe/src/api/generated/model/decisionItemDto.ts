@@ -12,11 +12,16 @@ import type { RecordStringAny } from './recordStringAny';
 
 export interface DecisionItemDto {
   id: string;
+  version?: number;
+  /** @nullable */
+  supersededById?: string | null;
   topic: string;
   decision: string;
   title?: string;
   decisionContent?: string;
   rationale: string;
+  rationaleSummary?: string;
+  rationaleQuotes?: string[];
   alternatives?: AlternativeItemDto[];
   categoryTag?: DecisionItemDtoCategoryTag;
   actionItems?: ActionItemDto[];

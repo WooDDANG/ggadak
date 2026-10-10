@@ -5,9 +5,13 @@
  * OpenAPI spec version: 1.0.0
  */
 import type { ResolveConflictDtoResolution } from './resolveConflictDtoResolution';
+import type { ResolveConflictDtoTaskDispositionsItem } from './resolveConflictDtoTaskDispositionsItem';
 
 export interface ResolveConflictDto {
   decisionId: string;
   conflictingId: string;
   resolution: ResolveConflictDtoResolution;
+  expectedVersion: number;
+  predecessorVersion?: number;
+  taskDispositions?: ResolveConflictDtoTaskDispositionsItem[];
 }

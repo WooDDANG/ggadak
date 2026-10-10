@@ -6,9 +6,18 @@
  */
 import type { ReviewDecisionDtoAction } from './reviewDecisionDtoAction';
 import type { ReviewDecisionDtoCategoryTag } from './reviewDecisionDtoCategoryTag';
+import type { ReviewDecisionDtoResolution } from './reviewDecisionDtoResolution';
+import type { ReviewDecisionDtoTaskDispositionsItem } from './reviewDecisionDtoTaskDispositionsItem';
 
 export interface ReviewDecisionDto {
   action: ReviewDecisionDtoAction;
+  expectedVersion: number;
+  resolution?: ReviewDecisionDtoResolution;
+  predecessorId?: string;
+  predecessorVersion?: number;
+  taskDispositions?: ReviewDecisionDtoTaskDispositionsItem[];
+  rationaleSummary?: string;
+  rationaleQuotes?: string[];
   approvedBy?: string;
   title?: string;
   decisionContent?: string;
