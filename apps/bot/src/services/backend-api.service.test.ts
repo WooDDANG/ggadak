@@ -24,7 +24,8 @@ test('failed delivery survives restart and retry retains its Analysis Request an
       sent.push(JSON.parse(init!.body as string));
       return Response.json({ found: true, decisions: [{ id: 'candidate' }] });
     });
-    const retried = await restarted.retryPendingAnalyses();
+    const retriedResult = await restarted.retryAnalysisRequest(sent[0].requestId);
+    const retried = [{ result: retriedResult }];
     assert.equal(retried[0].result.decisions[0].id, 'candidate');
     assert.deepEqual(sent[1], sent[0]);
     assert.ok(sent[0].requestId);
@@ -158,11 +159,87 @@ test('scan failure never advances checkpoint; a successful no-decision retry can
     await assert.rejects(harvester.scanChannel(channel, DEFAULT_HARVESTING_POLICY), /503/);
     assert.equal(checkpointWrites, 0);
     offline = false;
+    const retained = JSON.parse(
+      await (
+        await import('node:fs/promises')
+      ).readFile(join(directory, (await readdir(directory))[0]), 'utf8'),
+    );
+    await api.retryAnalysisRequest(retained.payload.requestId);
     assert.deepEqual(await harvester.scanChannel(channel, DEFAULT_HARVESTING_POLICY), {
       scannedCount: 1,
       decisionsCount: 0,
     });
     assert.equal(checkpointWrites, 1);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test('permanent failure retained first in journal does not starve a later legacy pending delivery', async () => {
+  const { writeFile } = await import('node:fs/promises');
+  const directory = await mkdtemp(join(tmpdir(), 'analysis-fairness-'));
+  const sent: string[] = [];
+  try {
+    for (const [filename, requestId] of [
+      ['00.json', 'bad'],
+      ['01.json', 'good'],
+    ]) {
+      await writeFile(join(directory, filename), JSON.stringify({ requestId, rawMessages: [] }));
+    }
+    const api = new BackendApiService('http://fixture', directory, async (_url, init) => {
+      const id = JSON.parse(init!.body as string).requestId;
+      sent.push(id);
+      return id === 'bad'
+        ? new Response('', { status: 400 })
+        : Response.json({ found: false, decisions: [] });
+    });
+    assert.deepEqual(await api.retryPendingAnalyses(1), []);
+    assert.equal((await api.retryPendingAnalyses(1))[0].payload.requestId, 'good');
+    assert.deepEqual(sent, ['bad', 'good']);
+    assert.equal((await readdir(directory)).length, 1);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test('transient retry budget and exponential backoff survive restart; explicit retry preserves original ID and payload', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'analysis-budget-'));
+  let clock = 1000;
+  let online = false;
+  const sent: any[] = [];
+  const transport: typeof fetch = async (_url, init) => {
+    sent.push(JSON.parse(init!.body as string));
+    return online
+      ? Response.json({ found: true, decisions: [{ id: 'recovered' }] })
+      : new Response('', { status: 503 });
+  };
+  const create = () => new BackendApiService('http://fixture', directory, transport, () => clock);
+  const payload = {
+    requestId: 'budget',
+    rawMessages: [{ id: '100', content: 'original' }],
+    traceId: 'original-trace',
+  };
+  try {
+    await assert.rejects(create().analyzeDiscussion(payload), /503/);
+    await create().retryPendingAnalyses();
+    assert.equal(sent.length, 1);
+    clock += 60_000;
+    await create().retryPendingAnalyses();
+    assert.equal(sent.length, 2);
+    clock += 60_000;
+    await create().retryPendingAnalyses();
+    assert.equal(sent.length, 2);
+    clock += 60_000;
+    await create().retryPendingAnalyses();
+    assert.equal(sent.length, 3);
+    clock += 86400_000;
+    await create().retryPendingAnalyses();
+    assert.equal(sent.length, 3);
+    assert.equal((await readdir(directory)).length, 1);
+    online = true;
+    assert.equal((await create().retryAnalysisRequest('budget')).decisions[0].id, 'recovered');
+    assert.deepEqual(sent, [payload, payload, payload, payload]);
+    assert.equal((await readdir(directory)).length, 0);
   } finally {
     await rm(directory, { recursive: true, force: true });
   }

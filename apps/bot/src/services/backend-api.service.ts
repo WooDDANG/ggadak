@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { mkdir, readFile, readdir, link, open, unlink } from 'node:fs/promises';
+import { mkdir, readFile, readdir, link, open, unlink, rename } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import {
   HarvestingPolicyConfig,
@@ -25,6 +25,14 @@ function deliveryIdentity(payload: any): string {
   return stablePayload(identity);
 }
 
+interface DeliveryRecord {
+  payload: any;
+  attempts: number;
+  nextAttemptAt: number;
+  stopped: boolean;
+  lastError?: string;
+}
+
 export class BackendApiService {
   private backendUrl: string;
 
@@ -34,6 +42,7 @@ export class BackendApiService {
       process.env.ANALYSIS_DELIVERY_DIR || '.data/analysis-deliveries',
     ),
     private readonly transport: typeof fetch = fetch,
+    private readonly now: () => number = Date.now,
   ) {
     this.backendUrl = backendUrl.replace(/\/+$/, '');
   }
@@ -83,16 +92,21 @@ export class BackendApiService {
       `${createHash('sha256').update(requestId).digest('hex')}.json`,
     );
     await mkdir(this.pendingDirectory, { recursive: true, mode: 0o700 });
-    let delivery: typeof payload & { requestId: string };
+    let record: DeliveryRecord;
     try {
-      delivery = JSON.parse(await readFile(filename, 'utf8'));
+      record = this.parseDelivery(await readFile(filename, 'utf8'));
     } catch (error: any) {
       if (error.code !== 'ENOENT') throw error;
-      delivery = { ...payload, requestId };
+      record = {
+        payload: { ...payload, requestId },
+        attempts: 0,
+        nextAttemptAt: 0,
+        stopped: false,
+      };
       const temporary = `${filename}.${randomUUID()}.tmp`;
       const file = await open(temporary, 'wx', 0o600);
       try {
-        await file.writeFile(JSON.stringify(delivery));
+        await file.writeFile(JSON.stringify(record));
         await file.sync();
       } finally {
         await file.close();
@@ -101,7 +115,7 @@ export class BackendApiService {
         await link(temporary, filename);
       } catch (error: any) {
         if (error.code !== 'EEXIST') throw error;
-        delivery = JSON.parse(await readFile(filename, 'utf8'));
+        record = this.parseDelivery(await readFile(filename, 'utf8'));
       } finally {
         await unlink(temporary);
       }
@@ -112,29 +126,78 @@ export class BackendApiService {
         await directory.close();
       }
     }
-    if (deliveryIdentity(delivery) !== deliveryIdentity(payload))
+    if (deliveryIdentity(record.payload) !== deliveryIdentity(payload))
       throw new Error('Analysis Request ID already has a different payload');
-    return this.deliverAnalysis(delivery, filename);
+    return this.deliverAnalysis(record, filename);
   }
 
-  private async deliverAnalysis(payload: any, filename: string): Promise<any> {
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    if (payload.traceId) headers['X-Trace-Id'] = payload.traceId;
-    const response = await this.transport(`${this.backendUrl}/api/discussions/analyze`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(50_000),
-    });
-    if (!response.ok) throw new Error(`Backend AI returned status ${response.status}`);
-    const result = (await response.json()) as any;
-    if (typeof result.found !== 'boolean' || !Array.isArray(result.decisions)) {
-      throw new Error('Backend returned an invalid analysis result');
+  private parseDelivery(contents: string): DeliveryRecord {
+    const parsed = JSON.parse(contents);
+    // Older journal files stored a bare request. Preserve that exact payload.
+    return parsed.payload && typeof parsed.attempts === 'number'
+      ? parsed
+      : { payload: parsed, attempts: 0, nextAttemptAt: 0, stopped: false };
+  }
+
+  private async persistDelivery(record: DeliveryRecord, filename: string): Promise<void> {
+    const temporary = `${filename}.${randomUUID()}.tmp`;
+    const file = await open(temporary, 'wx', 0o600);
+    try {
+      await file.writeFile(JSON.stringify(record));
+      await file.sync();
+    } finally {
+      await file.close();
     }
-    await unlink(filename).catch((error: any) => {
-      if (error.code !== 'ENOENT') throw error;
-    });
-    return result;
+    await rename(temporary, filename);
+    const directory = await open(this.pendingDirectory, 'r');
+    try {
+      await directory.sync();
+    } finally {
+      await directory.close();
+    }
+  }
+
+  private async deliverAnalysis(record: DeliveryRecord, filename: string): Promise<any> {
+    if (record.stopped || record.attempts >= 3)
+      throw new Error('Analysis delivery requires explicit manual retry');
+    if (record.nextAttemptAt > this.now())
+      throw new Error('Analysis delivery waiting for retry backoff');
+    record.attempts++;
+    // An interrupted attempt also consumes its persisted budget and backs off after restart.
+    record.nextAttemptAt = this.now() + 60_000 * 2 ** (record.attempts - 1);
+    if (record.attempts >= 3) record.stopped = true;
+    await this.persistDelivery(record, filename);
+    let permanent = false;
+    try {
+      const payload = record.payload;
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (payload.traceId) headers['X-Trace-Id'] = payload.traceId;
+      const response = await this.transport(`${this.backendUrl}/api/discussions/analyze`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(50_000),
+      });
+      if (!response.ok) {
+        permanent =
+          response.status >= 400 && response.status < 500 && ![408, 429].includes(response.status);
+        throw new Error(`Backend AI returned status ${response.status}`);
+      }
+      const result = (await response.json()) as any;
+      if (typeof result.found !== 'boolean' || !Array.isArray(result.decisions)) {
+        permanent = true;
+        throw new Error('Backend returned an invalid analysis result');
+      }
+      await unlink(filename).catch((error: any) => {
+        if (error.code !== 'ENOENT') throw error;
+      });
+      return result;
+    } catch (error: any) {
+      record.stopped ||= permanent;
+      record.lastError = error.message;
+      await this.persistDelivery(record, filename);
+      throw error;
+    }
   }
 
   async retryPendingAnalyses(limit = 20): Promise<Array<{ payload: any; result: any }>> {
@@ -145,20 +208,51 @@ export class BackendApiService {
       if (error.code === 'ENOENT') return [];
       throw error;
     }
-    const completed: Array<{ payload: any; result: any }> = [];
-    for (const name of filenames
-      .filter(name => name.endsWith('.json'))
-      .sort()
-      .slice(0, limit)) {
+    const eligible: Array<{ record: DeliveryRecord; filename: string }> = [];
+    for (const name of filenames.filter(name => name.endsWith('.json')).sort()) {
       try {
         const filename = join(this.pendingDirectory, name);
-        const payload = JSON.parse(await readFile(filename, 'utf8'));
-        completed.push({ payload, result: await this.deliverAnalysis(payload, filename) });
+        const record = this.parseDelivery(await readFile(filename, 'utf8'));
+        if (!record.stopped && record.attempts < 3 && record.nextAttemptAt <= this.now())
+          eligible.push({ record, filename });
+      } catch (error: any) {
+        logger.warn(`[Analysis retry] Cannot read retained delivery: ${error.message}`);
+      }
+    }
+    // Least-recently-attempted eligible work first; stopped/backoff records consume no batch slots.
+    eligible.sort(
+      (a, b) =>
+        a.record.nextAttemptAt - b.record.nextAttemptAt || a.filename.localeCompare(b.filename),
+    );
+    const completed: Array<{ payload: any; result: any }> = [];
+    for (const { record, filename } of eligible.slice(0, Math.max(0, limit))) {
+      try {
+        completed.push({
+          payload: record.payload,
+          result: await this.deliverAnalysis(record, filename),
+        });
       } catch (error: any) {
         logger.warn(`[Analysis retry] Pending delivery retained: ${error.message}`);
       }
     }
     return completed;
+  }
+
+  /** Explicit user/worker retry resets a stopped request without changing its identity or evidence. */
+  async retryAnalysisRequest(requestId: string): Promise<any> {
+    const names = await readdir(this.pendingDirectory);
+    for (const name of names.filter(name => name.endsWith('.json'))) {
+      const filename = join(this.pendingDirectory, name);
+      const record = this.parseDelivery(await readFile(filename, 'utf8'));
+      if (record.payload.requestId !== requestId) continue;
+      record.attempts = 0;
+      record.nextAttemptAt = 0;
+      record.stopped = false;
+      delete record.lastError;
+      await this.persistDelivery(record, filename);
+      return this.deliverAnalysis(record, filename);
+    }
+    throw new Error('No pending Analysis Request with this ID');
   }
 
   async saveFeedback(payload: {
