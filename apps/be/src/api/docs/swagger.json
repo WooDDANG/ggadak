@@ -192,6 +192,266 @@
 				"type": "object",
 				"description": "From T, pick a set of properties whose keys are in the union K"
 			},
+			"V1ReviewTicketDto": {
+				"description": "A Review Queue ticket is the Decision Candidate itself. Both IDs are identical strings.",
+				"properties": {
+					"id": {
+						"type": "string"
+					},
+					"version": {
+						"type": "number",
+						"format": "double"
+					},
+					"supersededById": {
+						"type": "string"
+					},
+					"topic": {
+						"type": "string"
+					},
+					"decision": {
+						"type": "string"
+					},
+					"title": {
+						"type": "string"
+					},
+					"decisionContent": {
+						"type": "string"
+					},
+					"rationale": {
+						"type": "string"
+					},
+					"rationaleSummary": {
+						"type": "string"
+					},
+					"rationaleQuotes": {
+						"items": {
+							"type": "string"
+						},
+						"type": "array"
+					},
+					"categoryTag": {
+						"type": "string",
+						"enum": [
+							"타깃",
+							"문제정의",
+							"기능",
+							"기술",
+							"BM",
+							"기타"
+						]
+					},
+					"actionItems": {
+						"items": {
+							"$ref": "#/components/schemas/ActionItemDto"
+						},
+						"type": "array"
+					},
+					"state": {
+						"type": "string",
+						"enum": [
+							"Draft",
+							"Proposed",
+							"Discussing",
+							"Decided",
+							"Superseded",
+							"Deferred",
+							"Rejected"
+						]
+					},
+					"supersedesId": {
+						"type": "string"
+					},
+					"isPivot": {
+						"type": "boolean"
+					},
+					"approvedBy": {
+						"type": "string"
+					},
+					"decisionConfirmedDate": {
+						"type": "string"
+					},
+					"feedbackSourceType": {
+						"type": "string"
+					},
+					"feedbackSourceDetail": {
+						"type": "string"
+					},
+					"feedbackReceivedDate": {
+						"type": "string"
+					},
+					"rawEvidence": {
+						"items": {
+							"type": "string"
+						},
+						"type": "array"
+					},
+					"evidenceHash": {
+						"type": "string"
+					},
+					"rawTranscript": {
+						"type": "string"
+					},
+					"source": {
+						"$ref": "#/components/schemas/Record_string.any_"
+					},
+					"messageCreatedAt": {
+						"type": "string"
+					},
+					"createdAt": {
+						"type": "string"
+					},
+					"governanceScore": {
+						"type": "number",
+						"format": "double"
+					},
+					"governanceReason": {
+						"type": "string"
+					},
+					"governancePassed": {
+						"type": "boolean"
+					},
+					"status": {
+						"$ref": "#/components/schemas/DecisionStatus"
+					},
+					"category": {
+						"type": "string"
+					},
+					"confirmedDate": {
+						"type": "string",
+						"nullable": true
+					},
+					"dates": {
+						"properties": {
+							"feedbackDate": {
+								"type": "string",
+								"nullable": true
+							},
+							"confirmedDate": {
+								"type": "string",
+								"nullable": true
+							},
+							"createdDate": {
+								"type": "string"
+							}
+						},
+						"required": [
+							"feedbackDate",
+							"confirmedDate",
+							"createdDate"
+						],
+						"type": "object"
+					},
+					"alternatives": {
+						"items": {
+							"properties": {
+								"reason": {
+									"type": "string"
+								},
+								"name": {
+									"type": "string"
+								},
+								"id": {
+									"type": "string"
+								}
+							},
+							"required": [
+								"reason",
+								"name",
+								"id"
+							],
+							"type": "object"
+						},
+						"type": "array"
+					},
+					"ticketId": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"id",
+					"topic",
+					"decision",
+					"rationale",
+					"state",
+					"createdAt",
+					"status",
+					"category",
+					"confirmedDate",
+					"dates",
+					"alternatives",
+					"ticketId"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"V1ReviewQueueDto": {
+				"properties": {
+					"items": {
+						"items": {
+							"$ref": "#/components/schemas/V1ReviewTicketDto"
+						},
+						"type": "array"
+					},
+					"pageInfo": {
+						"properties": {
+							"totalPages": {
+								"type": "number",
+								"format": "double"
+							},
+							"totalElements": {
+								"type": "number",
+								"format": "double"
+							},
+							"pageSize": {
+								"type": "number",
+								"format": "double"
+							},
+							"currentPage": {
+								"type": "number",
+								"format": "double"
+							}
+						},
+						"required": [
+							"totalPages",
+							"totalElements",
+							"pageSize",
+							"currentPage"
+						],
+						"type": "object"
+					}
+				},
+				"required": [
+					"items",
+					"pageInfo"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"ApiResponse_V1ReviewQueueDto_": {
+				"description": "Shared v1 response contract. Domain payloads remain typed by each endpoint.",
+				"properties": {
+					"success": {
+						"type": "boolean"
+					},
+					"code": {
+						"type": "string"
+					},
+					"message": {
+						"type": "string"
+					},
+					"data": {
+						"$ref": "#/components/schemas/V1ReviewQueueDto"
+					}
+				},
+				"required": [
+					"success",
+					"code",
+					"message",
+					"data"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
 			"V1DecisionDto": {
 				"properties": {
 					"id": {
@@ -400,6 +660,184 @@
 					"code",
 					"message",
 					"data"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"Pick_ReviewDecisionDto.Exclude_keyofReviewDecisionDto.action-or-approvedBy__": {
+				"properties": {
+					"title": {
+						"type": "string"
+					},
+					"decisionContent": {
+						"type": "string"
+					},
+					"rationale": {
+						"type": "string"
+					},
+					"rationaleSummary": {
+						"type": "string"
+					},
+					"rationaleQuotes": {
+						"items": {
+							"type": "string"
+						},
+						"type": "array"
+					},
+					"categoryTag": {
+						"type": "string",
+						"enum": [
+							"타깃",
+							"문제정의",
+							"기능",
+							"기술",
+							"BM",
+							"기타"
+						]
+					},
+					"expectedVersion": {
+						"type": "number",
+						"format": "double"
+					},
+					"resolution": {
+						"type": "string",
+						"enum": [
+							"independent",
+							"replace"
+						]
+					},
+					"predecessorId": {
+						"type": "string"
+					},
+					"predecessorVersion": {
+						"type": "number",
+						"format": "double"
+					},
+					"taskDispositions": {
+						"items": {
+							"properties": {
+								"disposition": {
+									"type": "string",
+									"enum": [
+										"cancel",
+										"transfer"
+									]
+								},
+								"classification": {
+									"type": "string",
+									"enum": [
+										"open",
+										"completed"
+									]
+								},
+								"actionItemId": {
+									"type": "string"
+								}
+							},
+							"required": [
+								"actionItemId"
+							],
+							"type": "object"
+						},
+						"type": "array"
+					}
+				},
+				"required": [
+					"expectedVersion"
+				],
+				"type": "object",
+				"description": "From T, pick a set of properties whose keys are in the union K"
+			},
+			"V1ReviewRequestDto": {
+				"description": "Reviewer identity is always taken from the authenticated session.",
+				"properties": {
+					"title": {
+						"type": "string"
+					},
+					"decisionContent": {
+						"type": "string"
+					},
+					"rationale": {
+						"type": "string"
+					},
+					"rationaleSummary": {
+						"type": "string"
+					},
+					"rationaleQuotes": {
+						"items": {
+							"type": "string"
+						},
+						"type": "array"
+					},
+					"categoryTag": {
+						"type": "string",
+						"enum": [
+							"타깃",
+							"문제정의",
+							"기능",
+							"기술",
+							"BM",
+							"기타"
+						]
+					},
+					"expectedVersion": {
+						"type": "number",
+						"format": "double"
+					},
+					"resolution": {
+						"type": "string",
+						"enum": [
+							"independent",
+							"replace"
+						]
+					},
+					"predecessorId": {
+						"type": "string"
+					},
+					"predecessorVersion": {
+						"type": "number",
+						"format": "double"
+					},
+					"taskDispositions": {
+						"items": {
+							"properties": {
+								"disposition": {
+									"type": "string",
+									"enum": [
+										"cancel",
+										"transfer"
+									]
+								},
+								"classification": {
+									"type": "string",
+									"enum": [
+										"open",
+										"completed"
+									]
+								},
+								"actionItemId": {
+									"type": "string"
+								}
+							},
+							"required": [
+								"actionItemId"
+							],
+							"type": "object"
+						},
+						"type": "array"
+					},
+					"action": {
+						"type": "string",
+						"enum": [
+							"confirm",
+							"defer",
+							"reject"
+						]
+					}
+				},
+				"required": [
+					"expectedVersion",
+					"action"
 				],
 				"type": "object",
 				"additionalProperties": false
@@ -1573,6 +2011,128 @@
 		"contact": {}
 	},
 	"paths": {
+		"/api/v1/review-queue": {
+			"get": {
+				"operationId": "ListV1ReviewQueue",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiResponse_V1ReviewQueueDto_"
+								}
+							}
+						}
+					}
+				},
+				"tags": [
+					"v1 Review Queue"
+				],
+				"security": [
+					{
+						"jwt": []
+					}
+				],
+				"parameters": [
+					{
+						"in": "query",
+						"name": "guildId",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"in": "query",
+						"name": "status",
+						"required": false,
+						"schema": {
+							"default": "IN_REVIEW",
+							"type": "string",
+							"enum": [
+								"IN_REVIEW",
+								"ON_HOLD"
+							]
+						}
+					},
+					{
+						"in": "query",
+						"name": "page",
+						"required": false,
+						"schema": {
+							"default": 1,
+							"format": "double",
+							"type": "number"
+						}
+					},
+					{
+						"in": "query",
+						"name": "size",
+						"required": false,
+						"schema": {
+							"default": 20,
+							"format": "double",
+							"type": "number"
+						}
+					}
+				]
+			}
+		},
+		"/api/v1/review-queue/{ticketId}/review": {
+			"post": {
+				"operationId": "ReviewV1Candidate",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiResponse_V1DecisionDto_"
+								}
+							}
+						}
+					}
+				},
+				"description": "ticketId and decisionId identify the same entity; review does not create a second record.",
+				"tags": [
+					"v1 Review Queue"
+				],
+				"security": [
+					{
+						"jwt": []
+					}
+				],
+				"parameters": [
+					{
+						"in": "path",
+						"name": "ticketId",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"in": "query",
+						"name": "guildId",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/V1ReviewRequestDto"
+							}
+						}
+					}
+				}
+			}
+		},
 		"/api/v1/decisions/{id}": {
 			"get": {
 				"operationId": "GetV1Decision",

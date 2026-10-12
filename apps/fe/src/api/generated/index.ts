@@ -36,6 +36,7 @@ import type {
   ApiResponseUrlString,
   ApiResponseV1DecisionDto,
   ApiResponseV1DecisionListDto,
+  ApiResponseV1ReviewQueueDto,
   CandidateHistoryEntry,
   CheckpointResponseDto,
   CreateFeedback201,
@@ -50,15 +51,18 @@ import type {
   ListDiscordChannelsParams,
   ListFeedbacksParams,
   ListV1DecisionsParams,
+  ListV1ReviewQueueParams,
   LoginDiscordBody,
   Resolve200,
   ResolveConflictDto,
   ReviewDecisionDto,
   ReviewDecisionResponseDto,
+  ReviewV1CandidateParams,
   Save200,
   SaveCheckpointDto,
   SaveDiscordChannelsBody,
   SaveDiscordChannelsParams,
+  V1ReviewRequestDto,
   Webhook201
 } from './model';
 
@@ -83,6 +87,227 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   }
   return result;
 };
+
+export type listV1ReviewQueueResponse200 = {
+  data: ApiResponseV1ReviewQueueDto
+  status: 200
+}
+
+export type listV1ReviewQueueResponseSuccess = (listV1ReviewQueueResponse200) & {
+  headers: Headers;
+};
+;
+
+export type listV1ReviewQueueResponse = (listV1ReviewQueueResponseSuccess)
+
+export const getListV1ReviewQueueUrl = (params: ListV1ReviewQueueParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/review-queue?${stringifiedParams}` : `/api/v1/review-queue`
+}
+
+export const listV1ReviewQueue = async (params: ListV1ReviewQueueParams, options?: Parameters<typeof authenticatedClient>[1]): Promise<listV1ReviewQueueResponse> => {
+
+  return authenticatedClient<listV1ReviewQueueResponse>(getListV1ReviewQueueUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListV1ReviewQueueQueryKey = (params?: ListV1ReviewQueueParams,) => {
+    return [
+    `/api/v1/review-queue`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListV1ReviewQueueQueryOptions = <TData = Awaited<ReturnType<typeof listV1ReviewQueue>>, TError = unknown>(params: ListV1ReviewQueueParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listV1ReviewQueue>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListV1ReviewQueueQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listV1ReviewQueue>>> = ({ signal }) => listV1ReviewQueue(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listV1ReviewQueue>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListV1ReviewQueueQueryResult = NonNullable<Awaited<ReturnType<typeof listV1ReviewQueue>>>
+export type ListV1ReviewQueueQueryError = unknown
+
+
+export function useListV1ReviewQueue<TData = Awaited<ReturnType<typeof listV1ReviewQueue>>, TError = unknown>(
+ params: ListV1ReviewQueueParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listV1ReviewQueue>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listV1ReviewQueue>>,
+          TError,
+          Awaited<ReturnType<typeof listV1ReviewQueue>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListV1ReviewQueue<TData = Awaited<ReturnType<typeof listV1ReviewQueue>>, TError = unknown>(
+ params: ListV1ReviewQueueParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listV1ReviewQueue>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listV1ReviewQueue>>,
+          TError,
+          Awaited<ReturnType<typeof listV1ReviewQueue>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListV1ReviewQueue<TData = Awaited<ReturnType<typeof listV1ReviewQueue>>, TError = unknown>(
+ params: ListV1ReviewQueueParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listV1ReviewQueue>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+
+export function useListV1ReviewQueue<TData = Awaited<ReturnType<typeof listV1ReviewQueue>>, TError = unknown>(
+ params: ListV1ReviewQueueParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listV1ReviewQueue>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListV1ReviewQueueQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export type reviewV1CandidateResponse200 = {
+  data: ApiResponseV1DecisionDto
+  status: 200
+}
+
+export type reviewV1CandidateResponseSuccess = (reviewV1CandidateResponse200) & {
+  headers: Headers;
+};
+;
+
+export type reviewV1CandidateResponse = (reviewV1CandidateResponseSuccess)
+
+export const getReviewV1CandidateUrl = (ticketId: string,
+    params: ReviewV1CandidateParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/review-queue/${ticketId}/review?${stringifiedParams}` : `/api/v1/review-queue/${ticketId}/review`
+}
+
+/**
+ * ticketId and decisionId identify the same entity; review does not create a second record.
+ */
+export const reviewV1Candidate = async (ticketId: string,
+    v1ReviewRequestDto: V1ReviewRequestDto,
+    params: ReviewV1CandidateParams, options?: Parameters<typeof authenticatedClient>[1]): Promise<reviewV1CandidateResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return authenticatedClient<reviewV1CandidateResponse>(getReviewV1CandidateUrl(ticketId,params),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(v1ReviewRequestDto)
+  }
+);}
+
+
+
+
+
+export const getReviewV1CandidateMutationKey = () => ['reviewV1Candidate'] as const;
+
+export const getReviewV1CandidateMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reviewV1Candidate>>, TError,ReviewV1CandidateMutationVariables, TContext>, request?: SecondParameter<typeof authenticatedClient>}
+): UseMutationOptions<Awaited<ReturnType<typeof reviewV1Candidate>>, TError,ReviewV1CandidateMutationVariables, TContext> => {
+
+const mutationKey = getReviewV1CandidateMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof reviewV1Candidate>>, ReviewV1CandidateMutationVariables> = (props) => {
+          const {ticketId,data,params} = props ?? {};
+
+          return  reviewV1Candidate(ticketId,data,params,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReviewV1CandidateMutationResult = NonNullable<Awaited<ReturnType<typeof reviewV1Candidate>>>
+    export type ReviewV1CandidateMutationBody = V1ReviewRequestDto
+    export type ReviewV1CandidateMutationError = unknown
+    export type ReviewV1CandidateMutationVariables = {ticketId: string;data: V1ReviewRequestDto;params: ReviewV1CandidateParams}
+
+    export const useReviewV1Candidate = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reviewV1Candidate>>, TError,ReviewV1CandidateMutationVariables, TContext>, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof reviewV1Candidate>>,
+        TError,
+        ReviewV1CandidateMutationVariables,
+        TContext
+      > => {
+      return useMutation(getReviewV1CandidateMutationOptions(options), queryClient);
+    }
 
 export type getV1DecisionResponse200 = {
   data: ApiResponseV1DecisionDto

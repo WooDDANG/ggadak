@@ -1,7 +1,7 @@
 import { Decision, ReviewAction } from '@ggaddak/shared';
 import { apiClient } from './client';
-import { listV1Decisions, getV1Decision } from './generated';
-import type { ListV1DecisionsParams } from './generated/model';
+import { listV1Decisions, getV1Decision, listV1ReviewQueue, reviewV1Candidate } from './generated';
+import type { ListV1DecisionsParams, V1DecisionDto } from './generated/model';
 
 export interface GetDecisionsParams {
   guildId: string;
@@ -10,35 +10,58 @@ export interface GetDecisionsParams {
   categoryTag?: string;
 }
 
+function asDecision(item: V1DecisionDto): Decision {
+  return {
+    ...item,
+    alternatives: item.alternatives.map(alt => ({ option: alt.name, reason: alt.reason })),
+  } as unknown as Decision;
+}
+
 export const decisionsApi = {
+  getReviewQueue: async (
+    guildId: string,
+    status: 'IN_REVIEW' | 'ON_HOLD' = 'IN_REVIEW',
+  ): Promise<Decision[]> => {
+    const items: Decision[] = [];
+    let page = 1;
+    while (true) {
+      const response = await listV1ReviewQueue({ guildId, status, page, size: 100 });
+      if (response.status !== 200 || !response.data.success)
+        throw new Error(response.data.message || `HTTP ${response.status}`);
+      items.push(...response.data.data.items.map(asDecision));
+      if (page >= response.data.data.pageInfo.totalPages) return items;
+      page++;
+    }
+  },
   browse: async (params: ListV1DecisionsParams) => {
     const response = await listV1Decisions(params);
-    if (response.status !== 200 || !response.data.success) throw new Error(response.data.message || `HTTP ${response.status}`);
+    if (response.status !== 200 || !response.data.success)
+      throw new Error(response.data.message || `HTTP ${response.status}`);
     return response.data.data;
   },
   detail: async (id: string, guildId: string) => {
-    const response = await getV1Decision(id, {guildId});
-    if (response.status !== 200 || !response.data.success) throw new Error(response.data.message || `HTTP ${response.status}`);
+    const response = await getV1Decision(id, { guildId });
+    if (response.status !== 200 || !response.data.success)
+      throw new Error(response.data.message || `HTTP ${response.status}`);
     return response.data.data;
   },
   getDecisions: async (params: GetDecisionsParams): Promise<Decision[]> => {
-    const first = await decisionsApi.browse({...params, size: 100});
+    const first = await decisionsApi.browse({ ...params, size: 100 });
     const records = [...first.decisions];
     for (let page = 2; page <= first.pageInfo.totalPages; page++) {
-      records.push(...(await decisionsApi.browse({...params, size: 100, page})).decisions);
+      records.push(...(await decisionsApi.browse({ ...params, size: 100, page })).decisions);
     }
     return records as Decision[];
   },
 
-  reviewDecision: async (id: string, action: ReviewAction): Promise<Decision> => {
-    const data = await apiClient<{ status: string; decision: Decision }>(
-      `/api/decisions/${id}/review`,
-      {
-        method: 'POST',
-        body: JSON.stringify(action),
-      },
-    );
-    return data.decision;
+  reviewDecision: async (id: string, action: ReviewAction, guildId: string): Promise<Decision> => {
+    const { approvedBy: _approvedBy, action: reviewAction, ...params } = action;
+    if (reviewAction === 'edit') throw new Error('Use the Decision Card editor');
+    const request = { ...params, action: reviewAction };
+    const response = await reviewV1Candidate(id, request, { guildId });
+    if (response.status !== 200 || !response.data.success)
+      throw new Error(response.data.message || `HTTP ${response.status}`);
+    return asDecision(response.data.data);
   },
 
   resolveConflict: async (

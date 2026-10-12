@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { ReviewResolution } from './ReviewResolution';
 import { Decision, ReviewAction } from '@ggaddak/shared';
 import {
   Check,
@@ -18,10 +19,33 @@ interface ReviewQueueProps {
   decisions: Decision[];
   onReview: (id: string, action: ReviewAction) => Promise<void>;
   isLoading: boolean;
+  records: Decision[];
 }
 
-export const ReviewQueue: React.FC<ReviewQueueProps> = ({ decisions, onReview, isLoading }) => {
-  const draftDecisions = decisions.filter(d => d.state === 'Draft' || d.state === 'Proposed');
+export const ReviewQueue: React.FC<ReviewQueueProps> = ({
+  decisions,
+  records,
+  onReview,
+  isLoading,
+}) => {
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState('');
+  const draftDecisions = decisions.filter(d =>
+    ['Draft', 'Proposed', 'Discussing', 'Deferred'].includes(d.state),
+  );
+  const review = async (id: string, action: ReviewAction) => {
+    setPending(true);
+    setError('');
+    try {
+      await onReview(id, action);
+    } catch (failure) {
+      setError(
+        `검수하지 못했습니다. 최신 후보를 확인한 후 다시 시도하세요. ${failure instanceof Error ? failure.message : ''}`,
+      );
+    } finally {
+      setPending(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -49,6 +73,11 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({ decisions, onReview, i
 
   return (
     <div className="space-y-6">
+      {error && (
+        <p role="alert" className="text-rose-300">
+          {error}
+        </p>
+      )}
       <div className="flex items-center justify-between pb-2">
         <div>
           <h2 className="text-xl font-bold text-white tracking-tight">PM 검토 대기 큐</h2>
@@ -70,7 +99,7 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({ decisions, onReview, i
               <div className="space-y-1.5 flex-1">
                 <div className="flex items-center space-x-2.5 flex-wrap gap-y-1">
                   <Badge variant="category">{dec.categoryTag || '기타'}</Badge>
-                  <Badge variant="draft">대기중</Badge>
+                  <Badge variant="draft">{dec.state === 'Deferred' ? '보류' : '대기중'}</Badge>
                   {dec.isPivot && (
                     <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-rose-500/20 text-rose-300 border border-rose-500/30">
                       🚨 방향 전환 (Pivot)
@@ -89,23 +118,17 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({ decisions, onReview, i
 
               {/* Action Buttons */}
               <div className="flex items-center space-x-2">
+                <ReviewResolution
+                  candidate={dec}
+                  records={records}
+                  disabled={pending}
+                  onConfirm={action => review(dec.id, action)}
+                />
                 <button
-                  disabled={dec.version === undefined}
+                  disabled={pending || dec.version === undefined}
                   onClick={() => {
                     if (dec.version !== undefined)
-                      return onReview(dec.id, { action: 'confirm', expectedVersion: dec.version });
-                  }}
-                  className="flex items-center space-x-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold shadow-lg shadow-emerald-600/20 transition duration-150"
-                  title="의사결정 확정"
-                >
-                  <Check className="w-4 h-4" />
-                  <span>승인 (Confirm)</span>
-                </button>
-                <button
-                  disabled={dec.version === undefined}
-                  onClick={() => {
-                    if (dec.version !== undefined)
-                      return onReview(dec.id, { action: 'defer', expectedVersion: dec.version });
+                      return review(dec.id, { action: 'defer', expectedVersion: dec.version });
                   }}
                   className="flex items-center space-x-1.5 px-3.5 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-xl text-xs font-semibold transition duration-150"
                   title="추가 논의를 위해 보류"
@@ -114,10 +137,10 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({ decisions, onReview, i
                   <span>보류 (Defer)</span>
                 </button>
                 <button
-                  disabled={dec.version === undefined}
+                  disabled={pending || dec.version === undefined}
                   onClick={() => {
                     if (dec.version !== undefined)
-                      return onReview(dec.id, { action: 'reject', expectedVersion: dec.version });
+                      return review(dec.id, { action: 'reject', expectedVersion: dec.version });
                   }}
                   className="flex items-center space-x-1.5 px-3.5 py-2 bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 rounded-xl text-xs font-semibold transition duration-150"
                   title="결정 후보 반려 (동일 근거 재추출 방지)"
