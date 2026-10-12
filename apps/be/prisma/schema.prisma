@@ -144,3 +144,13 @@ model OAuthState {
   nonce String @id
   expiresAt DateTime
 }
+
+model DecisionEdit {
+ id String @id
+ decisionId String
+ actorId String
+ version Int
+ beforeJson String
+ createdAt DateTime @default(now())
+ @@unique([decisionId, version])
+}

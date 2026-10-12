@@ -1,3 +1,4 @@
+import { DecisionEditSchema, DecisionEditDto } from '../dto/decision-edit.dto.js';
 import { Service } from 'typedi';
 import { PrismaClient, Prisma } from '@prisma/client';
 import { BadRequestError, ConflictError } from '../errors/AppError.js';
@@ -74,7 +75,12 @@ export class DecisionRepository {
     return Boolean(await this.prisma.rejectedEvidenceHash.findUnique({ where: { evidenceHash } }));
   }
   decodeDecision(row: Prisma.DecisionGetPayload<object>): Decision {
-    if (row.domainJson) return { ...JSON.parse(row.domainJson), version: row.version };
+    if (row.domainJson)
+      return {
+        ...JSON.parse(row.domainJson),
+        version: row.version,
+        updatedAt: row.updatedAt.toISOString(),
+      };
     const states: Record<string, Decision['state']> = {
       proposed: 'Proposed',
       confirmed: 'Decided',
@@ -119,7 +125,16 @@ export class DecisionRepository {
   }
   decisionData(decision: Decision) {
     return {
-      lifecycle: decision.state === "Decided" ? "CONFIRMED" : decision.state === "Superseded" ? "SUPERSEDED" : decision.state === "Deferred" ? "ON_HOLD" : decision.state === "Rejected" ? "DISCARDED" : "IN_REVIEW",
+      lifecycle:
+        decision.state === 'Decided'
+          ? 'CONFIRMED'
+          : decision.state === 'Superseded'
+            ? 'SUPERSEDED'
+            : decision.state === 'Deferred'
+              ? 'ON_HOLD'
+              : decision.state === 'Rejected'
+                ? 'DISCARDED'
+                : 'IN_REVIEW',
       category: decision.categoryTag,
       topic: decision.topic,
       guildId: decision.source.guildId,
@@ -178,6 +193,56 @@ export class DecisionRepository {
       await this.prisma.decision.create({ data: { id: decision.id, ...data } });
     }
   }
+  async editDecision(id: string, body: DecisionEditDto, actorId: string): Promise<Decision | null> {
+    const parsed = DecisionEditSchema.safeParse(body);
+    if (!parsed.success) throw new BadRequestError('Invalid decision edit', parsed.error.flatten());
+    const edit = parsed.data;
+    return this.prisma.$transaction(async tx => {
+      const row = await tx.decision.findUnique({ where: { id } });
+      if (!row) return null;
+      if (row.version !== edit.expectedVersion) throw new ConflictError('Stale decision version');
+      const old = this.decodeDecision(row);
+      if (old.state === 'Superseded' || old.state === 'Rejected')
+        throw new ConflictError('Historical decisions cannot be edited');
+      const ids = old.alternatives.map((a, index) => a.id ?? `${id}:alternative:${index}`);
+      const supplied = edit.alternatives.flatMap(a => (a.id ? [a.id] : []));
+      if (
+        new Set(supplied).size !== supplied.length ||
+        supplied.some(value => !ids.includes(value))
+      )
+        throw new BadRequestError('Unknown or duplicate alternative ID');
+      const updated = {
+        ...old,
+        title: edit.title,
+        decision: edit.decision,
+        decisionContent: edit.decision,
+        rationale: edit.rationale,
+        rationaleSummary: edit.rationale,
+        categoryTag: edit.category,
+        version: row.version + 1,
+        alternatives: edit.alternatives.map(a => ({
+          id: a.id ?? randomUUID(),
+          option: a.name,
+          reason: a.reason,
+        })),
+      };
+      const result = await tx.decision.updateMany({
+        where: { id, version: edit.expectedVersion },
+        data: this.decisionData(updated),
+      });
+      if (result.count !== 1) throw new ConflictError('Stale decision version');
+      await tx.decisionEdit.create({
+        data: {
+          id: randomUUID(),
+          decisionId: id,
+          actorId,
+          version: updated.version,
+          beforeJson: JSON.stringify(old),
+        },
+      });
+      return this.decodeDecision((await tx.decision.findUnique({ where: { id } }))!);
+    });
+  }
   async getDecisionById(id: string): Promise<Decision | null> {
     const row = await this.prisma.decision.findUnique({ where: { id } });
     return row ? this.decodeDecision(row) : null;
@@ -185,7 +250,12 @@ export class DecisionRepository {
   async getDecisions(
     filter: { guildId?: string; topic?: string; state?: string; categoryTag?: string } = {},
   ): Promise<Decision[]> {
-    return (await this.prisma.decision.findMany({ where: filter.guildId ? { guildId: filter.guildId } : {}, orderBy: { createdAt: 'desc' } }))
+    return (
+      await this.prisma.decision.findMany({
+        where: filter.guildId ? { guildId: filter.guildId } : {},
+        orderBy: { createdAt: 'desc' },
+      })
+    )
       .map(row => this.decodeDecision(row))
       .filter(
         d =>
@@ -194,16 +264,40 @@ export class DecisionRepository {
           (!filter.categoryTag || d.categoryTag === filter.categoryTag),
       );
   }
-  async browseDecisions(filter: {guildId: string; status?: string; category?: string; topic?: string; page: number; size: number}) {
-    const where: Prisma.DecisionWhereInput = { guildId: filter.guildId,
-      ...(filter.status ? {lifecycle: filter.status} : {}),
-      ...(filter.category ? {category: filter.category} : {}),
-      ...(filter.topic ? {OR: [{topic: {contains: filter.topic}}, {title: {contains: filter.topic}}]} : {}) };
+  async browseDecisions(filter: {
+    guildId: string;
+    status?: string;
+    category?: string;
+    topic?: string;
+    page: number;
+    size: number;
+  }) {
+    const where: Prisma.DecisionWhereInput = {
+      guildId: filter.guildId,
+      ...(filter.status ? { lifecycle: filter.status } : {}),
+      ...(filter.category ? { category: filter.category } : {}),
+      ...(filter.topic
+        ? { OR: [{ topic: { contains: filter.topic } }, { title: { contains: filter.topic } }] }
+        : {}),
+    };
     const [rows, totalElements] = await this.prisma.$transaction([
-      this.prisma.decision.findMany({where, orderBy: [{createdAt: 'desc'}, {id: 'asc'}], skip: (filter.page - 1) * filter.size, take: filter.size}),
-      this.prisma.decision.count({where}),
+      this.prisma.decision.findMany({
+        where,
+        orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+        skip: (filter.page - 1) * filter.size,
+        take: filter.size,
+      }),
+      this.prisma.decision.count({ where }),
     ]);
-    return {decisions: rows.map(row => this.decodeDecision(row)), pageInfo: {currentPage: filter.page, pageSize: filter.size, totalElements, totalPages: Math.ceil(totalElements / filter.size)}};
+    return {
+      decisions: rows.map(row => this.decodeDecision(row)),
+      pageInfo: {
+        currentPage: filter.page,
+        pageSize: filter.size,
+        totalElements,
+        totalPages: Math.ceil(totalElements / filter.size),
+      },
+    };
   }
   async reviewDecision(
     id: string,

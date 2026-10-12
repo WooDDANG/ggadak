@@ -38,8 +38,10 @@ import type {
   CheckpointResponseDto,
   CreateFeedback201,
   CreateFeedbackDto,
+  DecisionEditDto,
   DecisionListResponseDto,
   DecisionWebhookDto,
+  EditV1DecisionParams,
   FeedbackListResponseDto,
   GetV1DecisionParams,
   HarvestingPolicyDto,
@@ -77,6 +79,110 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   }
   return result;
 };
+
+export type editV1DecisionResponse200 = {
+  data: ApiResponseV1DecisionDto
+  status: 200
+}
+
+export type editV1DecisionResponseSuccess = (editV1DecisionResponse200) & {
+  headers: Headers;
+};
+;
+
+export type editV1DecisionResponse = (editV1DecisionResponseSuccess)
+
+export const getEditV1DecisionUrl = (id: string,
+    params: EditV1DecisionParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/decisions/${id}?${stringifiedParams}` : `/api/v1/decisions/${id}`
+}
+
+export const editV1Decision = async (id: string,
+    decisionEditDto: DecisionEditDto,
+    params: EditV1DecisionParams, options?: Parameters<typeof authenticatedClient>[1]): Promise<editV1DecisionResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return authenticatedClient<editV1DecisionResponse>(getEditV1DecisionUrl(id,params),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(decisionEditDto)
+  }
+);}
+
+
+
+
+
+export const getEditV1DecisionMutationKey = () => ['editV1Decision'] as const;
+
+export const getEditV1DecisionMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof editV1Decision>>, TError,EditV1DecisionMutationVariables, TContext>, request?: SecondParameter<typeof authenticatedClient>}
+): UseMutationOptions<Awaited<ReturnType<typeof editV1Decision>>, TError,EditV1DecisionMutationVariables, TContext> => {
+
+const mutationKey = getEditV1DecisionMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof editV1Decision>>, EditV1DecisionMutationVariables> = (props) => {
+          const {id,data,params} = props ?? {};
+
+          return  editV1Decision(id,data,params,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type EditV1DecisionMutationResult = NonNullable<Awaited<ReturnType<typeof editV1Decision>>>
+    export type EditV1DecisionMutationBody = DecisionEditDto
+    export type EditV1DecisionMutationError = unknown
+    export type EditV1DecisionMutationVariables = {id: string;data: DecisionEditDto;params: EditV1DecisionParams}
+
+    export const useEditV1Decision = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof editV1Decision>>, TError,EditV1DecisionMutationVariables, TContext>, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof editV1Decision>>,
+        TError,
+        EditV1DecisionMutationVariables,
+        TContext
+      > => {
+      return useMutation(getEditV1DecisionMutationOptions(options), queryClient);
+    }
 
 export type getV1DecisionResponse200 = {
   data: ApiResponseV1DecisionDto

@@ -32,5 +32,12 @@ test('Decision Card flow sends server filters and pagination through generated c
     const detail = await decisionsApi.detail('DEC-old','g1');
     assert.equal(detail.supersededById,'DEC-new');
     assert.equal(requests[1].url,'/api/v1/decisions/DEC-old?guildId=g1');
+    const changes={expectedVersion:7,title:'Revised',decision:'Use OAuth',rationale:'Identity',category:'기술',alternatives:[]};
+    await decisionsApi.edit('DEC-old','g1',changes);
+    assert.equal(requests[2].url,'/api/v1/decisions/DEC-old?guildId=g1');
+    assert.equal(requests[2].options.method,'PUT');
+    assert.deepEqual(JSON.parse(requests[2].options.body),changes);
+    globalThis.fetch=async()=>new Response(JSON.stringify({success:false,message:'Stale decision version'}),{status:409});
+    await assert.rejects(decisionsApi.edit('DEC-old','g1',changes),/Stale decision version/);
   } finally {globalThis.fetch=previousFetch;}
 });

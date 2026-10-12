@@ -1,7 +1,7 @@
 import { Decision, ReviewAction } from '@ggaddak/shared';
 import { apiClient } from './client';
-import { listV1Decisions, getV1Decision } from './generated';
-import type { ListV1DecisionsParams } from './generated/model';
+import { listV1Decisions, getV1Decision, editV1Decision } from './generated';
+import type { ListV1DecisionsParams, DecisionEditDto } from './generated/model';
 
 export interface GetDecisionsParams {
   guildId: string;
@@ -11,21 +11,29 @@ export interface GetDecisionsParams {
 }
 
 export const decisionsApi = {
+  edit: async (id: string, guildId: string, body: DecisionEditDto) => {
+    const response = await editV1Decision(id, body, { guildId });
+    if (response.status !== 200 || !response.data.success)
+      throw new Error(response.data.message || `HTTP ${response.status}`);
+    return response.data.data;
+  },
   browse: async (params: ListV1DecisionsParams) => {
     const response = await listV1Decisions(params);
-    if (response.status !== 200 || !response.data.success) throw new Error(response.data.message || `HTTP ${response.status}`);
+    if (response.status !== 200 || !response.data.success)
+      throw new Error(response.data.message || `HTTP ${response.status}`);
     return response.data.data;
   },
   detail: async (id: string, guildId: string) => {
-    const response = await getV1Decision(id, {guildId});
-    if (response.status !== 200 || !response.data.success) throw new Error(response.data.message || `HTTP ${response.status}`);
+    const response = await getV1Decision(id, { guildId });
+    if (response.status !== 200 || !response.data.success)
+      throw new Error(response.data.message || `HTTP ${response.status}`);
     return response.data.data;
   },
   getDecisions: async (params: GetDecisionsParams): Promise<Decision[]> => {
-    const first = await decisionsApi.browse({...params, size: 100});
+    const first = await decisionsApi.browse({ ...params, size: 100 });
     const records = [...first.decisions];
     for (let page = 2; page <= first.pageInfo.totalPages; page++) {
-      records.push(...(await decisionsApi.browse({...params, size: 100, page})).decisions);
+      records.push(...(await decisionsApi.browse({ ...params, size: 100, page })).decisions);
     }
     return records as Decision[];
   },

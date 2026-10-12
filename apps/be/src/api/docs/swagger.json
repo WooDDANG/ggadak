@@ -309,6 +309,9 @@
 					"governancePassed": {
 						"type": "boolean"
 					},
+					"updatedAt": {
+						"type": "string"
+					},
 					"status": {
 						"$ref": "#/components/schemas/DecisionStatus"
 					},
@@ -403,6 +406,70 @@
 				],
 				"type": "object",
 				"additionalProperties": false
+			},
+			"DecisionEditDto": {
+				"properties": {
+					"expectedVersion": {
+						"type": "number",
+						"format": "double",
+						"description": "Version last read; stale edits return 409."
+					},
+					"title": {
+						"type": "string",
+						"description": "Required summary, 1–200 trimmed characters."
+					},
+					"decision": {
+						"type": "string",
+						"description": "Required decision content, 1–10000 trimmed characters."
+					},
+					"rationale": {
+						"type": "string",
+						"description": "Required Rationale, 1–10000 trimmed characters."
+					},
+					"category": {
+						"type": "string",
+						"enum": [
+							"타깃",
+							"문제정의",
+							"기능",
+							"기술",
+							"BM",
+							"기타"
+						]
+					},
+					"alternatives": {
+						"items": {
+							"properties": {
+								"reason": {
+									"type": "string"
+								},
+								"name": {
+									"type": "string"
+								},
+								"id": {
+									"type": "string"
+								}
+							},
+							"required": [
+								"reason",
+								"name"
+							],
+							"type": "object"
+						},
+						"type": "array",
+						"description": "Full replacement (max 20). Keep existing IDs, omit ID to add; omitted existing alternatives are deleted. Unknown/duplicate IDs rejected."
+					}
+				},
+				"required": [
+					"expectedVersion",
+					"title",
+					"decision",
+					"rationale",
+					"category",
+					"alternatives"
+				],
+				"type": "object",
+				"additionalProperties": {}
 			},
 			"AlternativeItemDto": {
 				"properties": {
@@ -1462,6 +1529,57 @@
 	},
 	"paths": {
 		"/api/v1/decisions/{id}": {
+			"put": {
+				"operationId": "EditV1Decision",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiResponse_V1DecisionDto_"
+								}
+							}
+						}
+					}
+				},
+				"tags": [
+					"v1 Decisions"
+				],
+				"security": [
+					{
+						"jwt": []
+					}
+				],
+				"parameters": [
+					{
+						"in": "path",
+						"name": "id",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"in": "query",
+						"name": "guildId",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/DecisionEditDto"
+							}
+						}
+					}
+				}
+			},
 			"get": {
 				"operationId": "GetV1Decision",
 				"responses": {
