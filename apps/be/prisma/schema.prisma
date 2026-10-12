@@ -166,6 +166,31 @@ model MonitoredChannel {
   @@index([guildId])
 }
 
+model SyncJob {
+  id String @id
+  guildId String
+  forceFullSync Boolean @default(false)
+  status String @default("QUEUED")
+  channelIdsJson String
+  totalChannels Int @default(0)
+  completedChannels Int @default(0)
+  failedChannels Int @default(0)
+  decisionsFound Int @default(0)
+  messagesScanned Int @default(0)
+  errorMessage String?
+  leaseUntil DateTime?
+  createdAt DateTime @default(now())
+  startedAt DateTime?
+  completedAt DateTime?
+  @@index([guildId, createdAt])
+  @@index([status, leaseUntil])
+}
+
+model SyncJobLock {
+  guildId String @id
+  jobId String @unique
+}
+
 model DecisionEmbedding {
   decisionId String @id
   decision Decision @relation(fields: [decisionId], references: [id], onDelete: Cascade)

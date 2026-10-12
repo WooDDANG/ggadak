@@ -2,8 +2,8 @@ import React from 'react';
 import { Layers, ShieldCheck, RefreshCw } from 'lucide-react';
 
 interface HeaderProps {
-  activeTab: 'review' | 'timeline' | 'feedback' | 'settings' | 'search';
-  setActiveTab: (tab: 'review' | 'timeline' | 'feedback' | 'settings' | 'search') => void;
+  activeTab: 'review' | 'timeline' | 'feedback' | 'settings' | 'search' | 'sync';
+  setActiveTab: (tab: 'review' | 'timeline' | 'feedback' | 'settings' | 'search' | 'sync') => void;
   draftCount: number;
   onRefresh: () => void;
   isRefetching: boolean;
@@ -76,6 +76,7 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
             <button onClick={() => setActiveTab('search')} className={`px-4 py-2 rounded-lg text-sm ${activeTab === 'search' ? 'bg-indigo-600' : 'text-slate-300 hover:bg-slate-800'}`}>Why 검색</button>
             <button onClick={() => setActiveTab('settings')} className={`px-4 py-2 rounded-lg text-sm ${activeTab === 'settings' ? 'bg-indigo-600' : 'text-slate-300 hover:bg-slate-800'}`}>채널 설정</button>
+            <button onClick={() => setActiveTab('sync')} className={`px-4 py-2 rounded-lg text-sm ${activeTab === 'sync' ? 'bg-indigo-600' : 'text-slate-300 hover:bg-slate-800'}`}>수동 동기화</button>
           </nav>
 
           <div className="flex items-center space-x-3">

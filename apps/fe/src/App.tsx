@@ -10,13 +10,14 @@ import { Header } from './components/Header';
 import { ReviewQueue } from './features/review-queue/ReviewQueue';
 import { DecisionBrowser } from './features/decision-timeline/DecisionBrowser';
 import { FeedbackBoard } from './features/feedback-board/FeedbackBoard';
+import { ManualSync } from './features/ManualSync';
 
 export function App() {
   return <AuthGate>{guildId => <ServerApp key={guildId} guildId={guildId} />}</AuthGate>;
 }
 
 function ServerApp({ guildId }: { guildId: string }) {
-  const [activeTab, setActiveTab] = useState<'review' | 'timeline' | 'feedback' | 'settings' | 'search'>('review');
+  const [activeTab, setActiveTab] = useState<'review' | 'timeline' | 'feedback' | 'settings' | 'search' | 'sync'>('review');
   const queryClient = useQueryClient();
 
   // 1. Fetch Decisions Query
@@ -84,6 +85,7 @@ function ServerApp({ guildId }: { guildId: string }) {
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {activeTab === 'search' && <WhySearch key={guildId} guildId={guildId} />}
         {activeTab === 'settings' && <ChannelSettings key={guildId} guildId={guildId} />}
+        {activeTab === 'sync' && <ManualSync key={guildId} guildId={guildId} />}
         {activeTab === 'review' && queueError && (
           <p role="alert" className="text-rose-300">
             검수 큐를 불러오지 못했습니다. {queueError.message}
