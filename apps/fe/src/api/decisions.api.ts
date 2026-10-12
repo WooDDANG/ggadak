@@ -1,5 +1,6 @@
 import { Decision, ReviewAction } from '@ggaddak/shared';
 import { apiClient } from './client';
+import { listV1Decisions } from './generated';
 
 export interface GetDecisionsParams {
   topic?: string;
@@ -9,15 +10,13 @@ export interface GetDecisionsParams {
 
 export const decisionsApi = {
   getDecisions: async (params: GetDecisionsParams = {}): Promise<Decision[]> => {
-    const query = new URLSearchParams();
-    if (params.topic) query.set('topic', params.topic);
-    if (params.state) query.set('state', params.state);
-    if (params.categoryTag) query.set('categoryTag', params.categoryTag);
-
-    const queryString = query.toString();
-    const endpoint = `/api/decisions${queryString ? `?${queryString}` : ''}`;
-    const data = await apiClient<{ decisions: Decision[] }>(endpoint);
-    return data.decisions;
+    const response = await listV1Decisions(params);
+    if (response.status !== 200 || !response.data.success) {
+      throw new Error(response.data.message || `HTTP ${response.status}`);
+    }
+    // The compatibility endpoint returns full shared Decision Records; the legacy
+    // OpenAPI DTO marks their defaulted fields optional.
+    return response.data.data.decisions as Decision[];
   },
 
   reviewDecision: async (id: string, action: ReviewAction): Promise<Decision> => {

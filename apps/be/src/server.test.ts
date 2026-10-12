@@ -80,6 +80,43 @@ describe('BE Server & Ingestion API', () => {
     assert.strictEqual(data.decisions.length, 1);
   });
 
+  it('reads the same Decision Records through the v1 envelope and legacy contract', async () => {
+    const response = await fetch(`http://localhost:${port}/api/v1/decisions?topic=Architecture`);
+    assert.strictEqual(response.status, 200);
+    const body = (await response.json()) as any;
+    assert.strictEqual(body.success, true);
+    assert.strictEqual(body.code, 'OK');
+    assert.strictEqual(body.message, 'Success');
+    assert.strictEqual(body.data.decisions[0].id, 'DEC-101');
+  });
+
+  it('returns a v1 error envelope for unknown routes while preserving legacy errors', async () => {
+    const response = await fetch(`http://localhost:${port}/api/v1/missing`);
+    assert.strictEqual(response.status, 404);
+    assert.deepStrictEqual(await response.json(), {
+      success: false,
+      code: 'NOT_FOUND',
+      message: 'Not Found',
+      data: null,
+    });
+    const legacy = await fetch(`http://localhost:${port}/api/missing`);
+    assert.deepStrictEqual(await legacy.json(), { error: 'Not Found' });
+  });
+
+  it('uses the v1 validation envelope for malformed JSON', async () => {
+    const response = await fetch(`http://localhost:${port}/api/v1/decisions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{',
+    });
+    assert.strictEqual(response.status, 400);
+    const body = (await response.json()) as any;
+    assert.strictEqual(body.success, false);
+    assert.strictEqual(body.code, 'VALIDATION_ERROR');
+    assert.strictEqual(body.data, null);
+    assert.strictEqual(typeof body.message, 'string');
+  });
+
   it('does not replace existing decisions through ordinary ingestion', async () => {
     const payload2 = {
       event: 'decision.recorded',
@@ -270,5 +307,29 @@ describe('BE Server & Ingestion API', () => {
     assert.strictEqual(getData.feedbacks.length, 1);
     assert.strictEqual(getData.feedbacks[0].content, feedbackPayload.content);
     assert.strictEqual(getData.feedbacks[0].source, '교수');
+  });
+  it('returns the common v1 envelope when the request limit is exceeded', async () => {
+    const previous = process.env.DISABLE_RATE_LIMIT;
+    process.env.DISABLE_RATE_LIMIT = 'false';
+    const previousEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'development';
+    try {
+      let response: Response;
+      for (let index = 0; index < 121; index++) {
+        response = await fetch(`http://localhost:${port}/api/v1/decisions`);
+        if (response.status === 429) break;
+        await response.text();
+      }
+      assert.strictEqual(response!.status, 429);
+      const body = (await response!.json()) as any;
+      assert.strictEqual(body.success, false);
+      assert.strictEqual(body.code, 'RATE_LIMITED');
+      assert.strictEqual(body.data, null);
+    } finally {
+      if (previous === undefined) delete process.env.DISABLE_RATE_LIMIT;
+      else process.env.DISABLE_RATE_LIMIT = previous;
+      if (previousEnv === undefined) delete process.env.NODE_ENV;
+      else process.env.NODE_ENV = previousEnv;
+    }
   });
 });

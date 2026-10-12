@@ -1,4 +1,5 @@
 import rateLimit from 'express-rate-limit';
+import { apiFailure, isV1Request } from '../../dto/api-response.dto.js';
 
 export const apiLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
@@ -6,9 +7,15 @@ export const apiLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   skip: () => process.env.NODE_ENV === 'test' || process.env.DISABLE_RATE_LIMIT === 'true',
-  message: {
-    error: 'Too Many Requests',
-    message: '요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.',
+  handler: (req, res) => {
+    const message = '요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.';
+    res
+      .status(429)
+      .json(
+        isV1Request(req.originalUrl.split('?')[0])
+          ? apiFailure('RATE_LIMITED', message)
+          : { error: 'Too Many Requests', message },
+      );
   },
 });
 
