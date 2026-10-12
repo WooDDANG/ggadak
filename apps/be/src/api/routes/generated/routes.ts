@@ -29,13 +29,9 @@ const expressAuthenticationRecasted = expressAuthentication as (req: ExRequest, 
 // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
 
 const models: TsoaRoute.Models = {
-    "AlternativeItemDto": {
-        "dataType": "refObject",
-        "properties": {
-            "option": {"dataType":"string","required":true},
-            "reason": {"dataType":"string","required":true},
-        },
-        "additionalProperties": false,
+    "DecisionStatus": {
+        "dataType": "refAlias",
+        "type": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["IN_REVIEW"]},{"dataType":"enum","enums":["CONFIRMED"]},{"dataType":"enum","enums":["ON_HOLD"]},{"dataType":"enum","enums":["DISCARDED"]},{"dataType":"enum","enums":["SUPERSEDED"]}],"validators":{}},
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "ActionItemDto": {
@@ -56,6 +52,72 @@ const models: TsoaRoute.Models = {
     "Record_string.any_": {
         "dataType": "refAlias",
         "type": {"dataType":"nestedObjectLiteral","nestedProperties":{},"additionalProperties":{"dataType":"any"},"validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "Pick_DecisionItemDto.Exclude_keyofDecisionItemDto.alternatives__": {
+        "dataType": "refAlias",
+        "type": {"dataType":"nestedObjectLiteral","nestedProperties":{"id":{"dataType":"string","required":true},"version":{"dataType":"double"},"supersededById":{"dataType":"string"},"topic":{"dataType":"string","required":true},"decision":{"dataType":"string","required":true},"title":{"dataType":"string"},"decisionContent":{"dataType":"string"},"rationale":{"dataType":"string","required":true},"rationaleSummary":{"dataType":"string"},"rationaleQuotes":{"dataType":"array","array":{"dataType":"string"}},"categoryTag":{"dataType":"union","subSchemas":[{"dataType":"enum","enums":["타깃"]},{"dataType":"enum","enums":["문제정의"]},{"dataType":"enum","enums":["기능"]},{"dataType":"enum","enums":["기술"]},{"dataType":"enum","enums":["BM"]},{"dataType":"enum","enums":["기타"]}]},"actionItems":{"dataType":"array","array":{"dataType":"refObject","ref":"ActionItemDto"}},"state":{"dataType":"union","subSchemas":[{"dataType":"enum","enums":["Draft"]},{"dataType":"enum","enums":["Proposed"]},{"dataType":"enum","enums":["Discussing"]},{"dataType":"enum","enums":["Decided"]},{"dataType":"enum","enums":["Superseded"]},{"dataType":"enum","enums":["Deferred"]},{"dataType":"enum","enums":["Rejected"]}],"required":true},"supersedesId":{"dataType":"string"},"isPivot":{"dataType":"boolean"},"approvedBy":{"dataType":"string"},"decisionConfirmedDate":{"dataType":"string"},"feedbackSourceType":{"dataType":"string"},"feedbackSourceDetail":{"dataType":"string"},"feedbackReceivedDate":{"dataType":"string"},"rawEvidence":{"dataType":"array","array":{"dataType":"string"}},"evidenceHash":{"dataType":"string"},"rawTranscript":{"dataType":"string"},"source":{"ref":"Record_string.any_"},"messageCreatedAt":{"dataType":"string"},"createdAt":{"dataType":"string","required":true},"governanceScore":{"dataType":"double"},"governanceReason":{"dataType":"string"},"governancePassed":{"dataType":"boolean"}},"validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "V1DecisionDto": {
+        "dataType": "refObject",
+        "properties": {
+            "id": {"dataType":"string","required":true},
+            "version": {"dataType":"double"},
+            "supersededById": {"dataType":"string"},
+            "topic": {"dataType":"string","required":true},
+            "decision": {"dataType":"string","required":true},
+            "title": {"dataType":"string"},
+            "decisionContent": {"dataType":"string"},
+            "rationale": {"dataType":"string","required":true},
+            "rationaleSummary": {"dataType":"string"},
+            "rationaleQuotes": {"dataType":"array","array":{"dataType":"string"}},
+            "categoryTag": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["타깃"]},{"dataType":"enum","enums":["문제정의"]},{"dataType":"enum","enums":["기능"]},{"dataType":"enum","enums":["기술"]},{"dataType":"enum","enums":["BM"]},{"dataType":"enum","enums":["기타"]}]},
+            "actionItems": {"dataType":"array","array":{"dataType":"refObject","ref":"ActionItemDto"}},
+            "state": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["Draft"]},{"dataType":"enum","enums":["Proposed"]},{"dataType":"enum","enums":["Discussing"]},{"dataType":"enum","enums":["Decided"]},{"dataType":"enum","enums":["Superseded"]},{"dataType":"enum","enums":["Deferred"]},{"dataType":"enum","enums":["Rejected"]}],"required":true},
+            "supersedesId": {"dataType":"string"},
+            "isPivot": {"dataType":"boolean"},
+            "approvedBy": {"dataType":"string"},
+            "decisionConfirmedDate": {"dataType":"string"},
+            "feedbackSourceType": {"dataType":"string"},
+            "feedbackSourceDetail": {"dataType":"string"},
+            "feedbackReceivedDate": {"dataType":"string"},
+            "rawEvidence": {"dataType":"array","array":{"dataType":"string"}},
+            "evidenceHash": {"dataType":"string"},
+            "rawTranscript": {"dataType":"string"},
+            "source": {"ref":"Record_string.any_"},
+            "messageCreatedAt": {"dataType":"string"},
+            "createdAt": {"dataType":"string","required":true},
+            "governanceScore": {"dataType":"double"},
+            "governanceReason": {"dataType":"string"},
+            "governancePassed": {"dataType":"boolean"},
+            "status": {"ref":"DecisionStatus","required":true},
+            "category": {"dataType":"string","required":true},
+            "confirmedDate": {"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},
+            "dates": {"dataType":"nestedObjectLiteral","nestedProperties":{"feedbackDate":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},"confirmedDate":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},"createdDate":{"dataType":"string","required":true}},"required":true},
+            "alternatives": {"dataType":"array","array":{"dataType":"nestedObjectLiteral","nestedProperties":{"reason":{"dataType":"string","required":true},"name":{"dataType":"string","required":true},"id":{"dataType":"string","required":true}}},"required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "ApiResponse_V1DecisionDto_": {
+        "dataType": "refObject",
+        "properties": {
+            "success": {"dataType":"boolean","required":true},
+            "code": {"dataType":"string","required":true},
+            "message": {"dataType":"string","required":true},
+            "data": {"ref":"V1DecisionDto","required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "AlternativeItemDto": {
+        "dataType": "refObject",
+        "properties": {
+            "option": {"dataType":"string","required":true},
+            "reason": {"dataType":"string","required":true},
+        },
+        "additionalProperties": false,
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "DecisionItemDto": {
@@ -95,32 +157,23 @@ const models: TsoaRoute.Models = {
         "additionalProperties": false,
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
-    "ApiResponse_DecisionItemDto_": {
+    "V1DecisionListDto": {
         "dataType": "refObject",
         "properties": {
-            "success": {"dataType":"boolean","required":true},
-            "code": {"dataType":"string","required":true},
-            "message": {"dataType":"string","required":true},
-            "data": {"ref":"DecisionItemDto","required":true},
-        },
-        "additionalProperties": false,
-    },
-    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
-    "DecisionListResponseDto": {
-        "dataType": "refObject",
-        "properties": {
+            "items": {"dataType":"array","array":{"dataType":"refObject","ref":"V1DecisionDto"},"required":true},
             "decisions": {"dataType":"array","array":{"dataType":"refObject","ref":"DecisionItemDto"},"required":true},
+            "pageInfo": {"dataType":"nestedObjectLiteral","nestedProperties":{"totalPages":{"dataType":"double","required":true},"totalElements":{"dataType":"double","required":true},"pageSize":{"dataType":"double","required":true},"currentPage":{"dataType":"double","required":true}},"required":true},
         },
         "additionalProperties": false,
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
-    "ApiResponse_DecisionListResponseDto_": {
+    "ApiResponse_V1DecisionListDto_": {
         "dataType": "refObject",
         "properties": {
             "success": {"dataType":"boolean","required":true},
             "code": {"dataType":"string","required":true},
             "message": {"dataType":"string","required":true},
-            "data": {"ref":"DecisionListResponseDto","required":true},
+            "data": {"ref":"V1DecisionListDto","required":true},
         },
         "additionalProperties": false,
     },
@@ -233,6 +286,14 @@ const models: TsoaRoute.Models = {
             "score": {"dataType":"double"},
             "participantCount": {"dataType":"double"},
             "reactionsCount": {"dataType":"double"},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "DecisionListResponseDto": {
+        "dataType": "refObject",
+        "properties": {
+            "decisions": {"dataType":"array","array":{"dataType":"refObject","ref":"DecisionItemDto"},"required":true},
         },
         "additionalProperties": false,
     },
@@ -456,6 +517,10 @@ export function RegisterRoutes(app: Router) {
                 topic: {"in":"query","name":"topic","dataType":"string"},
                 state: {"in":"query","name":"state","dataType":"string"},
                 categoryTag: {"in":"query","name":"categoryTag","dataType":"string"},
+                status: {"in":"query","name":"status","ref":"DecisionStatus"},
+                category: {"in":"query","name":"category","dataType":"string"},
+                page: {"default":1,"in":"query","name":"page","dataType":"double"},
+                size: {"default":20,"in":"query","name":"size","dataType":"double"},
         };
         app.get('/api/v1/decisions',
             authenticateMiddleware([{"jwt":[]}]),

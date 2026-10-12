@@ -15,6 +15,10 @@ export interface QueryDecisionsFilter {
 export class DecisionService {
   constructor(private repo: DecisionRepository) {}
 
+  async browseDecisions(filter: Parameters<DecisionRepository['browseDecisions']>[0]) {
+    return this.repo.browseDecisions(filter);
+  }
+
   async getDecisions(filter: QueryDecisionsFilter): Promise<Decision[]> {
     return this.repo.getDecisions(filter);
   }
