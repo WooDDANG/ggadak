@@ -44,8 +44,6 @@ export class MessageHandler {
         },
       );
 
-      await this.onAddReaction(message, '👀');
-
       // Thin delegation to the deep engine — engine encapsulates debounce and in-flight locks
       await this.engine.harvest(
         {

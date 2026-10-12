@@ -5,7 +5,6 @@ import {
   createLogger,
   calculateDiscussionScore,
 } from '@ggaddak/shared';
-import { BotEmbedView } from '../views/embed.view.js';
 import { BackendApiService } from './backend-api.service.js';
 import { CONSENSUS_REGEX } from '../handlers/message.handler.js';
 
@@ -34,7 +33,6 @@ export interface ScanOptions {
 
 export class DiscussionHarvester {
   private static instance: DiscussionHarvester | null = null;
-  private inFlightChannels = new Set<string>();
 
   constructor(private backendApi: BackendApiService) {
     DiscussionHarvester.instance = this;
@@ -164,6 +162,7 @@ export class DiscussionHarvester {
     policy: HarvestingPolicyConfig,
     isManualOverride: boolean = false,
     traceId?: string,
+    triggers: Message[] = [message],
   ): Promise<Decision[] | null> {
     const channel = message.channel;
     if (!channel || !channel.isTextBased()) return null;
@@ -172,38 +171,28 @@ export class DiscussionHarvester {
     const currentTraceId =
       traceId || `trc-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
     const startTime = Date.now();
-    const channelId = channel.id;
     const channelName = 'name' in channel ? (channel.name as string) : 'dm';
-
-    if (this.inFlightChannels.has(channelId) && !isManualOverride) {
-      logger.info(`Channel #${channelId} is already in-flight. Skipping duplicate trigger.`, {
-        stage: 'LOCK',
-        traceId: currentTraceId,
-        channel: channelName,
-      });
-      return null;
-    }
-
-    this.inFlightChannels.add(channelId);
-    logger.info(`Acquired in-flight processing lock for #${channelName}`, {
-      stage: 'LOCK',
-      traceId: currentTraceId,
-      channel: channelName,
-    });
-
-    const lockSafetyTimeout = setTimeout(() => {
-      if (this.inFlightChannels.has(channelId)) {
-        logger.warn(`Channel #${channelName} lock exceeded 60s safety TTL. Force releasing.`, {
-          stage: 'LOCK',
-          traceId: currentTraceId,
-        });
-        this.inFlightChannels.delete(channelId);
-      }
-    }, 60000);
 
     try {
       const harvestStart = Date.now();
       const rawMessages = await this.harvestContextMessages(message, policy);
+      for (const trigger of triggers) {
+        const existing = rawMessages.find(m => m.id === trigger.id);
+        if (existing) existing.isTrigger = true;
+        else
+          rawMessages.push({
+            id: trigger.id,
+            authorId: trigger.author?.id || 'unknown',
+            authorName: trigger.author?.username || 'unknown',
+            content: trigger.content || '',
+            createdAt: trigger.createdAt || new Date(),
+            referenceMessageId: trigger.reference?.messageId,
+            ...this.extractReactions(trigger),
+            isTrigger: true,
+          });
+      }
+      rawMessages.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+
       const harvestDuration = Date.now() - harvestStart;
       const participants = Array.from(new Set(rawMessages.map(m => m.authorName)));
       const totalReactions = rawMessages.reduce((sum, m) => sum + (m.reactionCount || 0), 0);
@@ -228,28 +217,31 @@ export class DiscussionHarvester {
       );
 
       const beStart = Date.now();
-      const result = await this.backendApi.analyzeDiscussion({
-        rawMessages: rawMessages.map(m => ({
-          id: m.id,
-          author: m.authorName,
-          content: m.content,
-          createdAt: m.createdAt.toISOString(),
-          replyingTo: m.referenceMessageId,
-          reactionCount: m.reactionCount || 0,
-          reactions: m.reactions || [],
-          isTrigger: m.isTrigger || false,
-        })),
-        guildId: message.guildId || undefined,
-        channelId: message.channelId,
-        channelName,
-        triggerMessageId: message.id,
-        messageUrl: message.url,
-        isManualOverride,
-        traceId: currentTraceId,
-        score: scoreResult.score,
-        participantCount: participants.length,
-        reactionsCount: totalReactions,
-      });
+      const result = await this.backendApi.analyzeDiscussion(
+        {
+          rawMessages: rawMessages.map(m => ({
+            id: m.id,
+            author: m.authorName,
+            content: m.content,
+            createdAt: m.createdAt.toISOString(),
+            replyingTo: m.referenceMessageId,
+            reactionCount: m.reactionCount || 0,
+            reactions: m.reactions || [],
+            isTrigger: m.isTrigger || false,
+          })),
+          guildId: message.guildId || undefined,
+          channelId: message.channelId,
+          channelName,
+          triggerMessageId: message.id,
+          messageUrl: message.url,
+          isManualOverride,
+          traceId: currentTraceId,
+          score: scoreResult.score,
+          participantCount: participants.length,
+          reactionsCount: totalReactions,
+        },
+        () => this.addReactionSafely(message, '👀'),
+      );
       const beDuration = Date.now() - beStart;
 
       if (!result.found || !result.decisions || result.decisions.length === 0) {
@@ -292,14 +284,7 @@ export class DiscussionHarvester {
       });
       await this.removeReactionSafely(message, '👀');
       await this.addReactionSafely(message, '⚠️');
-      return null;
-    } finally {
-      clearTimeout(lockSafetyTimeout);
-      this.inFlightChannels.delete(channelId);
-      logger.info(`Released processing lock for #${channelName}`, {
-        stage: 'LOCK',
-        traceId: currentTraceId,
-      });
+      throw err;
     }
   }
 
@@ -451,6 +436,7 @@ export class DiscussionHarvester {
     let totalMessages = 0;
     let totalDecisions = 0;
     let channelCount = 0;
+    const failures: string[] = [];
 
     for (const channel of guild.channels.cache.values()) {
       if (
@@ -467,9 +453,14 @@ export class DiscussionHarvester {
         channelCount++;
       } catch (err: any) {
         logger.warn(`[Scan] Error scanning #${channel.name}: ${err.message}`);
+        failures.push(`${channel.name}: ${err.message}`);
       }
     }
 
+    if (failures.length)
+      throw new Error(
+        `${failures.length} channel scan(s) queued or failed: ${failures.join('; ')}`,
+      );
     return { channelCount, scannedCount: totalMessages, decisionsCount: totalDecisions };
   }
 
@@ -509,9 +500,8 @@ export class DiscussionHarvester {
   async removeReactionSafely(message: Message, emoji: string): Promise<void> {
     try {
       const existing = message.reactions?.cache?.find((r: any) => r.emoji.name === emoji);
-      if (existing && existing.remove) {
-        await existing.remove().catch(() => {});
-      }
+      const botId = message.client?.user?.id;
+      if (existing && botId && existing.users?.remove) await existing.users.remove(botId);
     } catch (err: any) {
       logger.warn(`[Reaction] Failed to remove '${emoji}' reaction: ${err.message}`);
     }

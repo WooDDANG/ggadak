@@ -29,7 +29,7 @@ test('failed delivery survives restart and retry retains its Analysis Request an
     assert.equal(retried[0].result.decisions[0].id, 'candidate');
     assert.deepEqual(sent[1], sent[0]);
     assert.ok(sent[0].requestId);
-    assert.equal((await readdir(directory)).length, 0);
+    assert.equal((await readdir(directory)).length, 1);
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
@@ -97,13 +97,16 @@ test('event analysis failure removes processing reaction, marks failure and keep
       isThread: () => false,
       messages: { fetch: async () => new Map() },
     },
+    client: { user: { id: 'bot' } },
     reactions: {
       cache: {
         values: () => [],
         find: () => ({
           emoji: { name: '👀' },
-          remove: async () => {
-            reactions.push('removed 👀');
+          users: {
+            remove: async () => {
+              reactions.push('removed 👀');
+            },
           },
         }),
       },
@@ -113,11 +116,11 @@ test('event analysis failure removes processing reaction, marks failure and keep
     },
   };
   try {
-    assert.equal(
-      await new DiscussionHarvester(api).processAnalysis(message, DEFAULT_HARVESTING_POLICY),
-      null,
+    await assert.rejects(
+      new DiscussionHarvester(api).processAnalysis(message, DEFAULT_HARVESTING_POLICY),
+      /503/,
     );
-    assert.deepEqual(reactions, ['removed 👀', '⚠️']);
+    assert.deepEqual(reactions, ['👀', 'removed 👀', '⚠️']);
     assert.equal((await readdir(directory)).length, 1);
   } finally {
     await rm(directory, { recursive: true, force: true });
@@ -210,7 +213,7 @@ test('permanent failure retained first in journal does not starve a later legacy
     assert.deepEqual(await api.retryPendingAnalyses(1), []);
     assert.equal((await api.retryPendingAnalyses(1))[0].payload.requestId, 'good');
     assert.deepEqual(sent, ['bad', 'good']);
-    assert.equal((await readdir(directory)).length, 1);
+    assert.equal((await readdir(directory)).length, 2);
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
@@ -227,7 +230,14 @@ test('transient retry budget and exponential backoff survive restart; explicit r
       ? Response.json({ found: true, decisions: [{ id: 'recovered' }] })
       : new Response('', { status: 503 });
   };
-  const create = () => new BackendApiService('http://fixture', directory, transport, () => clock);
+  const create = () =>
+    new BackendApiService('http://fixture', directory, transport, () => clock, undefined, {
+      maxAttempts: 3,
+      initialDelayMs: 60000,
+      maxDelayMs: 300000,
+      timeoutMs: 50000,
+      jitter: 0,
+    });
   const payload = {
     requestId: 'budget',
     rawMessages: [{ id: '100', content: 'original' }],
@@ -253,7 +263,7 @@ test('transient retry budget and exponential backoff survive restart; explicit r
     online = true;
     assert.equal((await create().retryAnalysisRequest('budget')).decisions[0].id, 'recovered');
     assert.deepEqual(sent, [payload, payload, payload, payload]);
-    assert.equal((await readdir(directory)).length, 0);
+    assert.equal((await readdir(directory)).length, 1);
   } finally {
     await rm(directory, { recursive: true, force: true });
   }

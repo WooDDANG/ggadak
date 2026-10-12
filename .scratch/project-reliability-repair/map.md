@@ -16,6 +16,7 @@ Whole-project review identified persistence, checkpoint, semantic admission, con
 - Database authority resolved: async persistent reads/writes, restart-safe full domain, additive legacy migration and safe conflict-reporting tools. [Ticket 01](issues/01-database-authority-and-migration.md).
 
 - Idempotent analysis resolved: durable request replay/fenced claims, atomic candidates and completion, exact reuse preserving review state, original evidence/reply identity and manual/overlap history. [Ticket 02](issues/02-idempotent-analysis-and-candidate-history.md).
+- Durable delivery resolved: requests persist before channel waiting; shared channel execution, bounded retries/timeouts, settled debounce, explicit AI failures and persisted Web retry/status protocol. [Ticket 03](issues/03-durable-delivery-and-channel-scheduling.md). Operational/storage notes: [delivery configuration](delivery-operations.md).
 - Atomic review resolved: required versions, transactional replacement and explicit task disposition; stale/concurrent review conflicts, compatibility route validation and SQLite rollback/restart verification. [Ticket 06](issues/06-atomic-review-and-action-items.md).
 
 ## Implementation map
@@ -38,3 +39,5 @@ Whole-project review identified persistence, checkpoint, semantic admission, con
 
 - Integration branch: `codex/project-reliability-repair`.
 - Approved test seams: persistent repository/review APIs, production discussion analysis API with injected AI, Bot delivery/harvesting public interfaces, and Web review/recovery HTTP behavior, as specified in spec.md.
+
+- Ticket 03 resumed on `codex/reliability-03-resume` from the completed backend architecture refactor on `main`; 120 full-suite tests and required checks pass.

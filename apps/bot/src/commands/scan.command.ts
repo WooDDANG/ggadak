@@ -1,7 +1,7 @@
 import { CommandInteraction, ApplicationCommandOptionType, TextChannel } from 'discord.js';
 import { Discord, Slash, SlashOption, SlashChoice } from 'discordx';
 import { DEFAULT_HARVESTING_POLICY, createLogger } from '@ggaddak/shared';
-import { BackendApiService } from '../services/backend-api.service.js';
+import { AnalysisDeliveryError, BackendApiService } from '../services/backend-api.service.js';
 import { AnalysisService, DecisionHarvestingEngine } from '../services/analysis.service.js';
 
 const logger = createLogger('SCAN-CMD');
@@ -72,6 +72,7 @@ export class ScanCommand {
 
     try {
       const scanOptions = {
+        forceFullSync: true,
         full: full ?? (hours ? false : false),
         hours,
         limit: limit || (full ? undefined : 50),
@@ -123,7 +124,11 @@ export class ScanCommand {
       }
     } catch (err: any) {
       logger.error(`Error during scan command: ${err.message}`, { stack: err.stack });
-      await interaction.editReply(`⚠️ 스캔 중 오류 발생: ${err.message}`);
+      const status =
+        err instanceof AnalysisDeliveryError && err.outcome === 'retry-pending'
+          ? '분석 요청을 보관했습니다. 연결 복구 후 자동 재시도합니다.'
+          : '스캔을 완료하지 못했습니다. 보관된 실패 요청을 확인해 주세요.';
+      await interaction.editReply(`⚠️ ${status}`);
     }
   }
 }

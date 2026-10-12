@@ -54,6 +54,7 @@ export interface AppConfig {
   harvestingPolicy: HarvestingPolicyConfig;
   ai: {
     provider: string;
+    model?: string;
     geminiApiKey?: string;
     openaiApiKey?: string;
   };
@@ -66,7 +67,9 @@ export const config: AppConfig = {
     return parseAuthConfig(process.env);
   },
   port: parseInt(process.env.PORT || '3001', 10),
-  nodeEnv: process.env.NODE_ENV || 'development',
+  get nodeEnv() {
+    return process.env.NODE_ENV || 'development';
+  },
   cors: {
     origins: (process.env.CORS_ORIGINS || 'http://localhost:5173,http://localhost:3000')
       .split(',')
@@ -74,10 +77,13 @@ export const config: AppConfig = {
       .filter(origin => origin && origin !== '*'),
   },
   harvestingPolicy: getHarvestingPolicyFromEnv() || DEFAULT_HARVESTING_POLICY,
-  ai: {
-    provider: process.env.AI_PROVIDER || 'gemini',
-    geminiApiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GEMINI_API_KEY,
-    openaiApiKey: process.env.OPENAI_API_KEY,
+  get ai() {
+    return {
+      provider: process.env.AI_PROVIDER || 'gemini',
+      model: process.env.AI_MODEL,
+      geminiApiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GEMINI_API_KEY,
+      openaiApiKey: process.env.OPENAI_API_KEY,
+    };
   },
 };
 

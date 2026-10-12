@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import { DiscussionHarvester, RawMessageData } from './services/harvester.service.js';
-import { DEFAULT_HARVESTING_POLICY, Decision } from '@ggaddak/shared';
+import { DiscussionHarvester } from './services/harvester.service.js';
+import { DEFAULT_HARVESTING_POLICY } from '@ggaddak/shared';
 
 describe('DiscussionHarvester Deep Module', () => {
   it('harvests asymmetric context window (before 15, after 5) in text channels', async () => {
@@ -57,9 +57,10 @@ describe('DiscussionHarvester Deep Module', () => {
     assert.strictEqual(harvested[20].id, 'msg-25');
   });
 
-  it('acquires in-flight lock and rejects concurrent duplicate analyses on the same channel', async () => {
+  it('retains concurrent event analyses rather than dropping the later trigger', async () => {
     let analyzeCallCount = 0;
     const harvester = new DiscussionHarvester({
+      isMonitoredChannel: async () => true,
       analyzeDiscussion: async () => {
         analyzeCallCount++;
         await new Promise(r => setTimeout(r, 50));
@@ -97,8 +98,8 @@ describe('DiscussionHarvester Deep Module', () => {
 
     const [res1, res2] = await Promise.all([p1, p2]);
     assert.ok(res1 !== null);
-    assert.strictEqual(res2, null); // skipped by lock
-    assert.strictEqual(analyzeCallCount, 1);
+    assert.ok(res2 !== null);
+    assert.strictEqual(analyzeCallCount, 2);
   });
 
   it('CONSENSUS_REGEX accurately matches agreement phrases and ignores casual talk', async () => {
@@ -145,7 +146,7 @@ describe('DiscussionHarvester Deep Module', () => {
       debounceMs: 5,
     });
 
-    assert.strictEqual(reactionCount, 1);
+    assert.strictEqual(reactionCount, 0);
     assert.strictEqual(triggerCount, 1);
   });
 
@@ -171,15 +172,17 @@ describe('DiscussionHarvester Deep Module', () => {
     // First call acquires in-flight lock (manual override to bypass debounce)
     const p1 = engine.harvest({ type: 'EVENT', message: testMsg, isManualOverride: true });
     // Second concurrent call on same channel is deduplicated/locked
-    const p2 = engine.harvest({ type: 'EVENT', message: testMsg, isManualOverride: false });
+    const p2 = engine.harvest(
+      { type: 'EVENT', message: testMsg, isManualOverride: false },
+      { ...DEFAULT_HARVESTING_POLICY, debounceMs: 1 },
+    );
 
     const [res1, res2] = await Promise.all([p1, p2]);
 
     assert.strictEqual(res1.success, true);
     assert.strictEqual(res1.decisionsCount, 1);
-    assert.strictEqual(res2.success, false);
-    assert.strictEqual(res2.summary, 'in-flight locked');
-    assert.strictEqual(sinkCalls, 1);
+    assert.strictEqual(res2.success, true);
+    assert.strictEqual(sinkCalls, 2);
   });
 
   it('DecisionHarvestingEngine properly resolves debounce timer on normal event triggers', async () => {

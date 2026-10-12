@@ -61,6 +61,9 @@ export async function initLoaders({
     prisma.externalFeedback.findFirst(),
     prisma.channelCheckpoint.findFirst(),
     prisma.rejectedEvidenceHash.findFirst(),
+    prisma.analysisDelivery.findFirst(),
+    prisma.analysisRetryCommand.findFirst(),
+    prisma.analysisDeliveryHeartbeat.findFirst(),
   ]);
 
   // 2. Database Loader

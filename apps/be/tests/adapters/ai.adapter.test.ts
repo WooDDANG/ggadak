@@ -59,3 +59,23 @@ test('fixed Gemini response validates without calling another provider', async (
     decisions: [],
   });
 });
+
+test('configured model is used and unavailable models are permanent failures while provider outages are retryable', async () => {
+  for (const [status, expected] of [
+    [404, 422],
+    [429, 503],
+    [503, 503],
+  ]) {
+    const adapter = new AiAdapter(
+      { provider: 'gemini', model: 'configured-model', geminiApiKey: 'fixture' },
+      'production',
+      async url => {
+        expect(String(url)).toContain('/models/configured-model:generateContent');
+        return new Response('', { status });
+      },
+    );
+    await expect(adapter.analyzeTranscript('SQLite를 채택합시다')).rejects.toMatchObject({
+      statusCode: expected,
+    });
+  }
+});

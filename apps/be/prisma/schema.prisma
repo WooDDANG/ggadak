@@ -201,3 +201,30 @@ model DecisionEmbedding {
   vectorJson String
   updatedAt DateTime @updatedAt
 }
+
+model AnalysisDelivery {
+  requestId String @id
+  guildId String
+  channelId String
+  status String
+  attempts Int
+  nextAttemptAt Float
+  errorCategory String?
+  lastError String?
+  synchronizedAt DateTime
+  @@index([guildId])
+}
+
+model AnalysisRetryCommand {
+  id String @id
+  requestId String
+  guildId String
+  acknowledgedAt DateTime?
+  createdAt DateTime @default(now())
+  @@index([acknowledgedAt])
+}
+
+model AnalysisDeliveryHeartbeat {
+  id String @id
+  synchronizedAt DateTime
+}

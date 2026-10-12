@@ -123,6 +123,24 @@ export class DecisionTrackerBot {
       }, 5_000);
       syncTimer.unref();
 
+      let synchronizing = false;
+      const synchronize = async () => {
+        if (synchronizing) return;
+        synchronizing = true;
+        try {
+          await this.backendApi.synchronizeDeliveryStatus();
+        } catch (error: any) {
+          logger.warn(`Queue status synchronization unavailable: ${error.message}`);
+        } finally {
+          synchronizing = false;
+        }
+      };
+      void synchronize();
+      const statusTimer = setInterval(() => {
+        void synchronize();
+      }, 5000);
+      statusTimer.unref();
+
       let recovering = false;
       const recover = async () => {
         if (recovering) return;
@@ -153,7 +171,7 @@ export class DecisionTrackerBot {
       void recover();
       const retryTimer = setInterval(() => {
         void recover();
-      }, 60_000);
+      }, 1_000);
       retryTimer.unref();
     });
 
@@ -168,7 +186,11 @@ export class DecisionTrackerBot {
   }
 
   async handleReactionTrigger(message: Message): Promise<Decision[] | null> {
-    return this.analysisService.executeAnalysis(message, this.policy, true);
+    const result = await this.engine.harvest(
+      { type: 'EVENT', message, isManualOverride: true },
+      this.policy,
+    );
+    return result.success ? result.decisions : null;
   }
 
   async start(): Promise<void> {
