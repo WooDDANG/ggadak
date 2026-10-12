@@ -1,3 +1,4 @@
+import { WhySearch } from './features/WhySearch';
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ReviewAction, ExternalFeedback } from '@ggaddak/shared';
@@ -13,7 +14,7 @@ import { FeedbackBoard } from './features/feedback-board/FeedbackBoard';
 export function App() { return <AuthGate>{guildId => <ServerApp key={guildId} guildId={guildId} />}</AuthGate>; }
 
 function ServerApp({ guildId }: { guildId: string }) {
-  const [activeTab, setActiveTab] = useState<'review' | 'timeline' | 'feedback' | 'settings'>('review');
+  const [activeTab, setActiveTab] = useState<'review' | 'timeline' | 'feedback' | 'settings' | 'search'>('review');
   const queryClient = useQueryClient();
 
   // 1. Fetch Decisions Query
@@ -59,6 +60,7 @@ function ServerApp({ guildId }: { guildId: string }) {
       />
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {activeTab === 'search' && <WhySearch key={guildId} guildId={guildId} />}
         {activeTab === 'settings' && <ChannelSettings key={guildId} guildId={guildId} />}
         {activeTab === 'review' && (
           <ReviewQueue

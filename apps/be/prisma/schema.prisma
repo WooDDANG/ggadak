@@ -8,6 +8,7 @@ generator client {
 }
 
 model Decision {
+  embedding DecisionEmbedding?
   id              String   @id
   domainJson      String?
   lifecycle       String @default("IN_REVIEW")
@@ -153,4 +154,13 @@ model MonitoredChannel {
   updatedAt DateTime @updatedAt
   guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
   @@index([guildId])
+}
+
+model DecisionEmbedding {
+  decisionId String @id
+  decision Decision @relation(fields: [decisionId], references: [id], onDelete: Cascade)
+  model String
+  contentHash String
+  vectorJson String
+  updatedAt DateTime @updatedAt
 }

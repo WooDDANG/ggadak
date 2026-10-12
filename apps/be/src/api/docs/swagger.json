@@ -642,6 +642,72 @@
 				"type": "object",
 				"additionalProperties": false
 			},
+			"SearchResult": {
+				"properties": {
+					"decision": {
+						"$ref": "#/components/schemas/V1DecisionDto"
+					},
+					"score": {
+						"type": "number",
+						"format": "double"
+					},
+					"excerpt": {
+						"type": "string"
+					},
+					"sourceUrl": {
+						"type": "string",
+						"nullable": true
+					}
+				},
+				"required": [
+					"decision",
+					"score",
+					"excerpt",
+					"sourceUrl"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"SearchResponse": {
+				"properties": {
+					"items": {
+						"items": {
+							"$ref": "#/components/schemas/SearchResult"
+						},
+						"type": "array"
+					}
+				},
+				"required": [
+					"items"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"ApiResponse_SearchResponse_": {
+				"description": "Shared v1 response contract. Domain payloads remain typed by each endpoint.",
+				"properties": {
+					"success": {
+						"type": "boolean"
+					},
+					"code": {
+						"type": "string"
+					},
+					"message": {
+						"type": "string"
+					},
+					"data": {
+						"$ref": "#/components/schemas/SearchResponse"
+					}
+				},
+				"required": [
+					"success",
+					"code",
+					"message",
+					"data"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
 			"HarvestingPolicyDto": {
 				"properties": {
 					"initialScanLimit": {
@@ -1704,6 +1770,60 @@
 						"required": false,
 						"schema": {
 							"default": 20,
+							"format": "double",
+							"type": "number"
+						}
+					}
+				]
+			}
+		},
+		"/api/v1/search": {
+			"get": {
+				"operationId": "SearchDecisions",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiResponse_SearchResponse_"
+								}
+							}
+						}
+					}
+				},
+				"description": "Semantic search of CONFIRMED and SUPERSEDED decisions in one authorized guild.",
+				"tags": [
+					"Why Search"
+				],
+				"security": [
+					{
+						"jwt": []
+					}
+				],
+				"parameters": [
+					{
+						"in": "query",
+						"name": "guildId",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"in": "query",
+						"name": "query",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"in": "query",
+						"name": "limit",
+						"required": false,
+						"schema": {
+							"default": 10,
 							"format": "double",
 							"type": "number"
 						}

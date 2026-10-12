@@ -1,3 +1,5 @@
+import { SearchService, EmbeddingProvider } from '../services/search.service.js';
+import { SearchController } from '../api/controllers/search.controller.js';
 import { ChannelsService } from '../services/channels.service.js';
 import { ChannelsController, InternalMonitoringController } from '../api/controllers/channels.controller.js';
 import { AuthController } from '../api/controllers/auth.controller.js';
@@ -29,11 +31,13 @@ export interface LoaderOptions {
   repo?: DecisionRepository;
   aiAdapter?: IAiAdapter;
   authOptions?: AuthOptions;
+  embeddingProvider?: EmbeddingProvider;
 }
 
 export async function initLoaders({
   expressApp,
   authOptions,
+  embeddingProvider,
   repo: customRepo,
   aiAdapter: customAiAdapter,
 }: LoaderOptions): Promise<{
@@ -65,6 +69,7 @@ export async function initLoaders({
 
   const authService = new AuthService(prisma, authOptions);
   container.set(AuthService, authService);
+  container.set(SearchController, new SearchController(new SearchService(repo, embeddingProvider), authService));
   expressApp.locals.authService = authService;
 
   const channelsService = new ChannelsService(prisma, authOptions?.channelAdapter);
