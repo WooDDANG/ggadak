@@ -24,7 +24,7 @@ export function initExpress({ app }: { app: Express }): void {
   );
 
   // 2. CORS
-  app.use(cors({ origin: config.cors.origins.includes('*') ? true : config.cors.origins, credentials: true }));
+  app.use(cors({ origin: config.cors.origins, credentials: true }));
 
   // 3. Body Parsing
   app.use(express.json({ limit: '10mb' }));

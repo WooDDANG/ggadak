@@ -76,7 +76,8 @@ test('event analysis failure removes processing reaction, marks failure and keep
   const api = new BackendApiService(
     'http://fixture',
     directory,
-    async () => new Response('', { status: 503 }),
+    async url => String(url).includes('/internal/monitoring') ? Response.json({ data: { channelIds: ['channel'] } }) : new Response('', { status: 503 }),
+    undefined, 'test-service',
   );
   const message: any = {
     id: '100',
@@ -126,6 +127,7 @@ test('scan failure never advances checkpoint; a successful no-decision retry can
   let offline = true;
   let checkpointWrites = 0;
   const api = new BackendApiService('http://fixture', directory, async (url, init) => {
+    if (String(url).includes('/internal/monitoring')) return Response.json({ data: { channelIds: ['channel'] } });
     if (String(url).endsWith('/checkpoint')) {
       if (init?.method === 'POST') checkpointWrites++;
       return Response.json({});
@@ -133,11 +135,12 @@ test('scan failure never advances checkpoint; a successful no-decision retry can
     return offline
       ? new Response('', { status: 503 })
       : Response.json({ found: false, decisions: [] });
-  });
+  }, undefined, 'test-service');
   const channel: any = {
     id: 'channel',
     name: 'general',
     guildId: 'guild',
+    guild: { id: 'guild' },
     messages: {
       fetch: async () =>
         new Map([

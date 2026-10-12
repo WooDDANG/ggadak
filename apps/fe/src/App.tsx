@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ReviewAction, ExternalFeedback } from '@ggaddak/shared';
 import { decisionsApi } from './api/decisions.api';
+import { ChannelSettings } from './features/ChannelSettings';
 import { AuthGate } from './features/AuthGate';
 import { decisionsQueryKey } from './api/session';
 import { Header } from './components/Header';
@@ -14,7 +15,7 @@ export function App() {
 }
 
 function ServerApp({ guildId }: { guildId: string }) {
-  const [activeTab, setActiveTab] = useState<'review' | 'timeline' | 'feedback'>('review');
+  const [activeTab, setActiveTab] = useState<'review' | 'timeline' | 'feedback' | 'settings'>('review');
   const queryClient = useQueryClient();
 
   // 1. Fetch Decisions Query
@@ -80,6 +81,7 @@ function ServerApp({ guildId }: { guildId: string }) {
       />
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {activeTab === 'settings' && <ChannelSettings key={guildId} guildId={guildId} />}
         {activeTab === 'review' && queueError && (
           <p role="alert" className="text-rose-300">
             검수 큐를 불러오지 못했습니다. {queueError.message}

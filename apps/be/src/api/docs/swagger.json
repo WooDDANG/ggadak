@@ -1616,6 +1616,118 @@
 				"type": "object",
 				"additionalProperties": false
 			},
+			"DiscordChannel": {
+				"properties": {
+					"id": {
+						"type": "string"
+					},
+					"guildId": {
+						"type": "string"
+					},
+					"name": {
+						"type": "string"
+					},
+					"type": {
+						"type": "number",
+						"format": "double"
+					},
+					"accessible": {
+						"type": "boolean"
+					}
+				},
+				"required": [
+					"id",
+					"guildId",
+					"name",
+					"type",
+					"accessible"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"ChannelSettings": {
+				"properties": {
+					"channels": {
+						"items": {
+							"$ref": "#/components/schemas/DiscordChannel"
+						},
+						"type": "array"
+					},
+					"monitoredChannelIds": {
+						"items": {
+							"type": "string"
+						},
+						"type": "array"
+					}
+				},
+				"required": [
+					"channels",
+					"monitoredChannelIds"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"ApiResponse_ChannelSettings_": {
+				"description": "Shared v1 response contract. Domain payloads remain typed by each endpoint.",
+				"properties": {
+					"success": {
+						"type": "boolean"
+					},
+					"code": {
+						"type": "string"
+					},
+					"message": {
+						"type": "string"
+					},
+					"data": {
+						"$ref": "#/components/schemas/ChannelSettings"
+					}
+				},
+				"required": [
+					"success",
+					"code",
+					"message",
+					"data"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"ApiResponse__channelIds-string-Array__": {
+				"description": "Shared v1 response contract. Domain payloads remain typed by each endpoint.",
+				"properties": {
+					"success": {
+						"type": "boolean"
+					},
+					"code": {
+						"type": "string"
+					},
+					"message": {
+						"type": "string"
+					},
+					"data": {
+						"properties": {
+							"channelIds": {
+								"items": {
+									"type": "string"
+								},
+								"type": "array"
+							}
+						},
+						"required": [
+							"channelIds"
+						],
+						"type": "object"
+					}
+				},
+				"required": [
+					"success",
+					"code",
+					"message",
+					"data"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
 			"ApiResponse__url-string__": {
 				"description": "Shared v1 response contract. Domain payloads remain typed by each endpoint.",
 				"properties": {
@@ -2594,6 +2706,130 @@
 						}
 					}
 				}
+			}
+		},
+		"/api/v1/discord/channels": {
+			"get": {
+				"operationId": "ListDiscordChannels",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiResponse_ChannelSettings_"
+								}
+							}
+						}
+					}
+				},
+				"tags": [
+					"Discord"
+				],
+				"security": [
+					{
+						"jwt": []
+					}
+				],
+				"parameters": [
+					{
+						"in": "query",
+						"name": "guildId",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				]
+			},
+			"put": {
+				"operationId": "SaveDiscordChannels",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiResponse_ChannelSettings_"
+								}
+							}
+						}
+					}
+				},
+				"tags": [
+					"Discord"
+				],
+				"security": [
+					{
+						"jwt": []
+					}
+				],
+				"parameters": [
+					{
+						"in": "query",
+						"name": "guildId",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"properties": {
+									"channelIds": {
+										"items": {
+											"type": "string"
+										},
+										"type": "array"
+									}
+								},
+								"required": [
+									"channelIds"
+								],
+								"type": "object"
+							}
+						}
+					}
+				}
+			}
+		},
+		"/api/v1/internal/monitoring": {
+			"get": {
+				"operationId": "GetMonitoredChannels",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiResponse__channelIds-string-Array__"
+								}
+							}
+						}
+					}
+				},
+				"tags": [
+					"Internal"
+				],
+				"security": [
+					{
+						"service": []
+					}
+				],
+				"parameters": [
+					{
+						"in": "query",
+						"name": "guildId",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				]
 			}
 		},
 		"/api/v1/auth/authorize": {
