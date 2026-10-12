@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { CategoryTagSchema, ReviewActionSchema, DecisionPayloadSchema } from '@ggaddak/shared';
+import { CategoryTagSchema, ReviewActionSchema } from '@ggaddak/shared';
 
 export interface AlternativeItemDto {
   option: string;
@@ -7,6 +7,11 @@ export interface AlternativeItemDto {
 }
 
 export interface ActionItemDto {
+  id?: string;
+  state?: 'unknown' | 'open' | 'completed' | 'canceled' | 'transferred';
+  transferredFromDecisionId?: string;
+  transferredFromActionItemId?: string;
+  transferredToDecisionId?: string;
   task: string;
   assignee?: string;
   dueDate?: string;
@@ -14,11 +19,15 @@ export interface ActionItemDto {
 
 export interface DecisionItemDto {
   id: string;
+  version?: number;
+  supersededById?: string | null;
   topic: string;
   decision: string;
   title?: string;
   decisionContent?: string;
   rationale: string;
+  rationaleSummary?: string;
+  rationaleQuotes?: string[];
   alternatives?: AlternativeItemDto[];
   categoryTag?: '타깃' | '문제정의' | '기능' | '기술' | 'BM' | '기타';
   actionItems?: ActionItemDto[];
@@ -53,30 +62,22 @@ export const ReviewDecisionDtoSchema = ReviewActionSchema;
 
 export interface ReviewDecisionDto {
   action: 'confirm' | 'defer' | 'reject' | 'edit';
+  expectedVersion: number;
+  resolution?: 'independent' | 'replace';
+  predecessorId?: string;
+  predecessorVersion?: number;
+  taskDispositions?: {
+    actionItemId: string;
+    classification?: 'open' | 'completed';
+    disposition?: 'cancel' | 'transfer';
+  }[];
+  rationaleSummary?: string;
+  rationaleQuotes?: string[];
   approvedBy?: string;
   title?: string;
   decisionContent?: string;
   rationale?: string;
   categoryTag?: '타깃' | '문제정의' | '기능' | '기술' | 'BM' | '기타';
-}
-
-export const ResolveConflictDtoSchema = z.object({
-  decisionId: z.string(),
-  conflictingId: z.string(),
-  resolution: z.enum(['supersede', 'coexist']),
-});
-
-export interface ResolveConflictDto {
-  decisionId: string;
-  conflictingId: string;
-  resolution: 'supersede' | 'coexist';
-}
-
-export const DecisionWebhookDtoSchema = DecisionPayloadSchema;
-
-export interface DecisionWebhookDto {
-  event: string;
-  payload: any;
 }
 
 export interface DecisionListResponseDto {

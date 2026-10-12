@@ -1,5 +1,9 @@
 import dotenv from 'dotenv';
-import { DEFAULT_HARVESTING_POLICY, HarvestingPolicyConfig, getHarvestingPolicyFromEnv } from '@ggaddak/shared';
+import {
+  DEFAULT_HARVESTING_POLICY,
+  HarvestingPolicyConfig,
+  getHarvestingPolicyFromEnv,
+} from '@ggaddak/shared';
 
 dotenv.config();
 
@@ -21,12 +25,12 @@ export const config: AppConfig = {
   port: parseInt(process.env.PORT || '3001', 10),
   nodeEnv: process.env.NODE_ENV || 'development',
   cors: {
-    origins: (process.env.CORS_ORIGINS || '*').split(',').map(s => s.trim()),
+    origins: (process.env.CORS_ORIGINS || 'http://localhost:5173,http://localhost:3000').split(',').map(s => s.trim()).filter(origin => origin && origin !== '*'),
   },
   harvestingPolicy: getHarvestingPolicyFromEnv() || DEFAULT_HARVESTING_POLICY,
   ai: {
-    provider: process.env.AI_PROVIDER || (process.env.GOOGLE_GENERATIVE_AI_API_KEY ? 'gemini' : (process.env.OPENAI_API_KEY ? 'openai' : 'mock')),
-    geminiApiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY,
+    provider: process.env.AI_PROVIDER || 'gemini',
+    geminiApiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GEMINI_API_KEY,
     openaiApiKey: process.env.OPENAI_API_KEY,
   },
 };

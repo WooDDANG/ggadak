@@ -7,6 +7,7 @@
 import type { RawMessageItemDto } from './rawMessageItemDto';
 
 export interface AnalyzeDiscussionRequestDto {
+  requestId: string;
   rawMessages: RawMessageItemDto[];
   guildId?: string;
   channelId?: string;
@@ -14,6 +15,7 @@ export interface AnalyzeDiscussionRequestDto {
   triggerMessageId?: string;
   messageUrl?: string;
   isManualOverride?: boolean;
+  traceId?: string;
   score?: number;
   participantCount?: number;
   reactionsCount?: number;

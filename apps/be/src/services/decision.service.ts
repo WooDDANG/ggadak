@@ -4,34 +4,40 @@ import { DecisionRepository } from '../repositories/decision.repository.js';
 
 const logger = createLogger('BE-DECISION-SERVICE');
 
-export interface QueryDecisionsFilter {
-  topic?: string;
-  state?: string;
-  categoryTag?: string;
-}
-
 @Service()
 export class DecisionService {
   constructor(private repo: DecisionRepository) {}
 
-  getDecisions(filter: QueryDecisionsFilter): Decision[] {
-    return this.repo.getDecisions(filter);
+  async editDecision(
+    id: string,
+    body: import('../dto/decision-edit.dto.js').DecisionEditDto,
+    actorId: string,
+  ) {
+    return this.repo.editDecision(id, body, actorId);
   }
 
-  getDecisionById(id: string): Decision | null {
+  async browseDecisions(filter: Parameters<DecisionRepository['browseDecisions']>[0]) {
+    return this.repo.browseDecisions(filter);
+  }
+
+  async getConfirmedTimeline(filter: Parameters<DecisionRepository['getConfirmedTimeline']>[0]) {
+    return this.repo.getConfirmedTimeline(filter);
+  }
+
+  async getDecisionById(id: string): Promise<Decision | null> {
     return this.repo.getDecisionById(id);
   }
 
-  saveDecision(decision: Decision): void {
-    this.repo.saveDecision(decision);
+  async saveDecision(decision: Decision): Promise<void> {
+    await this.repo.saveDecision(decision);
   }
 
-  reviewDecision(
+  async reviewDecision(
     decisionId: string,
     action: ReviewAction['action'],
     params: Omit<ReviewAction, 'action'>,
-  ): Decision | null {
-    const updated = this.repo.reviewDecision(decisionId, action, params);
+  ): Promise<Decision | null> {
+    const updated = await this.repo.reviewDecision(decisionId, action, params);
     if (updated) {
       logger.info(
         `[Review] Decision [${decisionId}] reviewed with action: ${action} -> state: ${updated.state}`,
@@ -40,17 +46,4 @@ export class DecisionService {
     return updated;
   }
 
-  resolveConflict(decisionId: string, conflictingId: string, resolution: string): boolean {
-    if (resolution === 'supersede' && conflictingId && decisionId) {
-      const current = this.repo.getDecisionById(decisionId);
-      if (current) {
-        current.supersedesId = conflictingId;
-        current.state = 'Decided';
-        this.repo.saveDecision(current);
-        logger.info(`[Conflict] Decision [${decisionId}] now supersedes [${conflictingId}]`);
-        return true;
-      }
-    }
-    return false;
-  }
 }

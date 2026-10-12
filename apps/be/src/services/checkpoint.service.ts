@@ -5,11 +5,11 @@ import { DecisionRepository } from '../repositories/decision.repository.js';
 export class CheckpointService {
   constructor(private repo: DecisionRepository) {}
 
-  getCheckpoint(channelId: string): string | null {
+  async getCheckpoint(channelId: string): Promise<string | null> {
     return this.repo.getCheckpoint(channelId);
   }
 
-  saveCheckpoint(channelId: string, lastMessageId: string): void {
-    this.repo.saveCheckpoint(channelId, lastMessageId);
+  async saveCheckpoint(channelId: string, lastMessageId: string): Promise<void> {
+    await this.repo.saveCheckpoint(channelId, lastMessageId);
   }
 }

@@ -1,5 +1,10 @@
 import { Client, Message, TextChannel } from 'discord.js';
-import { Decision, HarvestingPolicyConfig, createLogger, calculateDiscussionScore } from '@ggaddak/shared';
+import {
+  Decision,
+  HarvestingPolicyConfig,
+  createLogger,
+  calculateDiscussionScore,
+} from '@ggaddak/shared';
 import { BotEmbedView } from '../views/embed.view.js';
 import { BackendApiService } from './backend-api.service.js';
 import { CONSENSUS_REGEX } from '../handlers/message.handler.js';
@@ -23,6 +28,8 @@ export interface ScanOptions {
   hours?: number;
   limit?: number;
   initialOnly?: boolean;
+  forceFullSync?: boolean;
+  requestId?: string;
 }
 
 export class DiscussionHarvester {
@@ -37,7 +44,10 @@ export class DiscussionHarvester {
     return DiscussionHarvester.instance;
   }
 
-  private extractReactions(m: any): { reactionCount: number; reactions: Array<{ emoji: string; count: number }> } {
+  private extractReactions(m: any): {
+    reactionCount: number;
+    reactions: Array<{ emoji: string; count: number }>;
+  } {
     const reactions = Array.from(m.reactions?.cache?.values() || []).map((r: any) => ({
       emoji: r.emoji?.name || 'emoji',
       count: r.count || 0,
@@ -59,7 +69,9 @@ export class DiscussionHarvester {
     let rawMessages: RawMessageData[] = [];
 
     if (isThread) {
-      logger.info(`[Context] Channel #${channelName} is a Discord Thread. Harvesting thread history...`);
+      logger.info(
+        `[Context] Channel #${channelName} is a Discord Thread. Harvesting thread history...`,
+      );
       const threadLimit = Math.max(policy.maxMergedWindow, 100);
       const fetchedThread = await channel.messages.fetch({ limit: threadLimit });
       rawMessages = Array.from(fetchedThread.values())
@@ -155,8 +167,10 @@ export class DiscussionHarvester {
   ): Promise<Decision[] | null> {
     const channel = message.channel;
     if (!channel || !channel.isTextBased()) return null;
+    if (!await this.backendApi.isMonitoredChannel(message.guildId, channel.id)) return null;
 
-    const currentTraceId = traceId || `trc-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+    const currentTraceId =
+      traceId || `trc-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
     const startTime = Date.now();
     const channelId = channel.id;
     const channelName = 'name' in channel ? (channel.name as string) : 'dm';
@@ -249,10 +263,12 @@ export class DiscussionHarvester {
           },
         );
         await this.removeReactionSafely(message, '👀');
+        await this.removeReactionSafely(message, '⚠️');
         return null;
       }
 
       await this.removeReactionSafely(message, '👀');
+      await this.removeReactionSafely(message, '⚠️');
       await this.addReactionSafely(message, '📝');
 
       const totalDuration = Date.now() - startTime;
@@ -275,6 +291,7 @@ export class DiscussionHarvester {
         stack: err.stack,
       });
       await this.removeReactionSafely(message, '👀');
+      await this.addReactionSafely(message, '⚠️');
       return null;
     } finally {
       clearTimeout(lockSafetyTimeout);
@@ -301,6 +318,7 @@ export class DiscussionHarvester {
     policy: HarvestingPolicyConfig,
     options: ScanOptions = {},
   ): Promise<{ scannedCount: number; decisionsCount: number }> {
+    if (!await this.backendApi.isMonitoredChannel(channel.guild.id, channel.id)) return { scannedCount: 0, decisionsCount: 0 };
     const channelName = channel.name;
     const lastCheckpoint = await this.backendApi.getCheckpoint(channel.id);
 
@@ -368,7 +386,9 @@ export class DiscussionHarvester {
     logger.info(`[Scan] Scanning ${fetchedMessages.length} messages in #${channelName}...`);
     let decisionsFound = 0;
     const newestMessage = fetchedMessages[fetchedMessages.length - 1];
-    const participants = Array.from(new Set(fetchedMessages.map(m => m.author?.username || 'unknown')));
+    const participants = Array.from(
+      new Set(fetchedMessages.map(m => m.author?.username || 'unknown')),
+    );
     const totalReactions = fetchedMessages.reduce((sum, m) => {
       const rx = this.extractReactions(m);
       return sum + rx.reactionCount;
@@ -384,6 +404,7 @@ export class DiscussionHarvester {
 
     try {
       const result = await this.backendApi.analyzeDiscussion({
+        requestId: options.requestId,
         rawMessages: fetchedMessages.map(m => {
           const rx = this.extractReactions(m);
           return {
@@ -402,7 +423,7 @@ export class DiscussionHarvester {
         channelName,
         triggerMessageId: newestMessage.id,
         messageUrl: newestMessage.url,
-        isManualOverride: true,
+        isManualOverride: options.forceFullSync === true,
         score: scoreResult.score,
         participantCount: participants.length,
         reactionsCount: totalReactions,
@@ -413,6 +434,7 @@ export class DiscussionHarvester {
       }
     } catch (err: any) {
       logger.error(`[Scan] Error analyzing scanned messages for #${channelName}: ${err.message}`);
+      throw err;
     }
 
     await this.backendApi.saveCheckpoint(channel.id, newestMessage.id);
@@ -430,7 +452,11 @@ export class DiscussionHarvester {
     let channelCount = 0;
 
     for (const channel of guild.channels.cache.values()) {
-      if (!channel.isTextBased || !channel.isTextBased() || (channel.isThread && channel.isThread()))
+      if (
+        !channel.isTextBased ||
+        !channel.isTextBased() ||
+        (channel.isThread && channel.isThread())
+      )
         continue;
       try {
         const textChannel = channel as TextChannel;

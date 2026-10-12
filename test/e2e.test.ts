@@ -1,21 +1,68 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import { createServer } from '../apps/be/dist/server.js';
-import { DecisionRepository } from '../apps/be/dist/db.js';
-import { BackendExtractionEngine } from '../apps/be/dist/extractor/engine.js';
+import { isolatedRepository } from '../apps/be/dist/repositories/test-database.js';
+import type { IAiAdapter } from '../apps/be/dist/adapters/ai.adapter.js';
+import { fakeAuthOptions, loginAsTestUser } from '../apps/be/dist/test-support/auth.js';
+
+// Fixed AI responses keep this pipeline regression independent of providers and API keys.
+const decisionExtractor: IAiAdapter = {
+  async analyzeTranscript() {
+    return {
+      found: true,
+      summary: '두 개의 의사결정 후보',
+      decisions: [
+        {
+          topic: 'Database Selection',
+          decision: 'PostgreSQL 채택',
+          rationale: '트랜잭션 정합성 보장',
+          rationaleQuotes: [],
+          alternatives: [{ option: 'MongoDB', reason: '정합성 요구' }],
+          categoryTag: '기술',
+          actionItems: [],
+          isPivot: false,
+        },
+        {
+          topic: 'Backend Framework',
+          decision: 'Fastify 채택',
+          rationale: '비동기 처리량',
+          rationaleQuotes: [],
+          alternatives: [],
+          categoryTag: '기술',
+          actionItems: [],
+          isPivot: false,
+        },
+      ],
+    };
+  },
+};
+
+const noDecisionExtractor: IAiAdapter = {
+  async analyzeTranscript() {
+    return { found: false, summary: '의사결정 없음', decisions: [] };
+  },
+};
 
 describe('E2E Full Pipeline: Discord Messages ➔ Backend AI Core ➔ Review Queue ➔ DB ➔ Query', () => {
   it('extracts multi-decision candidates in DRAFT state and confirms via Review Queue', async () => {
     // 1. Start Backend Server with Mock AI Engine
-    const repo = new DecisionRepository();
-    const extractor = new BackendExtractionEngine();
-    const server = createServer(repo, extractor);
+    const database = await isolatedRepository();
+    const repo = database.repo;
+    const extractor = decisionExtractor;
+    const serviceToken = 'e2e-bot-secret';
+    const server = await createServer(repo, extractor, { ...fakeAuthOptions(), serviceToken });
 
-    await new Promise<void>(resolve => server.listen(0, resolve));
+    await new Promise<void>((resolve, reject) => {
+      server.once('error', reject);
+      server.listen(0, '127.0.0.1', resolve);
+    });
     const port = (server.address() as any).port;
+    const base = `http://127.0.0.1:${port}`;
+    const { token } = await loginAsTestUser(base);
+    const authHeaders = { Authorization: `Bearer ${token}` };
 
     // 2. Centralized Policy verification
-    const policyRes = await fetch(`http://localhost:${port}/api/config/policy`);
+    const policyRes = await fetch(`${base}/api/config/policy`);
     assert.strictEqual(policyRes.status, 200);
     const policy = (await policyRes.json()) as any;
     assert.strictEqual(policy.reactionThreshold, 3);
@@ -45,16 +92,17 @@ describe('E2E Full Pipeline: Discord Messages ➔ Backend AI Core ➔ Review Que
     ];
 
     // 4. Call Backend AI Analysis Endpoint
-    const analyzeRes = await fetch(`http://localhost:${port}/api/discussions/analyze`, {
+    const analyzeRes = await fetch(`${base}/api/discussions/analyze`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { Authorization: `Bearer ${serviceToken}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        requestId: 'e2e-initial',
         rawMessages,
-        guildId: 'guild-demo',
+        guildId: 'guild-1',
         channelId: 'chan-arch',
         channelName: 'dev-architecture',
         triggerMessageId: 'msg-103',
-        messageUrl: 'https://discord.com/channels/guild-demo/chan-arch/msg-103',
+        messageUrl: 'https://discord.com/channels/guild-1/chan-arch/msg-103',
       }),
     });
 
@@ -78,61 +126,67 @@ describe('E2E Full Pipeline: Discord Messages ➔ Backend AI Core ➔ Review Que
 
     // 5. Human Review Action: Confirm Postgres Decision
     const reviewRes = await fetch(
-      `http://localhost:${port}/api/decisions/${postgresDec.id}/review`,
+      `${base}/api/v1/review-queue/${postgresDec.id}/review?guildId=guild-1`,
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...authHeaders, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'confirm',
-          approvedBy: 'reviewer_wooddang',
+          expectedVersion: postgresDec.version,
+          resolution: 'independent',
         }),
       },
     );
     assert.strictEqual(reviewRes.status, 200);
     const reviewData = (await reviewRes.json()) as any;
-    assert.strictEqual(reviewData.decision.state, 'Decided');
-    assert.strictEqual(reviewData.decision.approvedBy, 'reviewer_wooddang');
+    assert.strictEqual(reviewData.data.state, 'Decided');
+    assert.strictEqual(reviewData.data.approvedBy, 'user-1');
 
-    // 6. Query Decisions via GET /api/decisions
-    const queryRes = await fetch(`http://localhost:${port}/api/decisions?state=Decided`);
+    // 6. Query confirmed decisions through the authenticated v1 read API.
+    const queryRes = await fetch(`${base}/api/v1/decisions?guildId=guild-1&status=CONFIRMED`, { headers: authHeaders });
     assert.strictEqual(queryRes.status, 200);
     const queryData = (await queryRes.json()) as any;
-    assert.strictEqual(queryData.decisions.length, 1);
-    assert.strictEqual(queryData.decisions[0].id, postgresDec.id);
+    assert.strictEqual(queryData.data.decisions.length, 1);
+    assert.strictEqual(queryData.data.decisions[0].id, postgresDec.id);
 
     // 7. Test Anti-recreation on Rejection
     const rejectRes = await fetch(
-      `http://localhost:${port}/api/decisions/${fastifyDec.id}/review`,
+      `${base}/api/v1/review-queue/${fastifyDec.id}/review?guildId=guild-1`,
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'reject' }),
+        headers: { ...authHeaders, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'reject', expectedVersion: fastifyDec.version }),
       },
     );
     assert.strictEqual(rejectRes.status, 200);
 
-    // Re-analyzing the same messages passively should be skipped by anti-recreation hash
-    const reAnalyzeRes = await fetch(`http://localhost:${port}/api/discussions/analyze`, {
+    // Re-analysis retains the confirmed candidate and suppresses only the rejected candidate.
+    const reAnalyzeRes = await fetch(`${base}/api/discussions/analyze`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { Authorization: `Bearer ${serviceToken}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        requestId: 'e2e-passive',
         rawMessages,
-        guildId: 'guild-demo',
+        guildId: 'guild-1',
         channelId: 'chan-arch',
         triggerMessageId: 'msg-103',
         isManualOverride: false,
       }),
     });
     const reAnalyzeData = (await reAnalyzeRes.json()) as any;
-    assert.strictEqual(reAnalyzeData.found, false);
+    assert.strictEqual(reAnalyzeData.found, true);
+    assert.strictEqual(reAnalyzeData.decisions.length, 1);
+    assert.strictEqual(reAnalyzeData.decisions[0].id, postgresDec.id);
+    assert.ok(!reAnalyzeData.decisions.some((d: any) => d.id === fastifyDec.id));
 
     // But with isManualOverride: true (e.g. 📌 pin added), re-analysis is permitted!
-    const manualOverrideRes = await fetch(`http://localhost:${port}/api/discussions/analyze`, {
+    const manualOverrideRes = await fetch(`${base}/api/discussions/analyze`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { Authorization: `Bearer ${serviceToken}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        requestId: 'e2e-manual',
         rawMessages,
-        guildId: 'guild-demo',
+        guildId: 'guild-1',
         channelId: 'chan-arch',
         triggerMessageId: 'msg-103',
         isManualOverride: true,
@@ -143,19 +197,26 @@ describe('E2E Full Pipeline: Discord Messages ➔ Backend AI Core ➔ Review Que
     assert.ok(manualOverrideData.decisions.length > 0);
 
     server.close();
-    repo.close();
+    await database.cleanup();
   });
 
   it('handles casual chatter with no decisions', async () => {
-    const repo = new DecisionRepository();
-    const server = createServer(repo, new BackendExtractionEngine());
-    await new Promise<void>(resolve => server.listen(0, resolve));
+    const database = await isolatedRepository();
+    const repo = database.repo;
+    const serviceToken = 'e2e-bot-secret';
+    const server = await createServer(repo, noDecisionExtractor, { ...fakeAuthOptions(), serviceToken });
+    await new Promise<void>((resolve, reject) => {
+      server.once('error', reject);
+      server.listen(0, '127.0.0.1', resolve);
+    });
     const port = (server.address() as any).port;
+    const base = `http://127.0.0.1:${port}`;
 
-    const res = await fetch(`http://localhost:${port}/api/discussions/analyze`, {
+    const res = await fetch(`${base}/api/discussions/analyze`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { Authorization: `Bearer ${serviceToken}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        requestId: 'e2e-chatter',
         rawMessages: [
           {
             author: 'wooddang',
@@ -172,6 +233,6 @@ describe('E2E Full Pipeline: Discord Messages ➔ Backend AI Core ➔ Review Que
     assert.strictEqual(data.decisions.length, 0);
 
     server.close();
-    repo.close();
+    await database.cleanup();
   });
 });

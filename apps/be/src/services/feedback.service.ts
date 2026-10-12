@@ -8,12 +8,12 @@ const logger = createLogger('BE-FEEDBACK-SERVICE');
 export class FeedbackService {
   constructor(private repo: DecisionRepository) {}
 
-  saveFeedback(feedback: ExternalFeedback): void {
-    this.repo.saveFeedback(feedback);
+  async saveFeedback(feedback: ExternalFeedback): Promise<void> {
+    await this.repo.saveFeedback(feedback);
     logger.info(`[Feedback] Saved External Feedback [${feedback.id}] Source="${feedback.source}"`);
   }
 
-  getFeedbacks(channelId?: string, limit = 10): ExternalFeedback[] {
+  async getFeedbacks(channelId?: string, limit = 10): Promise<ExternalFeedback[]> {
     return this.repo.getRecentFeedbacks(channelId, limit);
   }
 }

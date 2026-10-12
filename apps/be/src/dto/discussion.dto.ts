@@ -24,6 +24,7 @@ export const RawMessageItemDtoSchema = z.object({
 });
 
 export interface AnalyzeDiscussionRequestDto {
+  requestId: string;
   rawMessages: RawMessageItemDto[];
   guildId?: string;
   channelId?: string;
@@ -38,6 +39,7 @@ export interface AnalyzeDiscussionRequestDto {
 }
 
 export const AnalyzeDiscussionRequestDtoSchema = z.object({
+  requestId: z.string().trim().min(1),
   rawMessages: z.array(RawMessageItemDtoSchema).min(1, 'rawMessages array must not be empty'),
   guildId: z.string().optional(),
   channelId: z.string().optional(),

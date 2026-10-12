@@ -26,25 +26,56 @@ import type {
 import type {
   AnalyzeDiscussionRequestDto,
   AnalyzeDiscussionResponseDto,
+  ApiResponseAccessTokenStringTokenTypeStringExpiresAtString,
+  ApiResponseAccessTokenStringTokenTypeStringExpiresAtStringUserAuthUser,
+  ApiResponseAnyOrNull,
+  ApiResponseAuthUser,
+  ApiResponseChannelIdsStringArray,
+  ApiResponseChannelSettings,
+  ApiResponseDashboardDto,
+  ApiResponseDecisionTimelineDto,
+  ApiResponseGuildsDiscordGuildArray,
+  ApiResponseNull,
+  ApiResponseSearchResponse,
+  ApiResponseSyncJobView,
+  ApiResponseUrlString,
+  ApiResponseV1DecisionDto,
+  ApiResponseV1DecisionListDto,
+  ApiResponseV1ReviewQueueDto,
+  CandidateHistoryEntry,
   CheckpointResponseDto,
+  CreateBody,
   CreateFeedback201,
   CreateFeedbackDto,
-  DecisionListResponseDto,
-  DecisionWebhookDto,
+  CreateParams,
+  DecisionEditDto,
+  EditV1DecisionParams,
   FeedbackListResponseDto,
+  GetDashboardParams,
+  GetDecisionTimelineParams,
+  GetMonitoredChannelsParams,
+  GetParams,
+  GetV1DecisionParams,
   HarvestingPolicyDto,
-  ListDecisionsParams,
+  ListDiscordChannelsParams,
   ListFeedbacksParams,
-  Resolve200,
-  ResolveConflictDto,
-  ReviewDecisionDto,
-  ReviewDecisionResponseDto,
+  ListV1DecisionsParams,
+  ListV1ReviewQueueParams,
+  LoginDiscordBody,
+  ReviewV1CandidateParams,
   Save200,
   SaveCheckpointDto,
-  Webhook201
+  SaveDiscordChannelsBody,
+  SaveDiscordChannelsParams,
+  SearchDecisionsParams,
+  UpdateBody,
+  V1ReviewRequestDto
 } from './model';
 
+import { authenticatedClient } from '../transport';
 
+
+type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 
 
@@ -63,8 +94,785 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   return result;
 };
 
+export type listV1ReviewQueueResponse200 = {
+  data: ApiResponseV1ReviewQueueDto
+  status: 200
+}
+
+export type listV1ReviewQueueResponseSuccess = (listV1ReviewQueueResponse200) & {
+  headers: Headers;
+};
+;
+
+export type listV1ReviewQueueResponse = (listV1ReviewQueueResponseSuccess)
+
+export const getListV1ReviewQueueUrl = (params: ListV1ReviewQueueParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/review-queue?${stringifiedParams}` : `/api/v1/review-queue`
+}
+
+export const listV1ReviewQueue = async (params: ListV1ReviewQueueParams, options?: Parameters<typeof authenticatedClient>[1]): Promise<listV1ReviewQueueResponse> => {
+
+  return authenticatedClient<listV1ReviewQueueResponse>(getListV1ReviewQueueUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListV1ReviewQueueQueryKey = (params?: ListV1ReviewQueueParams,) => {
+    return [
+    `/api/v1/review-queue`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListV1ReviewQueueQueryOptions = <TData = Awaited<ReturnType<typeof listV1ReviewQueue>>, TError = unknown>(params: ListV1ReviewQueueParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listV1ReviewQueue>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListV1ReviewQueueQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listV1ReviewQueue>>> = ({ signal }) => listV1ReviewQueue(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listV1ReviewQueue>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListV1ReviewQueueQueryResult = NonNullable<Awaited<ReturnType<typeof listV1ReviewQueue>>>
+export type ListV1ReviewQueueQueryError = unknown
+
+
+export function useListV1ReviewQueue<TData = Awaited<ReturnType<typeof listV1ReviewQueue>>, TError = unknown>(
+ params: ListV1ReviewQueueParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listV1ReviewQueue>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listV1ReviewQueue>>,
+          TError,
+          Awaited<ReturnType<typeof listV1ReviewQueue>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListV1ReviewQueue<TData = Awaited<ReturnType<typeof listV1ReviewQueue>>, TError = unknown>(
+ params: ListV1ReviewQueueParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listV1ReviewQueue>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listV1ReviewQueue>>,
+          TError,
+          Awaited<ReturnType<typeof listV1ReviewQueue>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListV1ReviewQueue<TData = Awaited<ReturnType<typeof listV1ReviewQueue>>, TError = unknown>(
+ params: ListV1ReviewQueueParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listV1ReviewQueue>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+
+export function useListV1ReviewQueue<TData = Awaited<ReturnType<typeof listV1ReviewQueue>>, TError = unknown>(
+ params: ListV1ReviewQueueParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listV1ReviewQueue>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListV1ReviewQueueQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export type reviewV1CandidateResponse200 = {
+  data: ApiResponseV1DecisionDto
+  status: 200
+}
+
+export type reviewV1CandidateResponseSuccess = (reviewV1CandidateResponse200) & {
+  headers: Headers;
+};
+;
+
+export type reviewV1CandidateResponse = (reviewV1CandidateResponseSuccess)
+
+export const getReviewV1CandidateUrl = (ticketId: string,
+    params: ReviewV1CandidateParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/review-queue/${ticketId}/review?${stringifiedParams}` : `/api/v1/review-queue/${ticketId}/review`
+}
+
+/**
+ * ticketId and decisionId identify the same entity; review does not create a second record.
+ */
+export const reviewV1Candidate = async (ticketId: string,
+    v1ReviewRequestDto: V1ReviewRequestDto,
+    params: ReviewV1CandidateParams, options?: Parameters<typeof authenticatedClient>[1]): Promise<reviewV1CandidateResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return authenticatedClient<reviewV1CandidateResponse>(getReviewV1CandidateUrl(ticketId,params),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(v1ReviewRequestDto)
+  }
+);}
+
+
+
+
+
+export const getReviewV1CandidateMutationKey = () => ['reviewV1Candidate'] as const;
+
+export const getReviewV1CandidateMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reviewV1Candidate>>, TError,ReviewV1CandidateMutationVariables, TContext>, request?: SecondParameter<typeof authenticatedClient>}
+): UseMutationOptions<Awaited<ReturnType<typeof reviewV1Candidate>>, TError,ReviewV1CandidateMutationVariables, TContext> => {
+
+const mutationKey = getReviewV1CandidateMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof reviewV1Candidate>>, ReviewV1CandidateMutationVariables> = (props) => {
+          const {ticketId,data,params} = props ?? {};
+
+          return  reviewV1Candidate(ticketId,data,params,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReviewV1CandidateMutationResult = NonNullable<Awaited<ReturnType<typeof reviewV1Candidate>>>
+    export type ReviewV1CandidateMutationBody = V1ReviewRequestDto
+    export type ReviewV1CandidateMutationError = unknown
+    export type ReviewV1CandidateMutationVariables = {ticketId: string;data: V1ReviewRequestDto;params: ReviewV1CandidateParams}
+
+    export const useReviewV1Candidate = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reviewV1Candidate>>, TError,ReviewV1CandidateMutationVariables, TContext>, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof reviewV1Candidate>>,
+        TError,
+        ReviewV1CandidateMutationVariables,
+        TContext
+      > => {
+      return useMutation(getReviewV1CandidateMutationOptions(options), queryClient);
+    }
+
+export type getDecisionTimelineResponse200 = {
+  data: ApiResponseDecisionTimelineDto
+  status: 200
+}
+
+export type getDecisionTimelineResponseSuccess = (getDecisionTimelineResponse200) & {
+  headers: Headers;
+};
+;
+
+export type getDecisionTimelineResponse = (getDecisionTimelineResponseSuccess)
+
+export const getGetDecisionTimelineUrl = (params: GetDecisionTimelineParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/decisions/timeline?${stringifiedParams}` : `/api/v1/decisions/timeline`
+}
+
+export const getDecisionTimeline = async (params: GetDecisionTimelineParams, options?: Parameters<typeof authenticatedClient>[1]): Promise<getDecisionTimelineResponse> => {
+
+  return authenticatedClient<getDecisionTimelineResponse>(getGetDecisionTimelineUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetDecisionTimelineQueryKey = (params?: GetDecisionTimelineParams,) => {
+    return [
+    `/api/v1/decisions/timeline`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetDecisionTimelineQueryOptions = <TData = Awaited<ReturnType<typeof getDecisionTimeline>>, TError = unknown>(params: GetDecisionTimelineParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDecisionTimeline>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetDecisionTimelineQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDecisionTimeline>>> = ({ signal }) => getDecisionTimeline(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getDecisionTimeline>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetDecisionTimelineQueryResult = NonNullable<Awaited<ReturnType<typeof getDecisionTimeline>>>
+export type GetDecisionTimelineQueryError = unknown
+
+
+export function useGetDecisionTimeline<TData = Awaited<ReturnType<typeof getDecisionTimeline>>, TError = unknown>(
+ params: GetDecisionTimelineParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDecisionTimeline>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getDecisionTimeline>>,
+          TError,
+          Awaited<ReturnType<typeof getDecisionTimeline>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetDecisionTimeline<TData = Awaited<ReturnType<typeof getDecisionTimeline>>, TError = unknown>(
+ params: GetDecisionTimelineParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDecisionTimeline>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getDecisionTimeline>>,
+          TError,
+          Awaited<ReturnType<typeof getDecisionTimeline>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetDecisionTimeline<TData = Awaited<ReturnType<typeof getDecisionTimeline>>, TError = unknown>(
+ params: GetDecisionTimelineParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDecisionTimeline>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+
+export function useGetDecisionTimeline<TData = Awaited<ReturnType<typeof getDecisionTimeline>>, TError = unknown>(
+ params: GetDecisionTimelineParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDecisionTimeline>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetDecisionTimelineQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export type editV1DecisionResponse200 = {
+  data: ApiResponseV1DecisionDto
+  status: 200
+}
+
+export type editV1DecisionResponseSuccess = (editV1DecisionResponse200) & {
+  headers: Headers;
+};
+;
+
+export type editV1DecisionResponse = (editV1DecisionResponseSuccess)
+
+export const getEditV1DecisionUrl = (id: string,
+    params: EditV1DecisionParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/decisions/${id}?${stringifiedParams}` : `/api/v1/decisions/${id}`
+}
+
+export const editV1Decision = async (id: string,
+    decisionEditDto: DecisionEditDto,
+    params: EditV1DecisionParams, options?: Parameters<typeof authenticatedClient>[1]): Promise<editV1DecisionResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return authenticatedClient<editV1DecisionResponse>(getEditV1DecisionUrl(id,params),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(decisionEditDto)
+  }
+);}
+
+
+
+
+
+export const getEditV1DecisionMutationKey = () => ['editV1Decision'] as const;
+
+export const getEditV1DecisionMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof editV1Decision>>, TError,EditV1DecisionMutationVariables, TContext>, request?: SecondParameter<typeof authenticatedClient>}
+): UseMutationOptions<Awaited<ReturnType<typeof editV1Decision>>, TError,EditV1DecisionMutationVariables, TContext> => {
+
+const mutationKey = getEditV1DecisionMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof editV1Decision>>, EditV1DecisionMutationVariables> = (props) => {
+          const {id,data,params} = props ?? {};
+
+          return  editV1Decision(id,data,params,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type EditV1DecisionMutationResult = NonNullable<Awaited<ReturnType<typeof editV1Decision>>>
+    export type EditV1DecisionMutationBody = DecisionEditDto
+    export type EditV1DecisionMutationError = unknown
+    export type EditV1DecisionMutationVariables = {id: string;data: DecisionEditDto;params: EditV1DecisionParams}
+
+    export const useEditV1Decision = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof editV1Decision>>, TError,EditV1DecisionMutationVariables, TContext>, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof editV1Decision>>,
+        TError,
+        EditV1DecisionMutationVariables,
+        TContext
+      > => {
+      return useMutation(getEditV1DecisionMutationOptions(options), queryClient);
+    }
+
+export type getV1DecisionResponse200 = {
+  data: ApiResponseV1DecisionDto
+  status: 200
+}
+
+export type getV1DecisionResponseSuccess = (getV1DecisionResponse200) & {
+  headers: Headers;
+};
+;
+
+export type getV1DecisionResponse = (getV1DecisionResponseSuccess)
+
+export const getGetV1DecisionUrl = (id: string,
+    params: GetV1DecisionParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/decisions/${id}?${stringifiedParams}` : `/api/v1/decisions/${id}`
+}
+
+export const getV1Decision = async (id: string,
+    params: GetV1DecisionParams, options?: Parameters<typeof authenticatedClient>[1]): Promise<getV1DecisionResponse> => {
+
+  return authenticatedClient<getV1DecisionResponse>(getGetV1DecisionUrl(id,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetV1DecisionQueryKey = (id: string,
+    params?: GetV1DecisionParams,) => {
+    return [
+    `/api/v1/decisions/${id}`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetV1DecisionQueryOptions = <TData = Awaited<ReturnType<typeof getV1Decision>>, TError = unknown>(id: string,
+    params: GetV1DecisionParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getV1Decision>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetV1DecisionQueryKey(id,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getV1Decision>>> = ({ signal }) => getV1Decision(id,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getV1Decision>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetV1DecisionQueryResult = NonNullable<Awaited<ReturnType<typeof getV1Decision>>>
+export type GetV1DecisionQueryError = unknown
+
+
+export function useGetV1Decision<TData = Awaited<ReturnType<typeof getV1Decision>>, TError = unknown>(
+ id: string,
+    params: GetV1DecisionParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getV1Decision>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getV1Decision>>,
+          TError,
+          Awaited<ReturnType<typeof getV1Decision>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetV1Decision<TData = Awaited<ReturnType<typeof getV1Decision>>, TError = unknown>(
+ id: string,
+    params: GetV1DecisionParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getV1Decision>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getV1Decision>>,
+          TError,
+          Awaited<ReturnType<typeof getV1Decision>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetV1Decision<TData = Awaited<ReturnType<typeof getV1Decision>>, TError = unknown>(
+ id: string,
+    params: GetV1DecisionParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getV1Decision>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+
+export function useGetV1Decision<TData = Awaited<ReturnType<typeof getV1Decision>>, TError = unknown>(
+ id: string,
+    params: GetV1DecisionParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getV1Decision>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetV1DecisionQueryOptions(id,params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export type listV1DecisionsResponse200 = {
+  data: ApiResponseV1DecisionListDto
+  status: 200
+}
+
+export type listV1DecisionsResponseSuccess = (listV1DecisionsResponse200) & {
+  headers: Headers;
+};
+;
+
+export type listV1DecisionsResponse = (listV1DecisionsResponseSuccess)
+
+export const getListV1DecisionsUrl = (params: ListV1DecisionsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/decisions?${stringifiedParams}` : `/api/v1/decisions`
+}
+
+export const listV1Decisions = async (params: ListV1DecisionsParams, options?: Parameters<typeof authenticatedClient>[1]): Promise<listV1DecisionsResponse> => {
+
+  return authenticatedClient<listV1DecisionsResponse>(getListV1DecisionsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListV1DecisionsQueryKey = (params?: ListV1DecisionsParams,) => {
+    return [
+    `/api/v1/decisions`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListV1DecisionsQueryOptions = <TData = Awaited<ReturnType<typeof listV1Decisions>>, TError = unknown>(params: ListV1DecisionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listV1Decisions>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListV1DecisionsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listV1Decisions>>> = ({ signal }) => listV1Decisions(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listV1Decisions>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListV1DecisionsQueryResult = NonNullable<Awaited<ReturnType<typeof listV1Decisions>>>
+export type ListV1DecisionsQueryError = unknown
+
+
+export function useListV1Decisions<TData = Awaited<ReturnType<typeof listV1Decisions>>, TError = unknown>(
+ params: ListV1DecisionsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listV1Decisions>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listV1Decisions>>,
+          TError,
+          Awaited<ReturnType<typeof listV1Decisions>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListV1Decisions<TData = Awaited<ReturnType<typeof listV1Decisions>>, TError = unknown>(
+ params: ListV1DecisionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listV1Decisions>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listV1Decisions>>,
+          TError,
+          Awaited<ReturnType<typeof listV1Decisions>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListV1Decisions<TData = Awaited<ReturnType<typeof listV1Decisions>>, TError = unknown>(
+ params: ListV1DecisionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listV1Decisions>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+
+export function useListV1Decisions<TData = Awaited<ReturnType<typeof listV1Decisions>>, TError = unknown>(
+ params: ListV1DecisionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listV1Decisions>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListV1DecisionsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export type createResponse202 = {
+  data: ApiResponseSyncJobView
+  status: 202
+}
+
+export type createResponseSuccess = (createResponse202) & {
+  headers: Headers;
+};
+;
+
+export type createResponse = (createResponseSuccess)
+
+export const getCreateUrl = (params: CreateParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/sync-jobs?${stringifiedParams}` : `/api/v1/sync-jobs`
+}
+
+export const create = async (createBody: CreateBody,
+    params: CreateParams, options?: Parameters<typeof authenticatedClient>[1]): Promise<createResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return authenticatedClient<createResponse>(getCreateUrl(params),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(createBody)
+  }
+);}
+
+
+
+
+
+export const getCreateMutationKey = () => ['create'] as const;
+
+export const getCreateMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof create>>, TError,CreateMutationVariables, TContext>, request?: SecondParameter<typeof authenticatedClient>}
+): UseMutationOptions<Awaited<ReturnType<typeof create>>, TError,CreateMutationVariables, TContext> => {
+
+const mutationKey = getCreateMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof create>>, CreateMutationVariables> = (props) => {
+          const {data,params} = props ?? {};
+
+          return  create(data,params,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateMutationResult = NonNullable<Awaited<ReturnType<typeof create>>>
+    export type CreateMutationBody = CreateBody
+    export type CreateMutationError = unknown
+    export type CreateMutationVariables = {data: CreateBody;params: CreateParams}
+
+    export const useCreate = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof create>>, TError,CreateMutationVariables, TContext>, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof create>>,
+        TError,
+        CreateMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreateMutationOptions(options), queryClient);
+    }
+
 export type getResponse200 = {
-  data: HarvestingPolicyDto
+  data: ApiResponseSyncJobView
   status: 200
 }
 
@@ -75,59 +883,63 @@ export type getResponseSuccess = (getResponse200) & {
 
 export type getResponse = (getResponseSuccess)
 
-export const getGetUrl = () => {
+export const getGetUrl = (jobId: string,
+    params: GetParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/api/config/policy`
+  return stringifiedParams.length > 0 ? `/api/v1/sync-jobs/${jobId}?${stringifiedParams}` : `/api/v1/sync-jobs/${jobId}`
 }
 
-export const get = async ( options?: RequestInit): Promise<getResponse> => {
+export const get = async (jobId: string,
+    params: GetParams, options?: Parameters<typeof authenticatedClient>[1]): Promise<getResponse> => {
 
-  const res = await fetch(getGetUrl(),
+  return authenticatedClient<getResponse>(getGetUrl(jobId,params),
   {
     ...options,
     method: 'GET'
 
 
   }
-)
-
-
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-
-  const data: getResponse['data'] = body ? JSON.parse(body) : {}
-  return { data, status: res.status, headers: res.headers } as getResponse
-}
+);}
 
 
 
 
 
-export const getGetQueryKey = () => {
+export const getGetQueryKey = (jobId: string,
+    params?: GetParams,) => {
     return [
-    `/api/config/policy`
+    `/api/v1/sync-jobs/${jobId}`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getGetQueryOptions = <TData = Awaited<ReturnType<typeof get>>, TError = unknown>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof get>>, TError, TData>>, fetch?: RequestInit}
+export const getGetQueryOptions = <TData = Awaited<ReturnType<typeof get>>, TError = unknown>(jobId: string,
+    params: GetParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof get>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
 ) => {
 
-const {query: queryOptions, fetch: fetchOptions} = options ?? {};
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetQueryKey();
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof get>>> = ({ signal }) => get({ signal, ...fetchOptions });
+  const queryKey =  queryOptions?.queryKey ?? getGetQueryKey(jobId,params);
 
 
 
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof get>>> = ({ signal }) => get(jobId,params, { signal, ...requestOptions });
 
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof get>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+
+
+
+   return  { queryKey, queryFn, enabled: jobId !== null && jobId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof get>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type GetQueryResult = NonNullable<Awaited<ReturnType<typeof get>>>
@@ -135,36 +947,439 @@ export type GetQueryError = unknown
 
 
 export function useGet<TData = Awaited<ReturnType<typeof get>>, TError = unknown>(
-  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof get>>, TError, TData>> & Pick<
+ jobId: string,
+    params: GetParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof get>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof get>>,
           TError,
           Awaited<ReturnType<typeof get>>
         > , 'initialData'
-      >, fetch?: RequestInit}
+      >, request?: SecondParameter<typeof authenticatedClient>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGet<TData = Awaited<ReturnType<typeof get>>, TError = unknown>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof get>>, TError, TData>> & Pick<
+ jobId: string,
+    params: GetParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof get>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof get>>,
           TError,
           Awaited<ReturnType<typeof get>>
         > , 'initialData'
-      >, fetch?: RequestInit}
+      >, request?: SecondParameter<typeof authenticatedClient>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGet<TData = Awaited<ReturnType<typeof get>>, TError = unknown>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof get>>, TError, TData>>, fetch?: RequestInit}
+ jobId: string,
+    params: GetParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof get>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 
 export function useGet<TData = Awaited<ReturnType<typeof get>>, TError = unknown>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof get>>, TError, TData>>, fetch?: RequestInit}
+ jobId: string,
+    params: GetParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof get>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getGetQueryOptions(options)
+  const queryOptions = getGetQueryOptions(jobId,params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export type claimResponse200 = {
+  data: ApiResponseAnyOrNull
+  status: 200
+}
+
+export type claimResponseSuccess = (claimResponse200) & {
+  headers: Headers;
+};
+;
+
+export type claimResponse = (claimResponseSuccess)
+
+export const getClaimUrl = () => {
+
+
+
+
+  return `/api/v1/internal/sync-jobs/claim`
+}
+
+export const claim = async ( options?: Parameters<typeof authenticatedClient>[1]): Promise<claimResponse> => {
+
+  return authenticatedClient<claimResponse>(getClaimUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getClaimMutationKey = () => ['claim'] as const;
+
+export const getClaimMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof claim>>, TError,void, TContext>, request?: SecondParameter<typeof authenticatedClient>}
+): UseMutationOptions<Awaited<ReturnType<typeof claim>>, TError,void, TContext> => {
+
+const mutationKey = getClaimMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof claim>>, void> = () => {
+
+
+          return  claim(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ClaimMutationResult = NonNullable<Awaited<ReturnType<typeof claim>>>
+
+    export type ClaimMutationError = unknown
+
+
+    export const useClaim = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof claim>>, TError,void, TContext>, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof claim>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getClaimMutationOptions(options), queryClient);
+    }
+
+export type updateResponse200 = {
+  data: ApiResponseNull
+  status: 200
+}
+
+export type updateResponseSuccess = (updateResponse200) & {
+  headers: Headers;
+};
+;
+
+export type updateResponse = (updateResponseSuccess)
+
+export const getUpdateUrl = (jobId: string,) => {
+
+
+
+
+  return `/api/v1/internal/sync-jobs/${jobId}`
+}
+
+export const update = async (jobId: string,
+    updateBody: UpdateBody, options?: Parameters<typeof authenticatedClient>[1]): Promise<updateResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return authenticatedClient<updateResponse>(getUpdateUrl(jobId),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(updateBody)
+  }
+);}
+
+
+
+
+
+export const getUpdateMutationKey = () => ['update'] as const;
+
+export const getUpdateMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof update>>, TError,UpdateMutationVariables, TContext>, request?: SecondParameter<typeof authenticatedClient>}
+): UseMutationOptions<Awaited<ReturnType<typeof update>>, TError,UpdateMutationVariables, TContext> => {
+
+const mutationKey = getUpdateMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof update>>, UpdateMutationVariables> = (props) => {
+          const {jobId,data} = props ?? {};
+
+          return  update(jobId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateMutationResult = NonNullable<Awaited<ReturnType<typeof update>>>
+    export type UpdateMutationBody = UpdateBody
+    export type UpdateMutationError = unknown
+    export type UpdateMutationVariables = {jobId: string;data: UpdateBody}
+
+    export const useUpdate = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof update>>, TError,UpdateMutationVariables, TContext>, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof update>>,
+        TError,
+        UpdateMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUpdateMutationOptions(options), queryClient);
+    }
+
+export type searchDecisionsResponse200 = {
+  data: ApiResponseSearchResponse
+  status: 200
+}
+
+export type searchDecisionsResponseSuccess = (searchDecisionsResponse200) & {
+  headers: Headers;
+};
+;
+
+export type searchDecisionsResponse = (searchDecisionsResponseSuccess)
+
+export const getSearchDecisionsUrl = (params: SearchDecisionsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/search?${stringifiedParams}` : `/api/v1/search`
+}
+
+/**
+ * Semantic search of CONFIRMED and SUPERSEDED decisions in one authorized guild.
+ */
+export const searchDecisions = async (params: SearchDecisionsParams, options?: Parameters<typeof authenticatedClient>[1]): Promise<searchDecisionsResponse> => {
+
+  return authenticatedClient<searchDecisionsResponse>(getSearchDecisionsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getSearchDecisionsQueryKey = (params?: SearchDecisionsParams,) => {
+    return [
+    `/api/v1/search`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getSearchDecisionsQueryOptions = <TData = Awaited<ReturnType<typeof searchDecisions>>, TError = unknown>(params: SearchDecisionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchDecisions>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getSearchDecisionsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof searchDecisions>>> = ({ signal }) => searchDecisions(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof searchDecisions>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type SearchDecisionsQueryResult = NonNullable<Awaited<ReturnType<typeof searchDecisions>>>
+export type SearchDecisionsQueryError = unknown
+
+
+export function useSearchDecisions<TData = Awaited<ReturnType<typeof searchDecisions>>, TError = unknown>(
+ params: SearchDecisionsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchDecisions>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof searchDecisions>>,
+          TError,
+          Awaited<ReturnType<typeof searchDecisions>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useSearchDecisions<TData = Awaited<ReturnType<typeof searchDecisions>>, TError = unknown>(
+ params: SearchDecisionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchDecisions>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof searchDecisions>>,
+          TError,
+          Awaited<ReturnType<typeof searchDecisions>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useSearchDecisions<TData = Awaited<ReturnType<typeof searchDecisions>>, TError = unknown>(
+ params: SearchDecisionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchDecisions>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+
+export function useSearchDecisions<TData = Awaited<ReturnType<typeof searchDecisions>>, TError = unknown>(
+ params: SearchDecisionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchDecisions>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getSearchDecisionsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export type get2Response200 = {
+  data: HarvestingPolicyDto
+  status: 200
+}
+
+export type get2ResponseSuccess = (get2Response200) & {
+  headers: Headers;
+};
+;
+
+export type get2Response = (get2ResponseSuccess)
+
+export const getGet2Url = () => {
+
+
+
+
+  return `/api/config/policy`
+}
+
+export const get2 = async ( options?: Parameters<typeof authenticatedClient>[1]): Promise<get2Response> => {
+
+  return authenticatedClient<get2Response>(getGet2Url(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGet2QueryKey = () => {
+    return [
+    `/api/config/policy`
+    ] as const;
+    }
+
+
+export const getGet2QueryOptions = <TData = Awaited<ReturnType<typeof get2>>, TError = unknown>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof get2>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGet2QueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof get2>>> = ({ signal }) => get2({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof get2>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type Get2QueryResult = NonNullable<Awaited<ReturnType<typeof get2>>>
+export type Get2QueryError = unknown
+
+
+export function useGet2<TData = Awaited<ReturnType<typeof get2>>, TError = unknown>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof get2>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof get2>>,
+          TError,
+          Awaited<ReturnType<typeof get2>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGet2<TData = Awaited<ReturnType<typeof get2>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof get2>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof get2>>,
+          TError,
+          Awaited<ReturnType<typeof get2>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGet2<TData = Awaited<ReturnType<typeof get2>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof get2>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+
+export function useGet2<TData = Awaited<ReturnType<typeof get2>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof get2>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGet2QueryOptions(options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
@@ -204,23 +1419,16 @@ export const getListFeedbacksUrl = (params?: ListFeedbacksParams,) => {
   return stringifiedParams.length > 0 ? `/api/feedbacks?${stringifiedParams}` : `/api/feedbacks`
 }
 
-export const listFeedbacks = async (params?: ListFeedbacksParams, options?: RequestInit): Promise<listFeedbacksResponse> => {
+export const listFeedbacks = async (params?: ListFeedbacksParams, options?: Parameters<typeof authenticatedClient>[1]): Promise<listFeedbacksResponse> => {
 
-  const res = await fetch(getListFeedbacksUrl(params),
+  return authenticatedClient<listFeedbacksResponse>(getListFeedbacksUrl(params),
   {
     ...options,
     method: 'GET'
 
 
   }
-)
-
-
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-
-  const data: listFeedbacksResponse['data'] = body ? JSON.parse(body) : {}
-  return { data, status: res.status, headers: res.headers } as listFeedbacksResponse
-}
+);}
 
 
 
@@ -233,16 +1441,16 @@ export const getListFeedbacksQueryKey = (params?: ListFeedbacksParams,) => {
     }
 
 
-export const getListFeedbacksQueryOptions = <TData = Awaited<ReturnType<typeof listFeedbacks>>, TError = unknown>(params?: ListFeedbacksParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listFeedbacks>>, TError, TData>>, fetch?: RequestInit}
+export const getListFeedbacksQueryOptions = <TData = Awaited<ReturnType<typeof listFeedbacks>>, TError = unknown>(params?: ListFeedbacksParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listFeedbacks>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
 ) => {
 
-const {query: queryOptions, fetch: fetchOptions} = options ?? {};
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
   const queryKey =  queryOptions?.queryKey ?? getListFeedbacksQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof listFeedbacks>>> = ({ signal }) => listFeedbacks(params, { signal, ...fetchOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listFeedbacks>>> = ({ signal }) => listFeedbacks(params, { signal, ...requestOptions });
 
 
 
@@ -262,7 +1470,7 @@ export function useListFeedbacks<TData = Awaited<ReturnType<typeof listFeedbacks
           TError,
           Awaited<ReturnType<typeof listFeedbacks>>
         > , 'initialData'
-      >, fetch?: RequestInit}
+      >, request?: SecondParameter<typeof authenticatedClient>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useListFeedbacks<TData = Awaited<ReturnType<typeof listFeedbacks>>, TError = unknown>(
@@ -272,16 +1480,16 @@ export function useListFeedbacks<TData = Awaited<ReturnType<typeof listFeedbacks
           TError,
           Awaited<ReturnType<typeof listFeedbacks>>
         > , 'initialData'
-      >, fetch?: RequestInit}
+      >, request?: SecondParameter<typeof authenticatedClient>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useListFeedbacks<TData = Awaited<ReturnType<typeof listFeedbacks>>, TError = unknown>(
- params?: ListFeedbacksParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listFeedbacks>>, TError, TData>>, fetch?: RequestInit}
+ params?: ListFeedbacksParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listFeedbacks>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 
 export function useListFeedbacks<TData = Awaited<ReturnType<typeof listFeedbacks>>, TError = unknown>(
- params?: ListFeedbacksParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listFeedbacks>>, TError, TData>>, fetch?: RequestInit}
+ params?: ListFeedbacksParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listFeedbacks>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
@@ -318,7 +1526,7 @@ export const getCreateFeedbackUrl = () => {
   return `/api/feedbacks`
 }
 
-export const createFeedback = async (createFeedbackDto: CreateFeedbackDto, options?: RequestInit): Promise<createFeedbackResponse> => {
+export const createFeedback = async (createFeedbackDto: CreateFeedbackDto, options?: Parameters<typeof authenticatedClient>[1]): Promise<createFeedbackResponse> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -334,21 +1542,14 @@ export const createFeedback = async (createFeedbackDto: CreateFeedbackDto, optio
     }
     return headers;
   };
-const res = await fetch(getCreateFeedbackUrl(),
+return authenticatedClient<createFeedbackResponse>(getCreateFeedbackUrl(),
   {
     ...options,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(createFeedbackDto)
   }
-)
-
-
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-
-  const data: createFeedbackResponse['data'] = body ? JSON.parse(body) : {}
-  return { data, status: res.status, headers: res.headers } as createFeedbackResponse
-}
+);}
 
 
 
@@ -357,15 +1558,15 @@ const res = await fetch(getCreateFeedbackUrl(),
 export const getCreateFeedbackMutationKey = () => ['createFeedback'] as const;
 
 export const getCreateFeedbackMutationOptions = <TError = unknown,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createFeedback>>, TError,CreateFeedbackMutationVariables, TContext>, fetch?: RequestInit}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createFeedback>>, TError,CreateFeedbackMutationVariables, TContext>, request?: SecondParameter<typeof authenticatedClient>}
 ): UseMutationOptions<Awaited<ReturnType<typeof createFeedback>>, TError,CreateFeedbackMutationVariables, TContext> => {
 
 const mutationKey = getCreateFeedbackMutationKey();
-const {mutation: mutationOptions, fetch: fetchOptions} = options ?
+const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
       : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, fetch: undefined};
+      : {mutation: { mutationKey, }, request: undefined};
 
 
 
@@ -373,7 +1574,7 @@ const {mutation: mutationOptions, fetch: fetchOptions} = options ?
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof createFeedback>>, CreateFeedbackMutationVariables> = (props) => {
           const {data} = props ?? {};
 
-          return  createFeedback(data,fetchOptions)
+          return  createFeedback(data,requestOptions)
         }
 
 
@@ -389,7 +1590,7 @@ const {mutation: mutationOptions, fetch: fetchOptions} = options ?
     export type CreateFeedbackMutationVariables = {data: CreateFeedbackDto}
 
     export const useCreateFeedback = <TError = unknown,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createFeedback>>, TError,CreateFeedbackMutationVariables, TContext>, fetch?: RequestInit}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createFeedback>>, TError,CreateFeedbackMutationVariables, TContext>, request?: SecondParameter<typeof authenticatedClient>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof createFeedback>>,
         TError,
@@ -398,6 +1599,113 @@ const {mutation: mutationOptions, fetch: fetchOptions} = options ?
       > => {
       return useMutation(getCreateFeedbackMutationOptions(options), queryClient);
     }
+
+export type historyResponse200 = {
+  data: CandidateHistoryEntry[]
+  status: 200
+}
+
+export type historyResponseSuccess = (historyResponse200) & {
+  headers: Headers;
+};
+;
+
+export type historyResponse = (historyResponseSuccess)
+
+export const getHistoryUrl = (decisionId: string,) => {
+
+
+
+
+  return `/api/discussions/history/${decisionId}`
+}
+
+export const history = async (decisionId: string, options?: Parameters<typeof authenticatedClient>[1]): Promise<historyResponse> => {
+
+  return authenticatedClient<historyResponse>(getHistoryUrl(decisionId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getHistoryQueryKey = (decisionId: string,) => {
+    return [
+    `/api/discussions/history/${decisionId}`
+    ] as const;
+    }
+
+
+export const getHistoryQueryOptions = <TData = Awaited<ReturnType<typeof history>>, TError = unknown>(decisionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof history>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getHistoryQueryKey(decisionId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof history>>> = ({ signal }) => history(decisionId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: decisionId !== null && decisionId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof history>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type HistoryQueryResult = NonNullable<Awaited<ReturnType<typeof history>>>
+export type HistoryQueryError = unknown
+
+
+export function useHistory<TData = Awaited<ReturnType<typeof history>>, TError = unknown>(
+ decisionId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof history>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof history>>,
+          TError,
+          Awaited<ReturnType<typeof history>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useHistory<TData = Awaited<ReturnType<typeof history>>, TError = unknown>(
+ decisionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof history>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof history>>,
+          TError,
+          Awaited<ReturnType<typeof history>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useHistory<TData = Awaited<ReturnType<typeof history>>, TError = unknown>(
+ decisionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof history>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+
+export function useHistory<TData = Awaited<ReturnType<typeof history>>, TError = unknown>(
+ decisionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof history>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getHistoryQueryOptions(decisionId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export type analyzeResponse200 = {
   data: AnalyzeDiscussionResponseDto
@@ -419,7 +1727,7 @@ export const getAnalyzeUrl = () => {
   return `/api/discussions/analyze`
 }
 
-export const analyze = async (analyzeDiscussionRequestDto: AnalyzeDiscussionRequestDto, options?: RequestInit): Promise<analyzeResponse> => {
+export const analyze = async (analyzeDiscussionRequestDto: AnalyzeDiscussionRequestDto, options?: Parameters<typeof authenticatedClient>[1]): Promise<analyzeResponse> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -435,21 +1743,14 @@ export const analyze = async (analyzeDiscussionRequestDto: AnalyzeDiscussionRequ
     }
     return headers;
   };
-const res = await fetch(getAnalyzeUrl(),
+return authenticatedClient<analyzeResponse>(getAnalyzeUrl(),
   {
     ...options,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(analyzeDiscussionRequestDto)
   }
-)
-
-
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-
-  const data: analyzeResponse['data'] = body ? JSON.parse(body) : {}
-  return { data, status: res.status, headers: res.headers } as analyzeResponse
-}
+);}
 
 
 
@@ -458,15 +1759,15 @@ const res = await fetch(getAnalyzeUrl(),
 export const getAnalyzeMutationKey = () => ['analyze'] as const;
 
 export const getAnalyzeMutationOptions = <TError = unknown,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof analyze>>, TError,AnalyzeMutationVariables, TContext>, fetch?: RequestInit}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof analyze>>, TError,AnalyzeMutationVariables, TContext>, request?: SecondParameter<typeof authenticatedClient>}
 ): UseMutationOptions<Awaited<ReturnType<typeof analyze>>, TError,AnalyzeMutationVariables, TContext> => {
 
 const mutationKey = getAnalyzeMutationKey();
-const {mutation: mutationOptions, fetch: fetchOptions} = options ?
+const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
       : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, fetch: undefined};
+      : {mutation: { mutationKey, }, request: undefined};
 
 
 
@@ -474,7 +1775,7 @@ const {mutation: mutationOptions, fetch: fetchOptions} = options ?
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof analyze>>, AnalyzeMutationVariables> = (props) => {
           const {data} = props ?? {};
 
-          return  analyze(data,fetchOptions)
+          return  analyze(data,requestOptions)
         }
 
 
@@ -490,7 +1791,7 @@ const {mutation: mutationOptions, fetch: fetchOptions} = options ?
     export type AnalyzeMutationVariables = {data: AnalyzeDiscussionRequestDto}
 
     export const useAnalyze = <TError = unknown,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof analyze>>, TError,AnalyzeMutationVariables, TContext>, fetch?: RequestInit}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof analyze>>, TError,AnalyzeMutationVariables, TContext>, request?: SecondParameter<typeof authenticatedClient>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof analyze>>,
         TError,
@@ -500,19 +1801,19 @@ const {mutation: mutationOptions, fetch: fetchOptions} = options ?
       return useMutation(getAnalyzeMutationOptions(options), queryClient);
     }
 
-export type listDecisionsResponse200 = {
-  data: DecisionListResponseDto
+export type getDashboardResponse200 = {
+  data: ApiResponseDashboardDto
   status: 200
 }
 
-export type listDecisionsResponseSuccess = (listDecisionsResponse200) & {
+export type getDashboardResponseSuccess = (getDashboardResponse200) & {
   headers: Headers;
 };
 ;
 
-export type listDecisionsResponse = (listDecisionsResponseSuccess)
+export type getDashboardResponse = (getDashboardResponseSuccess)
 
-export const getListDecisionsUrl = (params?: ListDecisionsParams,) => {
+export const getGetDashboardUrl = (params: GetDashboardParams,) => {
   const normalizedParams = new URLSearchParams();
 
   Object.entries(params || {}).forEach(([key, value]) => {
@@ -524,91 +1825,84 @@ export const getListDecisionsUrl = (params?: ListDecisionsParams,) => {
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/decisions?${stringifiedParams}` : `/api/decisions`
+  return stringifiedParams.length > 0 ? `/api/v1/dashboard?${stringifiedParams}` : `/api/v1/dashboard`
 }
 
-export const listDecisions = async (params?: ListDecisionsParams, options?: RequestInit): Promise<listDecisionsResponse> => {
+export const getDashboard = async (params: GetDashboardParams, options?: Parameters<typeof authenticatedClient>[1]): Promise<getDashboardResponse> => {
 
-  const res = await fetch(getListDecisionsUrl(params),
+  return authenticatedClient<getDashboardResponse>(getGetDashboardUrl(params),
   {
     ...options,
     method: 'GET'
 
 
   }
-)
-
-
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-
-  const data: listDecisionsResponse['data'] = body ? JSON.parse(body) : {}
-  return { data, status: res.status, headers: res.headers } as listDecisionsResponse
-}
+);}
 
 
 
 
 
-export const getListDecisionsQueryKey = (params?: ListDecisionsParams,) => {
+export const getGetDashboardQueryKey = (params?: GetDashboardParams,) => {
     return [
-    `/api/decisions`, ...(params ? [params] : [])
+    `/api/v1/dashboard`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getListDecisionsQueryOptions = <TData = Awaited<ReturnType<typeof listDecisions>>, TError = unknown>(params?: ListDecisionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listDecisions>>, TError, TData>>, fetch?: RequestInit}
+export const getGetDashboardQueryOptions = <TData = Awaited<ReturnType<typeof getDashboard>>, TError = unknown>(params: GetDashboardParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDashboard>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
 ) => {
 
-const {query: queryOptions, fetch: fetchOptions} = options ?? {};
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getListDecisionsQueryKey(params);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof listDecisions>>> = ({ signal }) => listDecisions(params, { signal, ...fetchOptions });
+  const queryKey =  queryOptions?.queryKey ?? getGetDashboardQueryKey(params);
 
 
 
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDashboard>>> = ({ signal }) => getDashboard(params, { signal, ...requestOptions });
 
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listDecisions>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getDashboard>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
-export type ListDecisionsQueryResult = NonNullable<Awaited<ReturnType<typeof listDecisions>>>
-export type ListDecisionsQueryError = unknown
+export type GetDashboardQueryResult = NonNullable<Awaited<ReturnType<typeof getDashboard>>>
+export type GetDashboardQueryError = unknown
 
 
-export function useListDecisions<TData = Awaited<ReturnType<typeof listDecisions>>, TError = unknown>(
- params: undefined |  ListDecisionsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listDecisions>>, TError, TData>> & Pick<
+export function useGetDashboard<TData = Awaited<ReturnType<typeof getDashboard>>, TError = unknown>(
+ params: GetDashboardParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDashboard>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof listDecisions>>,
+          Awaited<ReturnType<typeof getDashboard>>,
           TError,
-          Awaited<ReturnType<typeof listDecisions>>
+          Awaited<ReturnType<typeof getDashboard>>
         > , 'initialData'
-      >, fetch?: RequestInit}
+      >, request?: SecondParameter<typeof authenticatedClient>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useListDecisions<TData = Awaited<ReturnType<typeof listDecisions>>, TError = unknown>(
- params?: ListDecisionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listDecisions>>, TError, TData>> & Pick<
+export function useGetDashboard<TData = Awaited<ReturnType<typeof getDashboard>>, TError = unknown>(
+ params: GetDashboardParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDashboard>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof listDecisions>>,
+          Awaited<ReturnType<typeof getDashboard>>,
           TError,
-          Awaited<ReturnType<typeof listDecisions>>
+          Awaited<ReturnType<typeof getDashboard>>
         > , 'initialData'
-      >, fetch?: RequestInit}
+      >, request?: SecondParameter<typeof authenticatedClient>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useListDecisions<TData = Awaited<ReturnType<typeof listDecisions>>, TError = unknown>(
- params?: ListDecisionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listDecisions>>, TError, TData>>, fetch?: RequestInit}
+export function useGetDashboard<TData = Awaited<ReturnType<typeof getDashboard>>, TError = unknown>(
+ params: GetDashboardParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDashboard>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 
-export function useListDecisions<TData = Awaited<ReturnType<typeof listDecisions>>, TError = unknown>(
- params?: ListDecisionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listDecisions>>, TError, TData>>, fetch?: RequestInit}
+export function useGetDashboard<TData = Awaited<ReturnType<typeof getDashboard>>, TError = unknown>(
+ params: GetDashboardParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDashboard>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getListDecisionsQueryOptions(params,options)
+  const queryOptions = getGetDashboardQueryOptions(params,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
@@ -620,310 +1914,6 @@ export function useListDecisions<TData = Awaited<ReturnType<typeof listDecisions
 
 
 
-
-export type reviewResponse200 = {
-  data: ReviewDecisionResponseDto
-  status: 200
-}
-
-export type reviewResponseSuccess = (reviewResponse200) & {
-  headers: Headers;
-};
-;
-
-export type reviewResponse = (reviewResponseSuccess)
-
-export const getReviewUrl = (id: string,) => {
-
-
-
-
-  return `/api/decisions/${id}/review`
-}
-
-export const review = async (id: string,
-    reviewDecisionDto: ReviewDecisionDto, options?: RequestInit): Promise<reviewResponse> => {
-
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-const res = await fetch(getReviewUrl(id),
-  {
-    ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-    body: JSON.stringify(reviewDecisionDto)
-  }
-)
-
-
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-
-  const data: reviewResponse['data'] = body ? JSON.parse(body) : {}
-  return { data, status: res.status, headers: res.headers } as reviewResponse
-}
-
-
-
-
-
-export const getReviewMutationKey = () => ['review'] as const;
-
-export const getReviewMutationOptions = <TError = unknown,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof review>>, TError,ReviewMutationVariables, TContext>, fetch?: RequestInit}
-): UseMutationOptions<Awaited<ReturnType<typeof review>>, TError,ReviewMutationVariables, TContext> => {
-
-const mutationKey = getReviewMutationKey();
-const {mutation: mutationOptions, fetch: fetchOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, fetch: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof review>>, ReviewMutationVariables> = (props) => {
-          const {id,data} = props ?? {};
-
-          return  review(id,data,fetchOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type ReviewMutationResult = NonNullable<Awaited<ReturnType<typeof review>>>
-    export type ReviewMutationBody = ReviewDecisionDto
-    export type ReviewMutationError = unknown
-    export type ReviewMutationVariables = {id: string;data: ReviewDecisionDto}
-
-    export const useReview = <TError = unknown,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof review>>, TError,ReviewMutationVariables, TContext>, fetch?: RequestInit}
- , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof review>>,
-        TError,
-        ReviewMutationVariables,
-        TContext
-      > => {
-      return useMutation(getReviewMutationOptions(options), queryClient);
-    }
-
-export type resolveResponse200 = {
-  data: Resolve200
-  status: 200
-}
-
-export type resolveResponseSuccess = (resolveResponse200) & {
-  headers: Headers;
-};
-;
-
-export type resolveResponse = (resolveResponseSuccess)
-
-export const getResolveUrl = () => {
-
-
-
-
-  return `/api/decisions/conflict`
-}
-
-export const resolve = async (resolveConflictDto: ResolveConflictDto, options?: RequestInit): Promise<resolveResponse> => {
-
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-const res = await fetch(getResolveUrl(),
-  {
-    ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-    body: JSON.stringify(resolveConflictDto)
-  }
-)
-
-
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-
-  const data: resolveResponse['data'] = body ? JSON.parse(body) : {}
-  return { data, status: res.status, headers: res.headers } as resolveResponse
-}
-
-
-
-
-
-export const getResolveMutationKey = () => ['resolve'] as const;
-
-export const getResolveMutationOptions = <TError = unknown,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resolve>>, TError,ResolveMutationVariables, TContext>, fetch?: RequestInit}
-): UseMutationOptions<Awaited<ReturnType<typeof resolve>>, TError,ResolveMutationVariables, TContext> => {
-
-const mutationKey = getResolveMutationKey();
-const {mutation: mutationOptions, fetch: fetchOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, fetch: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof resolve>>, ResolveMutationVariables> = (props) => {
-          const {data} = props ?? {};
-
-          return  resolve(data,fetchOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type ResolveMutationResult = NonNullable<Awaited<ReturnType<typeof resolve>>>
-    export type ResolveMutationBody = ResolveConflictDto
-    export type ResolveMutationError = unknown
-    export type ResolveMutationVariables = {data: ResolveConflictDto}
-
-    export const useResolve = <TError = unknown,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resolve>>, TError,ResolveMutationVariables, TContext>, fetch?: RequestInit}
- , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof resolve>>,
-        TError,
-        ResolveMutationVariables,
-        TContext
-      > => {
-      return useMutation(getResolveMutationOptions(options), queryClient);
-    }
-
-export type webhookResponse201 = {
-  data: Webhook201
-  status: 201
-}
-
-export type webhookResponseSuccess = (webhookResponse201) & {
-  headers: Headers;
-};
-;
-
-export type webhookResponse = (webhookResponseSuccess)
-
-export const getWebhookUrl = () => {
-
-
-
-
-  return `/api/webhooks/decisions`
-}
-
-export const webhook = async (decisionWebhookDto: DecisionWebhookDto, options?: RequestInit): Promise<webhookResponse> => {
-
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-const res = await fetch(getWebhookUrl(),
-  {
-    ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-    body: JSON.stringify(decisionWebhookDto)
-  }
-)
-
-
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-
-  const data: webhookResponse['data'] = body ? JSON.parse(body) : {}
-  return { data, status: res.status, headers: res.headers } as webhookResponse
-}
-
-
-
-
-
-export const getWebhookMutationKey = () => ['webhook'] as const;
-
-export const getWebhookMutationOptions = <TError = unknown,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof webhook>>, TError,WebhookMutationVariables, TContext>, fetch?: RequestInit}
-): UseMutationOptions<Awaited<ReturnType<typeof webhook>>, TError,WebhookMutationVariables, TContext> => {
-
-const mutationKey = getWebhookMutationKey();
-const {mutation: mutationOptions, fetch: fetchOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, fetch: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof webhook>>, WebhookMutationVariables> = (props) => {
-          const {data} = props ?? {};
-
-          return  webhook(data,fetchOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type WebhookMutationResult = NonNullable<Awaited<ReturnType<typeof webhook>>>
-    export type WebhookMutationBody = DecisionWebhookDto
-    export type WebhookMutationError = unknown
-    export type WebhookMutationVariables = {data: DecisionWebhookDto}
-
-    export const useWebhook = <TError = unknown,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof webhook>>, TError,WebhookMutationVariables, TContext>, fetch?: RequestInit}
- , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof webhook>>,
-        TError,
-        WebhookMutationVariables,
-        TContext
-      > => {
-      return useMutation(getWebhookMutationOptions(options), queryClient);
-    }
 
 export type getByChannelIdResponse200 = {
   data: CheckpointResponseDto
@@ -945,23 +1935,16 @@ export const getGetByChannelIdUrl = (channelId: string,) => {
   return `/api/channels/${channelId}/checkpoint`
 }
 
-export const getByChannelId = async (channelId: string, options?: RequestInit): Promise<getByChannelIdResponse> => {
+export const getByChannelId = async (channelId: string, options?: Parameters<typeof authenticatedClient>[1]): Promise<getByChannelIdResponse> => {
 
-  const res = await fetch(getGetByChannelIdUrl(channelId),
+  return authenticatedClient<getByChannelIdResponse>(getGetByChannelIdUrl(channelId),
   {
     ...options,
     method: 'GET'
 
 
   }
-)
-
-
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-
-  const data: getByChannelIdResponse['data'] = body ? JSON.parse(body) : {}
-  return { data, status: res.status, headers: res.headers } as getByChannelIdResponse
-}
+);}
 
 
 
@@ -974,16 +1957,16 @@ export const getGetByChannelIdQueryKey = (channelId: string,) => {
     }
 
 
-export const getGetByChannelIdQueryOptions = <TData = Awaited<ReturnType<typeof getByChannelId>>, TError = unknown>(channelId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getByChannelId>>, TError, TData>>, fetch?: RequestInit}
+export const getGetByChannelIdQueryOptions = <TData = Awaited<ReturnType<typeof getByChannelId>>, TError = unknown>(channelId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getByChannelId>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
 ) => {
 
-const {query: queryOptions, fetch: fetchOptions} = options ?? {};
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
   const queryKey =  queryOptions?.queryKey ?? getGetByChannelIdQueryKey(channelId);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getByChannelId>>> = ({ signal }) => getByChannelId(channelId, { signal, ...fetchOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getByChannelId>>> = ({ signal }) => getByChannelId(channelId, { signal, ...requestOptions });
 
 
 
@@ -1003,7 +1986,7 @@ export function useGetByChannelId<TData = Awaited<ReturnType<typeof getByChannel
           TError,
           Awaited<ReturnType<typeof getByChannelId>>
         > , 'initialData'
-      >, fetch?: RequestInit}
+      >, request?: SecondParameter<typeof authenticatedClient>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetByChannelId<TData = Awaited<ReturnType<typeof getByChannelId>>, TError = unknown>(
@@ -1013,16 +1996,16 @@ export function useGetByChannelId<TData = Awaited<ReturnType<typeof getByChannel
           TError,
           Awaited<ReturnType<typeof getByChannelId>>
         > , 'initialData'
-      >, fetch?: RequestInit}
+      >, request?: SecondParameter<typeof authenticatedClient>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetByChannelId<TData = Awaited<ReturnType<typeof getByChannelId>>, TError = unknown>(
- channelId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getByChannelId>>, TError, TData>>, fetch?: RequestInit}
+ channelId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getByChannelId>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 
 export function useGetByChannelId<TData = Awaited<ReturnType<typeof getByChannelId>>, TError = unknown>(
- channelId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getByChannelId>>, TError, TData>>, fetch?: RequestInit}
+ channelId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getByChannelId>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
@@ -1060,7 +2043,7 @@ export const getSaveUrl = (channelId: string,) => {
 }
 
 export const save = async (channelId: string,
-    saveCheckpointDto: SaveCheckpointDto, options?: RequestInit): Promise<saveResponse> => {
+    saveCheckpointDto: SaveCheckpointDto, options?: Parameters<typeof authenticatedClient>[1]): Promise<saveResponse> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -1076,21 +2059,14 @@ export const save = async (channelId: string,
     }
     return headers;
   };
-const res = await fetch(getSaveUrl(channelId),
+return authenticatedClient<saveResponse>(getSaveUrl(channelId),
   {
     ...options,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(saveCheckpointDto)
   }
-)
-
-
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-
-  const data: saveResponse['data'] = body ? JSON.parse(body) : {}
-  return { data, status: res.status, headers: res.headers } as saveResponse
-}
+);}
 
 
 
@@ -1099,15 +2075,15 @@ const res = await fetch(getSaveUrl(channelId),
 export const getSaveMutationKey = () => ['save'] as const;
 
 export const getSaveMutationOptions = <TError = unknown,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof save>>, TError,SaveMutationVariables, TContext>, fetch?: RequestInit}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof save>>, TError,SaveMutationVariables, TContext>, request?: SecondParameter<typeof authenticatedClient>}
 ): UseMutationOptions<Awaited<ReturnType<typeof save>>, TError,SaveMutationVariables, TContext> => {
 
 const mutationKey = getSaveMutationKey();
-const {mutation: mutationOptions, fetch: fetchOptions} = options ?
+const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
       : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, fetch: undefined};
+      : {mutation: { mutationKey, }, request: undefined};
 
 
 
@@ -1115,7 +2091,7 @@ const {mutation: mutationOptions, fetch: fetchOptions} = options ?
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof save>>, SaveMutationVariables> = (props) => {
           const {channelId,data} = props ?? {};
 
-          return  save(channelId,data,fetchOptions)
+          return  save(channelId,data,requestOptions)
         }
 
 
@@ -1131,7 +2107,7 @@ const {mutation: mutationOptions, fetch: fetchOptions} = options ?
     export type SaveMutationVariables = {channelId: string;data: SaveCheckpointDto}
 
     export const useSave = <TError = unknown,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof save>>, TError,SaveMutationVariables, TContext>, fetch?: RequestInit}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof save>>, TError,SaveMutationVariables, TContext>, request?: SecondParameter<typeof authenticatedClient>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof save>>,
         TError,
@@ -1139,5 +2115,910 @@ const {mutation: mutationOptions, fetch: fetchOptions} = options ?
         TContext
       > => {
       return useMutation(getSaveMutationOptions(options), queryClient);
+    }
+
+export type listDiscordChannelsResponse200 = {
+  data: ApiResponseChannelSettings
+  status: 200
+}
+
+export type listDiscordChannelsResponseSuccess = (listDiscordChannelsResponse200) & {
+  headers: Headers;
+};
+;
+
+export type listDiscordChannelsResponse = (listDiscordChannelsResponseSuccess)
+
+export const getListDiscordChannelsUrl = (params: ListDiscordChannelsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/discord/channels?${stringifiedParams}` : `/api/v1/discord/channels`
+}
+
+export const listDiscordChannels = async (params: ListDiscordChannelsParams, options?: Parameters<typeof authenticatedClient>[1]): Promise<listDiscordChannelsResponse> => {
+
+  return authenticatedClient<listDiscordChannelsResponse>(getListDiscordChannelsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListDiscordChannelsQueryKey = (params?: ListDiscordChannelsParams,) => {
+    return [
+    `/api/v1/discord/channels`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListDiscordChannelsQueryOptions = <TData = Awaited<ReturnType<typeof listDiscordChannels>>, TError = unknown>(params: ListDiscordChannelsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listDiscordChannels>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListDiscordChannelsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listDiscordChannels>>> = ({ signal }) => listDiscordChannels(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listDiscordChannels>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListDiscordChannelsQueryResult = NonNullable<Awaited<ReturnType<typeof listDiscordChannels>>>
+export type ListDiscordChannelsQueryError = unknown
+
+
+export function useListDiscordChannels<TData = Awaited<ReturnType<typeof listDiscordChannels>>, TError = unknown>(
+ params: ListDiscordChannelsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listDiscordChannels>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listDiscordChannels>>,
+          TError,
+          Awaited<ReturnType<typeof listDiscordChannels>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListDiscordChannels<TData = Awaited<ReturnType<typeof listDiscordChannels>>, TError = unknown>(
+ params: ListDiscordChannelsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listDiscordChannels>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listDiscordChannels>>,
+          TError,
+          Awaited<ReturnType<typeof listDiscordChannels>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListDiscordChannels<TData = Awaited<ReturnType<typeof listDiscordChannels>>, TError = unknown>(
+ params: ListDiscordChannelsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listDiscordChannels>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+
+export function useListDiscordChannels<TData = Awaited<ReturnType<typeof listDiscordChannels>>, TError = unknown>(
+ params: ListDiscordChannelsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listDiscordChannels>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListDiscordChannelsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export type saveDiscordChannelsResponse200 = {
+  data: ApiResponseChannelSettings
+  status: 200
+}
+
+export type saveDiscordChannelsResponseSuccess = (saveDiscordChannelsResponse200) & {
+  headers: Headers;
+};
+;
+
+export type saveDiscordChannelsResponse = (saveDiscordChannelsResponseSuccess)
+
+export const getSaveDiscordChannelsUrl = (params: SaveDiscordChannelsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/discord/channels?${stringifiedParams}` : `/api/v1/discord/channels`
+}
+
+export const saveDiscordChannels = async (saveDiscordChannelsBody: SaveDiscordChannelsBody,
+    params: SaveDiscordChannelsParams, options?: Parameters<typeof authenticatedClient>[1]): Promise<saveDiscordChannelsResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return authenticatedClient<saveDiscordChannelsResponse>(getSaveDiscordChannelsUrl(params),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(saveDiscordChannelsBody)
+  }
+);}
+
+
+
+
+
+export const getSaveDiscordChannelsMutationKey = () => ['saveDiscordChannels'] as const;
+
+export const getSaveDiscordChannelsMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveDiscordChannels>>, TError,SaveDiscordChannelsMutationVariables, TContext>, request?: SecondParameter<typeof authenticatedClient>}
+): UseMutationOptions<Awaited<ReturnType<typeof saveDiscordChannels>>, TError,SaveDiscordChannelsMutationVariables, TContext> => {
+
+const mutationKey = getSaveDiscordChannelsMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof saveDiscordChannels>>, SaveDiscordChannelsMutationVariables> = (props) => {
+          const {data,params} = props ?? {};
+
+          return  saveDiscordChannels(data,params,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SaveDiscordChannelsMutationResult = NonNullable<Awaited<ReturnType<typeof saveDiscordChannels>>>
+    export type SaveDiscordChannelsMutationBody = SaveDiscordChannelsBody
+    export type SaveDiscordChannelsMutationError = unknown
+    export type SaveDiscordChannelsMutationVariables = {data: SaveDiscordChannelsBody;params: SaveDiscordChannelsParams}
+
+    export const useSaveDiscordChannels = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveDiscordChannels>>, TError,SaveDiscordChannelsMutationVariables, TContext>, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof saveDiscordChannels>>,
+        TError,
+        SaveDiscordChannelsMutationVariables,
+        TContext
+      > => {
+      return useMutation(getSaveDiscordChannelsMutationOptions(options), queryClient);
+    }
+
+export type getMonitoredChannelsResponse200 = {
+  data: ApiResponseChannelIdsStringArray
+  status: 200
+}
+
+export type getMonitoredChannelsResponseSuccess = (getMonitoredChannelsResponse200) & {
+  headers: Headers;
+};
+;
+
+export type getMonitoredChannelsResponse = (getMonitoredChannelsResponseSuccess)
+
+export const getGetMonitoredChannelsUrl = (params: GetMonitoredChannelsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/internal/monitoring?${stringifiedParams}` : `/api/v1/internal/monitoring`
+}
+
+export const getMonitoredChannels = async (params: GetMonitoredChannelsParams, options?: Parameters<typeof authenticatedClient>[1]): Promise<getMonitoredChannelsResponse> => {
+
+  return authenticatedClient<getMonitoredChannelsResponse>(getGetMonitoredChannelsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMonitoredChannelsQueryKey = (params?: GetMonitoredChannelsParams,) => {
+    return [
+    `/api/v1/internal/monitoring`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetMonitoredChannelsQueryOptions = <TData = Awaited<ReturnType<typeof getMonitoredChannels>>, TError = unknown>(params: GetMonitoredChannelsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitoredChannels>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMonitoredChannelsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMonitoredChannels>>> = ({ signal }) => getMonitoredChannels(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMonitoredChannels>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetMonitoredChannelsQueryResult = NonNullable<Awaited<ReturnType<typeof getMonitoredChannels>>>
+export type GetMonitoredChannelsQueryError = unknown
+
+
+export function useGetMonitoredChannels<TData = Awaited<ReturnType<typeof getMonitoredChannels>>, TError = unknown>(
+ params: GetMonitoredChannelsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitoredChannels>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getMonitoredChannels>>,
+          TError,
+          Awaited<ReturnType<typeof getMonitoredChannels>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetMonitoredChannels<TData = Awaited<ReturnType<typeof getMonitoredChannels>>, TError = unknown>(
+ params: GetMonitoredChannelsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitoredChannels>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getMonitoredChannels>>,
+          TError,
+          Awaited<ReturnType<typeof getMonitoredChannels>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetMonitoredChannels<TData = Awaited<ReturnType<typeof getMonitoredChannels>>, TError = unknown>(
+ params: GetMonitoredChannelsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitoredChannels>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+
+export function useGetMonitoredChannels<TData = Awaited<ReturnType<typeof getMonitoredChannels>>, TError = unknown>(
+ params: GetMonitoredChannelsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitoredChannels>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetMonitoredChannelsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export type authorizeDiscordResponse200 = {
+  data: ApiResponseUrlString
+  status: 200
+}
+
+export type authorizeDiscordResponseSuccess = (authorizeDiscordResponse200) & {
+  headers: Headers;
+};
+;
+
+export type authorizeDiscordResponse = (authorizeDiscordResponseSuccess)
+
+export const getAuthorizeDiscordUrl = () => {
+
+
+
+
+  return `/api/v1/auth/authorize`
+}
+
+export const authorizeDiscord = async ( options?: Parameters<typeof authenticatedClient>[1]): Promise<authorizeDiscordResponse> => {
+
+  return authenticatedClient<authorizeDiscordResponse>(getAuthorizeDiscordUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getAuthorizeDiscordQueryKey = () => {
+    return [
+    `/api/v1/auth/authorize`
+    ] as const;
+    }
+
+
+export const getAuthorizeDiscordQueryOptions = <TData = Awaited<ReturnType<typeof authorizeDiscord>>, TError = unknown>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof authorizeDiscord>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getAuthorizeDiscordQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof authorizeDiscord>>> = ({ signal }) => authorizeDiscord({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof authorizeDiscord>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type AuthorizeDiscordQueryResult = NonNullable<Awaited<ReturnType<typeof authorizeDiscord>>>
+export type AuthorizeDiscordQueryError = unknown
+
+
+export function useAuthorizeDiscord<TData = Awaited<ReturnType<typeof authorizeDiscord>>, TError = unknown>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof authorizeDiscord>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof authorizeDiscord>>,
+          TError,
+          Awaited<ReturnType<typeof authorizeDiscord>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useAuthorizeDiscord<TData = Awaited<ReturnType<typeof authorizeDiscord>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof authorizeDiscord>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof authorizeDiscord>>,
+          TError,
+          Awaited<ReturnType<typeof authorizeDiscord>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useAuthorizeDiscord<TData = Awaited<ReturnType<typeof authorizeDiscord>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof authorizeDiscord>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+
+export function useAuthorizeDiscord<TData = Awaited<ReturnType<typeof authorizeDiscord>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof authorizeDiscord>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getAuthorizeDiscordQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export type loginDiscordResponse200 = {
+  data: ApiResponseAccessTokenStringTokenTypeStringExpiresAtStringUserAuthUser
+  status: 200
+}
+
+export type loginDiscordResponseSuccess = (loginDiscordResponse200) & {
+  headers: Headers;
+};
+;
+
+export type loginDiscordResponse = (loginDiscordResponseSuccess)
+
+export const getLoginDiscordUrl = () => {
+
+
+
+
+  return `/api/v1/auth/login`
+}
+
+export const loginDiscord = async (loginDiscordBody: LoginDiscordBody, options?: Parameters<typeof authenticatedClient>[1]): Promise<loginDiscordResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return authenticatedClient<loginDiscordResponse>(getLoginDiscordUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(loginDiscordBody)
+  }
+);}
+
+
+
+
+
+export const getLoginDiscordMutationKey = () => ['loginDiscord'] as const;
+
+export const getLoginDiscordMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof loginDiscord>>, TError,LoginDiscordMutationVariables, TContext>, request?: SecondParameter<typeof authenticatedClient>}
+): UseMutationOptions<Awaited<ReturnType<typeof loginDiscord>>, TError,LoginDiscordMutationVariables, TContext> => {
+
+const mutationKey = getLoginDiscordMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof loginDiscord>>, LoginDiscordMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  loginDiscord(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type LoginDiscordMutationResult = NonNullable<Awaited<ReturnType<typeof loginDiscord>>>
+    export type LoginDiscordMutationBody = LoginDiscordBody
+    export type LoginDiscordMutationError = unknown
+    export type LoginDiscordMutationVariables = {data: LoginDiscordBody}
+
+    export const useLoginDiscord = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof loginDiscord>>, TError,LoginDiscordMutationVariables, TContext>, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof loginDiscord>>,
+        TError,
+        LoginDiscordMutationVariables,
+        TContext
+      > => {
+      return useMutation(getLoginDiscordMutationOptions(options), queryClient);
+    }
+
+export type getCurrentUserResponse200 = {
+  data: ApiResponseAuthUser
+  status: 200
+}
+
+export type getCurrentUserResponseSuccess = (getCurrentUserResponse200) & {
+  headers: Headers;
+};
+;
+
+export type getCurrentUserResponse = (getCurrentUserResponseSuccess)
+
+export const getGetCurrentUserUrl = () => {
+
+
+
+
+  return `/api/v1/auth/me`
+}
+
+export const getCurrentUser = async ( options?: Parameters<typeof authenticatedClient>[1]): Promise<getCurrentUserResponse> => {
+
+  return authenticatedClient<getCurrentUserResponse>(getGetCurrentUserUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCurrentUserQueryKey = () => {
+    return [
+    `/api/v1/auth/me`
+    ] as const;
+    }
+
+
+export const getGetCurrentUserQueryOptions = <TData = Awaited<ReturnType<typeof getCurrentUser>>, TError = unknown>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCurrentUser>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCurrentUserQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCurrentUser>>> = ({ signal }) => getCurrentUser({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCurrentUser>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetCurrentUserQueryResult = NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>
+export type GetCurrentUserQueryError = unknown
+
+
+export function useGetCurrentUser<TData = Awaited<ReturnType<typeof getCurrentUser>>, TError = unknown>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCurrentUser>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getCurrentUser>>,
+          TError,
+          Awaited<ReturnType<typeof getCurrentUser>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetCurrentUser<TData = Awaited<ReturnType<typeof getCurrentUser>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCurrentUser>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getCurrentUser>>,
+          TError,
+          Awaited<ReturnType<typeof getCurrentUser>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetCurrentUser<TData = Awaited<ReturnType<typeof getCurrentUser>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCurrentUser>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+
+export function useGetCurrentUser<TData = Awaited<ReturnType<typeof getCurrentUser>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCurrentUser>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetCurrentUserQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export type listAuthGuildsResponse200 = {
+  data: ApiResponseGuildsDiscordGuildArray
+  status: 200
+}
+
+export type listAuthGuildsResponseSuccess = (listAuthGuildsResponse200) & {
+  headers: Headers;
+};
+;
+
+export type listAuthGuildsResponse = (listAuthGuildsResponseSuccess)
+
+export const getListAuthGuildsUrl = () => {
+
+
+
+
+  return `/api/v1/auth/guilds`
+}
+
+export const listAuthGuilds = async ( options?: Parameters<typeof authenticatedClient>[1]): Promise<listAuthGuildsResponse> => {
+
+  return authenticatedClient<listAuthGuildsResponse>(getListAuthGuildsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListAuthGuildsQueryKey = () => {
+    return [
+    `/api/v1/auth/guilds`
+    ] as const;
+    }
+
+
+export const getListAuthGuildsQueryOptions = <TData = Awaited<ReturnType<typeof listAuthGuilds>>, TError = unknown>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAuthGuilds>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListAuthGuildsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listAuthGuilds>>> = ({ signal }) => listAuthGuilds({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAuthGuilds>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListAuthGuildsQueryResult = NonNullable<Awaited<ReturnType<typeof listAuthGuilds>>>
+export type ListAuthGuildsQueryError = unknown
+
+
+export function useListAuthGuilds<TData = Awaited<ReturnType<typeof listAuthGuilds>>, TError = unknown>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAuthGuilds>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listAuthGuilds>>,
+          TError,
+          Awaited<ReturnType<typeof listAuthGuilds>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListAuthGuilds<TData = Awaited<ReturnType<typeof listAuthGuilds>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAuthGuilds>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listAuthGuilds>>,
+          TError,
+          Awaited<ReturnType<typeof listAuthGuilds>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListAuthGuilds<TData = Awaited<ReturnType<typeof listAuthGuilds>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAuthGuilds>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+
+export function useListAuthGuilds<TData = Awaited<ReturnType<typeof listAuthGuilds>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAuthGuilds>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListAuthGuildsQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export type refreshSessionResponse200 = {
+  data: ApiResponseAccessTokenStringTokenTypeStringExpiresAtString
+  status: 200
+}
+
+export type refreshSessionResponseSuccess = (refreshSessionResponse200) & {
+  headers: Headers;
+};
+;
+
+export type refreshSessionResponse = (refreshSessionResponseSuccess)
+
+export const getRefreshSessionUrl = () => {
+
+
+
+
+  return `/api/v1/auth/refresh`
+}
+
+export const refreshSession = async ( options?: Parameters<typeof authenticatedClient>[1]): Promise<refreshSessionResponse> => {
+
+  return authenticatedClient<refreshSessionResponse>(getRefreshSessionUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getRefreshSessionMutationKey = () => ['refreshSession'] as const;
+
+export const getRefreshSessionMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof refreshSession>>, TError,void, TContext>, request?: SecondParameter<typeof authenticatedClient>}
+): UseMutationOptions<Awaited<ReturnType<typeof refreshSession>>, TError,void, TContext> => {
+
+const mutationKey = getRefreshSessionMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof refreshSession>>, void> = () => {
+
+
+          return  refreshSession(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RefreshSessionMutationResult = NonNullable<Awaited<ReturnType<typeof refreshSession>>>
+
+    export type RefreshSessionMutationError = unknown
+
+
+    export const useRefreshSession = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof refreshSession>>, TError,void, TContext>, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof refreshSession>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getRefreshSessionMutationOptions(options), queryClient);
+    }
+
+export type logoutSessionResponse200 = {
+  data: ApiResponseNull
+  status: 200
+}
+
+export type logoutSessionResponseSuccess = (logoutSessionResponse200) & {
+  headers: Headers;
+};
+;
+
+export type logoutSessionResponse = (logoutSessionResponseSuccess)
+
+export const getLogoutSessionUrl = () => {
+
+
+
+
+  return `/api/v1/auth/logout`
+}
+
+export const logoutSession = async ( options?: Parameters<typeof authenticatedClient>[1]): Promise<logoutSessionResponse> => {
+
+  return authenticatedClient<logoutSessionResponse>(getLogoutSessionUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getLogoutSessionMutationKey = () => ['logoutSession'] as const;
+
+export const getLogoutSessionMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof logoutSession>>, TError,void, TContext>, request?: SecondParameter<typeof authenticatedClient>}
+): UseMutationOptions<Awaited<ReturnType<typeof logoutSession>>, TError,void, TContext> => {
+
+const mutationKey = getLogoutSessionMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof logoutSession>>, void> = () => {
+
+
+          return  logoutSession(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type LogoutSessionMutationResult = NonNullable<Awaited<ReturnType<typeof logoutSession>>>
+
+    export type LogoutSessionMutationError = unknown
+
+
+    export const useLogoutSession = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof logoutSession>>, TError,void, TContext>, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof logoutSession>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getLogoutSessionMutationOptions(options), queryClient);
     }
 

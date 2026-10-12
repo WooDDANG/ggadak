@@ -147,10 +147,10 @@ sequenceDiagram
     Harvester->>Bot: 메시지에 '📝' 리액션 추가 (큐 등록 완료)
     Harvester->>Harvester: In-flight Lock 해제
     
-    PM->>BE: GET /api/decisions?state=Draft
+    PM->>BE: GET /api/v1/review-queue?guildId=...&status=IN_REVIEW
     BE-->>PM: 대기 안건 + 근거 요약 + 인용구 + 원문 대화 목록 반환
     PM->>PM: Discord 대화 원문 뷰어로 컨텍스트 확인 후 승인 클릭
-    PM->>BE: POST /api/decisions/:id/review (action: confirm)
+    PM->>BE: POST /api/v1/review-queue/:ticketId/review?guildId=... (action: confirm)
     BE->>DB: State -> Decided 갱신
 ```
 

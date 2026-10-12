@@ -15,11 +15,17 @@ export const CategoryTagSchema = z.enum(['타깃', '문제정의', '기능', '�
 export const FeedbackSourceTypeSchema = z.enum(['교수', '심사위원', '팀원', '인터뷰이']);
 
 export const AlternativeOptionSchema = z.object({
+  id: z.string().optional(),
   option: z.string(),
   reason: z.string(),
 });
 
 export const ActionItemSchema = z.object({
+  id: z.string().optional(),
+  state: z.enum(['unknown', 'open', 'completed', 'canceled', 'transferred']).optional(),
+  transferredFromDecisionId: z.string().optional(),
+  transferredFromActionItemId: z.string().optional(),
+  transferredToDecisionId: z.string().optional(),
   task: z.string().min(1),
   assignee: z.string().optional(),
   dueDate: z.string().optional(),
@@ -46,6 +52,8 @@ export const DiscordSourceSchema = z.object({
 
 export const DecisionSchema = z.object({
   id: z.string(),
+  version: z.number().int().positive().optional(),
+  supersededById: z.string().nullable().optional(),
   // Core Decision Content
   topic: z.string().min(1),
   decision: z.string().min(1),
@@ -74,6 +82,7 @@ export const DecisionSchema = z.object({
   source: DiscordSourceSchema,
   messageCreatedAt: z.string().optional(),
   createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime().optional(),
   governanceScore: z.number().optional(),
   governanceReason: z.string().optional(),
   governancePassed: z.boolean().optional(),
@@ -102,6 +111,19 @@ export const ExternalFeedbackSchema = z.object({
 
 export const ReviewActionSchema = z.object({
   action: z.enum(['confirm', 'defer', 'reject', 'edit']),
+  expectedVersion: z.number().int().positive(),
+  resolution: z.enum(['independent', 'replace']).optional(),
+  predecessorId: z.string().optional(),
+  predecessorVersion: z.number().int().positive().optional(),
+  taskDispositions: z
+    .array(
+      z.object({
+        actionItemId: z.string(),
+        classification: z.enum(['open', 'completed']).optional(),
+        disposition: z.enum(['cancel', 'transfer']).optional(),
+      }),
+    )
+    .optional(),
   approvedBy: z.string().optional(),
   title: z.string().optional(),
   decisionContent: z.string().optional(),
