@@ -1,6 +1,7 @@
 import { Decision, ReviewAction } from '@ggaddak/shared';
 import { apiClient } from './client';
-import { listV1Decisions } from './generated';
+import { listV1Decisions, getV1Decision } from './generated';
+import type { ListV1DecisionsParams } from './generated/model';
 
 export interface GetDecisionsParams {
   guildId: string;
@@ -10,14 +11,23 @@ export interface GetDecisionsParams {
 }
 
 export const decisionsApi = {
-  getDecisions: async (params: GetDecisionsParams): Promise<Decision[]> => {
+  browse: async (params: ListV1DecisionsParams) => {
     const response = await listV1Decisions(params);
-    if (response.status !== 200 || !response.data.success) {
-      throw new Error(response.data.message || `HTTP ${response.status}`);
+    if (response.status !== 200 || !response.data.success) throw new Error(response.data.message || `HTTP ${response.status}`);
+    return response.data.data;
+  },
+  detail: async (id: string, guildId: string) => {
+    const response = await getV1Decision(id, {guildId});
+    if (response.status !== 200 || !response.data.success) throw new Error(response.data.message || `HTTP ${response.status}`);
+    return response.data.data;
+  },
+  getDecisions: async (params: GetDecisionsParams): Promise<Decision[]> => {
+    const first = await decisionsApi.browse({...params, size: 100});
+    const records = [...first.decisions];
+    for (let page = 2; page <= first.pageInfo.totalPages; page++) {
+      records.push(...(await decisionsApi.browse({...params, size: 100, page})).decisions);
     }
-    // The compatibility endpoint returns full shared Decision Records; the legacy
-    // OpenAPI DTO marks their defaulted fields optional.
-    return response.data.data.decisions as Decision[];
+    return records as Decision[];
   },
 
   reviewDecision: async (id: string, action: ReviewAction): Promise<Decision> => {

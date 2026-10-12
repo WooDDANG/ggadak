@@ -29,11 +29,11 @@ import type {
   ApiResponseAccessTokenStringTokenTypeStringExpiresAtString,
   ApiResponseAccessTokenStringTokenTypeStringExpiresAtStringUserAuthUser,
   ApiResponseAuthUser,
-  ApiResponseDecisionItemDto,
-  ApiResponseDecisionListResponseDto,
   ApiResponseGuildsDiscordGuildArray,
   ApiResponseNull,
   ApiResponseUrlString,
+  ApiResponseV1DecisionDto,
+  ApiResponseV1DecisionListDto,
   CandidateHistoryEntry,
   CheckpointResponseDto,
   CreateFeedback201,
@@ -79,7 +79,7 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
 };
 
 export type getV1DecisionResponse200 = {
-  data: ApiResponseDecisionItemDto
+  data: ApiResponseV1DecisionDto
   status: 200
 }
 
@@ -201,7 +201,7 @@ export function useGetV1Decision<TData = Awaited<ReturnType<typeof getV1Decision
 
 
 export type listV1DecisionsResponse200 = {
-  data: ApiResponseDecisionListResponseDto
+  data: ApiResponseV1DecisionListDto
   status: 200
 }
 

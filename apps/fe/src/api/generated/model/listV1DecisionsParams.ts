@@ -4,10 +4,15 @@
  * @ggaddak/be
  * OpenAPI spec version: 1.0.0
  */
+import type { DecisionStatus } from './decisionStatus';
 
 export type ListV1DecisionsParams = {
 guildId: string;
 topic?: string;
 state?: string;
 categoryTag?: string;
+status?: DecisionStatus;
+category?: string;
+page?: number;
+size?: number;
 };

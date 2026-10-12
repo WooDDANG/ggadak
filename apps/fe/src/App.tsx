@@ -6,7 +6,7 @@ import { AuthGate } from './features/AuthGate';
 import { decisionsQueryKey } from './api/session';
 import { Header } from './components/Header';
 import { ReviewQueue } from './features/review-queue/ReviewQueue';
-import { DecisionTimeline } from './features/decision-timeline/DecisionTimeline';
+import { DecisionBrowser } from './features/decision-timeline/DecisionBrowser';
 import { FeedbackBoard } from './features/feedback-board/FeedbackBoard';
 
 export function App() { return <AuthGate>{guildId => <ServerApp key={guildId} guildId={guildId} />}</AuthGate>; }
@@ -67,7 +67,7 @@ function ServerApp({ guildId }: { guildId: string }) {
         )}
 
         {activeTab === 'timeline' && (
-          <DecisionTimeline decisions={decisions} isLoading={isDecisionsLoading} />
+          <DecisionBrowser guildId={guildId} />
         )}
 
         {activeTab === 'feedback' && (
