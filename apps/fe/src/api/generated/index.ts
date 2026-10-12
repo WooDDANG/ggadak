@@ -33,6 +33,7 @@ import type {
   ApiResponseChannelSettings,
   ApiResponseGuildsDiscordGuildArray,
   ApiResponseNull,
+  ApiResponseSearchResponse,
   ApiResponseUrlString,
   ApiResponseV1DecisionDto,
   ApiResponseV1DecisionListDto,
@@ -64,6 +65,7 @@ import type {
   SaveCheckpointDto,
   SaveDiscordChannelsBody,
   SaveDiscordChannelsParams,
+  SearchDecisionsParams,
   V1ReviewRequestDto,
   Webhook201
 } from './model';
@@ -639,6 +641,123 @@ export function useListV1Decisions<TData = Awaited<ReturnType<typeof listV1Decis
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getListV1DecisionsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export type searchDecisionsResponse200 = {
+  data: ApiResponseSearchResponse
+  status: 200
+}
+
+export type searchDecisionsResponseSuccess = (searchDecisionsResponse200) & {
+  headers: Headers;
+};
+;
+
+export type searchDecisionsResponse = (searchDecisionsResponseSuccess)
+
+export const getSearchDecisionsUrl = (params: SearchDecisionsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/search?${stringifiedParams}` : `/api/v1/search`
+}
+
+/**
+ * Semantic search of CONFIRMED and SUPERSEDED decisions in one authorized guild.
+ */
+export const searchDecisions = async (params: SearchDecisionsParams, options?: Parameters<typeof authenticatedClient>[1]): Promise<searchDecisionsResponse> => {
+
+  return authenticatedClient<searchDecisionsResponse>(getSearchDecisionsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getSearchDecisionsQueryKey = (params?: SearchDecisionsParams,) => {
+    return [
+    `/api/v1/search`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getSearchDecisionsQueryOptions = <TData = Awaited<ReturnType<typeof searchDecisions>>, TError = unknown>(params: SearchDecisionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchDecisions>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getSearchDecisionsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof searchDecisions>>> = ({ signal }) => searchDecisions(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof searchDecisions>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type SearchDecisionsQueryResult = NonNullable<Awaited<ReturnType<typeof searchDecisions>>>
+export type SearchDecisionsQueryError = unknown
+
+
+export function useSearchDecisions<TData = Awaited<ReturnType<typeof searchDecisions>>, TError = unknown>(
+ params: SearchDecisionsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchDecisions>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof searchDecisions>>,
+          TError,
+          Awaited<ReturnType<typeof searchDecisions>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useSearchDecisions<TData = Awaited<ReturnType<typeof searchDecisions>>, TError = unknown>(
+ params: SearchDecisionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchDecisions>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof searchDecisions>>,
+          TError,
+          Awaited<ReturnType<typeof searchDecisions>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useSearchDecisions<TData = Awaited<ReturnType<typeof searchDecisions>>, TError = unknown>(
+ params: SearchDecisionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchDecisions>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+
+export function useSearchDecisions<TData = Awaited<ReturnType<typeof searchDecisions>>, TError = unknown>(
+ params: SearchDecisionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchDecisions>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getSearchDecisionsQueryOptions(params,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 

@@ -2,6 +2,14 @@
 
 ```mermaid
 erDiagram
+  Decision ||--o| DecisionEmbedding : indexes
+  DecisionEmbedding {
+    string decisionId PK,FK
+    string model
+    string contentHash
+    string vectorJson
+    datetime updatedAt
+  }
   User ||--o{ Membership : belongs_to
   Guild ||--o{ Membership : has
   User ||--o{ AuthSession : authenticates

@@ -2,8 +2,8 @@ import React from 'react';
 import { Layers, ShieldCheck, RefreshCw } from 'lucide-react';
 
 interface HeaderProps {
-  activeTab: 'review' | 'timeline' | 'feedback' | 'settings';
-  setActiveTab: (tab: 'review' | 'timeline' | 'feedback' | 'settings') => void;
+  activeTab: 'review' | 'timeline' | 'feedback' | 'settings' | 'search';
+  setActiveTab: (tab: 'review' | 'timeline' | 'feedback' | 'settings' | 'search') => void;
   draftCount: number;
   onRefresh: () => void;
   isRefetching: boolean;
@@ -74,6 +74,7 @@ export const Header: React.FC<HeaderProps> = ({
             >
               <span>외부 피드백</span>
             </button>
+            <button onClick={() => setActiveTab('search')} className={`px-4 py-2 rounded-lg text-sm ${activeTab === 'search' ? 'bg-indigo-600' : 'text-slate-300 hover:bg-slate-800'}`}>Why 검색</button>
             <button onClick={() => setActiveTab('settings')} className={`px-4 py-2 rounded-lg text-sm ${activeTab === 'settings' ? 'bg-indigo-600' : 'text-slate-300 hover:bg-slate-800'}`}>채널 설정</button>
           </nav>
 
