@@ -14,7 +14,7 @@ FE and BE must be on the same site for the SameSite=Lax browser state cookie: us
 
 Migration `202610120004_discord_auth` is additive. It creates User/Guild/Membership/AuthSession/OAuthState, seeds historical Guild IDs and does not alter Decision records or grant historical memberships. Generate the Prisma client and apply migrations only to an explicitly selected/backed-up DB. No production database was migrated during ticket implementation. See [ERD](../../docs/diagrams/v1-data-model.md).
 
-Legacy endpoints remain during expand–contract and are not yet secured by this ticket. They must be retired or separately service-authenticated in ticket 13. The FE no longer fetches global legacy feedback; server-scoped feedback remains pending. Reviews still use legacy compatibility until ticket 07 switches them.
+The Bot uses `BOT_SERVICE_TOKEN` as a bearer token for internal monitoring, discussion analysis, and candidate-history endpoints. The FE no longer fetches global legacy feedback; server-scoped feedback remains pending. Reviews still use legacy compatibility until ticket 07 switches them.
 
 Public HTTP test helpers: `test-support/auth.ts` provides `fakeAuthOptions()` with an injectable fake Discord adapter and `loginAsTestUser(baseUrl)` obtains a real application JWT through authorize/login. Tests use disposable DBs, never real Discord credentials.
 
