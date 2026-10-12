@@ -62,9 +62,12 @@ test('checked-in additive migrations preserve a legacy-schema fixture and missin
     await repo.saveDecision({ ...recovered!, actionItems: [{ task: 'Legacy unclassified task' }] });
     await client.$disconnect();
     assert.equal((await repo.getDecisionById('legacy'))?.actionItems[0]?.state, 'unknown');
-    assert.deepEqual(await repo.getDecisionById('historical-string-id'), historical);
+    const restoredHistorical = await repo.getDecisionById('historical-string-id');
+    const { updatedAt, ...legacyDomain } = restoredHistorical!;
+    assert.equal(updatedAt, '2020-01-01T00:00:00.000Z');
+    assert.deepEqual(legacyDomain, historical);
     const page = await repo.browseDecisions({guildId:'g',status:'SUPERSEDED',category:'기술',page:1,size:10});
-    assert.deepEqual(page.decisions, [historical]);
+    assert.deepEqual(page.decisions.map(({ updatedAt: _updatedAt, ...decision }) => decision), [historical]);
     assert.equal(page.pageInfo.totalElements, 1);
   } finally {
     await client.$disconnect();

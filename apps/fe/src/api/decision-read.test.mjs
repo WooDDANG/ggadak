@@ -42,6 +42,24 @@ test('Decision Card flow sends server filters and pagination through generated c
   } finally {globalThis.fetch=previousFetch;}
 });
 
+test('Decision Timeline uses generated guild-scoped month grouping with the browser timezone', async()=>{
+  const sessionUrl=moduleUrl('./session.ts');
+  const transportUrl=moduleUrl('./transport.ts',s=>s.replace("'./session'",JSON.stringify(sessionUrl)));
+  const generatedUrl=moduleUrl('./generated/index.ts',s=>s.replace("'../transport'",JSON.stringify(transportUrl)).replace("'@tanstack/react-query'",JSON.stringify(pathToFileURL(require.resolve('@tanstack/react-query')).href)));
+  const clientUrl=moduleUrl('./client.ts',s=>s.replace("'./transport'",JSON.stringify(transportUrl)));
+  const {decisionsApi}=await import(moduleUrl('./decisions.api.ts',s=>s.replace("'./generated'",JSON.stringify(generatedUrl)).replace("'./client'",JSON.stringify(clientUrl))));
+  const session=await import(sessionUrl);session.setAccessToken('member-token');
+  const previous=globalThis.fetch;let request;
+  globalThis.fetch=async(url,options)=>{request={url,options};return new Response(JSON.stringify({success:true,data:{groupBy:'month',timezone:'Asia/Seoul',totalElements:1,groups:[{key:'2026-10',count:1,items:[{id:'DEC-1'}]}]}}),{status:200});};
+  try{
+    const result=await decisionsApi.timeline({guildId:'guild-1',groupBy:'month',timezone:'Asia/Seoul'});
+    assert.equal(result.groups[0].items[0].id,'DEC-1');
+    const query=new URL(request.url,'http://local').searchParams;
+    assert.equal(query.get('guildId'),'guild-1');assert.equal(query.get('groupBy'),'month');assert.equal(query.get('timezone'),'Asia/Seoul');
+    assert.equal(request.options.headers.get('Authorization'),'Bearer member-token');
+  }finally{globalThis.fetch=previous;}
+});
+
 test('Review Queue client lists held tickets and sends authenticated versioned replacement with dispositions',async()=>{
   const sessionUrl=moduleUrl('./session.ts');
   const transportUrl=moduleUrl('./transport.ts',s=>s.replace("'./session'",JSON.stringify(sessionUrl)));

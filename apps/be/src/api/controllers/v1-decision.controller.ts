@@ -12,6 +12,7 @@ import {
 } from '../../dto/v1-decision.dto.js';
 import { BadRequestError } from '../../errors/AppError.js';
 import { ApiResponse, apiSuccess } from '../../dto/api-response.dto.js';
+import { DecisionTimelineDto, DecisionTimelineGroupBy, toDecisionTimeline } from '../../dto/decision-timeline.dto.js';
 
 @Tags('v1 Decisions')
 @Route('api/v1/decisions')
@@ -23,6 +24,20 @@ export class V1DecisionController extends Controller {
     private auth: AuthService,
   ) {
     super();
+  }
+
+  @Get('timeline')
+  public async getDecisionTimeline(
+    @Request() request: ExpressRequest,
+    @Query() guildId: string,
+    @Query() groupBy: DecisionTimelineGroupBy = 'month',
+    @Query() timezone: string = 'UTC',
+    @Query() from?: string,
+    @Query() to?: string,
+  ): Promise<ApiResponse<DecisionTimelineDto>> {
+    await this.auth.requireGuild(request.user as AuthPrincipal, guildId);
+    const result = await this.service.getConfirmedTimeline({ guildId, groupBy, timezone, from, to });
+    return apiSuccess(toDecisionTimeline(result, toV1Decision));
   }
 
   @Put('{id}')

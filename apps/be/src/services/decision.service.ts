@@ -27,6 +27,10 @@ export class DecisionService {
     return this.repo.browseDecisions(filter);
   }
 
+  async getConfirmedTimeline(filter: Parameters<DecisionRepository['getConfirmedTimeline']>[0]) {
+    return this.repo.getConfirmedTimeline(filter);
+  }
+
   async getDecisions(filter: QueryDecisionsFilter): Promise<Decision[]> {
     return this.repo.getDecisions(filter);
   }

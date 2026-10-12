@@ -211,6 +211,33 @@ const models: TsoaRoute.Models = {
         "additionalProperties": false,
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "DecisionTimelineGroupBy": {
+        "dataType": "refAlias",
+        "type": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["month"]},{"dataType":"enum","enums":["topic"]},{"dataType":"enum","enums":["channel"]},{"dataType":"enum","enums":["category"]}],"validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "DecisionTimelineDto": {
+        "dataType": "refObject",
+        "properties": {
+            "groupBy": {"ref":"DecisionTimelineGroupBy","required":true},
+            "timezone": {"dataType":"string","required":true},
+            "totalElements": {"dataType":"double","required":true},
+            "groups": {"dataType":"array","array":{"dataType":"nestedObjectLiteral","nestedProperties":{"items":{"dataType":"array","array":{"dataType":"refObject","ref":"V1DecisionDto"},"required":true},"count":{"dataType":"double","required":true},"key":{"dataType":"string","required":true}}},"required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "ApiResponse_DecisionTimelineDto_": {
+        "dataType": "refObject",
+        "properties": {
+            "success": {"dataType":"boolean","required":true},
+            "code": {"dataType":"string","required":true},
+            "message": {"dataType":"string","required":true},
+            "data": {"ref":"DecisionTimelineDto","required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "DecisionEditDto": {
         "dataType": "refObject",
         "properties": {
@@ -754,6 +781,47 @@ export function RegisterRoutes(app: Router) {
 
               await templateService.apiHandler({
                 methodName: 'reviewV1Candidate',
+                controller,
+                response,
+                next,
+                validatedArgs,
+                successStatus: undefined,
+              });
+            } catch (err) {
+                return next(err);
+            }
+        });
+        // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+        const argsV1DecisionController_getDecisionTimeline: Record<string, TsoaRoute.ParameterSchema> = {
+                request: {"in":"request","name":"request","required":true,"dataType":"object"},
+                guildId: {"in":"query","name":"guildId","required":true,"dataType":"string"},
+                groupBy: {"default":"month","in":"query","name":"groupBy","ref":"DecisionTimelineGroupBy"},
+                timezone: {"default":"UTC","in":"query","name":"timezone","dataType":"string"},
+                from: {"in":"query","name":"from","dataType":"string"},
+                to: {"in":"query","name":"to","dataType":"string"},
+        };
+        app.get('/api/v1/decisions/timeline',
+            authenticateMiddleware([{"jwt":[]}]),
+            ...(fetchMiddlewares<RequestHandler>(V1DecisionController)),
+            ...(fetchMiddlewares<RequestHandler>(V1DecisionController.prototype.getDecisionTimeline)),
+
+            async function V1DecisionController_getDecisionTimeline(request: ExRequest, response: ExResponse, next: any) {
+
+            // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+
+            let validatedArgs: any[] = [];
+            try {
+                validatedArgs = templateService.getValidatedArgs({ args: argsV1DecisionController_getDecisionTimeline, request, response });
+
+                const container: IocContainer = typeof iocContainer === 'function' ? (iocContainer as IocContainerFactory)(request) : iocContainer;
+
+                const controller: any = await container.get<V1DecisionController>(V1DecisionController);
+                if (typeof controller['setStatus'] === 'function') {
+                controller.setStatus(undefined);
+                }
+
+              await templateService.apiHandler({
+                methodName: 'getDecisionTimeline',
                 controller,
                 response,
                 next,
