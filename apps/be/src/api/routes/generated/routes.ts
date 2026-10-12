@@ -4,6 +4,8 @@
 import type { TsoaRoute } from '@tsoa/runtime';
 import {  fetchMiddlewares, ExpressTemplateService } from '@tsoa/runtime';
 // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+import { V1ReviewController } from './../../controllers/v1-review.controller.js';
+// WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
 import { V1DecisionController } from './../../controllers/v1-decision.controller.js';
 // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
 import { PolicyController } from './../../controllers/policy.controller.js';
@@ -59,6 +61,68 @@ const models: TsoaRoute.Models = {
         "type": {"dataType":"nestedObjectLiteral","nestedProperties":{"id":{"dataType":"string","required":true},"version":{"dataType":"double"},"supersededById":{"dataType":"string"},"topic":{"dataType":"string","required":true},"decision":{"dataType":"string","required":true},"title":{"dataType":"string"},"decisionContent":{"dataType":"string"},"rationale":{"dataType":"string","required":true},"rationaleSummary":{"dataType":"string"},"rationaleQuotes":{"dataType":"array","array":{"dataType":"string"}},"categoryTag":{"dataType":"union","subSchemas":[{"dataType":"enum","enums":["타깃"]},{"dataType":"enum","enums":["문제정의"]},{"dataType":"enum","enums":["기능"]},{"dataType":"enum","enums":["기술"]},{"dataType":"enum","enums":["BM"]},{"dataType":"enum","enums":["기타"]}]},"actionItems":{"dataType":"array","array":{"dataType":"refObject","ref":"ActionItemDto"}},"state":{"dataType":"union","subSchemas":[{"dataType":"enum","enums":["Draft"]},{"dataType":"enum","enums":["Proposed"]},{"dataType":"enum","enums":["Discussing"]},{"dataType":"enum","enums":["Decided"]},{"dataType":"enum","enums":["Superseded"]},{"dataType":"enum","enums":["Deferred"]},{"dataType":"enum","enums":["Rejected"]}],"required":true},"supersedesId":{"dataType":"string"},"isPivot":{"dataType":"boolean"},"approvedBy":{"dataType":"string"},"decisionConfirmedDate":{"dataType":"string"},"feedbackSourceType":{"dataType":"string"},"feedbackSourceDetail":{"dataType":"string"},"feedbackReceivedDate":{"dataType":"string"},"rawEvidence":{"dataType":"array","array":{"dataType":"string"}},"evidenceHash":{"dataType":"string"},"rawTranscript":{"dataType":"string"},"source":{"ref":"Record_string.any_"},"messageCreatedAt":{"dataType":"string"},"createdAt":{"dataType":"string","required":true},"governanceScore":{"dataType":"double"},"governanceReason":{"dataType":"string"},"governancePassed":{"dataType":"boolean"}},"validators":{}},
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "V1ReviewTicketDto": {
+        "dataType": "refObject",
+        "properties": {
+            "id": {"dataType":"string","required":true},
+            "version": {"dataType":"double"},
+            "supersededById": {"dataType":"string"},
+            "topic": {"dataType":"string","required":true},
+            "decision": {"dataType":"string","required":true},
+            "title": {"dataType":"string"},
+            "decisionContent": {"dataType":"string"},
+            "rationale": {"dataType":"string","required":true},
+            "rationaleSummary": {"dataType":"string"},
+            "rationaleQuotes": {"dataType":"array","array":{"dataType":"string"}},
+            "categoryTag": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["타깃"]},{"dataType":"enum","enums":["문제정의"]},{"dataType":"enum","enums":["기능"]},{"dataType":"enum","enums":["기술"]},{"dataType":"enum","enums":["BM"]},{"dataType":"enum","enums":["기타"]}]},
+            "actionItems": {"dataType":"array","array":{"dataType":"refObject","ref":"ActionItemDto"}},
+            "state": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["Draft"]},{"dataType":"enum","enums":["Proposed"]},{"dataType":"enum","enums":["Discussing"]},{"dataType":"enum","enums":["Decided"]},{"dataType":"enum","enums":["Superseded"]},{"dataType":"enum","enums":["Deferred"]},{"dataType":"enum","enums":["Rejected"]}],"required":true},
+            "supersedesId": {"dataType":"string"},
+            "isPivot": {"dataType":"boolean"},
+            "approvedBy": {"dataType":"string"},
+            "decisionConfirmedDate": {"dataType":"string"},
+            "feedbackSourceType": {"dataType":"string"},
+            "feedbackSourceDetail": {"dataType":"string"},
+            "feedbackReceivedDate": {"dataType":"string"},
+            "rawEvidence": {"dataType":"array","array":{"dataType":"string"}},
+            "evidenceHash": {"dataType":"string"},
+            "rawTranscript": {"dataType":"string"},
+            "source": {"ref":"Record_string.any_"},
+            "messageCreatedAt": {"dataType":"string"},
+            "createdAt": {"dataType":"string","required":true},
+            "governanceScore": {"dataType":"double"},
+            "governanceReason": {"dataType":"string"},
+            "governancePassed": {"dataType":"boolean"},
+            "status": {"ref":"DecisionStatus","required":true},
+            "category": {"dataType":"string","required":true},
+            "confirmedDate": {"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},
+            "dates": {"dataType":"nestedObjectLiteral","nestedProperties":{"feedbackDate":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},"confirmedDate":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},"createdDate":{"dataType":"string","required":true}},"required":true},
+            "alternatives": {"dataType":"array","array":{"dataType":"nestedObjectLiteral","nestedProperties":{"reason":{"dataType":"string","required":true},"name":{"dataType":"string","required":true},"id":{"dataType":"string","required":true}}},"required":true},
+            "ticketId": {"dataType":"string","required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "V1ReviewQueueDto": {
+        "dataType": "refObject",
+        "properties": {
+            "items": {"dataType":"array","array":{"dataType":"refObject","ref":"V1ReviewTicketDto"},"required":true},
+            "pageInfo": {"dataType":"nestedObjectLiteral","nestedProperties":{"totalPages":{"dataType":"double","required":true},"totalElements":{"dataType":"double","required":true},"pageSize":{"dataType":"double","required":true},"currentPage":{"dataType":"double","required":true}},"required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "ApiResponse_V1ReviewQueueDto_": {
+        "dataType": "refObject",
+        "properties": {
+            "success": {"dataType":"boolean","required":true},
+            "code": {"dataType":"string","required":true},
+            "message": {"dataType":"string","required":true},
+            "data": {"ref":"V1ReviewQueueDto","required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "V1DecisionDto": {
         "dataType": "refObject",
         "properties": {
@@ -107,6 +171,30 @@ const models: TsoaRoute.Models = {
             "code": {"dataType":"string","required":true},
             "message": {"dataType":"string","required":true},
             "data": {"ref":"V1DecisionDto","required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "Pick_ReviewDecisionDto.Exclude_keyofReviewDecisionDto.action-or-approvedBy__": {
+        "dataType": "refAlias",
+        "type": {"dataType":"nestedObjectLiteral","nestedProperties":{"title":{"dataType":"string"},"decisionContent":{"dataType":"string"},"rationale":{"dataType":"string"},"rationaleSummary":{"dataType":"string"},"rationaleQuotes":{"dataType":"array","array":{"dataType":"string"}},"categoryTag":{"dataType":"union","subSchemas":[{"dataType":"enum","enums":["타깃"]},{"dataType":"enum","enums":["문제정의"]},{"dataType":"enum","enums":["기능"]},{"dataType":"enum","enums":["기술"]},{"dataType":"enum","enums":["BM"]},{"dataType":"enum","enums":["기타"]}]},"expectedVersion":{"dataType":"double","required":true},"resolution":{"dataType":"union","subSchemas":[{"dataType":"enum","enums":["independent"]},{"dataType":"enum","enums":["replace"]}]},"predecessorId":{"dataType":"string"},"predecessorVersion":{"dataType":"double"},"taskDispositions":{"dataType":"array","array":{"dataType":"nestedObjectLiteral","nestedProperties":{"disposition":{"dataType":"union","subSchemas":[{"dataType":"enum","enums":["cancel"]},{"dataType":"enum","enums":["transfer"]}]},"classification":{"dataType":"union","subSchemas":[{"dataType":"enum","enums":["open"]},{"dataType":"enum","enums":["completed"]}]},"actionItemId":{"dataType":"string","required":true}}}}},"validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "V1ReviewRequestDto": {
+        "dataType": "refObject",
+        "properties": {
+            "title": {"dataType":"string"},
+            "decisionContent": {"dataType":"string"},
+            "rationale": {"dataType":"string"},
+            "rationaleSummary": {"dataType":"string"},
+            "rationaleQuotes": {"dataType":"array","array":{"dataType":"string"}},
+            "categoryTag": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["타깃"]},{"dataType":"enum","enums":["문제정의"]},{"dataType":"enum","enums":["기능"]},{"dataType":"enum","enums":["기술"]},{"dataType":"enum","enums":["BM"]},{"dataType":"enum","enums":["기타"]}]},
+            "expectedVersion": {"dataType":"double","required":true},
+            "resolution": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["independent"]},{"dataType":"enum","enums":["replace"]}]},
+            "predecessorId": {"dataType":"string"},
+            "predecessorVersion": {"dataType":"double"},
+            "taskDispositions": {"dataType":"array","array":{"dataType":"nestedObjectLiteral","nestedProperties":{"disposition":{"dataType":"union","subSchemas":[{"dataType":"enum","enums":["cancel"]},{"dataType":"enum","enums":["transfer"]}]},"classification":{"dataType":"union","subSchemas":[{"dataType":"enum","enums":["open"]},{"dataType":"enum","enums":["completed"]}]},"actionItemId":{"dataType":"string","required":true}}}},
+            "action": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["confirm"]},{"dataType":"enum","enums":["defer"]},{"dataType":"enum","enums":["reject"]}],"required":true},
         },
         "additionalProperties": false,
     },
@@ -473,6 +561,85 @@ export function RegisterRoutes(app: Router) {
 
 
     
+        const argsV1ReviewController_listV1ReviewQueue: Record<string, TsoaRoute.ParameterSchema> = {
+                request: {"in":"request","name":"request","required":true,"dataType":"object"},
+                guildId: {"in":"query","name":"guildId","required":true,"dataType":"string"},
+                status: {"default":"IN_REVIEW","in":"query","name":"status","dataType":"union","subSchemas":[{"dataType":"enum","enums":["IN_REVIEW"]},{"dataType":"enum","enums":["ON_HOLD"]}]},
+                page: {"default":1,"in":"query","name":"page","dataType":"double"},
+                size: {"default":20,"in":"query","name":"size","dataType":"double"},
+        };
+        app.get('/api/v1/review-queue',
+            authenticateMiddleware([{"jwt":[]}]),
+            ...(fetchMiddlewares<RequestHandler>(V1ReviewController)),
+            ...(fetchMiddlewares<RequestHandler>(V1ReviewController.prototype.listV1ReviewQueue)),
+
+            async function V1ReviewController_listV1ReviewQueue(request: ExRequest, response: ExResponse, next: any) {
+
+            // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+
+            let validatedArgs: any[] = [];
+            try {
+                validatedArgs = templateService.getValidatedArgs({ args: argsV1ReviewController_listV1ReviewQueue, request, response });
+
+                const container: IocContainer = typeof iocContainer === 'function' ? (iocContainer as IocContainerFactory)(request) : iocContainer;
+
+                const controller: any = await container.get<V1ReviewController>(V1ReviewController);
+                if (typeof controller['setStatus'] === 'function') {
+                controller.setStatus(undefined);
+                }
+
+              await templateService.apiHandler({
+                methodName: 'listV1ReviewQueue',
+                controller,
+                response,
+                next,
+                validatedArgs,
+                successStatus: undefined,
+              });
+            } catch (err) {
+                return next(err);
+            }
+        });
+        // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+        const argsV1ReviewController_reviewV1Candidate: Record<string, TsoaRoute.ParameterSchema> = {
+                request: {"in":"request","name":"request","required":true,"dataType":"object"},
+                ticketId: {"in":"path","name":"ticketId","required":true,"dataType":"string"},
+                guildId: {"in":"query","name":"guildId","required":true,"dataType":"string"},
+                body: {"in":"body","name":"body","required":true,"ref":"V1ReviewRequestDto"},
+        };
+        app.post('/api/v1/review-queue/:ticketId/review',
+            authenticateMiddleware([{"jwt":[]}]),
+            ...(fetchMiddlewares<RequestHandler>(V1ReviewController)),
+            ...(fetchMiddlewares<RequestHandler>(V1ReviewController.prototype.reviewV1Candidate)),
+
+            async function V1ReviewController_reviewV1Candidate(request: ExRequest, response: ExResponse, next: any) {
+
+            // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+
+            let validatedArgs: any[] = [];
+            try {
+                validatedArgs = templateService.getValidatedArgs({ args: argsV1ReviewController_reviewV1Candidate, request, response });
+
+                const container: IocContainer = typeof iocContainer === 'function' ? (iocContainer as IocContainerFactory)(request) : iocContainer;
+
+                const controller: any = await container.get<V1ReviewController>(V1ReviewController);
+                if (typeof controller['setStatus'] === 'function') {
+                controller.setStatus(undefined);
+                }
+
+              await templateService.apiHandler({
+                methodName: 'reviewV1Candidate',
+                controller,
+                response,
+                next,
+                validatedArgs,
+                successStatus: undefined,
+              });
+            } catch (err) {
+                return next(err);
+            }
+        });
+        // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
         const argsV1DecisionController_getV1Decision: Record<string, TsoaRoute.ParameterSchema> = {
                 request: {"in":"request","name":"request","required":true,"dataType":"object"},
                 id: {"in":"path","name":"id","required":true,"dataType":"string"},
