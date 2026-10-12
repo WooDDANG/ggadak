@@ -24,3 +24,5 @@ Validation: `npm run db:generate --workspace=@ggaddak/be`, `npm run api:sync`, a
 
 Implement-spec review follow-up: added the shared `BOT_SERVICE_TOKEN` boundary to the retained discussion analysis and candidate-history routes. HTTP coverage verifies requests without a token fail and Bot-token requests succeed for both routes; FE decision response handling now uses one shared envelope helper.
 
+Verification criterion: unauthenticated `POST /api/discussions/analyze` and `GET /api/discussions/history/{decisionId}` requests are rejected; requests carrying the configured service bearer token are accepted for both routes.
+
