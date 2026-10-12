@@ -20,3 +20,9 @@ Regenerated TSOA routes, OpenAPI, and Orval output. Removed stale generated conf
 
 Validation: `npm run db:generate --workspace=@ggaddak/be`, `npm run api:sync`, and full `npm test` passed, including BE/Bot/FE builds and both end-to-end flows. The E2E review test logs in and exercises authenticated guild-scoped review and confirmed-decision reads. Runtime Discord and AI calls remain adapter-backed in tests.
 
+## Comments
+
+Implement-spec review follow-up: added the shared `BOT_SERVICE_TOKEN` boundary to the retained discussion analysis and candidate-history routes. HTTP coverage verifies requests without a token fail and Bot-token requests succeed for both routes; FE decision response handling now uses one shared envelope helper.
+
+Verification criterion: unauthenticated `POST /api/discussions/analyze` and `GET /api/discussions/history/{decisionId}` requests are rejected; requests carrying the configured service bearer token are accepted for both routes.
+

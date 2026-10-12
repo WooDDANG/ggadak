@@ -1,4 +1,4 @@
-import { Controller, Route, Tags, Post, Body, Header, Get, Path } from 'tsoa';
+import { Controller, Route, Tags, Post, Body, Header, Get, Path, Security } from 'tsoa';
 import { Service } from 'typedi';
 import { DiscussionService } from '../../services/discussion.service.js';
 import { CandidateHistoryEntry } from '../../repositories/analysis-request.repository.js';
@@ -9,6 +9,7 @@ import {
 
 @Tags('Discussions')
 @Route('api/discussions')
+@Security('service')
 @Service()
 export class DiscussionController extends Controller {
   constructor(private service: DiscussionService) {

@@ -49,7 +49,8 @@ describe('E2E Full Pipeline: Discord Messages ➔ Backend AI Core ➔ Review Que
     const database = await isolatedRepository();
     const repo = database.repo;
     const extractor = decisionExtractor;
-    const server = await createServer(repo, extractor, fakeAuthOptions());
+    const serviceToken = 'e2e-bot-secret';
+    const server = await createServer(repo, extractor, { ...fakeAuthOptions(), serviceToken });
 
     await new Promise<void>((resolve, reject) => {
       server.once('error', reject);
@@ -93,7 +94,7 @@ describe('E2E Full Pipeline: Discord Messages ➔ Backend AI Core ➔ Review Que
     // 4. Call Backend AI Analysis Endpoint
     const analyzeRes = await fetch(`${base}/api/discussions/analyze`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { Authorization: `Bearer ${serviceToken}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         requestId: 'e2e-initial',
         rawMessages,
@@ -162,7 +163,7 @@ describe('E2E Full Pipeline: Discord Messages ➔ Backend AI Core ➔ Review Que
     // Re-analysis retains the confirmed candidate and suppresses only the rejected candidate.
     const reAnalyzeRes = await fetch(`${base}/api/discussions/analyze`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { Authorization: `Bearer ${serviceToken}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         requestId: 'e2e-passive',
         rawMessages,
@@ -181,7 +182,7 @@ describe('E2E Full Pipeline: Discord Messages ➔ Backend AI Core ➔ Review Que
     // But with isManualOverride: true (e.g. 📌 pin added), re-analysis is permitted!
     const manualOverrideRes = await fetch(`${base}/api/discussions/analyze`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { Authorization: `Bearer ${serviceToken}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         requestId: 'e2e-manual',
         rawMessages,
@@ -202,7 +203,8 @@ describe('E2E Full Pipeline: Discord Messages ➔ Backend AI Core ➔ Review Que
   it('handles casual chatter with no decisions', async () => {
     const database = await isolatedRepository();
     const repo = database.repo;
-    const server = await createServer(repo, noDecisionExtractor, fakeAuthOptions());
+    const serviceToken = 'e2e-bot-secret';
+    const server = await createServer(repo, noDecisionExtractor, { ...fakeAuthOptions(), serviceToken });
     await new Promise<void>((resolve, reject) => {
       server.once('error', reject);
       server.listen(0, '127.0.0.1', resolve);
@@ -212,7 +214,7 @@ describe('E2E Full Pipeline: Discord Messages ➔ Backend AI Core ➔ Review Que
 
     const res = await fetch(`${base}/api/discussions/analyze`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { Authorization: `Bearer ${serviceToken}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         requestId: 'e2e-chatter',
         rawMessages: [

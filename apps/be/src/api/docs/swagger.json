@@ -3013,7 +3013,11 @@
 				"tags": [
 					"Discussions"
 				],
-				"security": [],
+				"security": [
+					{
+						"service": []
+					}
+				],
 				"parameters": [
 					{
 						"in": "path",
@@ -3044,7 +3048,11 @@
 				"tags": [
 					"Discussions"
 				],
-				"security": [],
+				"security": [
+					{
+						"service": []
+					}
+				],
 				"parameters": [
 					{
 						"in": "header",

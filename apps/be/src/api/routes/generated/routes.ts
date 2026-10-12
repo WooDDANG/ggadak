@@ -1212,6 +1212,7 @@ export function RegisterRoutes(app: Router) {
                 decisionId: {"in":"path","name":"decisionId","required":true,"dataType":"string"},
         };
         app.get('/api/discussions/history/:decisionId',
+            authenticateMiddleware([{"service":[]}]),
             ...(fetchMiddlewares<RequestHandler>(DiscussionController)),
             ...(fetchMiddlewares<RequestHandler>(DiscussionController.prototype.history)),
 
@@ -1248,6 +1249,7 @@ export function RegisterRoutes(app: Router) {
                 traceIdHeader: {"in":"header","name":"X-Trace-Id","dataType":"string"},
         };
         app.post('/api/discussions/analyze',
+            authenticateMiddleware([{"service":[]}]),
             ...(fetchMiddlewares<RequestHandler>(DiscussionController)),
             ...(fetchMiddlewares<RequestHandler>(DiscussionController.prototype.analyze)),
 

@@ -11,10 +11,11 @@ function moduleUrl(path, transform = s=>s) {
 }
 test('Decision Card flow sends server filters and pagination through generated clients and retrieves string-ID detail', async()=>{
   const sessionUrl = moduleUrl('./session.ts');
+  const responseUrl = moduleUrl('./api-response.ts');
   const transportUrl = moduleUrl('./transport.ts', s=>s.replace("'./session'",JSON.stringify(sessionUrl)));
   const generatedUrl = moduleUrl('./generated/index.ts', s=>s.replace("'../transport'",JSON.stringify(transportUrl)).replace("'@tanstack/react-query'",JSON.stringify(pathToFileURL(require.resolve('@tanstack/react-query')).href)));
   const clientUrl = moduleUrl('./client.ts',s=>s.replace("'./transport'",JSON.stringify(transportUrl)));
-  const {decisionsApi} = await import(moduleUrl('./decisions.api.ts',s=>s.replace("'./generated'",JSON.stringify(generatedUrl)).replace("'./client'",JSON.stringify(clientUrl))));
+  const {decisionsApi} = await import(moduleUrl('./decisions.api.ts',s=>s.replace("'./generated'",JSON.stringify(generatedUrl)).replace("'./client'",JSON.stringify(clientUrl)).replace("'./api-response'",JSON.stringify(responseUrl))));
   const session = await import(sessionUrl);
   const previousFetch = globalThis.fetch;
   const requests = [];
@@ -44,10 +45,11 @@ test('Decision Card flow sends server filters and pagination through generated c
 
 test('Decision Timeline uses generated guild-scoped month grouping with the browser timezone', async()=>{
   const sessionUrl=moduleUrl('./session.ts');
+  const responseUrl=moduleUrl('./api-response.ts');
   const transportUrl=moduleUrl('./transport.ts',s=>s.replace("'./session'",JSON.stringify(sessionUrl)));
   const generatedUrl=moduleUrl('./generated/index.ts',s=>s.replace("'../transport'",JSON.stringify(transportUrl)).replace("'@tanstack/react-query'",JSON.stringify(pathToFileURL(require.resolve('@tanstack/react-query')).href)));
   const clientUrl=moduleUrl('./client.ts',s=>s.replace("'./transport'",JSON.stringify(transportUrl)));
-  const {decisionsApi}=await import(moduleUrl('./decisions.api.ts',s=>s.replace("'./generated'",JSON.stringify(generatedUrl)).replace("'./client'",JSON.stringify(clientUrl))));
+  const {decisionsApi}=await import(moduleUrl('./decisions.api.ts',s=>s.replace("'./generated'",JSON.stringify(generatedUrl)).replace("'./client'",JSON.stringify(clientUrl)).replace("'./api-response'",JSON.stringify(responseUrl))));
   const session=await import(sessionUrl);session.setAccessToken('member-token');
   const previous=globalThis.fetch;let request;
   globalThis.fetch=async(url,options)=>{request={url,options};return new Response(JSON.stringify({success:true,data:{groupBy:'month',timezone:'Asia/Seoul',totalElements:1,groups:[{key:'2026-10',count:1,items:[{id:'DEC-1'}]}]}}),{status:200});};
@@ -62,10 +64,11 @@ test('Decision Timeline uses generated guild-scoped month grouping with the brow
 
 test('Review Queue client lists held tickets and sends authenticated versioned replacement with dispositions',async()=>{
   const sessionUrl=moduleUrl('./session.ts');
+  const responseUrl=moduleUrl('./api-response.ts');
   const transportUrl=moduleUrl('./transport.ts',s=>s.replace("'./session'",JSON.stringify(sessionUrl)));
   const generatedUrl=moduleUrl('./generated/index.ts',s=>s.replace("'../transport'",JSON.stringify(transportUrl)).replace("'@tanstack/react-query'",JSON.stringify(pathToFileURL(require.resolve('@tanstack/react-query')).href)));
   const clientUrl=moduleUrl('./client.ts',s=>s.replace("'./transport'",JSON.stringify(transportUrl)));
-  const {decisionsApi}=await import(moduleUrl('./decisions.api.ts',s=>s.replace("'./generated'",JSON.stringify(generatedUrl)).replace("'./client'",JSON.stringify(clientUrl))));
+  const {decisionsApi}=await import(moduleUrl('./decisions.api.ts',s=>s.replace("'./generated'",JSON.stringify(generatedUrl)).replace("'./client'",JSON.stringify(clientUrl)).replace("'./api-response'",JSON.stringify(responseUrl))));
   const session=await import(sessionUrl);session.setAccessToken('reviewer-token');
   const previous=globalThis.fetch;const requests=[];
   globalThis.fetch=async(url,options)=>{requests.push({url,options});return new Response(JSON.stringify({success:true,data:requests.length===1?{items:[{id:'DEC-held',ticketId:'DEC-held',state:'Deferred',version:2,alternatives:[]}],pageInfo:{totalPages:1}}:{id:'DEC-held',state:'Decided',version:3,alternatives:[]}}),{status:200});};
