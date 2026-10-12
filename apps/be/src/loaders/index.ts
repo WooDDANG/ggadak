@@ -22,7 +22,6 @@ import { DecisionExtractorCore } from '../engine/extractor-core.js';
 import { PolicyController } from '../api/controllers/policy.controller.js';
 import { CheckpointController } from '../api/controllers/checkpoint.controller.js';
 import { FeedbackController } from '../api/controllers/feedback.controller.js';
-import { DecisionController } from '../api/controllers/decision.controller.js';
 import { DiscussionController } from '../api/controllers/discussion.controller.js';
 import { initExpress } from './express.js';
 import { initPrisma } from './prisma.js';
@@ -100,7 +99,6 @@ export async function initLoaders({
   container.set(PolicyController, new PolicyController(policyService));
   container.set(CheckpointController, new CheckpointController(checkpointService));
   container.set(FeedbackController, new FeedbackController(feedbackService));
-  container.set(DecisionController, new DecisionController(decisionService));
   container.set(DiscussionController, new DiscussionController(discussionService));
 
   container.set(AuthController, new AuthController(authService));

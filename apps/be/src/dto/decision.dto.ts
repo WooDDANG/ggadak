@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { CategoryTagSchema, ReviewActionSchema, DecisionPayloadSchema } from '@ggaddak/shared';
+import { CategoryTagSchema, ReviewActionSchema } from '@ggaddak/shared';
 
 export interface AlternativeItemDto {
   option: string;
@@ -78,31 +78,6 @@ export interface ReviewDecisionDto {
   decisionContent?: string;
   rationale?: string;
   categoryTag?: '타깃' | '문제정의' | '기능' | '기술' | 'BM' | '기타';
-}
-
-export const ResolveConflictDtoSchema = z.object({
-  decisionId: z.string(),
-  conflictingId: z.string(),
-  resolution: z.enum(['supersede', 'coexist']),
-  expectedVersion: z.number().int().positive(),
-  predecessorVersion: z.number().int().positive().optional(),
-  taskDispositions: ReviewActionSchema.shape.taskDispositions,
-});
-
-export interface ResolveConflictDto {
-  decisionId: string;
-  conflictingId: string;
-  resolution: 'supersede' | 'coexist';
-  expectedVersion: number;
-  predecessorVersion?: number;
-  taskDispositions?: ReviewDecisionDto['taskDispositions'];
-}
-
-export const DecisionWebhookDtoSchema = DecisionPayloadSchema;
-
-export interface DecisionWebhookDto {
-  event: string;
-  payload: any;
 }
 
 export interface DecisionListResponseDto {

@@ -4,13 +4,6 @@ import { DecisionRepository } from '../repositories/decision.repository.js';
 
 const logger = createLogger('BE-DECISION-SERVICE');
 
-export interface QueryDecisionsFilter {
-  guildId?: string;
-  topic?: string;
-  state?: string;
-  categoryTag?: string;
-}
-
 @Service()
 export class DecisionService {
   constructor(private repo: DecisionRepository) {}
@@ -29,10 +22,6 @@ export class DecisionService {
 
   async getConfirmedTimeline(filter: Parameters<DecisionRepository['getConfirmedTimeline']>[0]) {
     return this.repo.getConfirmedTimeline(filter);
-  }
-
-  async getDecisions(filter: QueryDecisionsFilter): Promise<Decision[]> {
-    return this.repo.getDecisions(filter);
   }
 
   async getDecisionById(id: string): Promise<Decision | null> {
@@ -57,18 +46,4 @@ export class DecisionService {
     return updated;
   }
 
-  async resolveConflict(
-    body: import('../dto/decision.dto.js').ResolveConflictDto,
-  ): Promise<boolean> {
-    const updated = await this.repo.reviewDecision(body.decisionId, 'confirm', {
-      expectedVersion: body.expectedVersion,
-      resolution: body.resolution === 'supersede' ? 'replace' : 'independent',
-      predecessorId: body.conflictingId,
-      predecessorVersion: body.predecessorVersion,
-      taskDispositions: body.taskDispositions,
-    });
-    if (!updated)
-      throw new (await import('../errors/AppError.js')).NotFoundError('Decision not found');
-    return true;
-  }
 }

@@ -314,7 +314,7 @@ test('replacement rejects cross guild or inactive predecessors and stale predece
   }
 });
 
-test('compatibility conflict controller rejects invalid replacements and persists cancellation after restart', async () => {
+test('replacement review rejects missing task dispositions and persists cancellation after restart', async () => {
   const db = await isolatedRepository();
   try {
     const base = {
@@ -333,23 +333,18 @@ test('compatibility conflict controller rejects invalid replacements and persist
       }),
     );
     await db.repo.saveDecision(DecisionSchema.parse({ ...base, id: 'candidate' }));
-    const { DecisionController } = await import('../api/controllers/decision.controller.js');
-    const { DecisionService } = await import('../services/decision.service.js');
-    const controller = new DecisionController(new DecisionService(db.repo));
     await assert.rejects(
-      controller.resolve({
-        decisionId: 'candidate',
-        conflictingId: 'pre',
-        resolution: 'supersede',
+      db.repo.reviewDecision('candidate', 'confirm', {
+        resolution: 'replace',
+        predecessorId: 'pre',
         expectedVersion: 1,
         predecessorVersion: 1,
       }),
       /unfinished/,
     );
-    await controller.resolve({
-      decisionId: 'candidate',
-      conflictingId: 'pre',
-      resolution: 'supersede',
+    await db.repo.reviewDecision('candidate', 'confirm', {
+      resolution: 'replace',
+      predecessorId: 'pre',
       expectedVersion: 1,
       predecessorVersion: 1,
       taskDispositions: [{ actionItemId: 'todo', disposition: 'cancel' }],

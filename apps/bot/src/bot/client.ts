@@ -15,7 +15,6 @@ import { ReactionHandler } from '../handlers/reaction.handler.js';
 import { registerEvents } from '../events/index.js';
 import '../commands/feedback.command.js';
 import '../commands/scan.command.js';
-import '../handlers/conflict.button.js';
 
 export interface BotConfig {
   token?: string;

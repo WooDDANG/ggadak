@@ -307,19 +307,6 @@ export class BackendApiService {
     return res.ok;
   }
 
-  async resolveConflict(payload: {
-    decisionId: string;
-    conflictingId: string;
-    resolution: string;
-  }): Promise<boolean> {
-    const res = await this.transport(`${this.backendUrl}/api/decisions/resolve-conflict`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    return res.ok;
-  }
-
   async getCheckpoint(channelId: string): Promise<string | null> {
     try {
       const res = await this.transport(`${this.backendUrl}/api/channels/${channelId}/checkpoint`);

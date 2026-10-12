@@ -1,4 +1,4 @@
-import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } from 'discord.js';
+import { EmbedBuilder } from 'discord.js';
 import { Decision } from '@ggaddak/shared';
 
 export class BotEmbedView {
@@ -58,34 +58,5 @@ export class BotEmbedView {
     });
 
     return embed;
-  }
-
-  static renderConflictEmbed(newDecision: Decision, oldDecision: Decision): EmbedBuilder {
-    return new EmbedBuilder()
-      .setTitle('⚠️ 의사결정 충돌/피벗 감지')
-      .setDescription(
-        `기존 확정 결정 **[${oldDecision.id}]**과 상충되거나 수정하는 새 후보가 추출되었습니다.\n\n` +
-          `**[기존 결정]**: ${oldDecision.decisionContent || oldDecision.decision}\n` +
-          `**[새로운 결정]**: ${newDecision.decisionContent || newDecision.decision}\n\n` +
-          `어떻게 처리할까요?`,
-      )
-      .setColor(0xe67e22)
-      .setFooter({ text: '선택 시 기존 결정의 계승 상태가 갱신됩니다.' });
-  }
-
-  static renderConflictActionRow(
-    newDecisionId: string,
-    oldDecisionId: string,
-  ): ActionRowBuilder<ButtonBuilder> {
-    return new ActionRowBuilder<ButtonBuilder>().addComponents(
-      new ButtonBuilder()
-        .setCustomId(`conflict:supersede:${newDecisionId}:${oldDecisionId}`)
-        .setLabel('새 결정으로 대체 (Supersede)')
-        .setStyle(ButtonStyle.Danger),
-      new ButtonBuilder()
-        .setCustomId(`conflict:coexist:${newDecisionId}:${oldDecisionId}`)
-        .setLabel('별도 결정으로 유지 (Coexist)')
-        .setStyle(ButtonStyle.Secondary),
-    );
   }
 }
