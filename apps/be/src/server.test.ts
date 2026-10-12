@@ -2,7 +2,7 @@ import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert';
 import http from 'node:http';
 import { createServer } from './server.js';
-import { DecisionRepository } from './db.js';
+import { DecisionRepository } from './repositories/decision.repository.js';
 import { isolatedRepository } from './repositories/test-database.js';
 
 describe('BE Server & Ingestion API', () => {

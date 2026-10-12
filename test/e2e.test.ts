@@ -2,14 +2,52 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import { createServer } from '../apps/be/dist/server.js';
 import { isolatedRepository } from '../apps/be/dist/repositories/test-database.js';
-import { BackendExtractionEngine } from '../apps/be/dist/extractor/engine.js';
+import type { IAiAdapter } from '../apps/be/dist/adapters/ai.adapter.js';
+
+// Fixed AI responses keep this pipeline regression independent of providers and API keys.
+const decisionExtractor: IAiAdapter = {
+  async analyzeTranscript() {
+    return {
+      found: true,
+      summary: '두 개의 의사결정 후보',
+      decisions: [
+        {
+          topic: 'Database Selection',
+          decision: 'PostgreSQL 채택',
+          rationale: '트랜잭션 정합성 보장',
+          rationaleQuotes: [],
+          alternatives: [{ option: 'MongoDB', reason: '정합성 요구' }],
+          categoryTag: '기술',
+          actionItems: [],
+          isPivot: false,
+        },
+        {
+          topic: 'Backend Framework',
+          decision: 'Fastify 채택',
+          rationale: '비동기 처리량',
+          rationaleQuotes: [],
+          alternatives: [],
+          categoryTag: '기술',
+          actionItems: [],
+          isPivot: false,
+        },
+      ],
+    };
+  },
+};
+
+const noDecisionExtractor: IAiAdapter = {
+  async analyzeTranscript() {
+    return { found: false, summary: '의사결정 없음', decisions: [] };
+  },
+};
 
 describe('E2E Full Pipeline: Discord Messages ➔ Backend AI Core ➔ Review Queue ➔ DB ➔ Query', () => {
   it('extracts multi-decision candidates in DRAFT state and confirms via Review Queue', async () => {
     // 1. Start Backend Server with Mock AI Engine
     const database = await isolatedRepository();
     const repo = database.repo;
-    const extractor = new BackendExtractionEngine();
+    const extractor = decisionExtractor;
     const server = await createServer(repo, extractor);
 
     await new Promise<void>(resolve => server.listen(0, resolve));
@@ -50,6 +88,7 @@ describe('E2E Full Pipeline: Discord Messages ➔ Backend AI Core ➔ Review Que
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        requestId: 'e2e-initial',
         rawMessages,
         guildId: 'guild-demo',
         channelId: 'chan-arch',
@@ -113,11 +152,12 @@ describe('E2E Full Pipeline: Discord Messages ➔ Backend AI Core ➔ Review Que
     );
     assert.strictEqual(rejectRes.status, 200);
 
-    // Re-analyzing the same messages passively should be skipped by anti-recreation hash
+    // Re-analysis retains the confirmed candidate and suppresses only the rejected candidate.
     const reAnalyzeRes = await fetch(`http://localhost:${port}/api/discussions/analyze`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        requestId: 'e2e-passive',
         rawMessages,
         guildId: 'guild-demo',
         channelId: 'chan-arch',
@@ -126,13 +166,17 @@ describe('E2E Full Pipeline: Discord Messages ➔ Backend AI Core ➔ Review Que
       }),
     });
     const reAnalyzeData = (await reAnalyzeRes.json()) as any;
-    assert.strictEqual(reAnalyzeData.found, false);
+    assert.strictEqual(reAnalyzeData.found, true);
+    assert.strictEqual(reAnalyzeData.decisions.length, 1);
+    assert.strictEqual(reAnalyzeData.decisions[0].id, postgresDec.id);
+    assert.ok(!reAnalyzeData.decisions.some((d: any) => d.id === fastifyDec.id));
 
     // But with isManualOverride: true (e.g. 📌 pin added), re-analysis is permitted!
     const manualOverrideRes = await fetch(`http://localhost:${port}/api/discussions/analyze`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        requestId: 'e2e-manual',
         rawMessages,
         guildId: 'guild-demo',
         channelId: 'chan-arch',
@@ -151,7 +195,7 @@ describe('E2E Full Pipeline: Discord Messages ➔ Backend AI Core ➔ Review Que
   it('handles casual chatter with no decisions', async () => {
     const database = await isolatedRepository();
     const repo = database.repo;
-    const server = await createServer(repo, new BackendExtractionEngine());
+    const server = await createServer(repo, noDecisionExtractor);
     await new Promise<void>(resolve => server.listen(0, resolve));
     const port = (server.address() as any).port;
 
@@ -159,6 +203,7 @@ describe('E2E Full Pipeline: Discord Messages ➔ Backend AI Core ➔ Review Que
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        requestId: 'e2e-chatter',
         rawMessages: [
           {
             author: 'wooddang',
