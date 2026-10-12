@@ -1,8 +1,5 @@
-import { IocContainer, ServiceIdentifier } from '@tsoa/runtime';
-import { Container } from 'typedi';
-
-export const iocContainer: IocContainer = {
-  get: <T>(controller: ServiceIdentifier<T>): T => {
-    return Container.get<T>(controller as any);
-  },
-};
+import type { IocContainer, ServiceIdentifier } from '@tsoa/runtime';
+import type { Request } from 'express';
+export function iocContainer(request: Request): IocContainer {
+  return { get: <T>(controller: ServiceIdentifier<T>): T => request.app.locals.container.get(controller) };
+}

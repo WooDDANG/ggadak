@@ -1,3 +1,7 @@
+import { AuthController } from '../api/controllers/auth.controller.js';
+import { V1DecisionController } from '../api/controllers/v1-decision.controller.js';
+import { randomUUID } from 'node:crypto';
+import { AuthService, AuthOptions } from '../services/auth.service.js';
 import 'reflect-metadata';
 import { Express } from 'express';
 import { Container } from 'typedi';
@@ -22,10 +26,12 @@ export interface LoaderOptions {
   expressApp: Express;
   repo?: DecisionRepository;
   aiAdapter?: IAiAdapter;
+  authOptions?: AuthOptions;
 }
 
 export async function initLoaders({
   expressApp,
+  authOptions,
   repo: customRepo,
   aiAdapter: customAiAdapter,
 }: LoaderOptions): Promise<{
@@ -33,6 +39,9 @@ export async function initLoaders({
   aiAdapter: IAiAdapter;
   prisma: import('@prisma/client').PrismaClient;
 }> {
+  const container = Container.of(randomUUID());
+  expressApp.locals.container = container;
+
   // 1. Prisma Client Loader
   const prisma = customRepo?.prisma ?? initPrisma();
   await prisma.$connect();
@@ -46,11 +55,15 @@ export async function initLoaders({
 
   // 2. Database Loader
   const repo = customRepo || new DecisionRepository(prisma);
-  Container.set(DecisionRepository, repo);
+  container.set(DecisionRepository, repo);
 
   // 3. AI Adapter Loader
   const aiAdapter = customAiAdapter || Container.get(AiAdapter);
-  Container.set(AiAdapter, aiAdapter);
+  container.set(AiAdapter, aiAdapter);
+
+  const authService = new AuthService(prisma, authOptions);
+  container.set(AuthService, authService);
+  expressApp.locals.authService = authService;
 
   // 4. Service Layer Binding
   const core = new DecisionExtractorCore();
@@ -60,19 +73,22 @@ export async function initLoaders({
   const decisionService = new DecisionService(repo);
   const discussionService = new DiscussionService(repo, aiAdapter as AiAdapter, core);
 
-  Container.set(DecisionExtractorCore, core);
-  Container.set(PolicyService, policyService);
-  Container.set(CheckpointService, checkpointService);
-  Container.set(FeedbackService, feedbackService);
-  Container.set(DecisionService, decisionService);
-  Container.set(DiscussionService, discussionService);
+  container.set(DecisionExtractorCore, core);
+  container.set(PolicyService, policyService);
+  container.set(CheckpointService, checkpointService);
+  container.set(FeedbackService, feedbackService);
+  container.set(DecisionService, decisionService);
+  container.set(DiscussionService, discussionService);
 
   // 5. Controller Layer Binding for TSOA IoC Container
-  Container.set(PolicyController, new PolicyController(policyService));
-  Container.set(CheckpointController, new CheckpointController(checkpointService));
-  Container.set(FeedbackController, new FeedbackController(feedbackService));
-  Container.set(DecisionController, new DecisionController(decisionService));
-  Container.set(DiscussionController, new DiscussionController(discussionService));
+  container.set(PolicyController, new PolicyController(policyService));
+  container.set(CheckpointController, new CheckpointController(checkpointService));
+  container.set(FeedbackController, new FeedbackController(feedbackService));
+  container.set(DecisionController, new DecisionController(decisionService));
+  container.set(DiscussionController, new DiscussionController(discussionService));
+
+  container.set(AuthController, new AuthController(authService));
+  container.set(V1DecisionController, new V1DecisionController(decisionService, authService));
 
   // 6. Express Loader (mounts TSOA RegisterRoutes)
   initExpress({ app: expressApp });

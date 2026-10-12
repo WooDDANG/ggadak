@@ -5,6 +5,7 @@ import { DecisionRepository } from '../repositories/decision.repository.js';
 const logger = createLogger('BE-DECISION-SERVICE');
 
 export interface QueryDecisionsFilter {
+  guildId?: string;
   topic?: string;
   state?: string;
   categoryTag?: string;

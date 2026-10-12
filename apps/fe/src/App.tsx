@@ -2,13 +2,16 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ReviewAction, ExternalFeedback } from '@ggaddak/shared';
 import { decisionsApi } from './api/decisions.api';
-import { feedbacksApi } from './api/feedbacks.api';
+import { AuthGate } from './features/AuthGate';
+import { decisionsQueryKey } from './api/session';
 import { Header } from './components/Header';
 import { ReviewQueue } from './features/review-queue/ReviewQueue';
 import { DecisionTimeline } from './features/decision-timeline/DecisionTimeline';
 import { FeedbackBoard } from './features/feedback-board/FeedbackBoard';
 
-export function App() {
+export function App() { return <AuthGate>{guildId => <ServerApp key={guildId} guildId={guildId} />}</AuthGate>; }
+
+function ServerApp({ guildId }: { guildId: string }) {
   const [activeTab, setActiveTab] = useState<'review' | 'timeline' | 'feedback'>('review');
   const queryClient = useQueryClient();
 
@@ -19,15 +22,16 @@ export function App() {
     isRefetching,
     refetch,
   } = useQuery({
-    queryKey: ['decisions'],
-    queryFn: () => decisionsApi.getDecisions(),
+    queryKey: decisionsQueryKey(guildId),
+    queryFn: () => decisionsApi.getDecisions({ guildId }),
     refetchInterval: 5000, // 5초 주기 폴링
   });
 
   // 2. Fetch Feedbacks Query
   const { data: feedbacks = [], isLoading: isFeedbacksLoading } = useQuery({
     queryKey: ['feedbacks'],
-    queryFn: () => feedbacksApi.getFeedbacks(),
+    queryFn: () => Promise.resolve([] as ExternalFeedback[]),
+    enabled: false,
   });
 
   // 3. Review Action Mutation
@@ -35,25 +39,11 @@ export function App() {
     mutationFn: ({ id, action }: { id: string; action: ReviewAction }) =>
       decisionsApi.reviewDecision(id, action),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['decisions'] });
+      queryClient.invalidateQueries({ queryKey: decisionsQueryKey(guildId) });
     },
   });
 
-  // 4. Create Feedback Mutation
-  const feedbackMutation = useMutation({
-    mutationFn: (feedback: ExternalFeedback) => feedbacksApi.createFeedback(feedback),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['feedbacks'] });
-    },
-  });
-
-  const handleReview = async (id: string, action: ReviewAction) => {
-    await reviewMutation.mutateAsync({ id, action });
-  };
-
-  const handleCreateFeedback = async (feedback: ExternalFeedback) => {
-    await feedbackMutation.mutateAsync(feedback);
-  };
+  const handleReview = async (id: string, action: ReviewAction) => { await reviewMutation.mutateAsync({ id, action }); };
 
   const draftCount = decisions.filter(d => d.state === 'Draft' || d.state === 'Proposed').length;
 
@@ -81,11 +71,11 @@ export function App() {
         )}
 
         {activeTab === 'feedback' && (
-          <FeedbackBoard
+          <div><p role="status">서버별 피드백 API 준비 중입니다.</p><FeedbackBoard
             feedbacks={feedbacks}
-            onSubmitFeedback={handleCreateFeedback}
+            onSubmitFeedback={async () => { throw new Error('서버별 피드백 API 준비 중입니다.'); }}
             isLoading={isFeedbacksLoading}
-          />
+          /></div>
         )}
       </main>
 

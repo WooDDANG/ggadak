@@ -6,6 +6,7 @@
  */
 
 export type ListV1DecisionsParams = {
+guildId: string;
 topic?: string;
 state?: string;
 categoryTag?: string;
