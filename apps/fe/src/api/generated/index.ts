@@ -29,6 +29,8 @@ import type {
   ApiResponseAccessTokenStringTokenTypeStringExpiresAtString,
   ApiResponseAccessTokenStringTokenTypeStringExpiresAtStringUserAuthUser,
   ApiResponseAuthUser,
+  ApiResponseChannelIdsStringArray,
+  ApiResponseChannelSettings,
   ApiResponseDecisionItemDto,
   ApiResponseDecisionListResponseDto,
   ApiResponseGuildsDiscordGuildArray,
@@ -41,9 +43,11 @@ import type {
   DecisionListResponseDto,
   DecisionWebhookDto,
   FeedbackListResponseDto,
+  GetMonitoredChannelsParams,
   GetV1DecisionParams,
   HarvestingPolicyDto,
   ListDecisionsParams,
+  ListDiscordChannelsParams,
   ListFeedbacksParams,
   ListV1DecisionsParams,
   LoginDiscordBody,
@@ -53,6 +57,8 @@ import type {
   ReviewDecisionResponseDto,
   Save200,
   SaveCheckpointDto,
+  SaveDiscordChannelsBody,
+  SaveDiscordChannelsParams,
   Webhook201
 } from './model';
 
@@ -1428,6 +1434,336 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       > => {
       return useMutation(getSaveMutationOptions(options), queryClient);
     }
+
+export type listDiscordChannelsResponse200 = {
+  data: ApiResponseChannelSettings
+  status: 200
+}
+
+export type listDiscordChannelsResponseSuccess = (listDiscordChannelsResponse200) & {
+  headers: Headers;
+};
+;
+
+export type listDiscordChannelsResponse = (listDiscordChannelsResponseSuccess)
+
+export const getListDiscordChannelsUrl = (params: ListDiscordChannelsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/discord/channels?${stringifiedParams}` : `/api/v1/discord/channels`
+}
+
+export const listDiscordChannels = async (params: ListDiscordChannelsParams, options?: Parameters<typeof authenticatedClient>[1]): Promise<listDiscordChannelsResponse> => {
+
+  return authenticatedClient<listDiscordChannelsResponse>(getListDiscordChannelsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListDiscordChannelsQueryKey = (params?: ListDiscordChannelsParams,) => {
+    return [
+    `/api/v1/discord/channels`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListDiscordChannelsQueryOptions = <TData = Awaited<ReturnType<typeof listDiscordChannels>>, TError = unknown>(params: ListDiscordChannelsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listDiscordChannels>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListDiscordChannelsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listDiscordChannels>>> = ({ signal }) => listDiscordChannels(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listDiscordChannels>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListDiscordChannelsQueryResult = NonNullable<Awaited<ReturnType<typeof listDiscordChannels>>>
+export type ListDiscordChannelsQueryError = unknown
+
+
+export function useListDiscordChannels<TData = Awaited<ReturnType<typeof listDiscordChannels>>, TError = unknown>(
+ params: ListDiscordChannelsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listDiscordChannels>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listDiscordChannels>>,
+          TError,
+          Awaited<ReturnType<typeof listDiscordChannels>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListDiscordChannels<TData = Awaited<ReturnType<typeof listDiscordChannels>>, TError = unknown>(
+ params: ListDiscordChannelsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listDiscordChannels>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listDiscordChannels>>,
+          TError,
+          Awaited<ReturnType<typeof listDiscordChannels>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListDiscordChannels<TData = Awaited<ReturnType<typeof listDiscordChannels>>, TError = unknown>(
+ params: ListDiscordChannelsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listDiscordChannels>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+
+export function useListDiscordChannels<TData = Awaited<ReturnType<typeof listDiscordChannels>>, TError = unknown>(
+ params: ListDiscordChannelsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listDiscordChannels>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListDiscordChannelsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export type saveDiscordChannelsResponse200 = {
+  data: ApiResponseChannelSettings
+  status: 200
+}
+
+export type saveDiscordChannelsResponseSuccess = (saveDiscordChannelsResponse200) & {
+  headers: Headers;
+};
+;
+
+export type saveDiscordChannelsResponse = (saveDiscordChannelsResponseSuccess)
+
+export const getSaveDiscordChannelsUrl = (params: SaveDiscordChannelsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/discord/channels?${stringifiedParams}` : `/api/v1/discord/channels`
+}
+
+export const saveDiscordChannels = async (saveDiscordChannelsBody: SaveDiscordChannelsBody,
+    params: SaveDiscordChannelsParams, options?: Parameters<typeof authenticatedClient>[1]): Promise<saveDiscordChannelsResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return authenticatedClient<saveDiscordChannelsResponse>(getSaveDiscordChannelsUrl(params),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(saveDiscordChannelsBody)
+  }
+);}
+
+
+
+
+
+export const getSaveDiscordChannelsMutationKey = () => ['saveDiscordChannels'] as const;
+
+export const getSaveDiscordChannelsMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveDiscordChannels>>, TError,SaveDiscordChannelsMutationVariables, TContext>, request?: SecondParameter<typeof authenticatedClient>}
+): UseMutationOptions<Awaited<ReturnType<typeof saveDiscordChannels>>, TError,SaveDiscordChannelsMutationVariables, TContext> => {
+
+const mutationKey = getSaveDiscordChannelsMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof saveDiscordChannels>>, SaveDiscordChannelsMutationVariables> = (props) => {
+          const {data,params} = props ?? {};
+
+          return  saveDiscordChannels(data,params,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SaveDiscordChannelsMutationResult = NonNullable<Awaited<ReturnType<typeof saveDiscordChannels>>>
+    export type SaveDiscordChannelsMutationBody = SaveDiscordChannelsBody
+    export type SaveDiscordChannelsMutationError = unknown
+    export type SaveDiscordChannelsMutationVariables = {data: SaveDiscordChannelsBody;params: SaveDiscordChannelsParams}
+
+    export const useSaveDiscordChannels = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveDiscordChannels>>, TError,SaveDiscordChannelsMutationVariables, TContext>, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof saveDiscordChannels>>,
+        TError,
+        SaveDiscordChannelsMutationVariables,
+        TContext
+      > => {
+      return useMutation(getSaveDiscordChannelsMutationOptions(options), queryClient);
+    }
+
+export type getMonitoredChannelsResponse200 = {
+  data: ApiResponseChannelIdsStringArray
+  status: 200
+}
+
+export type getMonitoredChannelsResponseSuccess = (getMonitoredChannelsResponse200) & {
+  headers: Headers;
+};
+;
+
+export type getMonitoredChannelsResponse = (getMonitoredChannelsResponseSuccess)
+
+export const getGetMonitoredChannelsUrl = (params: GetMonitoredChannelsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/internal/monitoring?${stringifiedParams}` : `/api/v1/internal/monitoring`
+}
+
+export const getMonitoredChannels = async (params: GetMonitoredChannelsParams, options?: Parameters<typeof authenticatedClient>[1]): Promise<getMonitoredChannelsResponse> => {
+
+  return authenticatedClient<getMonitoredChannelsResponse>(getGetMonitoredChannelsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMonitoredChannelsQueryKey = (params?: GetMonitoredChannelsParams,) => {
+    return [
+    `/api/v1/internal/monitoring`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetMonitoredChannelsQueryOptions = <TData = Awaited<ReturnType<typeof getMonitoredChannels>>, TError = unknown>(params: GetMonitoredChannelsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitoredChannels>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMonitoredChannelsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMonitoredChannels>>> = ({ signal }) => getMonitoredChannels(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMonitoredChannels>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetMonitoredChannelsQueryResult = NonNullable<Awaited<ReturnType<typeof getMonitoredChannels>>>
+export type GetMonitoredChannelsQueryError = unknown
+
+
+export function useGetMonitoredChannels<TData = Awaited<ReturnType<typeof getMonitoredChannels>>, TError = unknown>(
+ params: GetMonitoredChannelsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitoredChannels>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getMonitoredChannels>>,
+          TError,
+          Awaited<ReturnType<typeof getMonitoredChannels>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetMonitoredChannels<TData = Awaited<ReturnType<typeof getMonitoredChannels>>, TError = unknown>(
+ params: GetMonitoredChannelsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitoredChannels>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getMonitoredChannels>>,
+          TError,
+          Awaited<ReturnType<typeof getMonitoredChannels>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetMonitoredChannels<TData = Awaited<ReturnType<typeof getMonitoredChannels>>, TError = unknown>(
+ params: GetMonitoredChannelsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitoredChannels>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+
+export function useGetMonitoredChannels<TData = Awaited<ReturnType<typeof getMonitoredChannels>>, TError = unknown>(
+ params: GetMonitoredChannelsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitoredChannels>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetMonitoredChannelsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export type authorizeDiscordResponse200 = {
   data: ApiResponseUrlString

@@ -14,7 +14,8 @@ export class HttpDiscordChannelsAdapter implements DiscordChannelsAdapter {
   }
   async list(guildId: string): Promise<DiscordChannel[]> {
     const guild = encodeURIComponent(guildId);
-    const [channels, roles, member, info] = await Promise.all([this.get(`/guilds/${guild}/channels`), this.get(`/guilds/${guild}/roles`), this.get(`/guilds/${guild}/members/@me`), this.get(`/guilds/${guild}`)]);
+    const identity = await this.get('/users/@me');
+    const [channels, roles, member, info] = await Promise.all([this.get(`/guilds/${guild}/channels`), this.get(`/guilds/${guild}/roles`), this.get(`/guilds/${guild}/members/${encodeURIComponent(identity.id)}`), this.get(`/guilds/${guild}`)]);
     const roleIds = new Set<string>([guildId, ...member.roles]);
     const base = roles.filter((r: any) => roleIds.has(r.id)).reduce((p: bigint, r: any) => p | BigInt(r.permissions), 0n);
     return channels.map((channel: any) => {
