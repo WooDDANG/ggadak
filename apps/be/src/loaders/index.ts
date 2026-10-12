@@ -3,7 +3,10 @@ import { DashboardController } from '../api/controllers/dashboard.controller.js'
 import { SearchService, EmbeddingProvider } from '../services/search.service.js';
 import { SearchController } from '../api/controllers/search.controller.js';
 import { ChannelsService } from '../services/channels.service.js';
-import { ChannelsController, InternalMonitoringController } from '../api/controllers/channels.controller.js';
+import {
+  ChannelsController,
+  InternalMonitoringController,
+} from '../api/controllers/channels.controller.js';
 import { AuthController } from '../api/controllers/auth.controller.js';
 import { V1DecisionController } from '../api/controllers/v1-decision.controller.js';
 import { randomUUID } from 'node:crypto';
@@ -70,8 +73,14 @@ export async function initLoaders({
 
   const authService = new AuthService(prisma, authOptions);
   container.set(AuthService, authService);
-  container.set(DashboardController, new DashboardController(new DashboardService(repo), authService));
-  container.set(SearchController, new SearchController(new SearchService(repo, embeddingProvider), authService));
+  container.set(
+    DashboardController,
+    new DashboardController(new DashboardService(repo), authService),
+  );
+  container.set(
+    SearchController,
+    new SearchController(new SearchService(repo, embeddingProvider), authService),
+  );
   expressApp.locals.authService = authService;
 
   const channelsService = new ChannelsService(prisma, authOptions?.channelAdapter);

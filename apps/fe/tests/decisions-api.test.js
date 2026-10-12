@@ -22,12 +22,15 @@ test('Decision Card lookup consumes the generated v1 response', async () => {
         success: true,
         code: 'OK',
         message: 'Success',
-        data: { decisions: [{ id: 'DEC-101', topic: 'Architecture' }], pageInfo:{currentPage:1,pageSize:100,totalElements:1,totalPages:1} },
+        data: {
+          decisions: [{ id: 'DEC-101', topic: 'Architecture' }],
+          pageInfo: { currentPage: 1, pageSize: 100, totalElements: 1, totalPages: 1 },
+        },
       }),
     );
   };
   try {
-    assert.deepEqual(await decisionsApi.getDecisions({ guildId:'g1', topic: 'Architecture' }), [
+    assert.deepEqual(await decisionsApi.getDecisions({ guildId: 'g1', topic: 'Architecture' }), [
       { id: 'DEC-101', topic: 'Architecture' },
     ]);
   } finally {

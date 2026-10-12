@@ -45,7 +45,13 @@ describe('Conversation Disentanglement to Causal Stream', () => {
       // Topic A start
       { id: '1', author: 'alice', content: 'DB 뭐 쓸까요?', createdAt: baseTime, reactionCount: 0 },
       // Topic B start (interleaved)
-      { id: '2', author: 'charlie', content: '오늘 점심 뭐 먹음?', createdAt: new Date(baseTime.getTime() + 10000), reactionCount: 0 },
+      {
+        id: '2',
+        author: 'charlie',
+        content: '오늘 점심 뭐 먹음?',
+        createdAt: new Date(baseTime.getTime() + 10000),
+        reactionCount: 0,
+      },
       // Topic A reply (explicit reference to 1)
       {
         id: '3',
@@ -87,7 +93,13 @@ describe('Conversation Disentanglement to Causal Stream', () => {
   it('branches into a new thread root when silence exceeds 2 minutes', () => {
     const baseTime = new Date('2026-10-08T10:00:00.000Z');
     const messages: CleanMessageItem[] = [
-      { id: '1', author: 'alice', content: '오전 회의 종료합니다.', createdAt: baseTime, reactionCount: 0 },
+      {
+        id: '1',
+        author: 'alice',
+        content: '오전 회의 종료합니다.',
+        createdAt: baseTime,
+        reactionCount: 0,
+      },
       // 5 minutes later (> 2 min silence)
       {
         id: '2',

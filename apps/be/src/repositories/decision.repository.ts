@@ -185,7 +185,8 @@ export class DecisionRepository {
       if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(value))
         throw new BadRequestError('from and to must be ISO 8601 timestamps');
       const instant = new Date(value);
-      if (!Number.isFinite(instant.getTime())) throw new BadRequestError('from and to must be valid ISO timestamps');
+      if (!Number.isFinite(instant.getTime()))
+        throw new BadRequestError('from and to must be valid ISO timestamps');
       return instant;
     };
     const from = parseInstant(filter.from);
@@ -204,15 +205,22 @@ export class DecisionRepository {
       },
       orderBy: [{ confirmedAt: 'desc' }, { id: 'asc' }],
     });
-    const formatter = filter.groupBy === 'month'
-      ? new Intl.DateTimeFormat('en-US', { timeZone: filter.timezone, year: 'numeric', month: '2-digit' })
-      : undefined;
+    const formatter =
+      filter.groupBy === 'month'
+        ? new Intl.DateTimeFormat('en-US', {
+            timeZone: filter.timezone,
+            year: 'numeric',
+            month: '2-digit',
+          })
+        : undefined;
     const groups = new Map<string, Decision[]>();
     for (const row of rows) {
       const decision = this.decodeDecision(row);
       let key: string;
       if (filter.groupBy === 'month') {
-        const parts = Object.fromEntries(formatter!.formatToParts(row.confirmedAt!).map(part => [part.type, part.value]));
+        const parts = Object.fromEntries(
+          formatter!.formatToParts(row.confirmedAt!).map(part => [part.type, part.value]),
+        );
         key = `${parts.year}-${parts.month}`;
       } else if (filter.groupBy === 'topic') key = decision.topic;
       else if (filter.groupBy === 'channel') key = decision.source.channelId;

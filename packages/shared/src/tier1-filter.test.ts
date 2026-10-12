@@ -6,9 +6,27 @@ describe('Tier 1 Zero-Cost Rule Filtering & Synthetic Reactions', () => {
   it('drops bot messages and command prefix messages', () => {
     const raw: RawMessageItem[] = [
       { id: '1', author: 'user1', isBot: true, content: 'Bot announcement', createdAt: new Date() },
-      { id: '2', author: 'user2', isBot: false, content: '/help me configure', createdAt: new Date() },
-      { id: '3', author: 'user3', isBot: false, content: '!deploy production', createdAt: new Date() },
-      { id: '4', author: 'user4', isBot: false, content: '정상적인 업무 대화입니다.', createdAt: new Date() },
+      {
+        id: '2',
+        author: 'user2',
+        isBot: false,
+        content: '/help me configure',
+        createdAt: new Date(),
+      },
+      {
+        id: '3',
+        author: 'user3',
+        isBot: false,
+        content: '!deploy production',
+        createdAt: new Date(),
+      },
+      {
+        id: '4',
+        author: 'user4',
+        isBot: false,
+        content: '정상적인 업무 대화입니다.',
+        createdAt: new Date(),
+      },
     ];
 
     const result = filterTier1Messages(raw);
@@ -42,7 +60,12 @@ describe('Tier 1 Zero-Cost Rule Filtering & Synthetic Reactions', () => {
 
   it('absorbs short agreement phrases into preceding message as synthetic reactions', () => {
     const raw: RawMessageItem[] = [
-      { id: '1', author: 'lead', content: '데이터베이스로 PostgreSQL을 채택합시다.', createdAt: new Date() },
+      {
+        id: '1',
+        author: 'lead',
+        content: '데이터베이스로 PostgreSQL을 채택합시다.',
+        createdAt: new Date(),
+      },
       { id: '2', author: 'dev1', content: 'ㅇㅋ', createdAt: new Date() },
       { id: '3', author: 'dev2', content: '동의합니다', createdAt: new Date() },
       { id: '4', author: 'dev3', content: '👍', createdAt: new Date() },

@@ -4,7 +4,10 @@ export async function authorizedFetch(url: string, options: RequestInit = {}) {
   if (getAccessToken()) headers.set('Authorization', `Bearer ${getAccessToken()}`);
   const origin = (import.meta as any).env?.VITE_API_ORIGIN ?? '';
   const response = await fetch(`${origin}${url}`, { ...options, credentials: 'include', headers });
-  if (response.status === 401) { setAccessToken(''); window.dispatchEvent(new Event('ggaddak:logout')); }
+  if (response.status === 401) {
+    setAccessToken('');
+    window.dispatchEvent(new Event('ggaddak:logout'));
+  }
   return response;
 }
 export async function authenticatedClient<T>(url: string, options: RequestInit = {}): Promise<T> {

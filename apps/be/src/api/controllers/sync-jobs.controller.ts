@@ -1,5 +1,18 @@
 import type { Request as ExpressRequest } from 'express';
-import { Controller, Route, Tags, Post, Get, Put, Query, Path, Body, Request, Security, SuccessResponse } from 'tsoa';
+import {
+  Controller,
+  Route,
+  Tags,
+  Post,
+  Get,
+  Put,
+  Query,
+  Path,
+  Body,
+  Request,
+  Security,
+  SuccessResponse,
+} from 'tsoa';
 import { Service } from 'typedi';
 import { AuthService } from '../../services/auth.service.js';
 import { SyncJobService, SyncJobView } from '../../services/sync-job.service.js';
@@ -10,7 +23,12 @@ import { ApiResponse, apiSuccess } from '../../dto/api-response.dto.js';
 @Security('jwt')
 @Service()
 export class SyncJobsController extends Controller {
-  constructor(private jobs: SyncJobService, private auth: AuthService) { super(); }
+  constructor(
+    private jobs: SyncJobService,
+    private auth: AuthService,
+  ) {
+    super();
+  }
 
   @Post()
   @SuccessResponse('202', 'Sync Job accepted')
@@ -41,14 +59,29 @@ export class SyncJobsController extends Controller {
 @Security('service')
 @Service()
 export class InternalSyncJobsController extends Controller {
-  constructor(private jobs: SyncJobService) { super(); }
+  constructor(private jobs: SyncJobService) {
+    super();
+  }
 
   @Post('claim')
-  public async claim(): Promise<ApiResponse<any | null>> { return apiSuccess(await this.jobs.claim()); }
+  public async claim(): Promise<ApiResponse<any | null>> {
+    return apiSuccess(await this.jobs.claim());
+  }
 
   @Put('{jobId}')
   public async update(
     @Path() jobId: string,
-    @Body() body: { completedChannels?: number; failedChannels?: number; decisionsFound?: number; messagesScanned?: number; errorMessage?: string | null; status?: 'PROCESSING' | 'COMPLETED' | 'FAILED' },
-  ): Promise<ApiResponse<null>> { await this.jobs.update(jobId, body); return apiSuccess(null); }
+    @Body()
+    body: {
+      completedChannels?: number;
+      failedChannels?: number;
+      decisionsFound?: number;
+      messagesScanned?: number;
+      errorMessage?: string | null;
+      status?: 'PROCESSING' | 'COMPLETED' | 'FAILED';
+    },
+  ): Promise<ApiResponse<null>> {
+    await this.jobs.update(jobId, body);
+    return apiSuccess(null);
+  }
 }

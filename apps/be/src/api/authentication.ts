@@ -7,8 +7,17 @@ export async function expressAuthentication(request: Request, securityName: stri
   if (securityName === 'service') {
     const configured = request.app.locals.serviceToken as string | undefined;
     const actual = request.headers.authorization?.replace(/^Bearer /, '');
-    if (!configured || !actual || !request.headers.authorization?.startsWith('Bearer ') || Buffer.byteLength(actual) !== Buffer.byteLength(configured) || !timingSafeEqual(Buffer.from(actual), Buffer.from(configured))) throw new AuthError('Bot service authentication required');
+    if (
+      !configured ||
+      !actual ||
+      !request.headers.authorization?.startsWith('Bearer ') ||
+      Buffer.byteLength(actual) !== Buffer.byteLength(configured) ||
+      !timingSafeEqual(Buffer.from(actual), Buffer.from(configured))
+    )
+      throw new AuthError('Bot service authentication required');
     return {};
   }
-  return (request.app.locals.authService as AuthService).authenticate(request.headers.authorization);
+  return (request.app.locals.authService as AuthService).authenticate(
+    request.headers.authorization,
+  );
 }

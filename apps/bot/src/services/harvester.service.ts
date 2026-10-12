@@ -167,7 +167,7 @@ export class DiscussionHarvester {
   ): Promise<Decision[] | null> {
     const channel = message.channel;
     if (!channel || !channel.isTextBased()) return null;
-    if (!await this.backendApi.isMonitoredChannel(message.guildId, channel.id)) return null;
+    if (!(await this.backendApi.isMonitoredChannel(message.guildId, channel.id))) return null;
 
     const currentTraceId =
       traceId || `trc-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
@@ -318,7 +318,8 @@ export class DiscussionHarvester {
     policy: HarvestingPolicyConfig,
     options: ScanOptions = {},
   ): Promise<{ scannedCount: number; decisionsCount: number }> {
-    if (!await this.backendApi.isMonitoredChannel(channel.guild.id, channel.id)) return { scannedCount: 0, decisionsCount: 0 };
+    if (!(await this.backendApi.isMonitoredChannel(channel.guild.id, channel.id)))
+      return { scannedCount: 0, decisionsCount: 0 };
     const channelName = channel.name;
     const lastCheckpoint = await this.backendApi.getCheckpoint(channel.id);
 

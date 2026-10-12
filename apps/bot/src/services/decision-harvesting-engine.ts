@@ -33,8 +33,7 @@ export class DecisionHarvestingEngine implements IDecisionHarvestingEngine {
     policy: HarvestingPolicyConfig = DEFAULT_HARVESTING_POLICY,
   ): Promise<HarvestResult> {
     const traceId =
-      trigger.traceId ||
-      `trc-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+      trigger.traceId || `trc-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
 
     if (trigger.type === 'EVENT') {
       return this.handleEventTrigger(trigger.message, !!trigger.isManualOverride, policy, traceId);
@@ -107,7 +106,7 @@ export class DecisionHarvestingEngine implements IDecisionHarvestingEngine {
       clearTimeout(this.debounceTimers.get(channelId)!);
     }
 
-    return new Promise<HarvestResult>((resolve) => {
+    return new Promise<HarvestResult>(resolve => {
       const timer = setTimeout(async () => {
         this.clearDebounce(channelId);
         const res = await this.executeHarvestAnalysis(message, false, policy, traceId);
@@ -158,7 +157,12 @@ export class DecisionHarvestingEngine implements IDecisionHarvestingEngine {
     this.inFlightChannels.add(channelId);
     try {
       if (this.harvester) {
-        const decisions = await this.harvester.processAnalysis(message, policy, isManualOverride, traceId);
+        const decisions = await this.harvester.processAnalysis(
+          message,
+          policy,
+          isManualOverride,
+          traceId,
+        );
         if (!decisions || decisions.length === 0) {
           return {
             success: false,

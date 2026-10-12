@@ -12,6 +12,9 @@ export default [
       '**/*.log',
       '**/package-lock.json',
       '**/.system_generated/**',
+      'apps/fe/src/api/generated/**',
+      'apps/be/src/api/routes/generated/**',
+      'apps/be/src/api/docs/swagger.json',
     ],
   },
   {

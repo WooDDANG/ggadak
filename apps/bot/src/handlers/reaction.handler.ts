@@ -9,7 +9,10 @@ export class ReactionHandler {
     private triggerEmoji: string,
     private engine: IDecisionHarvestingEngine,
     private onAddReaction: (message: Message, emoji: string) => Promise<void>,
-    private isMonitored: (guildId: string | null, channelId: string) => Promise<boolean> = async () => true,
+    private isMonitored: (
+      guildId: string | null,
+      channelId: string,
+    ) => Promise<boolean> = async () => true,
   ) {}
 
   async handleReactionAdd(
@@ -24,7 +27,7 @@ export class ReactionHandler {
       if (reaction.message.partial) await reaction.message.fetch();
 
       const message = reaction.message as Message;
-      if (!await this.isMonitored(message.guildId, message.channelId)) return;
+      if (!(await this.isMonitored(message.guildId, message.channelId))) return;
       const isManualOverride = reaction.emoji.name === this.triggerEmoji;
 
       if (isManualOverride) {
@@ -32,11 +35,14 @@ export class ReactionHandler {
           `[Override] Manual trigger '${this.triggerEmoji}' added by @${user.username} on msg ${message.id}`,
         );
         await this.onAddReaction(message, '👀');
-        await this.engine.harvest({
-          type: 'EVENT',
-          message,
-          isManualOverride: true,
-        }, policy);
+        await this.engine.harvest(
+          {
+            type: 'EVENT',
+            message,
+            isManualOverride: true,
+          },
+          policy,
+        );
         return;
       }
 
@@ -47,11 +53,14 @@ export class ReactionHandler {
           `[Trigger] Reaction threshold (${totalReactions} >= ${policy.reactionThreshold}) reached on msg ${message.id}`,
         );
         await this.onAddReaction(message, '👀');
-        await this.engine.harvest({
-          type: 'EVENT',
-          message,
-          isManualOverride: false,
-        }, policy);
+        await this.engine.harvest(
+          {
+            type: 'EVENT',
+            message,
+            isManualOverride: false,
+          },
+          policy,
+        );
       }
     } catch (err: any) {
       logger.error(`[Reaction] Error handling reaction add: ${err.message}`, {

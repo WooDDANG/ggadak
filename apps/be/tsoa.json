@@ -1,9 +1,7 @@
 {
   "entryFile": "src/index.ts",
   "noImplicitAdditionalProperties": "silently-remove-extras",
-  "controllerPathGlobs": [
-    "src/api/controllers/**/*.controller.ts"
-  ],
+  "controllerPathGlobs": ["src/api/controllers/**/*.controller.ts"],
   "routes": {
     "routesDir": "src/api/routes/generated",
     "iocModule": "src/loaders/ioc.ts",

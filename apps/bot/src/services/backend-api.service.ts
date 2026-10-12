@@ -61,7 +61,7 @@ export class BackendApiService {
       signal: AbortSignal.timeout(15_000),
     });
     if (!response.ok) throw new Error(`Sync Job API failed (${response.status})`);
-    const envelope = await response.json() as { data?: unknown };
+    const envelope = (await response.json()) as { data?: unknown };
     return envelope.data;
   }
 
@@ -70,21 +70,33 @@ export class BackendApiService {
   }
 
   async updateSyncJob(jobId: string, update: Record<string, unknown>): Promise<void> {
-    await this.syncJobRequest(`/api/v1/internal/sync-jobs/${encodeURIComponent(jobId)}`, 'PUT', update);
+    await this.syncJobRequest(
+      `/api/v1/internal/sync-jobs/${encodeURIComponent(jobId)}`,
+      'PUT',
+      update,
+    );
   }
 
   /** Read persisted settings afresh. Missing credentials/access or BE outages disable harvesting. */
-  async isMonitoredChannel(guildId: string | null | undefined, channelId: string): Promise<boolean> {
+  async isMonitoredChannel(
+    guildId: string | null | undefined,
+    channelId: string,
+  ): Promise<boolean> {
     if (!guildId || !this.serviceToken) return false;
     try {
-      const response = await this.transport(`${this.backendUrl}/api/v1/internal/monitoring?guildId=${encodeURIComponent(guildId)}`, {
-        headers: { Authorization: `Bearer ${this.serviceToken}` },
-        signal: AbortSignal.timeout(15_000),
-      });
+      const response = await this.transport(
+        `${this.backendUrl}/api/v1/internal/monitoring?guildId=${encodeURIComponent(guildId)}`,
+        {
+          headers: { Authorization: `Bearer ${this.serviceToken}` },
+          signal: AbortSignal.timeout(15_000),
+        },
+      );
       if (!response.ok) return false;
-      const result = await response.json() as { data?: { channelIds?: unknown } };
+      const result = (await response.json()) as { data?: { channelIds?: unknown } };
       return Array.isArray(result.data?.channelIds) && result.data.channelIds.includes(channelId);
-    } catch { return false; }
+    } catch {
+      return false;
+    }
   }
 
   async syncPolicy(): Promise<HarvestingPolicyConfig> {

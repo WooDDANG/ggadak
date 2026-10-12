@@ -52,7 +52,9 @@ export function getLogDir(serviceName?: string, options?: LoggerOptions): string
   if (options?.appDir) {
     const target = path.join(options.appDir, 'logs');
     if (!fs.existsSync(target)) {
-      try { fs.mkdirSync(target, { recursive: true }); } catch {}
+      try {
+        fs.mkdirSync(target, { recursive: true });
+      } catch {}
     }
     return target;
   }
@@ -89,7 +91,9 @@ export function getLogDir(serviceName?: string, options?: LoggerOptions): string
   }
 
   if (!fs.existsSync(targetDir)) {
-    try { fs.mkdirSync(targetDir, { recursive: true }); } catch {}
+    try {
+      fs.mkdirSync(targetDir, { recursive: true });
+    } catch {}
   }
   return targetDir;
 }
@@ -109,31 +113,35 @@ export function createLogger(serviceName: string, options?: LoggerOptions): wins
     sName.includes('CONFLICT-BUTTON');
 
   // Visual Pretty Console Format for Terminal
-  const consoleFormat = winston.format.printf(({ timestamp, level, message, label, stack, stage, traceId, durationMs, ...meta }) => {
-    const tagLabel = label || sName;
-    const stagePrefix = stage ? ` ${formatStagePrefix(String(stage))}` : '';
-    const tracePrefix = traceId ? ` [${String(traceId).slice(0, 8)}]` : '';
-    const durationSuffix = durationMs !== undefined ? ` (+${durationMs}ms)` : '';
-    const metaKeys = Object.keys(meta);
-    const metaStr = metaKeys.length ? ` ${JSON.stringify(meta)}` : '';
-    const logMessage = stack || message;
+  const consoleFormat = winston.format.printf(
+    ({ timestamp, level, message, label, stack, stage, traceId, durationMs, ...meta }) => {
+      const tagLabel = label || sName;
+      const stagePrefix = stage ? ` ${formatStagePrefix(String(stage))}` : '';
+      const tracePrefix = traceId ? ` [${String(traceId).slice(0, 8)}]` : '';
+      const durationSuffix = durationMs !== undefined ? ` (+${durationMs}ms)` : '';
+      const metaKeys = Object.keys(meta);
+      const metaStr = metaKeys.length ? ` ${JSON.stringify(meta)}` : '';
+      const logMessage = stack || message;
 
-    return `[${timestamp}] [${tagLabel}] [${level.toUpperCase()}]${tracePrefix}${stagePrefix}: ${logMessage}${durationSuffix}${metaStr}`;
-  });
+      return `[${timestamp}] [${tagLabel}] [${level.toUpperCase()}]${tracePrefix}${stagePrefix}: ${logMessage}${durationSuffix}${metaStr}`;
+    },
+  );
 
   // Standard File Log Format
-  const fileFormat = winston.format.printf(({ timestamp, level, message, label, stack, stage, traceId, durationMs, ...meta }) => {
-    const tagLabel = label || sName;
-    const metaPayload = {
-      service: tagLabel,
-      traceId,
-      stage,
-      durationMs,
-      ...meta,
-    };
-    const logMessage = stack || message;
-    return `[${timestamp}] [${level.toUpperCase()}] [${tagLabel}]: ${logMessage} ${JSON.stringify(metaPayload)}`;
-  });
+  const fileFormat = winston.format.printf(
+    ({ timestamp, level, message, label, stack, stage, traceId, durationMs, ...meta }) => {
+      const tagLabel = label || sName;
+      const metaPayload = {
+        service: tagLabel,
+        traceId,
+        stage,
+        durationMs,
+        ...meta,
+      };
+      const logMessage = stack || message;
+      return `[${timestamp}] [${level.toUpperCase()}] [${tagLabel}]: ${logMessage} ${JSON.stringify(metaPayload)}`;
+    },
+  );
 
   const transports: winston.transport[] = [
     new winston.transports.Console({

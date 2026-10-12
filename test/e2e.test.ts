@@ -143,7 +143,9 @@ describe('E2E Full Pipeline: Discord Messages ➔ Backend AI Core ➔ Review Que
     assert.strictEqual(reviewData.data.approvedBy, 'user-1');
 
     // 6. Query confirmed decisions through the authenticated v1 read API.
-    const queryRes = await fetch(`${base}/api/v1/decisions?guildId=guild-1&status=CONFIRMED`, { headers: authHeaders });
+    const queryRes = await fetch(`${base}/api/v1/decisions?guildId=guild-1&status=CONFIRMED`, {
+      headers: authHeaders,
+    });
     assert.strictEqual(queryRes.status, 200);
     const queryData = (await queryRes.json()) as any;
     assert.strictEqual(queryData.data.decisions.length, 1);
@@ -204,7 +206,10 @@ describe('E2E Full Pipeline: Discord Messages ➔ Backend AI Core ➔ Review Que
     const database = await isolatedRepository();
     const repo = database.repo;
     const serviceToken = 'e2e-bot-secret';
-    const server = await createServer(repo, noDecisionExtractor, { ...fakeAuthOptions(), serviceToken });
+    const server = await createServer(repo, noDecisionExtractor, {
+      ...fakeAuthOptions(),
+      serviceToken,
+    });
     await new Promise<void>((resolve, reject) => {
       server.once('error', reject);
       server.listen(0, '127.0.0.1', resolve);

@@ -22,16 +22,31 @@ export const DECISION_ANCHOR_CORPUS: Array<{ anchor: string; category: string }>
   // 2. Architecture & System Design
   { anchor: '아키텍처 설계는 모듈러 모놀리스 구조로 가닥을 잡았습니다', category: '기술' },
   { anchor: '이쪽 아키텍처 방향으로 가닥 잡고 진행합시다', category: '기술' },
-  { anchor: 'API 명세 및 데이터 모델은 RESTful 규격으로 통일하기로 합의했습니다', category: '기술' },
-  { anchor: '배포 파이프라인은 GitHub Actions와 Docker로 구축하기로 결정했습니다', category: '인프라' },
+  {
+    anchor: 'API 명세 및 데이터 모델은 RESTful 규격으로 통일하기로 합의했습니다',
+    category: '기술',
+  },
+  {
+    anchor: '배포 파이프라인은 GitHub Actions와 Docker로 구축하기로 결정했습니다',
+    category: '인프라',
+  },
   { anchor: '캐싱 레이어는 Redis를 우선 도입하기로 결론지었습니다', category: '기술' },
 
   // 3. Feature Scope & Pivot (Exclusion / Prioritization)
   { anchor: '이번 스프린트 기능 범위는 알림 시스템 우선으로 못박죠', category: '기능' },
-  { anchor: '결제 모듈을 이번 릴리즈에서 제외하고 다음 버전으로 넘기기로 결정했습니다', category: '기능' },
-  { anchor: '로그인 방식은 카카오 로그인만 우선 채택하고 구글은 MVP에서 제외합시다', category: '기능' },
+  {
+    anchor: '결제 모듈을 이번 릴리즈에서 제외하고 다음 버전으로 넘기기로 결정했습니다',
+    category: '기능',
+  },
+  {
+    anchor: '로그인 방식은 카카오 로그인만 우선 채택하고 구글은 MVP에서 제외합시다',
+    category: '기능',
+  },
   { anchor: '핵심 기능인 의사결정 추적 뷰를 최우선 개발하기로 합의했습니다', category: '기능' },
-  { anchor: '일정 단축을 위해 복잡한 부가 기능은 다음 스프린트로 미루기로 결정했습니다', category: '기능' },
+  {
+    anchor: '일정 단축을 위해 복잡한 부가 기능은 다음 스프린트로 미루기로 결정했습니다',
+    category: '기능',
+  },
 
   // 4. Team Consensus & Final Agreement
   { anchor: '회의 결과 해당 방안을 최종 채택하고 작업을 분배합시다', category: '기타' },
@@ -42,8 +57,14 @@ export const DECISION_ANCHOR_CORPUS: Array<{ anchor: string; category: string }>
   // 5. English Global Decision Anchors
   { anchor: 'We have decided to adopt PostgreSQL as our primary database', category: 'technology' },
   { anchor: 'Let us finalize Fastify as our main HTTP backend framework', category: 'technology' },
-  { anchor: 'We agreed to prioritize the notification system for this sprint', category: 'feature' },
-  { anchor: 'The architecture direction is confirmed to be modular monolith', category: 'architecture' },
+  {
+    anchor: 'We agreed to prioritize the notification system for this sprint',
+    category: 'feature',
+  },
+  {
+    anchor: 'The architecture direction is confirmed to be modular monolith',
+    category: 'architecture',
+  },
   { anchor: 'All team members agreed on this technical RFC proposal', category: 'decision' },
 ];
 
@@ -76,8 +97,29 @@ export function extractFeatures(text: string): Map<string, number> {
 
   // 3. Core decision morpheme stems boost
   const STEMS = [
-    '결정', '확정', '합의', '채택', '도입', '진행', '우선', '선택', '픽스', '가닥', '못박', '통일',
-    '제외', '미루', '합시다', '가시죠', '가자', 'decid', 'adopt', 'agree', 'final', 'priorit', 'confirm',
+    '결정',
+    '확정',
+    '합의',
+    '채택',
+    '도입',
+    '진행',
+    '우선',
+    '선택',
+    '픽스',
+    '가닥',
+    '못박',
+    '통일',
+    '제외',
+    '미루',
+    '합시다',
+    '가시죠',
+    '가자',
+    'decid',
+    'adopt',
+    'agree',
+    'final',
+    'priorit',
+    'confirm',
   ];
   for (const stem of STEMS) {
     if (normalized.includes(stem)) {
@@ -140,7 +182,7 @@ const PRECOMPUTED_ANCHOR_VECTORS = DECISION_ANCHOR_CORPUS.map(item => ({
  */
 export function evaluateDenseMultiAnchorSimilarity(
   text: string,
-  threshold: number = 0.70,
+  threshold: number = 0.7,
 ): SemanticMatchResult {
   if (!text || text.trim().length === 0) {
     return { similarity: 0, isCandidate: false };

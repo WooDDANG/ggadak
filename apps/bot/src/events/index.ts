@@ -34,4 +34,3 @@ export function registerEvents({
 
   logger.info('✌️ Auto-loaded all discordx event listeners and command routers');
 }
-

@@ -128,12 +128,9 @@ describe('DiscussionHarvester Deep Module', () => {
       },
     };
 
-    const handler = new MessageHandler(
-      fakeEngine as any,
-      async (_msg: any, emoji: string) => {
-        if (emoji === '👀') reactionCount++;
-      },
-    );
+    const handler = new MessageHandler(fakeEngine as any, async (_msg: any, emoji: string) => {
+      if (emoji === '👀') reactionCount++;
+    });
 
     const semanticMsg: any = {
       id: 'sem-1',

@@ -24,7 +24,10 @@ export function handleReadyEvent(
     try {
       logger.info('🚀 Triggering initial full scan for new/uncheckpointed channels...');
       const policy = getPolicy();
-      const result = await analysisService.scanAllChannels(client, policy, { initialOnly: true, full: true });
+      const result = await analysisService.scanAllChannels(client, policy, {
+        initialOnly: true,
+        full: true,
+      });
       logger.info(
         `✅ Initial scan finished: ${result.channelCount} channels checked, ${result.scannedCount} msgs scanned, ${result.decisionsCount} decisions extracted.`,
       );
@@ -33,4 +36,3 @@ export function handleReadyEvent(
     }
   });
 }
-

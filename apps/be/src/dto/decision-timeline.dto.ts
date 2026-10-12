@@ -10,8 +10,16 @@ export interface DecisionTimelineDto {
 }
 
 export function toDecisionTimeline(
-  result: { groupBy: DecisionTimelineGroupBy; timezone: string; totalElements: number; groups: { key: string; count: number; items: Decision[] }[] },
+  result: {
+    groupBy: DecisionTimelineGroupBy;
+    timezone: string;
+    totalElements: number;
+    groups: { key: string; count: number; items: Decision[] }[];
+  },
   convert: (decision: Decision) => V1DecisionDto,
 ): DecisionTimelineDto {
-  return { ...result, groups: result.groups.map(group => ({ ...group, items: group.items.map(convert) })) };
+  return {
+    ...result,
+    groups: result.groups.map(group => ({ ...group, items: group.items.map(convert) })),
+  };
 }

@@ -40,8 +40,9 @@ export class DecisionTrackerBot {
     this.analysisService = new DiscussionHarvester(this.backendApi);
     this.engine = new DecisionHarvestingEngine(this.backendApi, this.analysisService);
 
-    this.messageHandler = new MessageHandler(this.engine, (msg: Message, emoji: string) =>
-      this.analysisService.addReactionSafely(msg, emoji),
+    this.messageHandler = new MessageHandler(
+      this.engine,
+      (msg: Message, emoji: string) => this.analysisService.addReactionSafely(msg, emoji),
       (guildId, channelId) => this.backendApi.isMonitoredChannel(guildId, channelId),
     );
 
@@ -93,14 +94,22 @@ export class DecisionTrackerBot {
               logger.warn(`[Sync Job ${job.jobId}] Channel ${channelId} failed: ${error.message}`);
             }
             await this.backendApi.updateSyncJob(job.jobId, {
-              completedChannels, failedChannels, decisionsFound, messagesScanned,
+              completedChannels,
+              failedChannels,
+              decisionsFound,
+              messagesScanned,
               status: 'PROCESSING',
             });
           }
           await this.backendApi.updateSyncJob(job.jobId, {
-            completedChannels, failedChannels, decisionsFound, messagesScanned,
+            completedChannels,
+            failedChannels,
+            decisionsFound,
+            messagesScanned,
             status: failedChannels ? 'FAILED' : 'COMPLETED',
-            errorMessage: failedChannels ? `${failedChannels} channel scan(s) failed; failed ranges remain available for retry.` : null,
+            errorMessage: failedChannels
+              ? `${failedChannels} channel scan(s) failed; failed ranges remain available for retry.`
+              : null,
           });
         } catch (error: any) {
           logger.warn(`Sync Job worker unavailable: ${error.message}`);
@@ -109,7 +118,9 @@ export class DecisionTrackerBot {
         }
       };
       void processSyncJob();
-      const syncTimer = setInterval(() => { void processSyncJob(); }, 5_000);
+      const syncTimer = setInterval(() => {
+        void processSyncJob();
+      }, 5_000);
       syncTimer.unref();
 
       let recovering = false;

@@ -56,7 +56,9 @@ export class DecisionExtractorCore {
       sessions.push(currentSession);
     }
 
-    logger.info(`[SessionSlicer] Split ${messages.length} messages into ${sessions.length} sessions (gap threshold: ${gapMinutes}m)`);
+    logger.info(
+      `[SessionSlicer] Split ${messages.length} messages into ${sessions.length} sessions (gap threshold: ${gapMinutes}m)`,
+    );
     return sessions;
   }
 
@@ -110,9 +112,9 @@ export class DecisionExtractorCore {
         const prevSim = i > 0 ? similarities[i - 1] : similarities[i];
         const nextSim = i < similarities.length - 1 ? similarities[i + 1] : similarities[i];
         const currSim = similarities[i];
-        const depth = (prevSim - currSim) + (nextSim - currSim);
+        const depth = prevSim - currSim + (nextSim - currSim);
 
-        if (depth >= depthThreshold || currSim < 0.20) {
+        if (depth >= depthThreshold || currSim < 0.2) {
           splitIndices.add(blocks[i + 1].startIndex);
         }
       }
@@ -153,7 +155,8 @@ export class DecisionExtractorCore {
    * participant diversity, rationale clarity, and action items.
    */
   calculateGovernanceScore(input: GovernanceInput): GovernanceScoreResult {
-    const { participantCount, reactionsCount, rationale, actionItemsCount, hasExternalFeedback } = input;
+    const { participantCount, reactionsCount, rationale, actionItemsCount, hasExternalFeedback } =
+      input;
     const cleanRationale = (rationale || '').trim();
 
     // 1.0 - Incomplete / Missing Rationale
@@ -182,7 +185,11 @@ export class DecisionExtractorCore {
     }
 
     // 3.0 - Standard Consensus: 2+ participants or multiple reactions with valid rationale
-    if (participantCount >= 2 || reactionsCount >= 2 || (reactionsCount >= 1 && hasExternalFeedback)) {
+    if (
+      participantCount >= 2 ||
+      reactionsCount >= 2 ||
+      (reactionsCount >= 1 && hasExternalFeedback)
+    ) {
       return {
         score: 3.0,
         strength: 'Standard',

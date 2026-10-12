@@ -1,6 +1,18 @@
 import { Decision, ReviewAction } from '@ggaddak/shared';
-import { listV1Decisions, getV1Decision, getDecisionTimeline, listV1ReviewQueue, reviewV1Candidate, editV1Decision } from './generated';
-import type { ListV1DecisionsParams, V1DecisionDto, DecisionEditDto, GetDecisionTimelineParams } from './generated/model';
+import {
+  listV1Decisions,
+  getV1Decision,
+  getDecisionTimeline,
+  listV1ReviewQueue,
+  reviewV1Candidate,
+  editV1Decision,
+} from './generated';
+import type {
+  ListV1DecisionsParams,
+  V1DecisionDto,
+  DecisionEditDto,
+  GetDecisionTimelineParams,
+} from './generated/model';
 import { unwrapApiResponse } from './api-response';
 
 export interface GetDecisionsParams {
@@ -35,7 +47,6 @@ export const decisionsApi = {
   edit: async (id: string, guildId: string, body: DecisionEditDto) => {
     const response = await editV1Decision(id, body, { guildId });
     return unwrapApiResponse(response);
-
   },
   browse: async (params: ListV1DecisionsParams) => {
     const response = await listV1Decisions(params);
@@ -65,5 +76,4 @@ export const decisionsApi = {
     const response = await reviewV1Candidate(id, request, { guildId });
     return asDecision(unwrapApiResponse(response));
   },
-
 };
