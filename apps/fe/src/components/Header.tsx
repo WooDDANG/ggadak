@@ -2,8 +2,8 @@ import React from 'react';
 import { Layers, ShieldCheck, RefreshCw } from 'lucide-react';
 
 interface HeaderProps {
-  activeTab: 'review' | 'timeline' | 'feedback' | 'settings' | 'search' | 'sync';
-  setActiveTab: (tab: 'review' | 'timeline' | 'feedback' | 'settings' | 'search' | 'sync') => void;
+  activeTab: 'review' | 'timeline' | 'feedback' | 'settings' | 'search' | 'sync' | 'dashboard';
+  setActiveTab: (tab: 'review' | 'timeline' | 'feedback' | 'settings' | 'search' | 'sync' | 'dashboard') => void;
   draftCount: number;
   onRefresh: () => void;
   isRefetching: boolean;
@@ -36,6 +36,7 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
 
           <nav className="flex items-center space-x-2">
+            <button onClick={() => setActiveTab('dashboard')} className="px-3 py-2 text-sm rounded-lg">대시보드</button>
             <button
               onClick={() => setActiveTab('review')}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-150 flex items-center space-x-2 ${
