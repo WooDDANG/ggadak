@@ -11,6 +11,8 @@ import {
   ReviewActionSchema,
 } from '@ggaddak/shared';
 
+type TimelineGroupBy = 'month' | 'topic' | 'channel' | 'category';
+
 /** Database is authoritative. Every mutation is awaited; no memory fallback exists. */
 @Service()
 export class DecisionRepository {
@@ -158,8 +160,70 @@ export class DecisionRepository {
       governanceReason: decision.governanceReason ?? '',
       governancePassed: decision.governancePassed ?? false,
       createdAt: new Date(decision.createdAt),
+      confirmedAt: decision.decisionConfirmedDate ? new Date(decision.decisionConfirmedDate) : null,
       domainJson: JSON.stringify(decision),
       version: decision.version ?? 1,
+    };
+  }
+
+  async getConfirmedTimeline(filter: {
+    guildId: string;
+    groupBy: TimelineGroupBy;
+    timezone: string;
+    from?: string;
+    to?: string;
+  }) {
+    const supported = ['month', 'topic', 'channel', 'category'];
+    if (!supported.includes(filter.groupBy)) throw new BadRequestError('Unsupported groupBy');
+    try {
+      new Intl.DateTimeFormat('en-US', { timeZone: filter.timezone });
+    } catch {
+      throw new BadRequestError('Invalid timezone');
+    }
+    const parseInstant = (value: string | undefined) => {
+      if (!value) return undefined;
+      if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(value))
+        throw new BadRequestError('from and to must be ISO 8601 timestamps');
+      const instant = new Date(value);
+      if (!Number.isFinite(instant.getTime())) throw new BadRequestError('from and to must be valid ISO timestamps');
+      return instant;
+    };
+    const from = parseInstant(filter.from);
+    const to = parseInstant(filter.to);
+    if (from && to && from >= to)
+      throw new BadRequestError('from and to must be valid ISO timestamps with from before to');
+    const rows = await this.prisma.decision.findMany({
+      where: {
+        guildId: filter.guildId,
+        lifecycle: 'CONFIRMED',
+        confirmedAt: {
+          not: null,
+          ...(from ? { gte: from } : {}),
+          ...(to ? { lt: to } : {}),
+        },
+      },
+      orderBy: [{ confirmedAt: 'desc' }, { id: 'asc' }],
+    });
+    const formatter = filter.groupBy === 'month'
+      ? new Intl.DateTimeFormat('en-US', { timeZone: filter.timezone, year: 'numeric', month: '2-digit' })
+      : undefined;
+    const groups = new Map<string, Decision[]>();
+    for (const row of rows) {
+      const decision = this.decodeDecision(row);
+      let key: string;
+      if (filter.groupBy === 'month') {
+        const parts = Object.fromEntries(formatter!.formatToParts(row.confirmedAt!).map(part => [part.type, part.value]));
+        key = `${parts.year}-${parts.month}`;
+      } else if (filter.groupBy === 'topic') key = decision.topic;
+      else if (filter.groupBy === 'channel') key = decision.source.channelId;
+      else key = decision.categoryTag;
+      groups.set(key, [...(groups.get(key) ?? []), decision]);
+    }
+    return {
+      groupBy: filter.groupBy,
+      timezone: filter.timezone,
+      totalElements: rows.length,
+      groups: [...groups].map(([key, items]) => ({ key, count: items.length, items })),
     };
   }
   async saveDecision(decision: Decision): Promise<void> {

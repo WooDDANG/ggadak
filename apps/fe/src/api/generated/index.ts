@@ -31,6 +31,7 @@ import type {
   ApiResponseAuthUser,
   ApiResponseChannelIdsStringArray,
   ApiResponseChannelSettings,
+  ApiResponseDecisionTimelineDto,
   ApiResponseGuildsDiscordGuildArray,
   ApiResponseNull,
   ApiResponseSearchResponse,
@@ -47,6 +48,7 @@ import type {
   DecisionWebhookDto,
   EditV1DecisionParams,
   FeedbackListResponseDto,
+  GetDecisionTimelineParams,
   GetMonitoredChannelsParams,
   GetV1DecisionParams,
   HarvestingPolicyDto,
@@ -312,6 +314,120 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       > => {
       return useMutation(getReviewV1CandidateMutationOptions(options), queryClient);
     }
+
+export type getDecisionTimelineResponse200 = {
+  data: ApiResponseDecisionTimelineDto
+  status: 200
+}
+
+export type getDecisionTimelineResponseSuccess = (getDecisionTimelineResponse200) & {
+  headers: Headers;
+};
+;
+
+export type getDecisionTimelineResponse = (getDecisionTimelineResponseSuccess)
+
+export const getGetDecisionTimelineUrl = (params: GetDecisionTimelineParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/decisions/timeline?${stringifiedParams}` : `/api/v1/decisions/timeline`
+}
+
+export const getDecisionTimeline = async (params: GetDecisionTimelineParams, options?: Parameters<typeof authenticatedClient>[1]): Promise<getDecisionTimelineResponse> => {
+
+  return authenticatedClient<getDecisionTimelineResponse>(getGetDecisionTimelineUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetDecisionTimelineQueryKey = (params?: GetDecisionTimelineParams,) => {
+    return [
+    `/api/v1/decisions/timeline`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetDecisionTimelineQueryOptions = <TData = Awaited<ReturnType<typeof getDecisionTimeline>>, TError = unknown>(params: GetDecisionTimelineParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDecisionTimeline>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetDecisionTimelineQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDecisionTimeline>>> = ({ signal }) => getDecisionTimeline(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getDecisionTimeline>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetDecisionTimelineQueryResult = NonNullable<Awaited<ReturnType<typeof getDecisionTimeline>>>
+export type GetDecisionTimelineQueryError = unknown
+
+
+export function useGetDecisionTimeline<TData = Awaited<ReturnType<typeof getDecisionTimeline>>, TError = unknown>(
+ params: GetDecisionTimelineParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDecisionTimeline>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getDecisionTimeline>>,
+          TError,
+          Awaited<ReturnType<typeof getDecisionTimeline>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetDecisionTimeline<TData = Awaited<ReturnType<typeof getDecisionTimeline>>, TError = unknown>(
+ params: GetDecisionTimelineParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDecisionTimeline>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getDecisionTimeline>>,
+          TError,
+          Awaited<ReturnType<typeof getDecisionTimeline>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetDecisionTimeline<TData = Awaited<ReturnType<typeof getDecisionTimeline>>, TError = unknown>(
+ params: GetDecisionTimelineParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDecisionTimeline>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+
+export function useGetDecisionTimeline<TData = Awaited<ReturnType<typeof getDecisionTimeline>>, TError = unknown>(
+ params: GetDecisionTimelineParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDecisionTimeline>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetDecisionTimelineQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export type editV1DecisionResponse200 = {
   data: ApiResponseV1DecisionDto

@@ -848,6 +848,88 @@
 				"type": "object",
 				"additionalProperties": false
 			},
+			"DecisionTimelineGroupBy": {
+				"type": "string",
+				"enum": [
+					"month",
+					"topic",
+					"channel",
+					"category"
+				]
+			},
+			"DecisionTimelineDto": {
+				"properties": {
+					"groupBy": {
+						"$ref": "#/components/schemas/DecisionTimelineGroupBy"
+					},
+					"timezone": {
+						"type": "string"
+					},
+					"totalElements": {
+						"type": "number",
+						"format": "double"
+					},
+					"groups": {
+						"items": {
+							"properties": {
+								"items": {
+									"items": {
+										"$ref": "#/components/schemas/V1DecisionDto"
+									},
+									"type": "array"
+								},
+								"count": {
+									"type": "number",
+									"format": "double"
+								},
+								"key": {
+									"type": "string"
+								}
+							},
+							"required": [
+								"items",
+								"count",
+								"key"
+							],
+							"type": "object"
+						},
+						"type": "array"
+					}
+				},
+				"required": [
+					"groupBy",
+					"timezone",
+					"totalElements",
+					"groups"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"ApiResponse_DecisionTimelineDto_": {
+				"description": "Shared v1 response contract. Domain payloads remain typed by each endpoint.",
+				"properties": {
+					"success": {
+						"type": "boolean"
+					},
+					"code": {
+						"type": "string"
+					},
+					"message": {
+						"type": "string"
+					},
+					"data": {
+						"$ref": "#/components/schemas/DecisionTimelineDto"
+					}
+				},
+				"required": [
+					"success",
+					"code",
+					"message",
+					"data"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
 			"DecisionEditDto": {
 				"properties": {
 					"expectedVersion": {
@@ -2267,6 +2349,74 @@
 						}
 					}
 				}
+			}
+		},
+		"/api/v1/decisions/timeline": {
+			"get": {
+				"operationId": "GetDecisionTimeline",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiResponse_DecisionTimelineDto_"
+								}
+							}
+						}
+					}
+				},
+				"tags": [
+					"v1 Decisions"
+				],
+				"security": [
+					{
+						"jwt": []
+					}
+				],
+				"parameters": [
+					{
+						"in": "query",
+						"name": "guildId",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"in": "query",
+						"name": "groupBy",
+						"required": false,
+						"schema": {
+							"$ref": "#/components/schemas/DecisionTimelineGroupBy"
+						}
+					},
+					{
+						"in": "query",
+						"name": "timezone",
+						"required": false,
+						"schema": {
+							"default": "UTC",
+							"type": "string"
+						}
+					},
+					{
+						"in": "query",
+						"name": "from",
+						"required": false,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"in": "query",
+						"name": "to",
+						"required": false,
+						"schema": {
+							"type": "string"
+						}
+					}
+				]
 			}
 		},
 		"/api/v1/decisions/{id}": {

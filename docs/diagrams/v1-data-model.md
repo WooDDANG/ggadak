@@ -51,6 +51,7 @@ erDiagram
     string guildId "Logical association; preserves unknown guilds"
     int version
     string status
+    datetime confirmedAt "Nullable; indexed for confirmed timeline ranges"
   }
 ```
 
@@ -59,6 +60,8 @@ User–Guild membership is persisted from Discord OAuth `guilds`, expires for au
 Decision.guildId remains its existing logical association rather than adding an immediate foreign key: the Bot may ingest a guild before a user logs in. The additive auth migration seeds Guild from existing Decision guild IDs and grants no memberships. Existing Decision, candidate history, Evidence Hash, feedback and checkpoint tables are retained.
 
 Decision content edits and their additive audit model are documented in [Decision Card editing](../model/decision-edit.md). `updatedAt` and version expose edits without changing lifecycle or replacement links.
+
+The [Decision Timeline](../model/decision-timeline.md) queries only confirmed records with a recorded confirmation timestamp. Missing historical dates remain null and are omitted from timeline groups; they remain available in Decision Card browsing. Confirmation timestamps are stored as UTC instants and grouped with an explicit IANA timezone.
 
 MonitoredChannel is the persisted positive selection, replaced atomically per Guild. Discord channels are fetched live rather than cached as authoritative permission records. Bot reads revalidate ViewChannel and ReadMessageHistory, exclude threads/forums, and fail closed when Discord or BE is unavailable. Selection survives restarts and permission loss; inaccessible selections can only be removed until access is restored.
 
