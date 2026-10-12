@@ -9,6 +9,7 @@ export default defineConfig({
       schemas: 'src/api/generated/model',
       client: 'react-query',
       httpClient: 'fetch',
+      override: { mutator: { path: './src/api/transport.ts', name: 'authenticatedClient' } },
     },
   },
 });

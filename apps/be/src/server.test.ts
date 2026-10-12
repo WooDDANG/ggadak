@@ -80,14 +80,10 @@ describe('BE Server & Ingestion API', () => {
     assert.strictEqual(data.decisions.length, 1);
   });
 
-  it('reads the same Decision Records through the v1 envelope and legacy contract', async () => {
+  it('requires authentication to read v1 Decision Records', async () => {
     const response = await fetch(`http://localhost:${port}/api/v1/decisions?topic=Architecture`);
-    assert.strictEqual(response.status, 200);
-    const body = (await response.json()) as any;
-    assert.strictEqual(body.success, true);
-    assert.strictEqual(body.code, 'OK');
-    assert.strictEqual(body.message, 'Success');
-    assert.strictEqual(body.data.decisions[0].id, 'DEC-101');
+    assert.strictEqual(response.status, 401);
+    assert.strictEqual(((await response.json()) as any).code, 'UNAUTHORIZED');
   });
 
   it('returns a v1 error envelope for unknown routes while preserving legacy errors', async () => {

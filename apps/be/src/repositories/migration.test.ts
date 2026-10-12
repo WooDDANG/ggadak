@@ -44,6 +44,10 @@ test('checked-in additive migrations preserve a legacy-schema fixture and missin
     const repo = new DecisionRepository(client);
     const recovered = await repo.getDecisionById('legacy');
     assert.equal(recovered?.state, 'Decided');
+    assert.equal(recovered?.source.guildId, 'g');
+    assert.equal((await client.guild.findUnique({ where: { id: 'g' } }))?.name, 'g');
+    assert.equal(await client.membership.count(), 0);
+
     assert.equal(recovered?.createdAt, '2020-01-01T00:00:00.000Z');
     assert.equal(recovered?.approvedBy, null);
     assert.equal(recovered?.decisionConfirmedDate, null);

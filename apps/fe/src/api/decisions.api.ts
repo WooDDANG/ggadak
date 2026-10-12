@@ -3,13 +3,14 @@ import { apiClient } from './client';
 import { listV1Decisions } from './generated';
 
 export interface GetDecisionsParams {
+  guildId: string;
   topic?: string;
   state?: string;
   categoryTag?: string;
 }
 
 export const decisionsApi = {
-  getDecisions: async (params: GetDecisionsParams = {}): Promise<Decision[]> => {
+  getDecisions: async (params: GetDecisionsParams): Promise<Decision[]> => {
     const response = await listV1Decisions(params);
     if (response.status !== 200 || !response.data.success) {
       throw new Error(response.data.message || `HTTP ${response.status}`);

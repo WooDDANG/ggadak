@@ -98,3 +98,45 @@ model CandidateAnalysis {
   @@id([requestId, decisionId])
   @@index([decisionId])
 }
+
+model User {
+  id String @id
+  username String
+  avatar String?
+  memberships Membership[]
+  sessions AuthSession[]
+  createdAt DateTime @default(now())
+}
+
+model Guild {
+  id String @id
+  name String
+  icon String?
+  memberships Membership[]
+}
+
+model Membership {
+  userId String
+  guildId String
+  owner Boolean @default(false)
+  permissions String @default("0")
+  refreshedAt DateTime
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  @@id([userId, guildId])
+}
+
+model AuthSession {
+  id String @id
+  userId String
+  refreshToken String
+  expiresAt DateTime
+  refreshedAt DateTime
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId])
+}
+
+model OAuthState {
+  nonce String @id
+  expiresAt DateTime
+}

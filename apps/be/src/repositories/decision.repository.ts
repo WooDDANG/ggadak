@@ -180,9 +180,9 @@ export class DecisionRepository {
     return row ? this.decodeDecision(row) : null;
   }
   async getDecisions(
-    filter: { topic?: string; state?: string; categoryTag?: string } = {},
+    filter: { guildId?: string; topic?: string; state?: string; categoryTag?: string } = {},
   ): Promise<Decision[]> {
-    return (await this.prisma.decision.findMany({ orderBy: { createdAt: 'desc' } }))
+    return (await this.prisma.decision.findMany({ where: filter.guildId ? { guildId: filter.guildId } : {}, orderBy: { createdAt: 'desc' } }))
       .map(row => this.decodeDecision(row))
       .filter(
         d =>

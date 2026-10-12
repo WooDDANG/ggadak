@@ -9,6 +9,7 @@ import { createLogger } from '@ggaddak/shared';
 import { RegisterRoutes } from '../api/routes/generated/routes.js';
 import { errorHandler } from '../api/middlewares/errorHandler.js';
 import { apiFailure, isV1Request } from '../dto/api-response.dto.js';
+import { config } from '../config/index.js';
 import { apiLimiter } from '../api/middlewares/rateLimiter.js';
 
 export function initExpress({ app }: { app: Express }): void {
@@ -23,7 +24,7 @@ export function initExpress({ app }: { app: Express }): void {
   );
 
   // 2. CORS
-  app.use(cors());
+  app.use(cors({ origin: config.cors.origins.includes('*') ? true : config.cors.origins, credentials: true }));
 
   // 3. Body Parsing
   app.use(express.json({ limit: '10mb' }));
@@ -32,8 +33,9 @@ export function initExpress({ app }: { app: Express }): void {
   app.use('/api', apiLimiter);
 
   // 5. Morgan Logging
+  morgan.token('safePath', req => req.url?.split('?')[0] ?? '');
   app.use(
-    morgan('":method :url" :status :res[content-length] - :response-time ms', {
+    morgan('":method :safePath" :status :res[content-length] - :response-time ms', {
       stream: {
         write: (message: string) => logger.info(`[HTTP] ${message.trim()}`),
       },
