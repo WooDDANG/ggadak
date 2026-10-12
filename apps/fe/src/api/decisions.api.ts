@@ -1,5 +1,4 @@
 import { Decision, ReviewAction } from '@ggaddak/shared';
-import { apiClient } from './client';
 import { listV1Decisions, getV1Decision, getDecisionTimeline, listV1ReviewQueue, reviewV1Candidate, editV1Decision } from './generated';
 import type { ListV1DecisionsParams, V1DecisionDto, DecisionEditDto, GetDecisionTimelineParams } from './generated/model';
 
@@ -77,14 +76,4 @@ export const decisionsApi = {
     return asDecision(response.data.data);
   },
 
-  resolveConflict: async (
-    decisionId: string,
-    conflictingId: string,
-    resolution: 'supersede' | 'coexist',
-  ): Promise<void> => {
-    await apiClient<{ status: string }>('/api/decisions/conflict', {
-      method: 'POST',
-      body: JSON.stringify({ decisionId, conflictingId, resolution }),
-    });
-  },
 };

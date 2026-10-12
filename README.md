@@ -77,7 +77,6 @@ DISCORD_BOT_TOKEN=your_discord_bot_token_here
 TRIGGER_EMOJI=📌
 BE_PORT=3001
 BE_DATABASE_PATH=./decisions.sqlite
-BE_WEBHOOK_URL=http://localhost:3001/api/webhooks/decisions
 FE_PORT=3000
 AI_PROVIDER=mock # mock, openai, google
 ```
