@@ -15,7 +15,6 @@
     "db:inspect": "python3 scripts/legacy-database.py inspect decisions.sqlite prisma/decisions.sqlite"
   },
   "dependencies": {
-    "@ai-sdk/google": "^0.0.15",
     "@ai-sdk/openai": "^0.0.15",
     "@ggaddak/shared": "*",
     "@prisma/client": "^5.22.0",
