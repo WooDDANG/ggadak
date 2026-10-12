@@ -22,6 +22,8 @@ import { DiscussionController } from './../../controllers/discussion.controller.
 // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
 import { DecisionController } from './../../controllers/decision.controller.js';
 // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+import { DashboardController } from './../../controllers/dashboard.controller.js';
+// WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
 import { CheckpointController } from './../../controllers/checkpoint.controller.js';
 // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
 import { ChannelsController } from './../../controllers/channels.controller.js';
@@ -553,6 +555,27 @@ const models: TsoaRoute.Models = {
         "properties": {
             "event": {"dataType":"string","required":true},
             "payload": {"dataType":"any","required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "DashboardDto": {
+        "dataType": "refObject",
+        "properties": {
+            "counts": {"dataType":"nestedObjectLiteral","nestedProperties":{"inReview":{"dataType":"double","required":true},"onHold":{"dataType":"double","required":true},"confirmed":{"dataType":"double","required":true}},"required":true},
+            "recentDecisions": {"dataType":"array","array":{"dataType":"refObject","ref":"V1DecisionDto"},"required":true},
+            "sync": {"dataType":"nestedObjectLiteral","nestedProperties":{"latestJob":{"dataType":"union","subSchemas":[{"dataType":"enum","enums":[null]},{"dataType":"nestedObjectLiteral","nestedProperties":{"completedAt":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},"createdAt":{"dataType":"string","required":true},"failedChannels":{"dataType":"double","required":true},"completedChannels":{"dataType":"double","required":true},"totalChannels":{"dataType":"double","required":true},"errorMessage":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},"status":{"dataType":"string","required":true},"jobId":{"dataType":"string","required":true}}}],"required":true},"lastSuccessfulAt":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true}},"required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "ApiResponse_DashboardDto_": {
+        "dataType": "refObject",
+        "properties": {
+            "success": {"dataType":"boolean","required":true},
+            "code": {"dataType":"string","required":true},
+            "message": {"dataType":"string","required":true},
+            "data": {"ref":"DashboardDto","required":true},
         },
         "additionalProperties": false,
     },
@@ -1454,6 +1477,43 @@ export function RegisterRoutes(app: Router) {
                 next,
                 validatedArgs,
                 successStatus: 201,
+              });
+            } catch (err) {
+                return next(err);
+            }
+        });
+        // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+        const argsDashboardController_getDashboard: Record<string, TsoaRoute.ParameterSchema> = {
+                guildId: {"in":"query","name":"guildId","required":true,"dataType":"string"},
+                request: {"in":"request","name":"request","required":true,"dataType":"object"},
+        };
+        app.get('/api/v1/dashboard',
+            authenticateMiddleware([{"jwt":[]}]),
+            ...(fetchMiddlewares<RequestHandler>(DashboardController)),
+            ...(fetchMiddlewares<RequestHandler>(DashboardController.prototype.getDashboard)),
+
+            async function DashboardController_getDashboard(request: ExRequest, response: ExResponse, next: any) {
+
+            // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+
+            let validatedArgs: any[] = [];
+            try {
+                validatedArgs = templateService.getValidatedArgs({ args: argsDashboardController_getDashboard, request, response });
+
+                const container: IocContainer = typeof iocContainer === 'function' ? (iocContainer as IocContainerFactory)(request) : iocContainer;
+
+                const controller: any = await container.get<DashboardController>(DashboardController);
+                if (typeof controller['setStatus'] === 'function') {
+                controller.setStatus(undefined);
+                }
+
+              await templateService.apiHandler({
+                methodName: 'getDashboard',
+                controller,
+                response,
+                next,
+                validatedArgs,
+                successStatus: undefined,
               });
             } catch (err) {
                 return next(err);

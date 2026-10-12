@@ -1,10 +1,13 @@
+import {dashboardQueryKey} from '../api/dashboard.api';
+import {decisionsQueryKey} from '../api/session';
 import React, { useState } from 'react';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { create as createSyncJob, get as getSyncJob } from '../api/generated';
 import type { SyncJobView } from '../api/generated/model';
 type SyncJob = SyncJobView & { status: 'QUEUED' | 'PROCESSING' | 'COMPLETED' | 'FAILED' };
 
 export function ManualSync({ guildId }: { guildId: string }) {
+  const queryClient = useQueryClient();
   const [job, setJob] = useState<SyncJob | null>(null);
   const [forceFullSync, setForceFullSync] = useState(false);
   const mutation = useMutation({
@@ -13,7 +16,7 @@ export function ManualSync({ guildId }: { guildId: string }) {
       if (result.status !== 202 || !result.data.success) throw new Error(result.data.message || `HTTP ${result.status}`);
       return result.data.data as SyncJob;
     },
-    onSuccess: setJob,
+    onSuccess: job => {setJob(job);queryClient.invalidateQueries({queryKey:dashboardQueryKey(guildId)});},
   });
   const status = useQuery({
     queryKey: ['sync-job', guildId, job?.jobId],
@@ -21,6 +24,11 @@ export function ManualSync({ guildId }: { guildId: string }) {
     queryFn: async () => {
       const result = await getSyncJob(job!.jobId, { guildId });
       if (result.status !== 200 || !result.data.success) throw new Error(result.data.message || `HTTP ${result.status}`);
+      if (['COMPLETED','FAILED'].includes(result.data.data.status)) {
+        queryClient.invalidateQueries({queryKey:dashboardQueryKey(guildId)});
+        queryClient.invalidateQueries({queryKey:decisionsQueryKey(guildId)});
+        queryClient.invalidateQueries({queryKey:['review-queue',guildId]});
+      }
       return result.data.data as SyncJob;
     },
     refetchInterval: 1500,

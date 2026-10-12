@@ -1,3 +1,5 @@
+import { Dashboard } from './features/Dashboard';
+import { dashboardQueryKey } from './api/dashboard.api';
 import { WhySearch } from './features/WhySearch';
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -17,7 +19,7 @@ export function App() {
 }
 
 function ServerApp({ guildId }: { guildId: string }) {
-  const [activeTab, setActiveTab] = useState<'review' | 'timeline' | 'feedback' | 'settings' | 'search' | 'sync'>('review');
+  const [activeTab, setActiveTab] = useState<'review' | 'timeline' | 'feedback' | 'settings' | 'search' | 'sync' | 'dashboard'>('dashboard');
   const queryClient = useQueryClient();
 
   // 1. Fetch Decisions Query
@@ -61,6 +63,7 @@ function ServerApp({ guildId }: { guildId: string }) {
       decisionsApi.reviewDecision(id, action, guildId),
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: decisionsQueryKey(guildId) });
+      queryClient.invalidateQueries({ queryKey: dashboardQueryKey(guildId) });
       queryClient.invalidateQueries({ queryKey: ['decision-detail', guildId] });
       queryClient.invalidateQueries({ queryKey: ['decision-cards', guildId] });
     },
