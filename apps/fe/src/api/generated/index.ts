@@ -26,6 +26,7 @@ import type {
 import type {
   AnalyzeDiscussionRequestDto,
   AnalyzeDiscussionResponseDto,
+  ApiResponseDecisionListResponseDto,
   CandidateHistoryEntry,
   CheckpointResponseDto,
   CreateFeedback201,
@@ -36,6 +37,7 @@ import type {
   HarvestingPolicyDto,
   ListDecisionsParams,
   ListFeedbacksParams,
+  ListV1DecisionsParams,
   Resolve200,
   ResolveConflictDto,
   ReviewDecisionDto,
@@ -63,6 +65,127 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   }
   return result;
 };
+
+export type listV1DecisionsResponse200 = {
+  data: ApiResponseDecisionListResponseDto
+  status: 200
+}
+
+export type listV1DecisionsResponseSuccess = (listV1DecisionsResponse200) & {
+  headers: Headers;
+};
+;
+
+export type listV1DecisionsResponse = (listV1DecisionsResponseSuccess)
+
+export const getListV1DecisionsUrl = (params?: ListV1DecisionsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/decisions?${stringifiedParams}` : `/api/v1/decisions`
+}
+
+export const listV1Decisions = async (params?: ListV1DecisionsParams, options?: RequestInit): Promise<listV1DecisionsResponse> => {
+
+  const res = await fetch(getListV1DecisionsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: listV1DecisionsResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as listV1DecisionsResponse
+}
+
+
+
+
+
+export const getListV1DecisionsQueryKey = (params?: ListV1DecisionsParams,) => {
+    return [
+    `/api/v1/decisions`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListV1DecisionsQueryOptions = <TData = Awaited<ReturnType<typeof listV1Decisions>>, TError = unknown>(params?: ListV1DecisionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listV1Decisions>>, TError, TData>>, fetch?: RequestInit}
+) => {
+
+const {query: queryOptions, fetch: fetchOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListV1DecisionsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listV1Decisions>>> = ({ signal }) => listV1Decisions(params, { signal, ...fetchOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listV1Decisions>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListV1DecisionsQueryResult = NonNullable<Awaited<ReturnType<typeof listV1Decisions>>>
+export type ListV1DecisionsQueryError = unknown
+
+
+export function useListV1Decisions<TData = Awaited<ReturnType<typeof listV1Decisions>>, TError = unknown>(
+ params: undefined |  ListV1DecisionsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listV1Decisions>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listV1Decisions>>,
+          TError,
+          Awaited<ReturnType<typeof listV1Decisions>>
+        > , 'initialData'
+      >, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListV1Decisions<TData = Awaited<ReturnType<typeof listV1Decisions>>, TError = unknown>(
+ params?: ListV1DecisionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listV1Decisions>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listV1Decisions>>,
+          TError,
+          Awaited<ReturnType<typeof listV1Decisions>>
+        > , 'initialData'
+      >, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListV1Decisions<TData = Awaited<ReturnType<typeof listV1Decisions>>, TError = unknown>(
+ params?: ListV1DecisionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listV1Decisions>>, TError, TData>>, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+
+export function useListV1Decisions<TData = Awaited<ReturnType<typeof listV1Decisions>>, TError = unknown>(
+ params?: ListV1DecisionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listV1Decisions>>, TError, TData>>, fetch?: RequestInit}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListV1DecisionsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export type getResponse200 = {
   data: HarvestingPolicyDto

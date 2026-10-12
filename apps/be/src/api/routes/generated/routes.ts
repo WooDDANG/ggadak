@@ -4,6 +4,8 @@
 import type { TsoaRoute } from '@tsoa/runtime';
 import {  fetchMiddlewares, ExpressTemplateService } from '@tsoa/runtime';
 // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+import { V1DecisionController } from './../../controllers/v1-decision.controller.js';
+// WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
 import { PolicyController } from './../../controllers/policy.controller.js';
 // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
 import { FeedbackController } from './../../controllers/feedback.controller.js';
@@ -22,72 +24,6 @@ import type { Request as ExRequest, Response as ExResponse, RequestHandler, Rout
 // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
 
 const models: TsoaRoute.Models = {
-    "HarvestingPolicyDto": {
-        "dataType": "refObject",
-        "properties": {
-            "initialScanLimit": {"dataType":"double","required":true},
-            "contextWindowBefore": {"dataType":"double","required":true},
-            "contextWindowAfter": {"dataType":"double","required":true},
-            "maxMergedWindow": {"dataType":"double","required":true},
-            "reactionThreshold": {"dataType":"double","required":true},
-            "debounceMs": {"dataType":"double","required":true},
-            "agreementThreshold": {"dataType":"double","required":true},
-            "lookbackDays": {"dataType":"double","required":true},
-        },
-        "additionalProperties": false,
-    },
-    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
-    "FeedbackSourceType": {
-        "dataType": "refAlias",
-        "type": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["교수"]},{"dataType":"enum","enums":["심사위원"]},{"dataType":"enum","enums":["팀원"]},{"dataType":"enum","enums":["인터뷰이"]}],"validators":{}},
-    },
-    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
-    "ExternalFeedbackItemDto": {
-        "dataType": "refObject",
-        "properties": {
-            "id": {"dataType":"string","required":true},
-            "source": {"ref":"FeedbackSourceType","required":true},
-            "detail": {"dataType":"string"},
-            "content": {"dataType":"string","required":true},
-            "channelId": {"dataType":"string","required":true},
-            "createdAt": {"dataType":"string","required":true},
-        },
-        "additionalProperties": false,
-    },
-    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
-    "FeedbackListResponseDto": {
-        "dataType": "refObject",
-        "properties": {
-            "feedbacks": {"dataType":"array","array":{"dataType":"refObject","ref":"ExternalFeedbackItemDto"},"required":true},
-        },
-        "additionalProperties": false,
-    },
-    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
-    "CreateFeedbackDto": {
-        "dataType": "refObject",
-        "properties": {
-            "id": {"dataType":"string","required":true},
-            "source": {"ref":"FeedbackSourceType","required":true},
-            "detail": {"dataType":"string"},
-            "content": {"dataType":"string","required":true},
-            "channelId": {"dataType":"string","required":true},
-            "createdAt": {"dataType":"string","required":true},
-        },
-        "additionalProperties": false,
-    },
-    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
-    "CandidateHistoryEntry": {
-        "dataType": "refObject",
-        "properties": {
-            "requestId": {"dataType":"string","required":true},
-            "isManualOverride": {"dataType":"boolean","required":true},
-            "previousRequestIds": {"dataType":"array","array":{"dataType":"string"},"required":true},
-            "relatedCandidateIds": {"dataType":"array","array":{"dataType":"string"},"required":true},
-            "createdAt": {"dataType":"string","required":true},
-        },
-        "additionalProperties": false,
-    },
-    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "AlternativeItemDto": {
         "dataType": "refObject",
         "properties": {
@@ -154,6 +90,91 @@ const models: TsoaRoute.Models = {
         "additionalProperties": false,
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "DecisionListResponseDto": {
+        "dataType": "refObject",
+        "properties": {
+            "decisions": {"dataType":"array","array":{"dataType":"refObject","ref":"DecisionItemDto"},"required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "ApiResponse_DecisionListResponseDto_": {
+        "dataType": "refObject",
+        "properties": {
+            "success": {"dataType":"boolean","required":true},
+            "code": {"dataType":"string","required":true},
+            "message": {"dataType":"string","required":true},
+            "data": {"ref":"DecisionListResponseDto","required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "HarvestingPolicyDto": {
+        "dataType": "refObject",
+        "properties": {
+            "initialScanLimit": {"dataType":"double","required":true},
+            "contextWindowBefore": {"dataType":"double","required":true},
+            "contextWindowAfter": {"dataType":"double","required":true},
+            "maxMergedWindow": {"dataType":"double","required":true},
+            "reactionThreshold": {"dataType":"double","required":true},
+            "debounceMs": {"dataType":"double","required":true},
+            "agreementThreshold": {"dataType":"double","required":true},
+            "lookbackDays": {"dataType":"double","required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "FeedbackSourceType": {
+        "dataType": "refAlias",
+        "type": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["교수"]},{"dataType":"enum","enums":["심사위원"]},{"dataType":"enum","enums":["팀원"]},{"dataType":"enum","enums":["인터뷰이"]}],"validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "ExternalFeedbackItemDto": {
+        "dataType": "refObject",
+        "properties": {
+            "id": {"dataType":"string","required":true},
+            "source": {"ref":"FeedbackSourceType","required":true},
+            "detail": {"dataType":"string"},
+            "content": {"dataType":"string","required":true},
+            "channelId": {"dataType":"string","required":true},
+            "createdAt": {"dataType":"string","required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "FeedbackListResponseDto": {
+        "dataType": "refObject",
+        "properties": {
+            "feedbacks": {"dataType":"array","array":{"dataType":"refObject","ref":"ExternalFeedbackItemDto"},"required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "CreateFeedbackDto": {
+        "dataType": "refObject",
+        "properties": {
+            "id": {"dataType":"string","required":true},
+            "source": {"ref":"FeedbackSourceType","required":true},
+            "detail": {"dataType":"string"},
+            "content": {"dataType":"string","required":true},
+            "channelId": {"dataType":"string","required":true},
+            "createdAt": {"dataType":"string","required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "CandidateHistoryEntry": {
+        "dataType": "refObject",
+        "properties": {
+            "requestId": {"dataType":"string","required":true},
+            "isManualOverride": {"dataType":"boolean","required":true},
+            "previousRequestIds": {"dataType":"array","array":{"dataType":"string"},"required":true},
+            "relatedCandidateIds": {"dataType":"array","array":{"dataType":"string"},"required":true},
+            "createdAt": {"dataType":"string","required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "AnalyzeDiscussionResponseDto": {
         "dataType": "refObject",
         "properties": {
@@ -196,14 +217,6 @@ const models: TsoaRoute.Models = {
             "score": {"dataType":"double"},
             "participantCount": {"dataType":"double"},
             "reactionsCount": {"dataType":"double"},
-        },
-        "additionalProperties": false,
-    },
-    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
-    "DecisionListResponseDto": {
-        "dataType": "refObject",
-        "properties": {
-            "decisions": {"dataType":"array","array":{"dataType":"refObject","ref":"DecisionItemDto"},"required":true},
         },
         "additionalProperties": false,
     },
@@ -293,6 +306,43 @@ export function RegisterRoutes(app: Router) {
 
 
     
+        const argsV1DecisionController_listV1Decisions: Record<string, TsoaRoute.ParameterSchema> = {
+                topic: {"in":"query","name":"topic","dataType":"string"},
+                state: {"in":"query","name":"state","dataType":"string"},
+                categoryTag: {"in":"query","name":"categoryTag","dataType":"string"},
+        };
+        app.get('/api/v1/decisions',
+            ...(fetchMiddlewares<RequestHandler>(V1DecisionController)),
+            ...(fetchMiddlewares<RequestHandler>(V1DecisionController.prototype.listV1Decisions)),
+
+            async function V1DecisionController_listV1Decisions(request: ExRequest, response: ExResponse, next: any) {
+
+            // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+
+            let validatedArgs: any[] = [];
+            try {
+                validatedArgs = templateService.getValidatedArgs({ args: argsV1DecisionController_listV1Decisions, request, response });
+
+                const container: IocContainer = typeof iocContainer === 'function' ? (iocContainer as IocContainerFactory)(request) : iocContainer;
+
+                const controller: any = await container.get<V1DecisionController>(V1DecisionController);
+                if (typeof controller['setStatus'] === 'function') {
+                controller.setStatus(undefined);
+                }
+
+              await templateService.apiHandler({
+                methodName: 'listV1Decisions',
+                controller,
+                response,
+                next,
+                validatedArgs,
+                successStatus: undefined,
+              });
+            } catch (err) {
+                return next(err);
+            }
+        });
+        // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
         const argsPolicyController_get: Record<string, TsoaRoute.ParameterSchema> = {
         };
         app.get('/api/config/policy',
