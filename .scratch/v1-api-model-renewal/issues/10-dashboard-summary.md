@@ -4,7 +4,7 @@
 
 **Blocked by:** 07: Review Queue 검수 흐름 전환, 09: 수동 Discord 동기화
 
-**Status:** ready-for-agent
+**Status:** claimed
 
 - [ ] 확정·보류·검수 대기 건수와 최근 결정, 마지막 성공 동기화 시각·진행 상태를 API와 화면에 연결한다.
 - [ ] 지표의 집계 범위와 최근 결정 정렬·개수, 동기화 시각의 기준을 명시하고 서버 범위 DB 집계를 사용한다.
