@@ -20,6 +20,10 @@ _Avoid_: Reason, Context, Background, Justification
 The formal invalidation and replacement of an older Decision Record by a newer Decision Record.
 _Avoid_: Overwrite, Deprecate, Expire, Cancel
 
+**Independent Retention**:
+Confirmation of a Decision Candidate as a separate Decision Record without invalidating an existing record considered during review.
+_Avoid_: Coexist Approval, Conflict Bypass
+
 **Pivot**:
 A strategic transformation in product direction, architecture, or core value proposition—a high-impact Supersede backed by External Feedback.
 _Avoid_: Direction Change, Shift, Course Correction

@@ -8,10 +8,13 @@
     "build": "tsoa spec-and-routes --config tsoa.json && tsc",
     "start": "node dist/index.js",
     "dev": "node --watch dist/index.js",
-    "test": "node --test dist/**/*.test.js"
+    "test": "node --test dist/**/*.test.js",
+    "db:generate": "prisma generate --schema prisma/schema.prisma",
+    "db:migrate": "prisma migrate deploy --schema prisma/schema.prisma",
+    "db:baseline": "prisma migrate resolve --applied 202610100001_legacy --schema prisma/schema.prisma",
+    "db:inspect": "python3 scripts/legacy-database.py inspect decisions.sqlite prisma/decisions.sqlite"
   },
   "dependencies": {
-    "@ai-sdk/google": "^0.0.15",
     "@ai-sdk/openai": "^0.0.15",
     "@ggaddak/shared": "*",
     "@prisma/client": "^5.22.0",

@@ -9,6 +9,11 @@ generator client {
 
 model Decision {
   id              String   @id
+  domainJson      String?
+  lifecycle       String @default("IN_REVIEW")
+  category        String @default("기타")
+  topic           String @default("")
+  version         Int      @default(1)
   guildId         String
   channelId       String
   messageId       String
@@ -34,11 +39,14 @@ model Decision {
 
   @@index([guildId, channelId])
   @@index([status])
+  @@index([guildId, lifecycle, category, createdAt])
   @@index([supersedesId])
 }
 
 model ExternalFeedback {
   id           String   @id
+  domainJson   String?
+  channelId    String?
   decisionId   String
   source       String   // "slack" | "jira" | "github" | "manual"
   author       String
@@ -59,4 +67,100 @@ model RejectedEvidenceHash {
   evidenceHash String   @id
   reason       String
   createdAt    DateTime @default(now())
+}
+
+model AnalysisRequest {
+  id String @id
+  fingerprint String
+  guildId String
+  channelId String
+  manual Boolean
+  state String
+  owner String?
+  leaseUntil DateTime?
+  resultJson String?
+  createdAt DateTime @default(now())
+  completedAt DateTime?
+}
+
+model CandidateIdentity {
+  key String @id
+  decisionId String
+  guildId String
+  channelId String
+  evidenceJson String
+  normalizedContent String
+  @@index([decisionId])
+  @@index([guildId, channelId])
+}
+
+model CandidateAnalysis {
+  requestId String
+  decisionId String
+  relatedJson String
+  previousRequestsJson String
+  @@id([requestId, decisionId])
+  @@index([decisionId])
+}
+
+model User {
+  id String @id
+  username String
+  avatar String?
+  memberships Membership[]
+  sessions AuthSession[]
+  createdAt DateTime @default(now())
+}
+
+model Guild {
+  channels MonitoredChannel[]
+  id String @id
+  name String
+  icon String?
+  memberships Membership[]
+}
+
+model Membership {
+  userId String
+  guildId String
+  owner Boolean @default(false)
+  permissions String @default("0")
+  refreshedAt DateTime
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  @@id([userId, guildId])
+}
+
+model AuthSession {
+  id String @id
+  userId String
+  refreshToken String
+  expiresAt DateTime
+  refreshedAt DateTime
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId])
+}
+
+model OAuthState {
+  nonce String @id
+  expiresAt DateTime
+}
+
+model DecisionEdit {
+ id String @id
+ decisionId String
+ actorId String
+ version Int
+ beforeJson String
+ createdAt DateTime @default(now())
+ @@unique([decisionId, version])
+}
+
+model MonitoredChannel {
+  id String @id
+  guildId String
+  name String
+  updatedAt DateTime @updatedAt
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  @@index([guildId])
 }
