@@ -82,6 +82,7 @@ export const DecisionSchema = z.object({
   source: DiscordSourceSchema,
   messageCreatedAt: z.string().optional(),
   createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime().optional(),
   governanceScore: z.number().optional(),
   governanceReason: z.string().optional(),
   governancePassed: z.boolean().optional(),

@@ -43,12 +43,27 @@ export class BackendApiService {
     ),
     private readonly transport: typeof fetch = fetch,
     private readonly now: () => number = Date.now,
+    private readonly serviceToken = process.env.BOT_SERVICE_TOKEN,
   ) {
     this.backendUrl = backendUrl.replace(/\/+$/, '');
   }
 
   get baseUrl(): string {
     return this.backendUrl;
+  }
+
+  /** Read persisted settings afresh. Missing credentials/access or BE outages disable harvesting. */
+  async isMonitoredChannel(guildId: string | null | undefined, channelId: string): Promise<boolean> {
+    if (!guildId || !this.serviceToken) return false;
+    try {
+      const response = await this.transport(`${this.backendUrl}/api/v1/internal/monitoring?guildId=${encodeURIComponent(guildId)}`, {
+        headers: { Authorization: `Bearer ${this.serviceToken}` },
+        signal: AbortSignal.timeout(15_000),
+      });
+      if (!response.ok) return false;
+      const result = await response.json() as { data?: { channelIds?: unknown } };
+      return Array.isArray(result.data?.channelIds) && result.data.channelIds.includes(channelId);
+    } catch { return false; }
   }
 
   async syncPolicy(): Promise<HarvestingPolicyConfig> {

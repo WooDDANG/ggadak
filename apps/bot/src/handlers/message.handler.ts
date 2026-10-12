@@ -15,10 +15,12 @@ export class MessageHandler {
   constructor(
     private engine: IDecisionHarvestingEngine,
     private onAddReaction: (message: Message, emoji: string) => Promise<void>,
+    private isMonitored: (guildId: string | null, channelId: string) => Promise<boolean> = async () => true,
   ) {}
 
   async handleMessage(message: Message, policy: HarvestingPolicyConfig): Promise<void> {
     if (message.author.bot) return;
+    if (!await this.isMonitored(message.guildId, message.channelId)) return;
 
     const isKeywordMatch = CONSENSUS_REGEX.test(message.content);
     const semanticMatch = evaluateSemanticDecision(message.content);

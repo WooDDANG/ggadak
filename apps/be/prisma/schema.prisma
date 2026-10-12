@@ -113,6 +113,7 @@ model User {
 }
 
 model Guild {
+  channels MonitoredChannel[]
   id String @id
   name String
   icon String?
@@ -153,4 +154,13 @@ model DecisionEdit {
  beforeJson String
  createdAt DateTime @default(now())
  @@unique([decisionId, version])
+}
+
+model MonitoredChannel {
+  id String @id
+  guildId String
+  name String
+  updatedAt DateTime @updatedAt
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  @@index([guildId])
 }

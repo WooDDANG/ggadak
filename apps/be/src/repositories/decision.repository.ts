@@ -118,6 +118,7 @@ export class DecisionRepository {
         ...(row.sourceJumpUrl ? { messageUrl: row.sourceJumpUrl } : {}),
       },
       createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
       governanceScore: row.governanceScore,
       governanceReason: row.governanceReason,
       governancePassed: row.governancePassed,
