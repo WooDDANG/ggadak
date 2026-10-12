@@ -109,6 +109,7 @@ model User {
 }
 
 model Guild {
+  channels MonitoredChannel[]
   id String @id
   name String
   icon String?
@@ -139,4 +140,13 @@ model AuthSession {
 model OAuthState {
   nonce String @id
   expiresAt DateTime
+}
+
+model MonitoredChannel {
+  id String @id
+  guildId String
+  name String
+  updatedAt DateTime @updatedAt
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  @@index([guildId])
 }

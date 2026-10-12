@@ -6,7 +6,7 @@ import { DiscordAuthAdapter, HttpDiscordAuthAdapter } from '../adapters/discord-
 export interface AuthUser { id: string; name: string; email: string | null; avatarUrl: string | null; discordUserId: string; }
 export interface AuthPrincipal { userId: string; sessionId: string; }
 export interface AuthConfig { clientId: string; clientSecret: string; redirectUri: string; secret: string; secureCookie: boolean; }
-export interface AuthOptions { config?: AuthConfig; discordAdapter?: DiscordAuthAdapter; now?: () => number; }
+export interface AuthOptions { channelAdapter?: import("../adapters/discord-channels.adapter.js").DiscordChannelsAdapter; serviceToken?: string; config?: AuthConfig; discordAdapter?: DiscordAuthAdapter; now?: () => number; }
 export class AuthError extends AppError { constructor(message = 'Authentication required', status = 401) { super(message, status); } }
 const TTL = 15 * 60 * 1000;
 @Service()

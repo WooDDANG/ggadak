@@ -1,3 +1,5 @@
+import { ChannelsService } from '../services/channels.service.js';
+import { ChannelsController, InternalMonitoringController } from '../api/controllers/channels.controller.js';
 import { AuthController } from '../api/controllers/auth.controller.js';
 import { V1DecisionController } from '../api/controllers/v1-decision.controller.js';
 import { randomUUID } from 'node:crypto';
@@ -64,6 +66,12 @@ export async function initLoaders({
   const authService = new AuthService(prisma, authOptions);
   container.set(AuthService, authService);
   expressApp.locals.authService = authService;
+
+  const channelsService = new ChannelsService(prisma, authOptions?.channelAdapter);
+  container.set(ChannelsService, channelsService);
+  container.set(ChannelsController, new ChannelsController(channelsService, authService));
+  container.set(InternalMonitoringController, new InternalMonitoringController(channelsService));
+  expressApp.locals.serviceToken = authOptions?.serviceToken ?? process.env.BOT_SERVICE_TOKEN;
 
   // 4. Service Layer Binding
   const core = new DecisionExtractorCore();
