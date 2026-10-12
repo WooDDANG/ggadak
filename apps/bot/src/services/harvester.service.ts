@@ -28,6 +28,8 @@ export interface ScanOptions {
   hours?: number;
   limit?: number;
   initialOnly?: boolean;
+  forceFullSync?: boolean;
+  requestId?: string;
 }
 
 export class DiscussionHarvester {
@@ -402,6 +404,7 @@ export class DiscussionHarvester {
 
     try {
       const result = await this.backendApi.analyzeDiscussion({
+        requestId: options.requestId,
         rawMessages: fetchedMessages.map(m => {
           const rx = this.extractReactions(m);
           return {
@@ -420,7 +423,7 @@ export class DiscussionHarvester {
         channelName,
         triggerMessageId: newestMessage.id,
         messageUrl: newestMessage.url,
-        isManualOverride: true,
+        isManualOverride: options.forceFullSync === true,
         score: scoreResult.score,
         participantCount: participants.length,
         reactionsCount: totalReactions,

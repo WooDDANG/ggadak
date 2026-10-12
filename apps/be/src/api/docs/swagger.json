@@ -1232,6 +1232,152 @@
 				"type": "object",
 				"additionalProperties": false
 			},
+			"SyncJobView": {
+				"properties": {
+					"completedAt": {
+						"type": "string",
+						"nullable": true
+					},
+					"startedAt": {
+						"type": "string",
+						"nullable": true
+					},
+					"createdAt": {
+						"type": "string"
+					},
+					"errorMessage": {
+						"type": "string",
+						"nullable": true
+					},
+					"messagesScanned": {
+						"type": "number",
+						"format": "double"
+					},
+					"decisionsFound": {
+						"type": "number",
+						"format": "double"
+					},
+					"failedChannels": {
+						"type": "number",
+						"format": "double"
+					},
+					"completedChannels": {
+						"type": "number",
+						"format": "double"
+					},
+					"totalChannels": {
+						"type": "number",
+						"format": "double"
+					},
+					"status": {
+						"type": "string"
+					},
+					"forceFullSync": {
+						"type": "boolean"
+					},
+					"guildId": {
+						"type": "string"
+					},
+					"jobId": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"completedAt",
+					"startedAt",
+					"createdAt",
+					"errorMessage",
+					"messagesScanned",
+					"decisionsFound",
+					"failedChannels",
+					"completedChannels",
+					"totalChannels",
+					"status",
+					"forceFullSync",
+					"guildId",
+					"jobId"
+				],
+				"type": "object"
+			},
+			"ApiResponse_SyncJobView_": {
+				"description": "Shared v1 response contract. Domain payloads remain typed by each endpoint.",
+				"properties": {
+					"success": {
+						"type": "boolean"
+					},
+					"code": {
+						"type": "string"
+					},
+					"message": {
+						"type": "string"
+					},
+					"data": {
+						"$ref": "#/components/schemas/SyncJobView"
+					}
+				},
+				"required": [
+					"success",
+					"code",
+					"message",
+					"data"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"ApiResponse_any-or-null_": {
+				"description": "Shared v1 response contract. Domain payloads remain typed by each endpoint.",
+				"properties": {
+					"success": {
+						"type": "boolean"
+					},
+					"code": {
+						"type": "string"
+					},
+					"message": {
+						"type": "string"
+					},
+					"data": {
+						"nullable": true
+					}
+				},
+				"required": [
+					"success",
+					"code",
+					"message",
+					"data"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"ApiResponse_null_": {
+				"description": "Shared v1 response contract. Domain payloads remain typed by each endpoint.",
+				"properties": {
+					"success": {
+						"type": "boolean"
+					},
+					"code": {
+						"type": "string"
+					},
+					"message": {
+						"type": "string"
+					},
+					"data": {
+						"type": "number",
+						"enum": [
+							null
+						],
+						"nullable": true
+					}
+				},
+				"required": [
+					"success",
+					"code",
+					"message",
+					"data"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
 			"SearchResult": {
 				"properties": {
 					"decision": {
@@ -2306,35 +2452,6 @@
 				],
 				"type": "object",
 				"additionalProperties": false
-			},
-			"ApiResponse_null_": {
-				"description": "Shared v1 response contract. Domain payloads remain typed by each endpoint.",
-				"properties": {
-					"success": {
-						"type": "boolean"
-					},
-					"code": {
-						"type": "string"
-					},
-					"message": {
-						"type": "string"
-					},
-					"data": {
-						"type": "number",
-						"enum": [
-							null
-						],
-						"nullable": true
-					}
-				},
-				"required": [
-					"success",
-					"code",
-					"message",
-					"data"
-				],
-				"type": "object",
-				"additionalProperties": false
 			}
 		},
 		"securitySchemes": {
@@ -2728,6 +2845,200 @@
 						}
 					}
 				]
+			}
+		},
+		"/api/v1/sync-jobs": {
+			"post": {
+				"operationId": "Create",
+				"responses": {
+					"202": {
+						"description": "Sync Job accepted",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiResponse_SyncJobView_"
+								}
+							}
+						}
+					}
+				},
+				"tags": [
+					"v1 Sync Jobs"
+				],
+				"security": [
+					{
+						"jwt": []
+					}
+				],
+				"parameters": [
+					{
+						"in": "query",
+						"name": "guildId",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"properties": {
+									"forceFullSync": {
+										"type": "boolean"
+									}
+								},
+								"type": "object"
+							}
+						}
+					}
+				}
+			}
+		},
+		"/api/v1/sync-jobs/{jobId}": {
+			"get": {
+				"operationId": "Get",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiResponse_SyncJobView_"
+								}
+							}
+						}
+					}
+				},
+				"tags": [
+					"v1 Sync Jobs"
+				],
+				"security": [
+					{
+						"jwt": []
+					}
+				],
+				"parameters": [
+					{
+						"in": "path",
+						"name": "jobId",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"in": "query",
+						"name": "guildId",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				]
+			}
+		},
+		"/api/v1/internal/sync-jobs/claim": {
+			"post": {
+				"operationId": "Claim",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiResponse_any-or-null_"
+								}
+							}
+						}
+					}
+				},
+				"tags": [
+					"Internal Sync Jobs"
+				],
+				"security": [
+					{
+						"service": []
+					}
+				],
+				"parameters": []
+			}
+		},
+		"/api/v1/internal/sync-jobs/{jobId}": {
+			"put": {
+				"operationId": "Update",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiResponse_null_"
+								}
+							}
+						}
+					}
+				},
+				"tags": [
+					"Internal Sync Jobs"
+				],
+				"security": [
+					{
+						"service": []
+					}
+				],
+				"parameters": [
+					{
+						"in": "path",
+						"name": "jobId",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"properties": {
+									"status": {
+										"type": "string",
+										"enum": [
+											"PROCESSING",
+											"COMPLETED",
+											"FAILED"
+										]
+									},
+									"errorMessage": {
+										"type": "string",
+										"nullable": true
+									},
+									"messagesScanned": {
+										"type": "number",
+										"format": "double"
+									},
+									"decisionsFound": {
+										"type": "number",
+										"format": "double"
+									},
+									"failedChannels": {
+										"type": "number",
+										"format": "double"
+									},
+									"completedChannels": {
+										"type": "number",
+										"format": "double"
+									}
+								},
+								"type": "object"
+							}
+						}
+					}
+				}
 			}
 		},
 		"/api/v1/search": {
