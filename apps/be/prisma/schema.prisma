@@ -35,12 +35,14 @@ model Decision {
   governanceReason String
   governancePassed Boolean
   createdAt       DateTime @default(now())
+  confirmedAt     DateTime?
   updatedAt       DateTime @updatedAt
   archivedAt      DateTime?
 
   @@index([guildId, channelId])
   @@index([status])
   @@index([guildId, lifecycle, category, createdAt])
+  @@index([guildId, lifecycle, confirmedAt])
   @@index([supersedesId])
 }
 
