@@ -14,3 +14,5 @@
 ## Implementation
 
 AuthUserDto/AuthPrincipal and AuthError now have dedicated modules. Auth configuration is parsed in config/index.ts and validated when login is used, preserving service-only startup. Build and HTTP auth regression tests pass.
+
+Startup-order regression covered: default auth snapshots env settings at Service construction, after entrypoint .env discovery.

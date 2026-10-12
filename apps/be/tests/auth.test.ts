@@ -1,4 +1,5 @@
-import { test, expect } from 'vitest';
+import { test, expect, vi } from 'vitest';
+import { AuthService } from '../src/services/auth.service.js';
 import { fakeAuthOptions, FakeDiscordAuth, loginAsTestUser } from '../src/test-support/auth.js';
 import { createServer } from '../src/server.js';
 import { isolatedRepository } from '../src/repositories/test-database.js';
@@ -111,6 +112,24 @@ test('Session refresh replaces revoked memberships; expired JWT and logout deny 
     expect((await fetch(`${base}/api/v1/auth/me`, { headers })).status).toBe(401);
   } finally {
     await new Promise<void>(r => server.close(() => r()));
+    await db.cleanup();
+  }
+});
+
+test('default auth reads environment loaded by the entrypoint after module imports', async () => {
+  const db = await isolatedRepository();
+  try {
+    vi.stubEnv('DISCORD_CLIENT_ID', 'entrypoint-client');
+    vi.stubEnv('DISCORD_CLIENT_SECRET', 'entrypoint-secret');
+    vi.stubEnv('DISCORD_REDIRECT_URI', 'http://localhost:5173/callback');
+    vi.stubEnv('AUTH_SECRET', '0123456789abcdef0123456789abcdef');
+    const result = await new AuthService(db.client).authorize();
+    expect(new URL(result.url).searchParams.get('client_id')).toBe('entrypoint-client');
+    expect(new URL(result.url).searchParams.get('redirect_uri')).toBe(
+      'http://localhost:5173/callback',
+    );
+  } finally {
+    vi.unstubAllEnvs();
     await db.cleanup();
   }
 });

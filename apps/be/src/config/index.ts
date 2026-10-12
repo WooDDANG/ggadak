@@ -60,7 +60,11 @@ export interface AppConfig {
 }
 
 export const config: AppConfig = {
-  auth: parseAuthConfig(process.env),
+  // index.ts discovers workspace/root .env files after ESM dependencies initialize.
+  // Snapshot auth when the service is constructed, after that discovery completes.
+  get auth() {
+    return parseAuthConfig(process.env);
+  },
   port: parseInt(process.env.PORT || '3001', 10),
   nodeEnv: process.env.NODE_ENV || 'development',
   cors: {
