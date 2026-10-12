@@ -7,21 +7,15 @@
 		"requestBodies": {},
 		"responses": {},
 		"schemas": {
-			"AlternativeItemDto": {
-				"properties": {
-					"option": {
-						"type": "string"
-					},
-					"reason": {
-						"type": "string"
-					}
-				},
-				"required": [
-					"option",
-					"reason"
-				],
-				"type": "object",
-				"additionalProperties": false
+			"DecisionStatus": {
+				"type": "string",
+				"enum": [
+					"IN_REVIEW",
+					"CONFIRMED",
+					"ON_HOLD",
+					"DISCARDED",
+					"SUPERSEDED"
+				]
 			},
 			"ActionItemDto": {
 				"properties": {
@@ -68,6 +62,363 @@
 				"additionalProperties": {},
 				"type": "object",
 				"description": "Construct a type with a set of properties K of type T"
+			},
+			"Pick_DecisionItemDto.Exclude_keyofDecisionItemDto.alternatives__": {
+				"properties": {
+					"id": {
+						"type": "string"
+					},
+					"version": {
+						"type": "number",
+						"format": "double"
+					},
+					"supersededById": {
+						"type": "string"
+					},
+					"topic": {
+						"type": "string"
+					},
+					"decision": {
+						"type": "string"
+					},
+					"title": {
+						"type": "string"
+					},
+					"decisionContent": {
+						"type": "string"
+					},
+					"rationale": {
+						"type": "string"
+					},
+					"rationaleSummary": {
+						"type": "string"
+					},
+					"rationaleQuotes": {
+						"items": {
+							"type": "string"
+						},
+						"type": "array"
+					},
+					"categoryTag": {
+						"type": "string",
+						"enum": [
+							"타깃",
+							"문제정의",
+							"기능",
+							"기술",
+							"BM",
+							"기타"
+						]
+					},
+					"actionItems": {
+						"items": {
+							"$ref": "#/components/schemas/ActionItemDto"
+						},
+						"type": "array"
+					},
+					"state": {
+						"type": "string",
+						"enum": [
+							"Draft",
+							"Proposed",
+							"Discussing",
+							"Decided",
+							"Superseded",
+							"Deferred",
+							"Rejected"
+						]
+					},
+					"supersedesId": {
+						"type": "string"
+					},
+					"isPivot": {
+						"type": "boolean"
+					},
+					"approvedBy": {
+						"type": "string"
+					},
+					"decisionConfirmedDate": {
+						"type": "string"
+					},
+					"feedbackSourceType": {
+						"type": "string"
+					},
+					"feedbackSourceDetail": {
+						"type": "string"
+					},
+					"feedbackReceivedDate": {
+						"type": "string"
+					},
+					"rawEvidence": {
+						"items": {
+							"type": "string"
+						},
+						"type": "array"
+					},
+					"evidenceHash": {
+						"type": "string"
+					},
+					"rawTranscript": {
+						"type": "string"
+					},
+					"source": {
+						"$ref": "#/components/schemas/Record_string.any_"
+					},
+					"messageCreatedAt": {
+						"type": "string"
+					},
+					"createdAt": {
+						"type": "string"
+					},
+					"governanceScore": {
+						"type": "number",
+						"format": "double"
+					},
+					"governanceReason": {
+						"type": "string"
+					},
+					"governancePassed": {
+						"type": "boolean"
+					}
+				},
+				"required": [
+					"id",
+					"topic",
+					"decision",
+					"rationale",
+					"state",
+					"createdAt"
+				],
+				"type": "object",
+				"description": "From T, pick a set of properties whose keys are in the union K"
+			},
+			"V1DecisionDto": {
+				"properties": {
+					"id": {
+						"type": "string"
+					},
+					"version": {
+						"type": "number",
+						"format": "double"
+					},
+					"supersededById": {
+						"type": "string"
+					},
+					"topic": {
+						"type": "string"
+					},
+					"decision": {
+						"type": "string"
+					},
+					"title": {
+						"type": "string"
+					},
+					"decisionContent": {
+						"type": "string"
+					},
+					"rationale": {
+						"type": "string"
+					},
+					"rationaleSummary": {
+						"type": "string"
+					},
+					"rationaleQuotes": {
+						"items": {
+							"type": "string"
+						},
+						"type": "array"
+					},
+					"categoryTag": {
+						"type": "string",
+						"enum": [
+							"타깃",
+							"문제정의",
+							"기능",
+							"기술",
+							"BM",
+							"기타"
+						]
+					},
+					"actionItems": {
+						"items": {
+							"$ref": "#/components/schemas/ActionItemDto"
+						},
+						"type": "array"
+					},
+					"state": {
+						"type": "string",
+						"enum": [
+							"Draft",
+							"Proposed",
+							"Discussing",
+							"Decided",
+							"Superseded",
+							"Deferred",
+							"Rejected"
+						]
+					},
+					"supersedesId": {
+						"type": "string"
+					},
+					"isPivot": {
+						"type": "boolean"
+					},
+					"approvedBy": {
+						"type": "string"
+					},
+					"decisionConfirmedDate": {
+						"type": "string"
+					},
+					"feedbackSourceType": {
+						"type": "string"
+					},
+					"feedbackSourceDetail": {
+						"type": "string"
+					},
+					"feedbackReceivedDate": {
+						"type": "string"
+					},
+					"rawEvidence": {
+						"items": {
+							"type": "string"
+						},
+						"type": "array"
+					},
+					"evidenceHash": {
+						"type": "string"
+					},
+					"rawTranscript": {
+						"type": "string"
+					},
+					"source": {
+						"$ref": "#/components/schemas/Record_string.any_"
+					},
+					"messageCreatedAt": {
+						"type": "string"
+					},
+					"createdAt": {
+						"type": "string"
+					},
+					"governanceScore": {
+						"type": "number",
+						"format": "double"
+					},
+					"governanceReason": {
+						"type": "string"
+					},
+					"governancePassed": {
+						"type": "boolean"
+					},
+					"status": {
+						"$ref": "#/components/schemas/DecisionStatus"
+					},
+					"category": {
+						"type": "string"
+					},
+					"confirmedDate": {
+						"type": "string",
+						"nullable": true
+					},
+					"dates": {
+						"properties": {
+							"feedbackDate": {
+								"type": "string",
+								"nullable": true
+							},
+							"confirmedDate": {
+								"type": "string",
+								"nullable": true
+							},
+							"createdDate": {
+								"type": "string"
+							}
+						},
+						"required": [
+							"feedbackDate",
+							"confirmedDate",
+							"createdDate"
+						],
+						"type": "object"
+					},
+					"alternatives": {
+						"items": {
+							"properties": {
+								"reason": {
+									"type": "string"
+								},
+								"name": {
+									"type": "string"
+								},
+								"id": {
+									"type": "string"
+								}
+							},
+							"required": [
+								"reason",
+								"name",
+								"id"
+							],
+							"type": "object"
+						},
+						"type": "array"
+					}
+				},
+				"required": [
+					"id",
+					"topic",
+					"decision",
+					"rationale",
+					"state",
+					"createdAt",
+					"status",
+					"category",
+					"confirmedDate",
+					"dates",
+					"alternatives"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"ApiResponse_V1DecisionDto_": {
+				"description": "Shared v1 response contract. Domain payloads remain typed by each endpoint.",
+				"properties": {
+					"success": {
+						"type": "boolean"
+					},
+					"code": {
+						"type": "string"
+					},
+					"message": {
+						"type": "string"
+					},
+					"data": {
+						"$ref": "#/components/schemas/V1DecisionDto"
+					}
+				},
+				"required": [
+					"success",
+					"code",
+					"message",
+					"data"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"AlternativeItemDto": {
+				"properties": {
+					"option": {
+						"type": "string"
+					},
+					"reason": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"option",
+					"reason"
+				],
+				"type": "object",
+				"additionalProperties": false
 			},
 			"DecisionItemDto": {
 				"properties": {
@@ -215,47 +566,58 @@
 				"type": "object",
 				"additionalProperties": false
 			},
-			"ApiResponse_DecisionItemDto_": {
-				"description": "Shared v1 response contract. Domain payloads remain typed by each endpoint.",
+			"V1DecisionListDto": {
 				"properties": {
-					"success": {
-						"type": "boolean"
+					"items": {
+						"items": {
+							"$ref": "#/components/schemas/V1DecisionDto"
+						},
+						"type": "array"
 					},
-					"code": {
-						"type": "string"
-					},
-					"message": {
-						"type": "string"
-					},
-					"data": {
-						"$ref": "#/components/schemas/DecisionItemDto"
-					}
-				},
-				"required": [
-					"success",
-					"code",
-					"message",
-					"data"
-				],
-				"type": "object",
-				"additionalProperties": false
-			},
-			"DecisionListResponseDto": {
-				"properties": {
 					"decisions": {
 						"items": {
 							"$ref": "#/components/schemas/DecisionItemDto"
 						},
-						"type": "array"
+						"type": "array",
+						"description": "Compatibility projection for callers awaiting their feature migration."
+					},
+					"pageInfo": {
+						"properties": {
+							"totalPages": {
+								"type": "number",
+								"format": "double"
+							},
+							"totalElements": {
+								"type": "number",
+								"format": "double"
+							},
+							"pageSize": {
+								"type": "number",
+								"format": "double"
+							},
+							"currentPage": {
+								"type": "number",
+								"format": "double"
+							}
+						},
+						"required": [
+							"totalPages",
+							"totalElements",
+							"pageSize",
+							"currentPage"
+						],
+						"type": "object"
 					}
 				},
 				"required": [
-					"decisions"
+					"items",
+					"decisions",
+					"pageInfo"
 				],
 				"type": "object",
 				"additionalProperties": false
 			},
-			"ApiResponse_DecisionListResponseDto_": {
+			"ApiResponse_V1DecisionListDto_": {
 				"description": "Shared v1 response contract. Domain payloads remain typed by each endpoint.",
 				"properties": {
 					"success": {
@@ -268,7 +630,7 @@
 						"type": "string"
 					},
 					"data": {
-						"$ref": "#/components/schemas/DecisionListResponseDto"
+						"$ref": "#/components/schemas/V1DecisionListDto"
 					}
 				},
 				"required": [
@@ -576,6 +938,21 @@
 				"required": [
 					"requestId",
 					"rawMessages"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"DecisionListResponseDto": {
+				"properties": {
+					"decisions": {
+						"items": {
+							"$ref": "#/components/schemas/DecisionItemDto"
+						},
+						"type": "array"
+					}
+				},
+				"required": [
+					"decisions"
 				],
 				"type": "object",
 				"additionalProperties": false
@@ -1205,7 +1582,7 @@
 						"content": {
 							"application/json": {
 								"schema": {
-									"$ref": "#/components/schemas/ApiResponse_DecisionItemDto_"
+									"$ref": "#/components/schemas/ApiResponse_V1DecisionDto_"
 								}
 							}
 						}
@@ -1248,7 +1625,7 @@
 						"content": {
 							"application/json": {
 								"schema": {
-									"$ref": "#/components/schemas/ApiResponse_DecisionListResponseDto_"
+									"$ref": "#/components/schemas/ApiResponse_V1DecisionListDto_"
 								}
 							}
 						}
@@ -1293,6 +1670,42 @@
 						"required": false,
 						"schema": {
 							"type": "string"
+						}
+					},
+					{
+						"in": "query",
+						"name": "status",
+						"required": false,
+						"schema": {
+							"$ref": "#/components/schemas/DecisionStatus"
+						}
+					},
+					{
+						"in": "query",
+						"name": "category",
+						"required": false,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"in": "query",
+						"name": "page",
+						"required": false,
+						"schema": {
+							"default": 1,
+							"format": "double",
+							"type": "number"
+						}
+					},
+					{
+						"in": "query",
+						"name": "size",
+						"required": false,
+						"schema": {
+							"default": 20,
+							"format": "double",
+							"type": "number"
 						}
 					}
 				]

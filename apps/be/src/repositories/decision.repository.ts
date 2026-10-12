@@ -119,6 +119,9 @@ export class DecisionRepository {
   }
   decisionData(decision: Decision) {
     return {
+      lifecycle: decision.state === "Decided" ? "CONFIRMED" : decision.state === "Superseded" ? "SUPERSEDED" : decision.state === "Deferred" ? "ON_HOLD" : decision.state === "Rejected" ? "DISCARDED" : "IN_REVIEW",
+      category: decision.categoryTag,
+      topic: decision.topic,
       guildId: decision.source.guildId,
       channelId: decision.source.channelId,
       messageId: decision.source.triggerMessageId,
@@ -190,6 +193,17 @@ export class DecisionRepository {
           (!filter.state || d.state === filter.state) &&
           (!filter.categoryTag || d.categoryTag === filter.categoryTag),
       );
+  }
+  async browseDecisions(filter: {guildId: string; status?: string; category?: string; topic?: string; page: number; size: number}) {
+    const where: Prisma.DecisionWhereInput = { guildId: filter.guildId,
+      ...(filter.status ? {lifecycle: filter.status} : {}),
+      ...(filter.category ? {category: filter.category} : {}),
+      ...(filter.topic ? {OR: [{topic: {contains: filter.topic}}, {title: {contains: filter.topic}}]} : {}) };
+    const [rows, totalElements] = await this.prisma.$transaction([
+      this.prisma.decision.findMany({where, orderBy: [{createdAt: 'desc'}, {id: 'asc'}], skip: (filter.page - 1) * filter.size, take: filter.size}),
+      this.prisma.decision.count({where}),
+    ]);
+    return {decisions: rows.map(row => this.decodeDecision(row)), pageInfo: {currentPage: filter.page, pageSize: filter.size, totalElements, totalPages: Math.ceil(totalElements / filter.size)}};
   }
   async reviewDecision(
     id: string,

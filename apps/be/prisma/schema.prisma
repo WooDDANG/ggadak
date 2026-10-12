@@ -10,6 +10,9 @@ generator client {
 model Decision {
   id              String   @id
   domainJson      String?
+  lifecycle       String @default("IN_REVIEW")
+  category        String @default("기타")
+  topic           String @default("")
   version         Int      @default(1)
   guildId         String
   channelId       String
@@ -36,6 +39,7 @@ model Decision {
 
   @@index([guildId, channelId])
   @@index([status])
+  @@index([guildId, lifecycle, category, createdAt])
   @@index([supersedesId])
 }
 
