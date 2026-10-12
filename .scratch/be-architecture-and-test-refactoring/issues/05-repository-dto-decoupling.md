@@ -4,9 +4,13 @@
 
 **Blocked by:** 04: Base Repository 구축 및 Prisma 공통 인프라 모듈화
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] `DecisionRepository`가 `BaseRepository`를 상속하도록 구조를 변경한다.
-- [ ] `DecisionRepository.editDecision`에서 `DecisionEditDto` 및 `DecisionEditSchema.safeParse` 의존성을 제거한다.
-- [ ] 저장소 메서드는 순수 업데이트 속성(Entity 파라미터)을 받아 DB 트랜잭션과 영속화만 전담하도록 시그니처를 수정한다.
-- [ ] 기존 저장소 기능 테스트(`decision.repository.test.ts`)가 변경된 시그니처에 맞춰 성공하도록 갱신한다.
+- [x] `DecisionRepository`가 `BaseRepository`를 상속하도록 구조를 변경한다.
+- [x] `DecisionRepository.editDecision`에서 `DecisionEditDto` 및 `DecisionEditSchema.safeParse` 의존성을 제거한다.
+- [x] 저장소 메서드는 순수 업데이트 속성(Entity 파라미터)을 받아 DB 트랜잭션과 영속화만 전담하도록 시그니처를 수정한다.
+- [x] 기존 저장소 기능 테스트(`decision.repository.test.ts`)가 변경된 시그니처에 맞춰 성공하도록 갱신한다.
+
+## Implementation
+
+DecisionRepository extends BaseRepository. editDecision accepts a prepared Decision entity, expectedVersion and actorId; it has no API DTO dependency. Conditional persistence and audit history remain transactional.

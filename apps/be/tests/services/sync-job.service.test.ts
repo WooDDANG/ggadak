@@ -1,8 +1,7 @@
 import 'reflect-metadata';
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
-import { isolatedRepository } from '../repositories/test-database.js';
-import { SyncJobService } from './sync-job.service.js';
+import { test, expect } from 'vitest';
+import { isolatedRepository } from '../../src/repositories/test-database.js';
+import { SyncJobService } from '../../src/services/sync-job.service.js';
 
 test('manual sync is durable, rejects a duplicate active guild job, and releases its lock at completion', async () => {
   const db = await isolatedRepository();
@@ -16,23 +15,23 @@ test('manual sync is durable, rejects a duplicate active guild job, and releases
     });
     const jobs = new SyncJobService(db.repo);
     const accepted = await jobs.create('guild-sync', false);
-    assert.equal(accepted.status, 'QUEUED');
-    assert.equal(accepted.totalChannels, 2);
-    await assert.rejects(jobs.create('guild-sync', true), (error: any) => error.statusCode === 409);
+    expect(accepted.status).toBe('QUEUED');
+    expect(accepted.totalChannels).toBe(2);
+    await expect(jobs.create('guild-sync', true)).rejects.toMatchObject({ statusCode: 409 });
 
     const claim = await jobs.claim();
-    assert.equal(claim.jobId, accepted.jobId);
-    assert.deepEqual(claim.channelIds, ['channel-a', 'channel-b']);
+    expect(claim.jobId).toBe(accepted.jobId);
+    expect(claim.channelIds).toEqual(['channel-a', 'channel-b']);
     await jobs.update(accepted.jobId, {
       completedChannels: 2,
       decisionsFound: 1,
       messagesScanned: 18,
       status: 'COMPLETED',
     });
-    assert.equal((await jobs.get(accepted.jobId, 'guild-sync')).status, 'COMPLETED');
+    expect((await jobs.get(accepted.jobId, 'guild-sync')).status).toBe('COMPLETED');
 
     const next = await jobs.create('guild-sync', true);
-    assert.equal(next.forceFullSync, true);
+    expect(next.forceFullSync).toBe(true);
   } finally {
     await db.cleanup();
   }
@@ -52,7 +51,7 @@ test('a processing job with an expired lease can be reclaimed after Bot restart'
       where: { id: created.jobId },
       data: { leaseUntil: new Date(Date.now() - 1) },
     });
-    assert.equal((await jobs.claim()).jobId, created.jobId);
+    expect((await jobs.claim()).jobId).toBe(created.jobId);
   } finally {
     await db.cleanup();
   }

@@ -1,3 +1,4 @@
+import { requirePrincipal } from '../guards/authorization.js';
 import type { Request as ExpressRequest } from 'express';
 import { Controller, Route, Tags, Security, Get, Query, Request } from 'tsoa';
 import { DashboardService } from '../../services/dashboard.service.js';
@@ -19,7 +20,7 @@ export class DashboardController extends Controller {
     @Query() guildId: string,
     @Request() request: ExpressRequest,
   ): Promise<ApiResponse<DashboardDto>> {
-    await this.auth.requireGuild(request.user!, guildId);
+    await this.auth.requireGuild(requirePrincipal(request), guildId);
     return apiSuccess(await this.dashboard.summary(guildId));
   }
 }

@@ -43,3 +43,12 @@ export function toV1Decision(decision: Decision): V1DecisionDto {
     })),
   };
 }
+
+export interface QueryDecisionsFilter {
+  guildId: string;
+  status?: string;
+  category?: string;
+  topic?: string;
+  page: number;
+  size: number;
+}

@@ -1,8 +1,7 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
-import { createServer } from './server.js';
-import { isolatedRepository } from './repositories/test-database.js';
-import { fakeAuthOptions, loginAsTestUser } from './test-support/auth.js';
+import { test, expect } from 'vitest';
+import { createServer } from '../src/server.js';
+import { isolatedRepository } from '../src/repositories/test-database.js';
+import { fakeAuthOptions, loginAsTestUser } from '../src/test-support/auth.js';
 import { DecisionSchema } from '@ggaddak/shared';
 
 test('authenticated reviewers process the same string-ID candidate with version checks and trusted identity', async () => {
@@ -30,43 +29,40 @@ test('authenticated reviewers process the same string-ID candidate with version 
     const { token } = await loginAsTestUser(base);
     const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
     const queue = `${base}/api/v1/review-queue?guildId=guild-1`;
-    assert.equal((await fetch(queue)).status, 401);
+    expect((await fetch(queue)).status).toBe(401);
     const first = await fetch(queue, { headers });
-    assert.equal(first.status, 200);
+    expect(first.status).toBe(200);
     const item = ((await first.json()) as any).data.items[0];
-    assert.equal(item.ticketId, 'candidate');
-    assert.equal(item.id, 'candidate');
+    expect(item.ticketId).toBe('candidate');
+    expect(item.id).toBe('candidate');
     const review = (id: string, body: object, guildId = 'guild-1') =>
       fetch(`${base}/api/v1/review-queue/${id}/review?guildId=${guildId}`, {
         method: 'POST',
         headers,
         body: JSON.stringify(body),
       });
-    assert.equal((await review('other', { action: 'confirm', expectedVersion: 1 })).status, 403);
-    assert.equal(
-      (await review('candidate', { action: 'confirm', expectedVersion: 8 })).status,
-      409,
-    );
+    expect((await review('other', { action: 'confirm', expectedVersion: 1 })).status).toBe(403);
+    expect((await review('candidate', { action: 'confirm', expectedVersion: 8 })).status).toBe(409);
     const confirmed = await review('candidate', {
       action: 'confirm',
       expectedVersion: 1,
       approvedBy: 'spoofed',
     });
-    assert.equal(confirmed.status, 200);
+    expect(confirmed.status).toBe(200);
     const result = ((await confirmed.json()) as any).data;
-    assert.equal(result.status, 'CONFIRMED');
-    assert.notEqual(result.approvedBy, 'spoofed');
-    assert.ok(result.approvedBy);
-    assert.ok(result.confirmedDate);
-    assert.equal((await review('candidate', { action: 'reject', expectedVersion: 2 })).status, 409);
+    expect(result.status).toBe('CONFIRMED');
+    expect(result.approvedBy).not.toBe('spoofed');
+    expect(result.approvedBy).toBeTruthy();
+    expect(result.confirmedDate).toBeTruthy();
+    expect((await review('candidate', { action: 'reject', expectedVersion: 2 })).status).toBe(409);
     const remaining = ((await (await fetch(queue, { headers })).json()) as any).data;
-    assert.equal(remaining.items.length, 0);
+    expect(remaining.items.length).toBe(0);
     const detail = (
       (await (
         await fetch(`${base}/api/v1/decisions/candidate?guildId=guild-1`, { headers })
       ).json()) as any
     ).data;
-    assert.equal(detail.confirmedDate, result.confirmedDate);
+    expect(detail.confirmedDate).toBe(result.confirmedDate);
   } finally {
     await new Promise<void>(resolve => server.close(() => resolve()));
     await db.cleanup();
@@ -126,10 +122,10 @@ test('review replacement is atomic, dispositions preserve completed history, and
       predecessorId: 'old',
       predecessorVersion: 1,
     };
-    assert.equal((await review('new', { ...replacement, predecessorVersion: 7 })).status, 409);
-    assert.equal((await review('new', replacement)).status, 400);
-    assert.equal((await detail('old')).status, 'CONFIRMED');
-    assert.equal((await detail('new')).version, 1);
+    expect((await review('new', { ...replacement, predecessorVersion: 7 })).status).toBe(409);
+    expect((await review('new', replacement)).status).toBe(400);
+    expect((await detail('old')).status).toBe('CONFIRMED');
+    expect((await detail('new')).version).toBe(1);
     const result = await review('new', {
       ...replacement,
       taskDispositions: [
@@ -137,31 +133,32 @@ test('review replacement is atomic, dispositions preserve completed history, and
         { actionItemId: 'cancel', classification: 'open', disposition: 'cancel' },
       ],
     });
-    assert.equal(result.status, 200);
+    expect(result.status).toBe(200);
     const successor = ((await result.json()) as any).data;
-    assert.equal(successor.supersedesId, 'old');
-    assert.equal(successor.actionItems[0].transferredFromActionItemId, 'open');
+    expect(successor.supersedesId).toBe('old');
+    expect(successor.actionItems[0].transferredFromActionItemId).toBe('open');
     const predecessor = await detail('old');
-    assert.equal(predecessor.status, 'SUPERSEDED');
-    assert.equal(predecessor.supersededById, 'new');
-    assert.equal(predecessor.version, 2);
-    assert.deepEqual(
-      predecessor.actionItems.map((task: any) => task.state),
-      ['transferred', 'completed', 'canceled'],
-    );
-    assert.equal((await review('held', { action: 'defer', expectedVersion: 1 })).status, 200);
+    expect(predecessor.status).toBe('SUPERSEDED');
+    expect(predecessor.supersededById).toBe('new');
+    expect(predecessor.version).toBe(2);
+    expect(predecessor.actionItems.map((task: any) => task.state)).toEqual([
+      'transferred',
+      'completed',
+      'canceled',
+    ]);
+    expect((await review('held', { action: 'defer', expectedVersion: 1 })).status).toBe(200);
     const held = (
       (await (
         await fetch(`${base}/api/v1/review-queue?guildId=guild-1&status=ON_HOLD`, { headers })
       ).json()) as any
     ).data;
-    assert.equal(held.items[0].ticketId, 'held');
-    assert.equal(held.items[0].version, 2);
-    assert.equal((await review('held', { action: 'confirm', expectedVersion: 1 })).status, 409);
-    assert.equal((await review('held', { action: 'confirm', expectedVersion: 2 })).status, 200);
-    assert.equal((await review('discarded', { action: 'reject', expectedVersion: 1 })).status, 200);
-    assert.equal((await detail('discarded')).status, 'DISCARDED');
-    assert.equal(await db.repo.isEvidenceRejected('hash-discarded'), true);
+    expect(held.items[0].ticketId).toBe('held');
+    expect(held.items[0].version).toBe(2);
+    expect((await review('held', { action: 'confirm', expectedVersion: 1 })).status).toBe(409);
+    expect((await review('held', { action: 'confirm', expectedVersion: 2 })).status).toBe(200);
+    expect((await review('discarded', { action: 'reject', expectedVersion: 1 })).status).toBe(200);
+    expect((await detail('discarded')).status).toBe('DISCARDED');
+    expect(await db.repo.isEvidenceRejected('hash-discarded')).toBe(true);
   } finally {
     await new Promise<void>(resolve => server.close(() => resolve()));
     await db.cleanup();

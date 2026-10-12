@@ -1,10 +1,9 @@
 import { PrismaClient } from '@prisma/client';
-import { DecisionRepository } from './repositories/decision.repository.js';
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
-import { createServer } from './server.js';
-import { isolatedRepository } from './repositories/test-database.js';
-import { fakeAuthOptions, loginAsTestUser } from './test-support/auth.js';
+import { DecisionRepository } from '../src/repositories/decision.repository.js';
+import { test, expect } from 'vitest';
+import { createServer } from '../src/server.js';
+import { isolatedRepository } from '../src/repositories/test-database.js';
+import { fakeAuthOptions, loginAsTestUser } from '../src/test-support/auth.js';
 import { DecisionSchema } from '@ggaddak/shared';
 
 test('versioned card edit persists content without changing review state', async () => {
@@ -37,18 +36,17 @@ test('versioned card edit persists content without changing review state', async
       alternatives: [{ name: 'Email', reason: 'Manual mapping' }],
     };
     const put = await fetch(url, { method: 'PUT', headers, body: JSON.stringify(body) });
-    assert.equal(put.status, 200);
+    expect(put.status).toBe(200);
     const edited = ((await put.json()) as any).data;
-    assert.equal(edited.title, 'Updated');
-    assert.equal(edited.status, 'CONFIRMED');
-    assert.equal(edited.version, 2);
-    assert.ok(edited.updatedAt);
-    assert.ok(edited.alternatives[0].id);
-    assert.equal(
-      (await fetch(url, { method: 'PUT', headers, body: JSON.stringify(body) })).status,
+    expect(edited.title).toBe('Updated');
+    expect(edited.status).toBe('CONFIRMED');
+    expect(edited.version).toBe(2);
+    expect(edited.updatedAt).toBeTruthy();
+    expect(edited.alternatives[0].id).toBeTruthy();
+    expect((await fetch(url, { method: 'PUT', headers, body: JSON.stringify(body) })).status).toBe(
       409,
     );
-    assert.equal(
+    expect(
       (
         await fetch(url, {
           method: 'PUT',
@@ -56,9 +54,8 @@ test('versioned card edit persists content without changing review state', async
           body: JSON.stringify({ ...body, expectedVersion: 2, status: 'DISCARDED' }),
         })
       ).status,
-      400,
-    );
-    assert.equal(
+    ).toBe(400);
+    expect(
       (
         await fetch(url, {
           method: 'PUT',
@@ -66,9 +63,8 @@ test('versioned card edit persists content without changing review state', async
           body: JSON.stringify({ ...body, expectedVersion: 2, title: ' ' }),
         })
       ).status,
-      400,
-    );
-    assert.equal(
+    ).toBe(400);
+    expect(
       (
         await fetch(url, {
           method: 'PUT',
@@ -76,9 +72,8 @@ test('versioned card edit persists content without changing review state', async
           body: JSON.stringify(body),
         })
       ).status,
-      401,
-    );
-    assert.equal(
+    ).toBe(401);
+    expect(
       (
         await fetch(url.replace('guild-1', 'guild-2'), {
           method: 'PUT',
@@ -86,11 +81,10 @@ test('versioned card edit persists content without changing review state', async
           body: JSON.stringify(body),
         })
       ).status,
-      403,
-    );
+    ).toBe(403);
     const read = ((await (await fetch(url, { headers })).json()) as any).data;
-    assert.equal(read.decision, 'Use OAuth');
-    assert.equal(read.alternatives[0].id, edited.alternatives[0].id);
+    expect(read.decision).toBe('Use OAuth');
+    expect(read.alternatives[0].id).toBe(edited.alternatives[0].id);
     const retained = {
       ...body,
       expectedVersion: 2,
@@ -100,11 +94,11 @@ test('versioned card edit persists content without changing review state', async
       ],
     };
     const amended = await fetch(url, { method: 'PUT', headers, body: JSON.stringify(retained) });
-    assert.equal(amended.status, 200);
+    expect(amended.status).toBe(200);
     const latest = ((await amended.json()) as any).data;
-    assert.equal(latest.alternatives[0].id, edited.alternatives[0].id);
-    assert.notEqual(latest.alternatives[1].id, latest.alternatives[0].id);
-    assert.equal(
+    expect(latest.alternatives[0].id).toBe(edited.alternatives[0].id);
+    expect(latest.alternatives[1].id).not.toBe(latest.alternatives[0].id);
+    expect(
       (
         await fetch(url, {
           method: 'PUT',
@@ -116,9 +110,8 @@ test('versioned card edit persists content without changing review state', async
           }),
         })
       ).status,
-      400,
-    );
-    assert.equal(
+    ).toBe(400);
+    expect(
       (
         await fetch(url, {
           method: 'PUT',
@@ -130,9 +123,8 @@ test('versioned card edit persists content without changing review state', async
           }),
         })
       ).status,
-      400,
-    );
-    assert.equal(
+    ).toBe(400);
+    expect(
       (
         await fetch(url, {
           method: 'PUT',
@@ -140,8 +132,7 @@ test('versioned card edit persists content without changing review state', async
           body: JSON.stringify({ ...retained, expectedVersion: 3, title: 'x'.repeat(201) }),
         })
       ).status,
-      400,
-    );
+    ).toBe(400);
     const removal = await fetch(url, {
       method: 'PUT',
       headers,
@@ -151,14 +142,14 @@ test('versioned card edit persists content without changing review state', async
         alternatives: [latest.alternatives[1]],
       }),
     });
-    assert.equal(removal.status, 200);
+    expect(removal.status).toBe(200);
     const restartedClient = new PrismaClient({ datasources: { db: { url: db.url } } });
     try {
       const restored = await new DecisionRepository(restartedClient).getDecisionById('edit');
-      assert.equal(restored?.title, 'Updated');
-      assert.equal(restored?.version, 4);
-      assert.equal(restored?.alternatives.length, 1);
-      assert.equal(restored?.alternatives[0].option, 'SSO');
+      expect(restored?.title).toBe('Updated');
+      expect(restored?.version).toBe(4);
+      expect(restored?.alternatives.length).toBe(1);
+      expect(restored?.alternatives[0].option).toBe('SSO');
     } finally {
       await restartedClient.$disconnect();
     }

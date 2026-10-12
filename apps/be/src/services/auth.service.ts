@@ -1,3 +1,7 @@
+import type { AuthUserDto, AuthPrincipal } from '../dto/auth.dto.js';
+import { AuthError } from '../errors/AuthError.js';
+import { config, validateAuthConfig, type AuthConfig } from '../config/index.js';
+import type { DiscordChannelsAdapter } from '../adapters/discord-channels.adapter.js';
 import {
   createHmac,
   timingSafeEqual,
@@ -9,37 +13,14 @@ import {
 } from 'node:crypto';
 import { Service } from 'typedi';
 import { PrismaClient } from '@prisma/client';
-import { AppError, NotFoundError } from '../errors/AppError.js';
+import { NotFoundError } from '../errors/AppError.js';
 import { DiscordAuthAdapter, HttpDiscordAuthAdapter } from '../adapters/discord-auth.adapter.js';
-export interface AuthUser {
-  id: string;
-  name: string;
-  email: string | null;
-  avatarUrl: string | null;
-  discordUserId: string;
-}
-export interface AuthPrincipal {
-  userId: string;
-  sessionId: string;
-}
-export interface AuthConfig {
-  clientId: string;
-  clientSecret: string;
-  redirectUri: string;
-  secret: string;
-  secureCookie: boolean;
-}
 export interface AuthOptions {
-  channelAdapter?: import('../adapters/discord-channels.adapter.js').DiscordChannelsAdapter;
+  channelAdapter?: DiscordChannelsAdapter;
   serviceToken?: string;
   config?: AuthConfig;
   discordAdapter?: DiscordAuthAdapter;
   now?: () => number;
-}
-export class AuthError extends AppError {
-  constructor(message = 'Authentication required', status = 401) {
-    super(message, status);
-  }
 }
 const TTL = 15 * 60 * 1000;
 @Service()
@@ -51,26 +32,14 @@ export class AuthService {
     private prisma: PrismaClient,
     options: AuthOptions = {},
   ) {
-    this.config = options.config ?? {
-      clientId: process.env.DISCORD_CLIENT_ID ?? '',
-      clientSecret: process.env.DISCORD_CLIENT_SECRET ?? '',
-      redirectUri: process.env.DISCORD_REDIRECT_URI ?? '',
-      secret: process.env.AUTH_SECRET ?? '',
-      secureCookie: process.env.NODE_ENV === 'production',
-    };
+    this.config = options.config ?? config.auth;
     this.discord =
       options.discordAdapter ??
       new HttpDiscordAuthAdapter(this.config.clientId, this.config.clientSecret);
     this.now = options.now ?? Date.now;
   }
   private configured() {
-    if (
-      !this.config.clientId ||
-      !this.config.clientSecret ||
-      this.config.secret.length < 32 ||
-      !/^https?:\/\//.test(this.config.redirectUri)
-    )
-      throw new AppError('Discord login is not configured', 503);
+    validateAuthConfig(this.config);
   }
   private signature(value: string) {
     return createHmac('sha256', this.config.secret).update(value).digest('base64url');
@@ -271,7 +240,7 @@ export class AuthService {
       throw new AuthError('Decision belongs to another guild', 403);
     return decision.guildId;
   }
-  private publicUser(user: { id: string; username: string; avatar: string | null }): AuthUser {
+  private publicUser(user: { id: string; username: string; avatar: string | null }): AuthUserDto {
     return {
       id: user.id,
       name: user.username,

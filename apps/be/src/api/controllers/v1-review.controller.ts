@@ -1,3 +1,4 @@
+import { authorizeDecisions, requirePrincipal } from '../guards/authorization.js';
 import type { Request as ExpressRequest } from 'express';
 import { Controller, Route, Tags, Get, Post, Query, Security, Request, Path, Body } from 'tsoa';
 import { Service } from 'typedi';
@@ -28,7 +29,7 @@ export class V1ReviewController extends Controller {
     @Query() page: number = 1,
     @Query() size: number = 20,
   ): Promise<ApiResponse<V1ReviewQueueDto>> {
-    await this.auth.requireGuild(request.user!, guildId);
+    await this.auth.requireGuild(requirePrincipal(request), guildId);
     if (!Number.isInteger(page) || page < 1 || !Number.isInteger(size) || size < 1 || size > 100)
       throw new BadRequestError('page must be positive and size between 1 and 100');
     const result = await this.service.browseDecisions({ guildId, status, page, size });
@@ -49,13 +50,14 @@ export class V1ReviewController extends Controller {
     @Query() guildId: string,
     @Body() body: V1ReviewRequestDto,
   ): Promise<ApiResponse<V1DecisionDto>> {
-    await this.auth.requireDecision(request.user!, ticketId, guildId);
-    if (body.predecessorId)
-      await this.auth.requireDecision(request.user!, body.predecessorId, guildId);
+    await authorizeDecisions(this.auth, request, guildId, [
+      ticketId,
+      ...(body.predecessorId ? [body.predecessorId] : []),
+    ]);
     const { action, ...params } = body;
     const updated = await this.service.reviewDecision(ticketId, action, {
       ...params,
-      approvedBy: request.user!.userId,
+      approvedBy: requirePrincipal(request).userId,
     });
     if (!updated) throw new NotFoundError('Decision Candidate not found');
     return apiSuccess(toV1Decision(updated));

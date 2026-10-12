@@ -15,8 +15,10 @@
 
 - **점진적 확장-축소(Expand-Contract)**: DTO 분리 ➔ Base Repo 구축 ➔ Repository DTO 분리 ➔ Service 비즈니스 회수 순서로 안전하게 진행한다.
 - **Repository의 DTO 비의존**: Repository는 순수 Entity 및 Primitive 파라미터만 다루며, DTO 유효성 검증은 상위 계층에서 완료한다.
-- **Service의 비즈니스 책임 회수**: 도메인 상태 전이 제약 및 낙관적 락 판단은 Service 계층이 책임진다.
+- **Service의 비즈니스 책임 회수**: 도메인 상태 전이 제약 및 낙관적 락의 충돌 의미 판단은 Service 계층이 책임진다. Repository는 기대 버전 조건을 포함한 원자적 DB 갱신으로 동시 수정에서 하나의 요청만 성공하게 한다.
 - **단일 패키지 매니저**: `npm` 워크스페이스 표준을 준수하고 불필요한 `pnpm` 잔재를 청소한다.
+- **Auth 타입 경계**: `.env` 기반 비밀 설정은 `config/index.ts`에서 파싱하며 DTO로 노출하지 않는다. 외부 응답/인가 principal 타입만 DTO 경계에 둔다.
+- **Prisma 수명주기**: 연결·종료는 BE loader가 맡는다. BaseRepository는 Prisma 접근과 명시적 트랜잭션 전파만 공통화한다.
 
 ## 티켓 목록
 
@@ -28,3 +30,7 @@
 - [06: 의사결정 비즈니스 유효성 검증 로직 Service 이관](issues/06-service-business-logic-migration.md)
 - [07: Controller 계층 인가 가드 및 DTO 변환 표준화](issues/07-controller-guard-and-mapping.md)
 - [08: Vitest 기반 테스트 환경 통합 및 디렉터리 분리](issues/08-vitest-test-migration.md)
+
+## 구현 결과
+
+8개 티켓 구현 완료. 검증: `npm test`, `npm run typecheck`, `npm run format:check`, `npm run lint`. lint는 기존 Bot/shared 경고 7개를 남기고 오류 없이 통과한다.

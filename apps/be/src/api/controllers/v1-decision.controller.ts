@@ -1,6 +1,7 @@
+import { authorizeDecisions, requirePrincipal } from '../guards/authorization.js';
 import { DecisionEditDto } from '../../dto/decision-edit.dto.js';
 import type { Request as ExpressRequest } from 'express';
-import { AuthService, AuthPrincipal } from '../../services/auth.service.js';
+import { AuthService } from '../../services/auth.service.js';
 import { Controller, Put, Body, Route, Tags, Get, Query, Security, Request, Path } from 'tsoa';
 import { Service } from 'typedi';
 import { DecisionService } from '../../services/decision.service.js';
@@ -10,7 +11,7 @@ import {
   DecisionStatus,
   toV1Decision,
 } from '../../dto/v1-decision.dto.js';
-import { BadRequestError } from '../../errors/AppError.js';
+import { BadRequestError, NotFoundError } from '../../errors/AppError.js';
 import { ApiResponse, apiSuccess } from '../../dto/api-response.dto.js';
 import {
   DecisionTimelineDto,
@@ -39,7 +40,7 @@ export class V1DecisionController extends Controller {
     @Query() from?: string,
     @Query() to?: string,
   ): Promise<ApiResponse<DecisionTimelineDto>> {
-    await this.auth.requireGuild(request.user as AuthPrincipal, guildId);
+    await this.auth.requireGuild(requirePrincipal(request), guildId);
     const result = await this.service.getConfirmedTimeline({
       guildId,
       groupBy,
@@ -55,18 +56,17 @@ export class V1DecisionController extends Controller {
     @Request() request: ExpressRequest,
     @Path() id: string,
     @Query() guildId: string,
-    @Body() body: DecisionEditDto,
+    @Body() _body: DecisionEditDto,
   ): Promise<ApiResponse<V1DecisionDto>> {
-    await this.auth.requireDecision(request.user!, id, guildId);
-    return apiSuccess(
-      toV1Decision(
-        (await this.service.editDecision(
-          id,
-          request.body as DecisionEditDto,
-          (request.user as AuthPrincipal).userId,
-        ))!,
-      ),
+    await authorizeDecisions(this.auth, request, guildId, [id]);
+    // Preserve the raw body for strict Zod validation; TSOA strips additional fields.
+    const updated = await this.service.editDecision(
+      id,
+      request.body as DecisionEditDto,
+      requirePrincipal(request).userId,
     );
+    if (!updated) throw new NotFoundError('Decision not found');
+    return apiSuccess(toV1Decision(updated));
   }
 
   @Get('{id}')
@@ -75,8 +75,10 @@ export class V1DecisionController extends Controller {
     @Path() id: string,
     @Query() guildId: string,
   ): Promise<ApiResponse<V1DecisionDto>> {
-    await this.auth.requireDecision(request.user!, id, guildId);
-    return apiSuccess(toV1Decision((await this.service.getDecisionById(id))!));
+    await authorizeDecisions(this.auth, request, guildId, [id]);
+    const decision = await this.service.getDecisionById(id);
+    if (!decision) throw new NotFoundError('Decision not found');
+    return apiSuccess(toV1Decision(decision));
   }
 
   @Get()
@@ -91,7 +93,7 @@ export class V1DecisionController extends Controller {
     @Query() page: number = 1,
     @Query() size: number = 20,
   ): Promise<ApiResponse<V1DecisionListDto>> {
-    await this.auth.requireGuild(request.user as AuthPrincipal, guildId);
+    await this.auth.requireGuild(requirePrincipal(request), guildId);
     if (!Number.isInteger(page) || page < 1 || !Number.isInteger(size) || size < 1 || size > 100)
       throw new BadRequestError('page must be positive and size between 1 and 100');
     const states: Record<string, DecisionStatus> = {

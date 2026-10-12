@@ -1,8 +1,7 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
-import { createServer } from './server.js';
-import { isolatedRepository } from './repositories/test-database.js';
-import { fakeAuthOptions, loginAsTestUser } from './test-support/auth.js';
+import { test, expect } from 'vitest';
+import { createServer } from '../src/server.js';
+import { isolatedRepository } from '../src/repositories/test-database.js';
+import { fakeAuthOptions, loginAsTestUser } from '../src/test-support/auth.js';
 import { DecisionSchema } from '@ggaddak/shared';
 
 test('server members browse filtered paginated Decision Cards and complete detail with preserved history', async () => {
@@ -49,43 +48,40 @@ test('server members browse filtered paginated Decision Cards and complete detai
       `${base}/api/v1/decisions?guildId=guild-1&status=CONFIRMED&category=기술&page=2&size=1`,
       { headers },
     );
-    assert.equal(response.status, 200);
+    expect(response.status).toBe(200);
     const data = ((await response.json()) as any).data;
-    assert.deepEqual(data.pageInfo, {
+    expect(data.pageInfo).toEqual({
       currentPage: 2,
       pageSize: 1,
       totalElements: 2,
       totalPages: 2,
     });
-    assert.equal(data.items.length, 1);
-    assert.equal(data.items[0].status, 'CONFIRMED');
-    assert.equal(data.items[0].confirmedDate, null);
-    assert.equal(data.items[0].category, '기술');
-    assert.equal(data.items[0].source.channelName, 'Architecture');
+    expect(data.items.length).toBe(1);
+    expect(data.items[0].status).toBe('CONFIRMED');
+    expect(data.items[0].confirmedDate).toBe(null);
+    expect(data.items[0].category).toBe('기술');
+    expect(data.items[0].source.channelName).toBe('Architecture');
     const detail = (
       (await (
         await fetch(`${base}/api/v1/decisions/old?guildId=guild-1`, { headers })
       ).json()) as any
     ).data;
-    assert.equal(detail.status, 'SUPERSEDED');
-    assert.equal(detail.supersededById, 'one');
-    assert.equal(detail.alternatives[0].name, 'Email');
-    assert.ok(detail.alternatives[0].id);
-    assert.equal(detail.dates.confirmedDate, null);
-    assert.deepEqual(detail.rawEvidence, ['m']);
-    assert.equal(detail.actionItems[0].state, 'completed');
-    assert.equal(
+    expect(detail.status).toBe('SUPERSEDED');
+    expect(detail.supersededById).toBe('one');
+    expect(detail.alternatives[0].name).toBe('Email');
+    expect(detail.alternatives[0].id).toBeTruthy();
+    expect(detail.dates.confirmedDate).toBe(null);
+    expect(detail.rawEvidence).toEqual(['m']);
+    expect(detail.actionItems[0].state).toBe('completed');
+    expect(
       (await fetch(`${base}/api/v1/decisions/other?guildId=guild-1`, { headers })).status,
-      403,
-    );
-    assert.equal(
+    ).toBe(403);
+    expect(
       (await fetch(`${base}/api/v1/decisions?guildId=guild-1&page=0`, { headers })).status,
-      400,
-    );
-    assert.equal(
+    ).toBe(400);
+    expect(
       (await fetch(`${base}/api/v1/decisions?guildId=guild-1&status=bogus`, { headers })).status,
-      400,
-    );
+    ).toBe(400);
   } finally {
     await new Promise<void>(resolve => server.close(() => resolve()));
     await db.cleanup();

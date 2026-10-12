@@ -1,3 +1,4 @@
+import { requirePrincipal } from '../guards/authorization.js';
 import type { Request as ExpressRequest } from 'express';
 import { Controller, Route, Tags, Get, Query, Security, Request } from 'tsoa';
 import { AuthService } from '../../services/auth.service.js';
@@ -22,7 +23,7 @@ export class SearchController extends Controller {
     @Query() query: string,
     @Query() limit: number = 10,
   ): Promise<ApiResponse<SearchResponse>> {
-    await this.auth.requireGuild(request.user!, guildId);
+    await this.auth.requireGuild(requirePrincipal(request), guildId);
     return apiSuccess(await this.service.search(guildId, query, limit));
   }
 }

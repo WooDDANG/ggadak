@@ -1,6 +1,5 @@
-import { describe, it } from 'node:test';
-import assert from 'node:assert';
-import { DecisionExtractorCore } from './extractor-core.js';
+import { describe, it, expect } from 'vitest';
+import { DecisionExtractorCore } from '../../src/engine/extractor-core.js';
 
 describe('DecisionExtractorCore - Slicing & Governance Rubric', () => {
   const core = new DecisionExtractorCore();
@@ -39,11 +38,11 @@ describe('DecisionExtractorCore - Slicing & Governance Rubric', () => {
     ];
 
     const sessions = core.sliceMessagesByIdleGap(messages, 30);
-    assert.strictEqual(sessions.length, 2);
-    assert.strictEqual(sessions[0].length, 2);
-    assert.strictEqual(sessions[1].length, 2);
-    assert.strictEqual(sessions[0][0].id, 'm1');
-    assert.strictEqual(sessions[1][0].id, 'm3');
+    expect(sessions.length).toBe(2);
+    expect(sessions[0].length).toBe(2);
+    expect(sessions[1].length).toBe(2);
+    expect(sessions[0][0].id).toBe('m1');
+    expect(sessions[1][0].id).toBe('m3');
   });
 
   it('calculates 4.0 Strong governance score for multi-participant consensus with rationale and action items', () => {
@@ -56,9 +55,9 @@ describe('DecisionExtractorCore - Slicing & Governance Rubric', () => {
       hasExternalFeedback: true,
     });
 
-    assert.strictEqual(scoreResult.score, 4.0);
-    assert.strictEqual(scoreResult.strength, 'Strong');
-    assert.strictEqual(scoreResult.passed, true);
+    expect(scoreResult.score).toBe(4.0);
+    expect(scoreResult.strength).toBe('Strong');
+    expect(scoreResult.passed).toBe(true);
   });
 
   it('calculates 2.0 Weak governance score for solo announcement without multi-participant consensus', () => {
@@ -70,9 +69,9 @@ describe('DecisionExtractorCore - Slicing & Governance Rubric', () => {
       hasExternalFeedback: false,
     });
 
-    assert.strictEqual(scoreResult.score, 2.0);
-    assert.strictEqual(scoreResult.strength, 'Weak');
-    assert.strictEqual(scoreResult.passed, false);
+    expect(scoreResult.score).toBe(2.0);
+    expect(scoreResult.strength).toBe('Weak');
+    expect(scoreResult.passed).toBe(false);
   });
 
   it('calculates 1.0 Incomplete governance score for vague/missing rationale', () => {
@@ -84,9 +83,9 @@ describe('DecisionExtractorCore - Slicing & Governance Rubric', () => {
       hasExternalFeedback: false,
     });
 
-    assert.strictEqual(scoreResult.score, 1.0);
-    assert.strictEqual(scoreResult.strength, 'Incomplete');
-    assert.strictEqual(scoreResult.passed, false);
+    expect(scoreResult.score).toBe(1.0);
+    expect(scoreResult.strength).toBe('Incomplete');
+    expect(scoreResult.passed).toBe(false);
   });
 
   it('slices long session (>15 msgs) when significant topic drift occurs via TextTiling', () => {
@@ -209,11 +208,11 @@ describe('DecisionExtractorCore - Slicing & Governance Rubric', () => {
     ];
 
     const chunks = core.sliceSessionWithTopicDrift(messages, 30, 0.35);
-    assert.ok(chunks.length >= 2, `Expected at least 2 chunks, got ${chunks.length}`);
+    expect(chunks.length >= 2, `Expected at least 2 chunks, got ${chunks.length}`).toBeTruthy();
     // Verify first chunk has DB topic and later chunk has pizza topic
-    assert.strictEqual(chunks[0][0].id, 'm1');
+    expect(chunks[0][0].id).toBe('m1');
     const lastChunk = chunks[chunks.length - 1];
-    assert.strictEqual(lastChunk[lastChunk.length - 1].id, 'm18');
+    expect(lastChunk[lastChunk.length - 1].id).toBe('m18');
   });
 
   it('keeps short sessions (<= 15 msgs) intact without artificial topic drift splitting', () => {
@@ -240,7 +239,7 @@ describe('DecisionExtractorCore - Slicing & Governance Rubric', () => {
     ];
 
     const chunks = core.sliceSessionWithTopicDrift(shortMessages, 30, 0.35);
-    assert.strictEqual(chunks.length, 1);
-    assert.strictEqual(chunks[0].length, 3);
+    expect(chunks.length).toBe(1);
+    expect(chunks[0].length).toBe(3);
   });
 });

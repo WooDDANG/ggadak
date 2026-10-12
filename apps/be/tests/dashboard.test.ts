@@ -1,9 +1,8 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
-import { createServer } from './server.js';
-import { isolatedRepository } from './repositories/test-database.js';
-import { fakeAuthOptions, loginAsTestUser } from './test-support/auth.js';
-import { SyncJobService } from './services/sync-job.service.js';
+import { test, expect } from 'vitest';
+import { createServer } from '../src/server.js';
+import { isolatedRepository } from '../src/repositories/test-database.js';
+import { fakeAuthOptions, loginAsTestUser } from '../src/test-support/auth.js';
+import { SyncJobService } from '../src/services/sync-job.service.js';
 import { DecisionSchema } from '@ggaddak/shared';
 
 test('dashboard returns empty server metrics then reflects review, recent records and real sync progress without leaking another guild', async () => {
@@ -16,14 +15,14 @@ test('dashboard returns empty server metrics then reflects review, recent record
     const headers = { Authorization: `Bearer ${token}` };
     const summary = async (guildId = 'guild-1') => {
       const response = await fetch(`${base}/api/v1/dashboard?guildId=${guildId}`, { headers });
-      assert.equal(response.status, 200);
+      expect(response.status).toBe(200);
       return ((await response.json()) as any).data;
     };
     const empty = await summary();
-    assert.deepEqual(empty.counts, { confirmed: 0, onHold: 0, inReview: 0 });
-    assert.deepEqual(empty.recentDecisions, []);
-    assert.equal(empty.sync.lastSuccessfulAt, null);
-    assert.equal(empty.sync.latestJob, null);
+    expect(empty.counts).toEqual({ confirmed: 0, onHold: 0, inReview: 0 });
+    expect(empty.recentDecisions).toEqual([]);
+    expect(empty.sync.lastSuccessfulAt).toBe(null);
+    expect(empty.sync.latestJob).toBe(null);
     for (const [id, state, guildId, date] of [
       ['draft', 'Draft', 'guild-1', '2026-01-01'],
       ['held', 'Deferred', 'guild-1', '2026-01-02'],
@@ -43,17 +42,14 @@ test('dashboard returns empty server metrics then reflects review, recent record
         }),
       );
     let data = await summary();
-    assert.deepEqual(data.counts, { confirmed: 1, onHold: 1, inReview: 1 });
-    assert.deepEqual(
-      data.recentDecisions.map((d: any) => d.id),
-      ['confirmed'],
-    );
+    expect(data.counts).toEqual({ confirmed: 1, onHold: 1, inReview: 1 });
+    expect(data.recentDecisions.map((d: any) => d.id)).toEqual(['confirmed']);
     await db.repo.reviewDecision('draft', 'confirm', {
       expectedVersion: 1,
       resolution: 'independent',
     });
     data = await summary();
-    assert.deepEqual(data.counts, { confirmed: 2, onHold: 1, inReview: 0 });
+    expect(data.counts).toEqual({ confirmed: 2, onHold: 1, inReview: 0 });
     await db.client.monitoredChannel.create({
       data: { id: 'channel-sync', guildId: 'guild-1', name: 'Sync' },
     });
@@ -63,28 +59,28 @@ test('dashboard returns empty server metrics then reflects review, recent record
     await jobs.update(completed.jobId, { completedChannels: 1, status: 'COMPLETED' });
     const successful = (await jobs.get(completed.jobId, 'guild-1')).completedAt;
     data = await summary();
-    assert.equal(data.sync.lastSuccessfulAt, successful);
-    assert.equal(data.sync.latestJob.status, 'COMPLETED');
+    expect(data.sync.lastSuccessfulAt).toBe(successful);
+    expect(data.sync.latestJob.status).toBe('COMPLETED');
     const active = await jobs.create('guild-1', false);
     data = await summary();
-    assert.equal(data.sync.latestJob.jobId, active.jobId);
-    assert.equal(data.sync.latestJob.status, 'QUEUED');
-    assert.equal(data.sync.lastSuccessfulAt, successful);
+    expect(data.sync.latestJob.jobId).toBe(active.jobId);
+    expect(data.sync.latestJob.status).toBe('QUEUED');
+    expect(data.sync.lastSuccessfulAt).toBe(successful);
     await jobs.claim();
     data = await summary();
-    assert.equal(data.sync.latestJob.status, 'PROCESSING');
+    expect(data.sync.latestJob.status).toBe('PROCESSING');
     await jobs.update(active.jobId, {
       failedChannels: 1,
       status: 'FAILED',
       errorMessage: 'AI unavailable',
     });
     data = await summary();
-    assert.equal(data.sync.latestJob.status, 'FAILED');
-    assert.equal(data.sync.latestJob.errorMessage, 'AI unavailable');
-    assert.equal(data.sync.lastSuccessfulAt, successful);
+    expect(data.sync.latestJob.status).toBe('FAILED');
+    expect(data.sync.latestJob.errorMessage).toBe('AI unavailable');
+    expect(data.sync.lastSuccessfulAt).toBe(successful);
     const other = await summary('guild-2');
-    assert.equal(other.sync.latestJob, null);
-    assert.equal(other.sync.lastSuccessfulAt, null);
+    expect(other.sync.latestJob).toBe(null);
+    expect(other.sync.lastSuccessfulAt).toBe(null);
     for (let index = 0; index < 6; index++)
       await db.repo.saveDecision(
         DecisionSchema.parse({
@@ -99,15 +95,15 @@ test('dashboard returns empty server metrics then reflects review, recent record
         }),
       );
     data = await summary();
-    assert.deepEqual(
-      data.recentDecisions.map((d: any) => d.id),
-      ['recent-5', 'recent-4', 'recent-3', 'recent-2', 'recent-1'],
-    );
-    assert.equal((await fetch(`${base}/api/v1/dashboard?guildId=guild-1`)).status, 401);
-    assert.equal(
-      (await fetch(`${base}/api/v1/dashboard?guildId=unknown`, { headers })).status,
-      403,
-    );
+    expect(data.recentDecisions.map((d: any) => d.id)).toEqual([
+      'recent-5',
+      'recent-4',
+      'recent-3',
+      'recent-2',
+      'recent-1',
+    ]);
+    expect((await fetch(`${base}/api/v1/dashboard?guildId=guild-1`)).status).toBe(401);
+    expect((await fetch(`${base}/api/v1/dashboard?guildId=unknown`, { headers })).status).toBe(403);
   } finally {
     await new Promise<void>(r => server.close(() => r()));
     await db.cleanup();

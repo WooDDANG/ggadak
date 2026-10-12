@@ -1,9 +1,8 @@
-import { describe, it } from 'node:test';
-import assert from 'node:assert';
-import { createServer } from '../apps/be/dist/server.js';
-import { isolatedRepository } from '../apps/be/dist/repositories/test-database.js';
-import type { IAiAdapter } from '../apps/be/dist/adapters/ai.adapter.js';
-import { fakeAuthOptions, loginAsTestUser } from '../apps/be/dist/test-support/auth.js';
+import { describe, it, expect } from 'vitest';
+import { createServer } from '../../apps/be/src/server.js';
+import { isolatedRepository } from '../../apps/be/src/repositories/test-database.js';
+import type { IAiAdapter } from '../../apps/be/src/adapters/ai.adapter.js';
+import { fakeAuthOptions, loginAsTestUser } from '../../apps/be/src/test-support/auth.js';
 
 // Fixed AI responses keep this pipeline regression independent of providers and API keys.
 const decisionExtractor: IAiAdapter = {
@@ -63,10 +62,10 @@ describe('E2E Full Pipeline: Discord Messages ➔ Backend AI Core ➔ Review Que
 
     // 2. Centralized Policy verification
     const policyRes = await fetch(`${base}/api/config/policy`);
-    assert.strictEqual(policyRes.status, 200);
+    expect(policyRes.status).toBe(200);
     const policy = (await policyRes.json()) as any;
-    assert.strictEqual(policy.reactionThreshold, 3);
-    assert.strictEqual(policy.maxMergedWindow, 40);
+    expect(policy.reactionThreshold).toBe(3);
+    expect(policy.maxMergedWindow).toBe(40);
 
     // 3. Simulate raw Discord discussion messages
     const rawMessages = [
@@ -106,23 +105,23 @@ describe('E2E Full Pipeline: Discord Messages ➔ Backend AI Core ➔ Review Que
       }),
     });
 
-    assert.strictEqual(analyzeRes.status, 200);
+    expect(analyzeRes.status).toBe(200);
     const analyzeData = (await analyzeRes.json()) as any;
 
-    assert.strictEqual(analyzeData.found, true);
-    assert.strictEqual(analyzeData.decisions.length, 2); // Multi-decision extraction
+    expect(analyzeData.found).toBe(true);
+    expect(analyzeData.decisions.length).toBe(2); // Multi-decision extraction
 
     const postgresDec = analyzeData.decisions.find((d: any) => d.topic === 'Database Selection');
     const fastifyDec = analyzeData.decisions.find((d: any) => d.topic === 'Backend Framework');
 
-    assert.ok(postgresDec);
-    assert.ok(fastifyDec);
-    assert.strictEqual(postgresDec.state, 'Draft'); // Initial state is Draft (PM policy)
-    assert.strictEqual(postgresDec.categoryTag, '기술');
-    assert.ok(typeof postgresDec.governanceScore === 'number');
-    assert.ok(postgresDec.alternatives.length > 0);
-    assert.ok(postgresDec.rawTranscript.includes('PostgreSQL'));
-    assert.strictEqual(postgresDec.source.rawMessages.length, 3);
+    expect(postgresDec).toBeTruthy();
+    expect(fastifyDec).toBeTruthy();
+    expect(postgresDec.state).toBe('Draft'); // Initial state is Draft (PM policy)
+    expect(postgresDec.categoryTag).toBe('기술');
+    expect(typeof postgresDec.governanceScore === 'number').toBeTruthy();
+    expect(postgresDec.alternatives.length > 0).toBeTruthy();
+    expect(postgresDec.rawTranscript.includes('PostgreSQL')).toBeTruthy();
+    expect(postgresDec.source.rawMessages.length).toBe(3);
 
     // 5. Human Review Action: Confirm Postgres Decision
     const reviewRes = await fetch(
@@ -137,19 +136,19 @@ describe('E2E Full Pipeline: Discord Messages ➔ Backend AI Core ➔ Review Que
         }),
       },
     );
-    assert.strictEqual(reviewRes.status, 200);
+    expect(reviewRes.status).toBe(200);
     const reviewData = (await reviewRes.json()) as any;
-    assert.strictEqual(reviewData.data.state, 'Decided');
-    assert.strictEqual(reviewData.data.approvedBy, 'user-1');
+    expect(reviewData.data.state).toBe('Decided');
+    expect(reviewData.data.approvedBy).toBe('user-1');
 
     // 6. Query confirmed decisions through the authenticated v1 read API.
     const queryRes = await fetch(`${base}/api/v1/decisions?guildId=guild-1&status=CONFIRMED`, {
       headers: authHeaders,
     });
-    assert.strictEqual(queryRes.status, 200);
+    expect(queryRes.status).toBe(200);
     const queryData = (await queryRes.json()) as any;
-    assert.strictEqual(queryData.data.decisions.length, 1);
-    assert.strictEqual(queryData.data.decisions[0].id, postgresDec.id);
+    expect(queryData.data.decisions.length).toBe(1);
+    expect(queryData.data.decisions[0].id).toBe(postgresDec.id);
 
     // 7. Test Anti-recreation on Rejection
     const rejectRes = await fetch(
@@ -160,7 +159,7 @@ describe('E2E Full Pipeline: Discord Messages ➔ Backend AI Core ➔ Review Que
         body: JSON.stringify({ action: 'reject', expectedVersion: fastifyDec.version }),
       },
     );
-    assert.strictEqual(rejectRes.status, 200);
+    expect(rejectRes.status).toBe(200);
 
     // Re-analysis retains the confirmed candidate and suppresses only the rejected candidate.
     const reAnalyzeRes = await fetch(`${base}/api/discussions/analyze`, {
@@ -176,10 +175,10 @@ describe('E2E Full Pipeline: Discord Messages ➔ Backend AI Core ➔ Review Que
       }),
     });
     const reAnalyzeData = (await reAnalyzeRes.json()) as any;
-    assert.strictEqual(reAnalyzeData.found, true);
-    assert.strictEqual(reAnalyzeData.decisions.length, 1);
-    assert.strictEqual(reAnalyzeData.decisions[0].id, postgresDec.id);
-    assert.ok(!reAnalyzeData.decisions.some((d: any) => d.id === fastifyDec.id));
+    expect(reAnalyzeData.found).toBe(true);
+    expect(reAnalyzeData.decisions.length).toBe(1);
+    expect(reAnalyzeData.decisions[0].id).toBe(postgresDec.id);
+    expect(!reAnalyzeData.decisions.some((d: any) => d.id === fastifyDec.id)).toBeTruthy();
 
     // But with isManualOverride: true (e.g. 📌 pin added), re-analysis is permitted!
     const manualOverrideRes = await fetch(`${base}/api/discussions/analyze`, {
@@ -195,8 +194,8 @@ describe('E2E Full Pipeline: Discord Messages ➔ Backend AI Core ➔ Review Que
       }),
     });
     const manualOverrideData = (await manualOverrideRes.json()) as any;
-    assert.strictEqual(manualOverrideData.found, true);
-    assert.ok(manualOverrideData.decisions.length > 0);
+    expect(manualOverrideData.found).toBe(true);
+    expect(manualOverrideData.decisions.length > 0).toBeTruthy();
 
     server.close();
     await database.cleanup();
@@ -232,10 +231,10 @@ describe('E2E Full Pipeline: Discord Messages ➔ Backend AI Core ➔ Review Que
       }),
     });
 
-    assert.strictEqual(res.status, 200);
+    expect(res.status).toBe(200);
     const data = (await res.json()) as any;
-    assert.strictEqual(data.found, false);
-    assert.strictEqual(data.decisions.length, 0);
+    expect(data.found).toBe(false);
+    expect(data.decisions.length).toBe(0);
 
     server.close();
     await database.cleanup();

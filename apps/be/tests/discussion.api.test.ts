@@ -1,7 +1,6 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
-import { createServer } from './server.js';
-import { isolatedRepository } from './repositories/test-database.js';
+import { test, expect } from 'vitest';
+import { createServer } from '../src/server.js';
+import { isolatedRepository } from '../src/repositories/test-database.js';
 
 test('discussion analysis and candidate history require Bot service authentication', async () => {
   const db = await isolatedRepository();
@@ -35,7 +34,7 @@ test('discussion analysis and candidate history require Bot service authenticati
       fetch(`${base}/api/discussions/history/DEC-1`),
     ]) {
       const response = await request;
-      assert.equal(response.status, 401);
+      expect(response.status).toBe(401);
     }
 
     const botHeaders = {
@@ -47,12 +46,12 @@ test('discussion analysis and candidate history require Bot service authenticati
       headers: botHeaders,
       body: JSON.stringify(payload),
     });
-    assert.equal(analysis.status, 200);
-    assert.equal(((await analysis.json()) as any).found, false);
+    expect(analysis.status).toBe(200);
+    expect(((await analysis.json()) as any).found).toBe(false);
 
     const history = await fetch(`${base}/api/discussions/history/DEC-1`, { headers: botHeaders });
-    assert.equal(history.status, 200);
-    assert.deepEqual(await history.json(), []);
+    expect(history.status).toBe(200);
+    expect(await history.json()).toEqual([]);
   } finally {
     await new Promise<void>(resolve => server.close(() => resolve()));
     await db.cleanup();

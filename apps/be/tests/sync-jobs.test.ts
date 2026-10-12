@@ -1,8 +1,7 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
-import { createServer } from './server.js';
-import { isolatedRepository } from './repositories/test-database.js';
-import { fakeAuthOptions, loginAsTestUser } from './test-support/auth.js';
+import { test, expect } from 'vitest';
+import { createServer } from '../src/server.js';
+import { isolatedRepository } from '../src/repositories/test-database.js';
+import { fakeAuthOptions, loginAsTestUser } from '../src/test-support/auth.js';
 
 test('Sync Job API returns 202, scopes status to guild membership, and exposes worker claim/update only to Bot', async () => {
   const db = await isolatedRepository();
@@ -26,16 +25,15 @@ test('Sync Job API returns 202, scopes status to guild membership, and exposes w
       headers: user,
       body: '{}',
     });
-    assert.equal(accepted.status, 202);
+    expect(accepted.status).toBe(202);
     const job = ((await accepted.json()) as any).data;
-    assert.equal(job.status, 'QUEUED');
-    assert.equal(job.totalChannels, 1);
-    assert.equal(
+    expect(job.status).toBe('QUEUED');
+    expect(job.totalChannels).toBe(1);
+    expect(
       (await fetch(`${base}/api/v1/sync-jobs/${job.jobId}?guildId=guild-2`, { headers: user }))
         .status,
-      404,
-    );
-    assert.equal(
+    ).toBe(404);
+    expect(
       (
         await fetch(`${base}/api/v1/sync-jobs?guildId=guild-1`, {
           method: 'POST',
@@ -43,35 +41,32 @@ test('Sync Job API returns 202, scopes status to guild membership, and exposes w
           body: '{"forceFullSync":true}',
         })
       ).status,
-      409,
-    );
+    ).toBe(409);
 
-    assert.equal(
+    expect(
       (await fetch(`${base}/api/v1/internal/sync-jobs/claim`, { method: 'POST' })).status,
-      401,
-    );
+    ).toBe(401);
     const bot = { Authorization: 'Bearer sync-worker-secret', 'Content-Type': 'application/json' };
     const claimed = await fetch(`${base}/api/v1/internal/sync-jobs/claim`, {
       method: 'POST',
       headers: bot,
       body: '{}',
     });
-    assert.equal(claimed.status, 200);
-    assert.equal(((await claimed.json()) as any).data.jobId, job.jobId);
+    expect(claimed.status).toBe(200);
+    expect(((await claimed.json()) as any).data.jobId).toBe(job.jobId);
     const update = await fetch(`${base}/api/v1/internal/sync-jobs/${job.jobId}`, {
       method: 'PUT',
       headers: bot,
       body: JSON.stringify({ status: 'COMPLETED', completedChannels: 1 }),
     });
-    assert.equal(update.status, 200);
-    assert.equal(
+    expect(update.status).toBe(200);
+    expect(
       (
         (await (
           await fetch(`${base}/api/v1/sync-jobs/${job.jobId}?guildId=guild-1`, { headers: user })
         ).json()) as any
       ).data.status,
-      'COMPLETED',
-    );
+    ).toBe('COMPLETED');
   } finally {
     await new Promise<void>(resolve => server.close(() => resolve()));
     await db.cleanup();

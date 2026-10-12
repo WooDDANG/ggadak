@@ -1,6 +1,5 @@
 import 'reflect-metadata';
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { test, expect } from 'vitest';
 import { mkdtemp, rm, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -8,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { PrismaClient } from '@prisma/client';
 import { DecisionSchema } from '@ggaddak/shared';
-import { DecisionRepository } from './decision.repository.js';
+import { DecisionRepository } from '../../src/repositories/decision.repository.js';
 
 const root = fileURLToPath(new URL('../../../../', import.meta.url));
 function migrate(url: string, ...args: string[]) {
@@ -77,23 +76,23 @@ test('checked-in additive migrations preserve a legacy-schema fixture and missin
     migrate(url, 'deploy');
     const repo = new DecisionRepository(client);
     const recovered = await repo.getDecisionById('legacy');
-    assert.equal(recovered?.state, 'Decided');
-    assert.equal(recovered?.source.guildId, 'g');
-    assert.equal((await client.guild.findUnique({ where: { id: 'g' } }))?.name, 'g');
-    assert.equal(await client.membership.count(), 0);
+    expect(recovered?.state).toBe('Decided');
+    expect(recovered?.source.guildId).toBe('g');
+    expect((await client.guild.findUnique({ where: { id: 'g' } }))?.name).toBe('g');
+    expect(await client.membership.count()).toBe(0);
 
-    assert.equal(recovered?.createdAt, '2020-01-01T00:00:00.000Z');
-    assert.equal(recovered?.approvedBy, null);
-    assert.equal(recovered?.decisionConfirmedDate, null);
-    assert.deepEqual(recovered?.source.rawMessages, []);
-    assert.deepEqual(recovered?.actionItems, []);
+    expect(recovered?.createdAt).toBe('2020-01-01T00:00:00.000Z');
+    expect(recovered?.approvedBy).toBe(null);
+    expect(recovered?.decisionConfirmedDate).toBe(null);
+    expect(recovered?.source.rawMessages).toEqual([]);
+    expect(recovered?.actionItems).toEqual([]);
     await repo.saveDecision({ ...recovered!, actionItems: [{ task: 'Legacy unclassified task' }] });
     await client.$disconnect();
-    assert.equal((await repo.getDecisionById('legacy'))?.actionItems[0]?.state, 'unknown');
+    expect((await repo.getDecisionById('legacy'))?.actionItems[0]?.state).toBe('unknown');
     const restoredHistorical = await repo.getDecisionById('historical-string-id');
     const { updatedAt, ...legacyDomain } = restoredHistorical!;
-    assert.equal(updatedAt, '2020-01-01T00:00:00.000Z');
-    assert.deepEqual(legacyDomain, historical);
+    expect(updatedAt).toBe('2020-01-01T00:00:00.000Z');
+    expect(legacyDomain).toEqual(historical);
     const page = await repo.browseDecisions({
       guildId: 'g',
       status: 'SUPERSEDED',
@@ -101,11 +100,10 @@ test('checked-in additive migrations preserve a legacy-schema fixture and missin
       page: 1,
       size: 10,
     });
-    assert.deepEqual(
-      page.decisions.map(({ updatedAt: _updatedAt, ...decision }) => decision),
-      [historical],
-    );
-    assert.equal(page.pageInfo.totalElements, 1);
+    expect(page.decisions.map(({ updatedAt: _updatedAt, ...decision }) => decision)).toEqual([
+      historical,
+    ]);
+    expect(page.pageInfo.totalElements).toBe(1);
   } finally {
     await client.$disconnect();
     await rm(dir, { recursive: true });

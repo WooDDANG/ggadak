@@ -6,7 +6,15 @@
     "outDir": "./dist-test",
     "strict": true,
     "esModuleInterop": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "noEmit": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true
   },
-  "include": ["test/**/*"]
+  "include": [
+    "tests/e2e/**/*",
+    "tooling/**/*",
+    "vitest.e2e.config.ts",
+    "apps/be/src/types/**/*.d.ts"
+  ]
 }

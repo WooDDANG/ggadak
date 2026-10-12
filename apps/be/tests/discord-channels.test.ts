@@ -1,6 +1,5 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
-import { HttpDiscordChannelsAdapter } from './adapters/discord-channels.adapter.js';
+import { test, expect } from 'vitest';
+import { HttpDiscordChannelsAdapter } from '../src/adapters/discord-channels.adapter.js';
 
 test('Discord channel access uses bot identity and effective channel overwrite permissions', async () => {
   const responses: Record<string, unknown> = {
@@ -26,16 +25,13 @@ test('Discord channel access uses bot identity and effective channel overwrite p
   };
   const adapter = new HttpDiscordChannelsAdapter('token', async input => {
     const path = new URL(String(input)).pathname.replace('/api/v10', '');
-    assert.ok(path in responses, `Unsupported Discord API path: ${path}`);
+    expect(path in responses, `Unsupported Discord API path: ${path}`).toBeTruthy();
     return Response.json(responses[path]);
   });
-  assert.deepEqual(
-    (await adapter.list('g1')).map(channel => [channel.id, channel.accessible]),
-    [
-      ['allowed', true],
-      ['denied', false],
-      ['thread', false],
-      ['outside', false],
-    ],
-  );
+  expect((await adapter.list('g1')).map(channel => [channel.id, channel.accessible])).toEqual([
+    ['allowed', true],
+    ['denied', false],
+    ['thread', false],
+    ['outside', false],
+  ]);
 });

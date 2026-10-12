@@ -1,10 +1,9 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { test, expect } from 'vitest';
 import { DecisionSchema } from '@ggaddak/shared';
 import { PrismaClient } from '@prisma/client';
-import { isolatedRepository } from './repositories/test-database.js';
-import { DecisionRepository } from './repositories/decision.repository.js';
-import { SearchService, EmbeddingProvider } from './services/search.service.js';
+import { isolatedRepository } from '../src/repositories/test-database.js';
+import { DecisionRepository } from '../src/repositories/decision.repository.js';
+import { SearchService, EmbeddingProvider } from '../src/services/search.service.js';
 
 const provider: EmbeddingProvider = {
   model: 'fixture-v1',
@@ -43,11 +42,11 @@ test('Why retrieves related Rationale and sources only from confirmed guild reco
       );
     const service = new SearchService(db.repo, provider);
     const results = await service.search('guild-1', '빠르게 응답하는 이유?', 1);
-    assert.equal(results.items.length, 1);
-    assert.equal(results.items[0].decision.id, 'cache');
-    assert.equal(results.items[0].score, 1);
-    assert.ok(results.items[0].excerpt.includes('Reduce latency'));
-    assert.equal(results.items[0].sourceUrl, 'https://discord.com/channels/guild-1/c/m');
+    expect(results.items.length).toBe(1);
+    expect(results.items[0].decision.id).toBe('cache');
+    expect(results.items[0].score).toBe(1);
+    expect(results.items[0].excerpt.includes('Reduce latency')).toBeTruthy();
+    expect(results.items[0].sourceUrl).toBe('https://discord.com/channels/guild-1/c/m');
     await db.client.$disconnect();
     restarted = new PrismaClient({ datasources: { db: { url: db.url } } });
     let calls = 0;
@@ -58,16 +57,16 @@ test('Why retrieves related Rationale and sources only from confirmed guild reco
         return provider.embed(text);
       },
     });
-    assert.equal((await after.search('guild-1', '빠르게', 1)).items[0].decision.id, 'cache');
-    assert.equal(calls, 1, 'restart reuses stored document vectors; only query needs embedding');
+    expect((await after.search('guild-1', '빠르게', 1)).items[0].decision.id).toBe('cache');
+    expect(calls, 'restart reuses stored document vectors; only query needs embedding').toBe(1);
   } finally {
     await restarted?.$disconnect();
     await db.cleanup();
   }
 });
 
-import { createServer } from './server.js';
-import { fakeAuthOptions, loginAsTestUser } from './test-support/auth.js';
+import { createServer } from '../src/server.js';
+import { fakeAuthOptions, loginAsTestUser } from '../src/test-support/auth.js';
 
 test('Why HTTP enforces authentication, guild access and input bounds and retries failed indexing after edits', async () => {
   const db = await isolatedRepository();
@@ -94,35 +93,29 @@ test('Why HTTP enforces authentication, guild access and input bounds and retrie
         createdAt: '2026-01-01T00:00:00Z',
       }),
     );
-    assert.equal((await fetch(`${base}/api/v1/search?guildId=guild-1&query=빠르게`)).status, 401);
+    expect((await fetch(`${base}/api/v1/search?guildId=guild-1&query=빠르게`)).status).toBe(401);
     const { token } = await loginAsTestUser(base);
     const headers = { Authorization: `Bearer ${token}` };
-    assert.equal(
+    expect(
       (await fetch(`${base}/api/v1/search?guildId=forbidden&query=빠르게`, { headers })).status,
-      403,
-    );
-    assert.equal(
+    ).toBe(403);
+    expect(
       (await fetch(`${base}/api/v1/search?guildId=guild-1&query=빠르게&limit=0`, { headers }))
         .status,
-      400,
-    );
-    assert.equal(
+    ).toBe(400);
+    expect(
       (await fetch(`${base}/api/v1/search?guildId=guild-1&query=%20`, { headers })).status,
-      400,
-    );
+    ).toBe(400);
     const url = `${base}/api/v1/search?guildId=guild-1&query=빠르게`;
-    assert.equal((await fetch(url, { headers })).status, 200);
+    expect((await fetch(url, { headers })).status).toBe(200);
     const d = (await db.repo.getDecisionById('d'))!;
     await db.repo.saveDecision({ ...d, rationale: 'Updated source rationale' });
     fail = true;
-    assert.equal((await fetch(url, { headers })).status, 503);
+    expect((await fetch(url, { headers })).status).toBe(503);
     fail = false;
     const response = await fetch(url, { headers });
-    assert.equal(response.status, 200);
-    assert.equal(
-      ((await response.json()) as any).data.items[0].excerpt,
-      'Updated source rationale',
-    );
+    expect(response.status).toBe(200);
+    expect(((await response.json()) as any).data.items[0].excerpt).toBe('Updated source rationale');
   } finally {
     await new Promise<void>(resolve => server.close(() => resolve()));
     await db.cleanup();
@@ -145,9 +138,9 @@ test('review confirmation indexes a candidate, document-provider failure survive
       }),
     );
     const service = new SearchService(db.repo, provider);
-    assert.equal((await service.search('guild-1', '빠르게')).items.length, 0);
+    expect((await service.search('guild-1', '빠르게')).items.length).toBe(0);
     await db.repo.reviewDecision('review', 'confirm', { expectedVersion: 1, approvedBy: 'Lee' });
-    assert.equal((await service.search('guild-1', '빠르게')).items[0].decision.status, 'CONFIRMED');
+    expect((await service.search('guild-1', '빠르게')).items[0].decision.status).toBe('CONFIRMED');
     const updated = (await db.repo.getDecisionById('review'))!;
     await db.repo.saveDecision({ ...updated, rationale: 'Changed Rationale' });
     const failing = new SearchService(db.repo, {
@@ -157,15 +150,14 @@ test('review confirmation indexes a candidate, document-provider failure survive
         return provider.embed(text);
       },
     });
-    await assert.rejects(
-      () => failing.search('guild-1', '빠르게'),
+    await expect((() => failing.search('guild-1', '빠르게'))()).rejects.toThrow(
       /Embedding provider unavailable/,
     );
     await db.client.$disconnect();
     restarted = new PrismaClient({ datasources: { db: { url: db.url } } });
     const retry = new SearchService(new DecisionRepository(restarted), provider);
-    assert.equal((await retry.backfill('guild-1')).indexed, 1);
-    assert.equal((await retry.search('guild-1', '빠르게')).items[0].excerpt, 'Changed Rationale');
+    expect((await retry.backfill('guild-1')).indexed).toBe(1);
+    expect((await retry.search('guild-1', '빠르게')).items[0].excerpt).toBe('Changed Rationale');
     // Public Prisma storage boundary represents an imported discarded decision.
     await restarted.decision.update({
       where: { id: 'review' },
@@ -175,7 +167,7 @@ test('review confirmation indexes a candidate, document-provider failure survive
         domainJson: JSON.stringify({ ...updated, state: 'Rejected' }),
       },
     });
-    assert.equal((await retry.search('guild-1', '빠르게')).items.length, 0);
+    expect((await retry.search('guild-1', '빠르게')).items.length).toBe(0);
   } finally {
     await restarted?.$disconnect();
     await db.cleanup();

@@ -1,12 +1,11 @@
 import 'reflect-metadata';
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
-import { isolatedRepository } from '../repositories/test-database.js';
-import { DiscussionService } from './discussion.service.js';
-import { DecisionExtractorCore } from '../engine/extractor-core.js';
-import { IAiAdapter } from '../adapters/ai.adapter.js';
-import { ExtractionResultSchema } from '../extractor/schemas.js';
-import { DecisionRepository } from '../repositories/decision.repository.js';
+import { test, expect, vi } from 'vitest';
+import { isolatedRepository } from '../../src/repositories/test-database.js';
+import { DiscussionService } from '../../src/services/discussion.service.js';
+import { DecisionExtractorCore } from '../../src/engine/extractor-core.js';
+import { IAiAdapter } from '../../src/adapters/ai.adapter.js';
+import { ExtractionResultSchema } from '../../src/extractor/schemas.js';
+import { DecisionRepository } from '../../src/repositories/decision.repository.js';
 import { PrismaClient } from '@prisma/client';
 import { createHash } from 'node:crypto';
 import { DecisionSchema } from '@ggaddak/shared';
@@ -44,8 +43,8 @@ test('lost-response retry survives restart and does not repeat paid extraction, 
       new DecisionExtractorCore(),
     ).analyzeDiscussion(input);
     await restarted.$disconnect();
-    assert.deepEqual(retry, first);
-    assert.equal(calls, 1);
+    expect(retry).toEqual(first);
+    expect(calls).toBe(1);
   } finally {
     await db.cleanup();
   }
@@ -62,8 +61,8 @@ test('original burst message IDs and reply targets remain available to extractio
   const db = await isolatedRepository();
   const adapter: IAiAdapter = {
     async analyzeTranscript(transcript) {
-      assert.match(transcript, /\[101\]/);
-      assert.match(transcript, /replying to 101/);
+      expect(transcript).toMatch(/\[101\]/);
+      expect(transcript).toMatch(/replying to 101/);
       return extracted();
     },
   };
@@ -91,8 +90,8 @@ test('original burst message IDs and reply targets remain available to extractio
         },
       ],
     });
-    assert.deepEqual(result.decisions[0].rawEvidence, ['100', '101', '102']);
-    assert.equal(result.decisions[0].source.rawMessages[2].replyingTo, '101');
+    expect(result.decisions[0].rawEvidence).toEqual(['100', '101', '102']);
+    expect(result.decisions[0].source.rawMessages[2].replyingTo).toBe('101');
   } finally {
     await db.cleanup();
   }
@@ -121,21 +120,20 @@ test('concurrent same-ID deliveries produce one committed candidate and changed 
   try {
     const first = service.analyzeDiscussion(input);
     await started;
-    await assert.rejects(service.analyzeDiscussion(input), { status: 503 });
+    await expect(service.analyzeDiscussion(input)).rejects.toMatchObject({ status: 503 });
     resume();
     const result = await first;
     const replay = await service.analyzeDiscussion({ ...input, traceId: 'retry-trace' });
-    assert.deepEqual(replay, result);
-    assert.equal((await db.repo.getDecisions()).length, 1);
-    assert.equal(calls, 1);
-    await assert.rejects(
+    expect(replay).toEqual(result);
+    expect((await db.repo.getDecisions()).length).toBe(1);
+    expect(calls).toBe(1);
+    await expect(
       service.analyzeDiscussion({
         ...input,
         rawMessages: [{ ...input.rawMessages[0], content: 'Changed' }],
       }),
-      { status: 409 },
-    );
-    assert.equal(await db.repo.getCheckpoint(input.channelId), null);
+    ).rejects.toMatchObject({ status: 409 });
+    expect(await db.repo.getCheckpoint(input.channelId)).toBe(null);
   } finally {
     resume();
     await db.cleanup();
@@ -162,13 +160,13 @@ test('a failed later session commits no partial candidates and retry can recover
     ],
   };
   try {
-    await assert.rejects(service.analyzeDiscussion(params), /Provider unavailable/);
-    assert.deepEqual(await db.repo.getDecisions(), []);
+    await expect(service.analyzeDiscussion(params)).rejects.toThrow(/Provider unavailable/);
+    expect(await db.repo.getDecisions()).toEqual([]);
     shouldFail = false;
     const result = await service.analyzeDiscussion(params);
-    assert.equal(result.decisions.length, 2);
-    assert.equal((await service.analyzeDiscussion(params)).decisions.length, 2);
-    assert.equal(calls, 4);
+    expect(result.decisions.length).toBe(2);
+    expect((await service.analyzeDiscussion(params)).decisions.length).toBe(2);
+    expect(calls).toBe(4);
   } finally {
     await db.cleanup();
   }
@@ -194,9 +192,9 @@ test('exact reanalysis preserves reviewer edits and rejection while unrelated de
       decisionContent: 'Reviewer edited text',
     });
     const manual = await service.analyzeDiscussion({ ...input, requestId: 'manual-two' });
-    assert.equal(manual.decisions[0].id, original.id);
-    assert.equal(manual.decisions[0].state, 'Draft');
-    assert.equal(manual.decisions[0].decisionContent, 'Reviewer edited text');
+    expect(manual.decisions[0].id).toBe(original.id);
+    expect(manual.decisions[0].state).toBe('Draft');
+    expect(manual.decisions[0].decisionContent).toBe('Reviewer edited text');
     await db.repo.reviewDecision(original.id, 'reject', {
       expectedVersion: manual.decisions[0].version!,
     });
@@ -210,27 +208,27 @@ test('exact reanalysis preserves reviewer edits and rejection while unrelated de
       requestId: 'auto-three',
       isManualOverride: false,
     });
-    assert.equal(automatic.decisions.length, 1);
-    assert.equal(automatic.decisions[0].decision, 'Deploy on Monday');
+    expect(automatic.decisions.length).toBe(1);
+    expect(automatic.decisions[0].decision).toBe('Deploy on Monday');
     await db.repo.reviewDecision(automatic.decisions[0].id, 'confirm', {
       expectedVersion: automatic.decisions[0].version!,
       approvedBy: 'Kim',
     });
     const changed = await service.analyzeDiscussion({ ...input, requestId: 'manual-four' });
-    assert.equal(changed.decisions.length, 2);
-    assert.equal(changed.decisions.find(d => d.id === original.id)?.state, 'Rejected');
-    assert.equal(changed.decisions.find(d => d.id === automatic.decisions[0].id)?.state, 'Decided');
+    expect(changed.decisions.length).toBe(2);
+    expect(changed.decisions.find(d => d.id === original.id)?.state).toBe('Rejected');
+    expect(changed.decisions.find(d => d.id === automatic.decisions[0].id)?.state).toBe('Decided');
     const history = await service.getCandidateHistory(automatic.decisions[0].id);
-    assert.ok(history.some(h => h.previousRequestIds.includes('manual-two')));
-    assert.ok(history.some(h => h.relatedCandidateIds.includes(original.id)));
+    expect(history.some(h => h.previousRequestIds.includes('manual-two'))).toBeTruthy();
+    expect(history.some(h => h.relatedCandidateIds.includes(original.id))).toBeTruthy();
   } finally {
     await db.cleanup();
   }
 });
 
-test('an abandoned claim recovers after lease expiry and its stale owner cannot commit', async t => {
+test('an abandoned claim recovers after lease expiry and its stale owner cannot commit', async () => {
   const db = await isolatedRepository();
-  t.mock.timers.enable({ apis: ['Date'], now: Date.now() });
+  vi.useFakeTimers({ toFake: ['Date'] });
   let entered!: () => void;
   let resume!: () => void;
   const started = new Promise<void>(resolve => {
@@ -262,16 +260,16 @@ test('an abandoned claim recovers after lease expiry and its stale owner cannot 
   try {
     const interrupted = old.analyzeDiscussion(input);
     await started;
-    t.mock.timers.setTime(Date.now() + 60_001);
+    vi.setSystemTime(Date.now() + 60_001);
     const recovered = await restarted.analyzeDiscussion(input);
     resume();
-    await assert.rejects(interrupted, { status: 503 });
-    assert.equal(recovered.decisions[0].decision, 'Recovered owner');
-    assert.equal((await db.repo.getDecisions()).length, 1);
-    assert.deepEqual(await restarted.analyzeDiscussion(input), recovered);
+    await expect(interrupted).rejects.toMatchObject({ status: 503 });
+    expect(recovered.decisions[0].decision).toBe('Recovered owner');
+    expect((await db.repo.getDecisions()).length).toBe(1);
+    expect(await restarted.analyzeDiscussion(input)).toEqual(recovered);
   } finally {
     resume();
-    t.mock.timers.reset();
+    vi.useRealTimers();
     await db.cleanup();
   }
 });
@@ -296,7 +294,7 @@ test('partial overlap remains related and delivery reactions do not change canon
         { ...input.rawMessages[0], reactionCount: 5, reactions: [{ emoji: '👀', count: 1 }] },
       ],
     });
-    assert.equal(reacted.decisions[0].id, first.decisions[0].id);
+    expect(reacted.decisions[0].id).toBe(first.decisions[0].id);
     const overlapping = await service.analyzeDiscussion({
       ...input,
       requestId: 'overlap',
@@ -310,13 +308,13 @@ test('partial overlap remains related and delivery reactions do not change canon
         },
       ],
     });
-    assert.notEqual(overlapping.decisions[0].id, first.decisions[0].id);
-    assert.equal((await db.repo.getDecisions()).length, 2);
-    assert.ok(
+    expect(overlapping.decisions[0].id).not.toBe(first.decisions[0].id);
+    expect((await db.repo.getDecisions()).length).toBe(2);
+    expect(
       (await service.getCandidateHistory(first.decisions[0].id)).some(h =>
         h.relatedCandidateIds.includes(overlapping.decisions[0].id),
       ),
-    );
+    ).toBeTruthy();
   } finally {
     await db.cleanup();
   }
@@ -338,12 +336,12 @@ test('a persistence failure rolls back candidates and completion together; the o
     await db.client.$executeRawUnsafe(
       `CREATE TRIGGER fail_history BEFORE INSERT ON CandidateAnalysis BEGIN SELECT RAISE(ABORT, 'disk write failure'); END`,
     );
-    await assert.rejects(service.analyzeDiscussion(input));
-    assert.deepEqual(await db.repo.getDecisions(), []);
+    await expect(service.analyzeDiscussion(input)).rejects.toBeDefined();
+    expect(await db.repo.getDecisions()).toEqual([]);
     await db.client.$executeRawUnsafe('DROP TRIGGER fail_history');
     const retry = await service.analyzeDiscussion(input);
-    assert.equal(retry.decisions.length, 1);
-    assert.equal((await service.getCandidateHistory(retry.decisions[0].id)).length, 1);
+    expect(retry.decisions.length).toBe(1);
+    expect((await service.getCandidateHistory(retry.decisions[0].id)).length).toBe(1);
   } finally {
     await db.cleanup();
   }
@@ -386,10 +384,7 @@ test('legacy rejected evidence suppresses its original decision rather than ever
       new DecisionExtractorCore(),
     );
     const result = await service.analyzeDiscussion({ ...input, isManualOverride: false });
-    assert.deepEqual(
-      result.decisions.map(d => d.decision),
-      ['Deploy on Monday'],
-    );
+    expect(result.decisions.map(d => d.decision)).toEqual(['Deploy on Monday']);
   } finally {
     await db.cleanup();
   }

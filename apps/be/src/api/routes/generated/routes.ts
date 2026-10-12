@@ -590,7 +590,7 @@ const models: TsoaRoute.Models = {
         "additionalProperties": false,
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
-    "AuthUser": {
+    "AuthUserDto": {
         "dataType": "refObject",
         "properties": {
             "id": {"dataType":"string","required":true},
@@ -602,24 +602,24 @@ const models: TsoaRoute.Models = {
         "additionalProperties": false,
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
-    "ApiResponse__accessToken-string--tokenType-string--expiresAt-string--user-AuthUser__": {
+    "ApiResponse__accessToken-string--tokenType-string--expiresAt-string--user-AuthUserDto__": {
         "dataType": "refObject",
         "properties": {
             "success": {"dataType":"boolean","required":true},
             "code": {"dataType":"string","required":true},
             "message": {"dataType":"string","required":true},
-            "data": {"dataType":"nestedObjectLiteral","nestedProperties":{"user":{"ref":"AuthUser","required":true},"expiresAt":{"dataType":"string","required":true},"tokenType":{"dataType":"string","required":true},"accessToken":{"dataType":"string","required":true}},"required":true},
+            "data": {"dataType":"nestedObjectLiteral","nestedProperties":{"user":{"ref":"AuthUserDto","required":true},"expiresAt":{"dataType":"string","required":true},"tokenType":{"dataType":"string","required":true},"accessToken":{"dataType":"string","required":true}},"required":true},
         },
         "additionalProperties": false,
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
-    "ApiResponse_AuthUser_": {
+    "ApiResponse_AuthUserDto_": {
         "dataType": "refObject",
         "properties": {
             "success": {"dataType":"boolean","required":true},
             "code": {"dataType":"string","required":true},
             "message": {"dataType":"string","required":true},
-            "data": {"ref":"AuthUser","required":true},
+            "data": {"ref":"AuthUserDto","required":true},
         },
         "additionalProperties": false,
     },
@@ -799,7 +799,7 @@ export function RegisterRoutes(app: Router) {
                 request: {"in":"request","name":"request","required":true,"dataType":"object"},
                 id: {"in":"path","name":"id","required":true,"dataType":"string"},
                 guildId: {"in":"query","name":"guildId","required":true,"dataType":"string"},
-                body: {"in":"body","name":"body","required":true,"ref":"DecisionEditDto"},
+                _body: {"in":"body","name":"_body","required":true,"ref":"DecisionEditDto"},
         };
         app.put('/api/v1/decisions/:id',
             authenticateMiddleware([{"jwt":[]}]),

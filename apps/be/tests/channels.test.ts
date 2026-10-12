@@ -1,11 +1,10 @@
 import { PrismaClient } from '@prisma/client';
-import { DecisionRepository } from './repositories/decision.repository.js';
-import { AppError } from './errors/AppError.js';
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
-import { createServer } from './server.js';
-import { isolatedRepository } from './repositories/test-database.js';
-import { fakeAuthOptions, loginAsTestUser } from './test-support/auth.js';
+import { DecisionRepository } from '../src/repositories/decision.repository.js';
+import { AppError } from '../src/errors/AppError.js';
+import { test, expect } from 'vitest';
+import { createServer } from '../src/server.js';
+import { isolatedRepository } from '../src/repositories/test-database.js';
+import { fakeAuthOptions, loginAsTestUser } from '../src/test-support/auth.js';
 
 test('Monitoring settings authorize guild managers, validate Discord channels, and survive restart', async () => {
   const db = await isolatedRepository();
@@ -32,11 +31,11 @@ test('Monitoring settings authorize guild managers, validate Discord channels, a
     const deniedOrigin = await fetch(`${base}/health`, {
       headers: { Origin: 'https://untrusted.example' },
     });
-    assert.equal(deniedOrigin.headers.get('access-control-allow-origin'), null);
+    expect(deniedOrigin.headers.get('access-control-allow-origin')).toBe(null);
     const localOrigin = await fetch(`${base}/health`, {
       headers: { Origin: 'http://localhost:5173' },
     });
-    assert.equal(localOrigin.headers.get('access-control-allow-origin'), 'http://localhost:5173');
+    expect(localOrigin.headers.get('access-control-allow-origin')).toBe('http://localhost:5173');
     const { token } = await loginAsTestUser(base);
     const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
     const save = async (guildId: string, ids: string[]) =>
@@ -45,23 +44,23 @@ test('Monitoring settings authorize guild managers, validate Discord channels, a
         headers,
         body: JSON.stringify({ channelIds: ids }),
       });
-    assert.equal((await save('guild-1', ['c1'])).status, 200);
-    assert.equal((await save('guild-2', ['c1'])).status, 403);
-    assert.equal((await save('guild-1', ['other-server-channel'])).status, 400);
+    expect((await save('guild-1', ['c1'])).status).toBe(200);
+    expect((await save('guild-2', ['c1'])).status).toBe(403);
+    expect((await save('guild-1', ['other-server-channel'])).status).toBe(400);
     const get = async () =>
       (
         (await (
           await fetch(`${base}/api/v1/discord/channels?guildId=guild-1`, { headers })
         ).json()) as any
       ).data;
-    assert.deepEqual((await get()).monitoredChannelIds, ['c1']);
+    expect((await get()).monitoredChannelIds).toEqual(['c1']);
     await new Promise<void>(r => server.close(() => r()));
     await db.client.$disconnect();
     reopened = new PrismaClient({ datasources: { db: { url: db.url } } });
     server = await createServer(new DecisionRepository(reopened), undefined, options);
     base = await listen();
-    assert.deepEqual((await get()).monitoredChannelIds, ['c1']);
-    assert.equal((await fetch(`${base}/api/v1/internal/monitoring?guildId=guild-1`)).status, 401);
+    expect((await get()).monitoredChannelIds).toEqual(['c1']);
+    expect((await fetch(`${base}/api/v1/internal/monitoring?guildId=guild-1`)).status).toBe(401);
     const monitored = async () =>
       (
         (await (
@@ -70,19 +69,19 @@ test('Monitoring settings authorize guild managers, validate Discord channels, a
           })
         ).json()) as any
       ).data.channelIds;
-    assert.deepEqual(await monitored(), ['c1']);
+    expect(await monitored()).toEqual(['c1']);
     accessible = false;
-    assert.deepEqual(await monitored(), []);
-    assert.equal((await save('guild-1', ['c1'])).status, 400);
-    assert.deepEqual((await get()).monitoredChannelIds, ['c1']);
+    expect(await monitored()).toEqual([]);
+    expect((await save('guild-1', ['c1'])).status).toBe(400);
+    expect((await get()).monitoredChannelIds).toEqual(['c1']);
     botInstalled = false;
-    assert.equal((await save('guild-1', [])).status, 409);
+    expect((await save('guild-1', [])).status).toBe(409);
     botInstalled = true;
     accessible = true;
-    assert.deepEqual((await get()).monitoredChannelIds, ['c1']);
-    assert.equal((await save('guild-1', ['c1', 'c1'])).status, 400);
-    assert.equal((await save('guild-1', [])).status, 200);
-    assert.deepEqual(await monitored(), []);
+    expect((await get()).monitoredChannelIds).toEqual(['c1']);
+    expect((await save('guild-1', ['c1', 'c1'])).status).toBe(400);
+    expect((await save('guild-1', [])).status).toBe(200);
+    expect(await monitored()).toEqual([]);
   } finally {
     await new Promise<void>(r => server.close(() => r()));
     await reopened?.$disconnect();

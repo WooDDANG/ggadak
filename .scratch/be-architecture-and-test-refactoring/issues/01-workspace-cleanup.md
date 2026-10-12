@@ -4,9 +4,13 @@
 
 **Blocked by:** None
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] 루트의 `pnpm-workspace.yaml`을 삭제하고 `package-lock.json` 기반의 npm 워크스페이스 체계를 정착시킨다.
-- [ ] Orval 및 TSOA 자동 생성 경로(`apps/fe/src/api/generated/`, `apps/be/src/api/routes/generated/` 등)를 `.prettierignore` 및 `.eslintignore`에 등록한다.
-- [ ] `npm run format`을 실행하여 프로젝트 전체 코드 스타일을 일괄 정리하고 `npm run format:check`가 성공하도록 만든다.
-- [ ] `npm run lint` 검사가 정상 통과하는지 확인한다.
+- [x] 이미 존재하는 루트 `package-lock.json`과 npm workspaces를 단일 패키지 관리 경로로 유지하고 불필요한 `pnpm-workspace.yaml`을 제거한다.
+- [x] Orval 및 TSOA 자동 생성 경로(`apps/fe/src/api/generated/`, `apps/be/src/api/routes/generated/` 등)를 `.prettierignore`와 ESLint flat config(`eslint.config.mjs`)의 ignore 설정에 등록한다. 별도 `.eslintignore`는 만들지 않는다.
+- [x] 먼저 `npm run format:check`를 실행해 현재 실패 파일을 확인한다. 포맷이 필요한 파일만 정리하고, 생성 코드와 산출물은 변경하지 않으며 포맷 전용 커밋으로 검토할 수 있도록 한다.
+- [x] 전체 `npm run format:check`와 `npm run lint`가 통과하는지 확인한다.
+
+## Implementation
+
+Generated TSOA/Orval paths are ignored by Prettier and ESLint. Formatting is isolated in commit d6f0f08. npm run format:check and npm run lint pass (lint retains 7 pre-existing Bot/shared warnings).

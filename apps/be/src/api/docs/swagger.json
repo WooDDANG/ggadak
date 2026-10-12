@@ -2040,7 +2040,7 @@
 				"type": "object",
 				"additionalProperties": false
 			},
-			"AuthUser": {
+			"AuthUserDto": {
 				"properties": {
 					"id": {
 						"type": "string"
@@ -2070,7 +2070,7 @@
 				"type": "object",
 				"additionalProperties": false
 			},
-			"ApiResponse__accessToken-string--tokenType-string--expiresAt-string--user-AuthUser__": {
+			"ApiResponse__accessToken-string--tokenType-string--expiresAt-string--user-AuthUserDto__": {
 				"description": "Shared v1 response contract. Domain payloads remain typed by each endpoint.",
 				"properties": {
 					"success": {
@@ -2085,7 +2085,7 @@
 					"data": {
 						"properties": {
 							"user": {
-								"$ref": "#/components/schemas/AuthUser"
+								"$ref": "#/components/schemas/AuthUserDto"
 							},
 							"expiresAt": {
 								"type": "string"
@@ -2115,7 +2115,7 @@
 				"type": "object",
 				"additionalProperties": false
 			},
-			"ApiResponse_AuthUser_": {
+			"ApiResponse_AuthUserDto_": {
 				"description": "Shared v1 response contract. Domain payloads remain typed by each endpoint.",
 				"properties": {
 					"success": {
@@ -2128,7 +2128,7 @@
 						"type": "string"
 					},
 					"data": {
-						"$ref": "#/components/schemas/AuthUser"
+						"$ref": "#/components/schemas/AuthUserDto"
 					}
 				},
 				"required": [
@@ -3351,7 +3351,7 @@
 						"content": {
 							"application/json": {
 								"schema": {
-									"$ref": "#/components/schemas/ApiResponse__accessToken-string--tokenType-string--expiresAt-string--user-AuthUser__"
+									"$ref": "#/components/schemas/ApiResponse__accessToken-string--tokenType-string--expiresAt-string--user-AuthUserDto__"
 								}
 							}
 						}
@@ -3395,7 +3395,7 @@
 						"content": {
 							"application/json": {
 								"schema": {
-									"$ref": "#/components/schemas/ApiResponse_AuthUser_"
+									"$ref": "#/components/schemas/ApiResponse_AuthUserDto_"
 								}
 							}
 						}

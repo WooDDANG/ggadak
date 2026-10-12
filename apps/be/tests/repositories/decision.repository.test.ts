@@ -1,10 +1,9 @@
 import 'reflect-metadata';
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { test, expect } from 'vitest';
 import { PrismaClient } from '@prisma/client';
 import { DecisionSchema } from '@ggaddak/shared';
-import { isolatedRepository } from './test-database.js';
-import { DecisionRepository } from './decision.repository.js';
+import { isolatedRepository } from '../../src/repositories/test-database.js';
+import { DecisionRepository } from '../../src/repositories/decision.repository.js';
 test('full decisions and supporting records survive repository restart', async () => {
   const db = await isolatedRepository();
   try {
@@ -53,15 +52,15 @@ test('full decisions and supporting records survive repository restart', async (
     const restarted = new PrismaClient({ datasources: { db: { url: db.url } } });
     const recovered = new DecisionRepository(restarted);
     const actual = await recovered.getDecisionById('restart');
-    assert.deepEqual(actual, saved);
-    assert.equal(actual?.actionItems[0]?.state, 'unknown');
-    assert.ok(actual?.actionItems[0]?.id);
-    assert.equal(actual?.source.rawMessages[0]?.content, 'Use SQLite');
-    assert.equal(actual?.actionItems[0]?.task, 'Migrate');
-    assert.equal(actual?.createdAt, '2020-01-01T00:00:00.000Z');
-    assert.equal(await recovered.getCheckpoint('c'), '123456789012345678');
-    assert.equal((await recovered.getRecentFeedbacks('c'))[0]?.detail, 'Review');
-    assert.equal(await recovered.isEvidenceRejected('rejected'), true);
+    expect(actual).toEqual(saved);
+    expect(actual?.actionItems[0]?.state).toBe('unknown');
+    expect(actual?.actionItems[0]?.id).toBeTruthy();
+    expect(actual?.source.rawMessages[0]?.content).toBe('Use SQLite');
+    expect(actual?.actionItems[0]?.task).toBe('Migrate');
+    expect(actual?.createdAt).toBe('2020-01-01T00:00:00.000Z');
+    expect(await recovered.getCheckpoint('c')).toBe('123456789012345678');
+    expect((await recovered.getRecentFeedbacks('c'))[0]?.detail).toBe('Review');
+    expect(await recovered.isEvidenceRejected('rejected')).toBe(true);
     await restarted.$disconnect();
   } finally {
     await db.cleanup();
@@ -89,16 +88,18 @@ test('review edits persist approval, category and original timestamps after rest
       rationaleSummary: 'Reviewed reason',
       rationaleQuotes: ['Evidence'],
     });
-    assert.equal(edited?.version, 2);
+    expect(edited?.version).toBe(2);
     await db.client.$disconnect();
     const client = new PrismaClient({ datasources: { db: { url: db.url } } });
-    const repo = new (await import('./decision.repository.js')).DecisionRepository(client);
+    const repo = new (
+      await import('../../src/repositories/decision.repository.js')
+    ).DecisionRepository(client);
     const recovered = await repo.getDecisionById('edit');
-    assert.equal(recovered?.decisionContent, 'Reviewed content');
-    assert.equal(recovered?.categoryTag, '기술');
-    assert.equal(recovered?.approvedBy, 'Kim');
-    assert.equal(recovered?.decisionConfirmedDate, edited?.decisionConfirmedDate);
-    assert.equal(recovered?.createdAt, '2020-01-01T00:00:00.000Z');
+    expect(recovered?.decisionContent).toBe('Reviewed content');
+    expect(recovered?.categoryTag).toBe('기술');
+    expect(recovered?.approvedBy).toBe('Kim');
+    expect(recovered?.decisionConfirmedDate).toBe(edited?.decisionConfirmedDate);
+    expect(recovered?.createdAt).toBe('2020-01-01T00:00:00.000Z');
     await client.$disconnect();
   } finally {
     await db.cleanup();
@@ -106,14 +107,14 @@ test('review edits persist approval, category and original timestamps after rest
 });
 
 test('database write failures propagate and failed startup cannot return a ready server', async () => {
-  const { DecisionRepository } = await import('./decision.repository.js');
+  const { DecisionRepository } = await import('../../src/repositories/decision.repository.js');
   const client = new PrismaClient({
     datasources: { db: { url: 'file:/does-not-exist/ggaddak/test.sqlite' } },
   });
   const repo = new DecisionRepository(client);
-  await assert.rejects(repo.saveCheckpoint('c', '1'));
-  const { createServer } = await import('../server.js');
-  await assert.rejects(createServer(repo));
+  await expect(repo.saveCheckpoint('c', '1')).rejects.toBeDefined();
+  const { createServer } = await import('../../src/server.js');
+  await expect(createServer(repo)).rejects.toBeDefined();
   await client.$disconnect();
 });
 
@@ -131,11 +132,10 @@ test('stale review conflicts without changing a decision', async () => {
       }),
     );
     await db.repo.reviewDecision('stale', 'confirm', { expectedVersion: 1 });
-    await assert.rejects(
-      db.repo.reviewDecision('stale', 'reject', { expectedVersion: 1 }),
+    await expect(db.repo.reviewDecision('stale', 'reject', { expectedVersion: 1 })).rejects.toThrow(
       /version|stale/i,
     );
-    assert.equal((await db.repo.getDecisionById('stale'))?.state, 'Decided');
+    expect((await db.repo.getDecisionById('stale'))?.state).toBe('Decided');
   } finally {
     await db.cleanup();
   }
@@ -163,7 +163,7 @@ test('replacement transfers open work, preserves completed history and commits b
       }),
     );
     await db.repo.saveDecision(DecisionSchema.parse({ ...base, id: 'new', supersedesId: 'old' }));
-    assert.equal((await db.repo.getDecisionById('old'))?.state, 'Decided');
+    expect((await db.repo.getDecisionById('old'))?.state).toBe('Decided');
     const next = await db.repo.reviewDecision('new', 'confirm', {
       expectedVersion: 1,
       resolution: 'replace',
@@ -172,11 +172,11 @@ test('replacement transfers open work, preserves completed history and commits b
       taskDispositions: [{ actionItemId: 'todo', disposition: 'transfer' }],
     });
     const old = await db.repo.getDecisionById('old');
-    assert.equal(old?.state, 'Superseded');
-    assert.equal(old?.supersededById, 'new');
-    assert.equal(old?.actionItems[1]?.state, 'completed');
-    assert.equal(next?.actionItems[0]?.transferredFromActionItemId, 'todo');
-    assert.equal(next?.isPivot, false);
+    expect(old?.state).toBe('Superseded');
+    expect(old?.supersededById).toBe('new');
+    expect(old?.actionItems[1]?.state).toBe('completed');
+    expect(next?.actionItems[0]?.transferredFromActionItemId).toBe('todo');
+    expect(next?.isPivot).toBe(false);
   } finally {
     await db.cleanup();
   }
@@ -201,7 +201,7 @@ test('invalid replacement rolls back edits, classifies legacy tasks explicitly a
       }),
     );
     await db.repo.saveDecision(DecisionSchema.parse({ ...base, id: 'candidate' }));
-    await assert.rejects(
+    await expect(
       db.repo.reviewDecision('candidate', 'confirm', {
         expectedVersion: 1,
         resolution: 'replace',
@@ -209,10 +209,9 @@ test('invalid replacement rolls back edits, classifies legacy tasks explicitly a
         predecessorVersion: 1,
         title: 'Edited',
       }),
-      /Classify/,
-    );
-    assert.equal((await db.repo.getDecisionById('pre'))?.state, 'Decided');
-    assert.equal((await db.repo.getDecisionById('candidate'))?.version, 1);
+    ).rejects.toThrow(/Classify/);
+    expect((await db.repo.getDecisionById('pre'))?.state).toBe('Decided');
+    expect((await db.repo.getDecisionById('candidate'))?.version).toBe(1);
     const next = await db.repo.reviewDecision('candidate', 'confirm', {
       expectedVersion: 1,
       resolution: 'replace',
@@ -220,8 +219,8 @@ test('invalid replacement rolls back edits, classifies legacy tasks explicitly a
       predecessorVersion: 1,
       taskDispositions: [{ actionItemId: 'legacy', classification: 'completed' }],
     });
-    assert.equal(next?.state, 'Decided');
-    assert.equal((await db.repo.getDecisionById('pre'))?.actionItems[0]?.state, 'completed');
+    expect(next?.state).toBe('Decided');
+    expect((await db.repo.getDecisionById('pre'))?.actionItems[0]?.state).toBe('completed');
     await db.repo.saveDecision(
       DecisionSchema.parse({ ...base, id: 'independent', supersedesId: 'candidate' }),
     );
@@ -229,8 +228,8 @@ test('invalid replacement rolls back edits, classifies legacy tasks explicitly a
       expectedVersion: 1,
       resolution: 'independent',
     });
-    assert.equal((await db.repo.getDecisionById('candidate'))?.state, 'Decided');
-    assert.equal((await db.repo.getDecisionById('independent'))?.supersedesId, null);
+    expect((await db.repo.getDecisionById('candidate'))?.state).toBe('Decided');
+    expect((await db.repo.getDecisionById('independent'))?.supersedesId).toBe(null);
   } finally {
     await db.cleanup();
   }
@@ -260,11 +259,11 @@ test('concurrent replacement accepts one successor and leaves the losing candida
         }),
       ),
     );
-    assert.equal(results.filter(result => result.status === 'fulfilled').length, 1);
+    expect(results.filter(result => result.status === 'fulfilled').length).toBe(1);
     const rejection = results.find(result => result.status === 'rejected') as PromiseRejectedResult;
-    assert.equal(rejection.reason.statusCode, 409);
+    expect(rejection.reason.statusCode).toBe(409);
     const decisions = await db.repo.getDecisions();
-    assert.equal(decisions.filter(d => d.state === 'Draft').length, 1);
+    expect(decisions.filter(d => d.state === 'Draft').length).toBe(1);
   } finally {
     await db.cleanup();
   }
@@ -289,26 +288,24 @@ test('replacement rejects cross guild or inactive predecessors and stale predece
         source: { ...base.source, guildId: 'other' },
       }),
     );
-    await assert.rejects(
+    await expect(
       db.repo.reviewDecision('candidate', 'confirm', {
         expectedVersion: 1,
         resolution: 'replace',
         predecessorId: 'cross',
         predecessorVersion: 1,
       }),
-      /same guild/,
-    );
+    ).rejects.toThrow(/same guild/);
     await db.repo.saveDecision(DecisionSchema.parse({ ...base, id: 'pre', state: 'Decided' }));
-    await assert.rejects(
+    await expect(
       db.repo.reviewDecision('candidate', 'confirm', {
         expectedVersion: 1,
         resolution: 'replace',
         predecessorId: 'pre',
         predecessorVersion: 2,
       }),
-      /Stale/,
-    );
-    assert.equal((await db.repo.getDecisionById('candidate'))?.version, 1);
+    ).rejects.toThrow(/Stale/);
+    expect((await db.repo.getDecisionById('candidate'))?.version).toBe(1);
   } finally {
     await db.cleanup();
   }
@@ -333,15 +330,14 @@ test('replacement review rejects missing task dispositions and persists cancella
       }),
     );
     await db.repo.saveDecision(DecisionSchema.parse({ ...base, id: 'candidate' }));
-    await assert.rejects(
+    await expect(
       db.repo.reviewDecision('candidate', 'confirm', {
         resolution: 'replace',
         predecessorId: 'pre',
         expectedVersion: 1,
         predecessorVersion: 1,
       }),
-      /unfinished/,
-    );
+    ).rejects.toThrow(/unfinished/);
     await db.repo.reviewDecision('candidate', 'confirm', {
       resolution: 'replace',
       predecessorId: 'pre',
@@ -352,8 +348,8 @@ test('replacement review rejects missing task dispositions and persists cancella
     await db.client.$disconnect();
     const client = new PrismaClient({ datasources: { db: { url: db.url } } });
     const restarted = new DecisionRepository(client);
-    assert.equal((await restarted.getDecisionById('pre'))?.actionItems[0]?.state, 'canceled');
-    assert.equal((await restarted.getDecisionById('candidate'))?.supersedesId, 'pre');
+    expect((await restarted.getDecisionById('pre'))?.actionItems[0]?.state).toBe('canceled');
+    expect((await restarted.getDecisionById('candidate'))?.supersedesId).toBe('pre');
     await client.$disconnect();
   } finally {
     await db.cleanup();
@@ -376,17 +372,17 @@ test('database failure after predecessor update rolls the entire replacement bac
     await db.client.$executeRawUnsafe(
       "CREATE TRIGGER fail_candidate BEFORE UPDATE ON Decision WHEN NEW.id = 'candidate' BEGIN SELECT RAISE(ABORT, 'injected write failure'); END",
     );
-    await assert.rejects(
+    await expect(
       db.repo.reviewDecision('candidate', 'confirm', {
         expectedVersion: 1,
         resolution: 'replace',
         predecessorId: 'pre',
         predecessorVersion: 1,
       }),
-    );
-    assert.equal((await db.repo.getDecisionById('pre'))?.state, 'Decided');
-    assert.equal((await db.repo.getDecisionById('pre'))?.version, 1);
-    assert.equal((await db.repo.getDecisionById('candidate'))?.state, 'Draft');
+    ).rejects.toBeDefined();
+    expect((await db.repo.getDecisionById('pre'))?.state).toBe('Decided');
+    expect((await db.repo.getDecisionById('pre'))?.version).toBe(1);
+    expect((await db.repo.getDecisionById('candidate'))?.state).toBe('Draft');
   } finally {
     await db.cleanup();
   }
@@ -405,8 +401,8 @@ test('generic save cannot bypass versioned review transitions', async () => {
     });
     await db.repo.saveDecision(value);
     const saved = (await db.repo.getDecisionById('draft'))!;
-    await assert.rejects(db.repo.saveDecision({ ...saved, state: 'Decided' }), /review/);
-    assert.equal((await db.repo.getDecisionById('draft'))?.state, 'Draft');
+    await expect(db.repo.saveDecision({ ...saved, state: 'Decided' })).rejects.toThrow(/review/);
+    expect((await db.repo.getDecisionById('draft'))?.state).toBe('Draft');
   } finally {
     await db.cleanup();
   }

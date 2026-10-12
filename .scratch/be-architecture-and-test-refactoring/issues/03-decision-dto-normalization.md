@@ -4,9 +4,13 @@
 
 **Blocked by:** 02: 인증/세션 전용 DTO 및 에러 분리
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] `DecisionService` 내부에 정의된 `QueryDecisionsFilter`를 `src/dto/v1-decision.dto.ts`로 이전한다.
-- [ ] `DecisionService.editDecision`의 인라인 DTO import(`import('../dto/decision-edit.dto.js')`)를 제거하고 상단 정식 import로 통일한다.
-- [ ] DTO 파일들의 export 항목을 `src/dto/index.ts` 배럴 파일에 깔끔하게 등록한다.
-- [ ] API 컨트롤러(`v1-decision.controller.ts`) 및 서비스 타입 체크가 회귀 없이 통과하는지 검증한다.
+- [x] `DecisionService` 내부에 정의된 `QueryDecisionsFilter`를 `src/dto/v1-decision.dto.ts`로 이전한다.
+- [x] `DecisionService.editDecision`의 인라인 DTO import(`import('../dto/decision-edit.dto.js')`)를 제거하고 상단 정식 import로 통일한다.
+- [x] DTO 파일들의 export 항목을 `src/dto/index.ts` 배럴 파일에 깔끔하게 등록한다.
+- [x] API 컨트롤러(`v1-decision.controller.ts`) 및 서비스 타입 체크가 회귀 없이 통과하는지 검증한다.
+
+## Implementation
+
+QueryDecisionsFilter is exported from v1-decision.dto.ts; decision edit uses a top-level DTO import; DTO barrel exports are complete. npm run typecheck passes.

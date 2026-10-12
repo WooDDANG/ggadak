@@ -1,7 +1,7 @@
 import { timingSafeEqual } from 'node:crypto';
-import { AuthError } from '../services/auth.service.js';
+import { AuthError } from '../errors/AuthError.js';
 import type { Request } from 'express';
-import { AuthService } from '../services/auth.service.js';
+import type { AuthService } from '../services/auth.service.js';
 
 export async function expressAuthentication(request: Request, securityName: string) {
   if (securityName === 'service') {

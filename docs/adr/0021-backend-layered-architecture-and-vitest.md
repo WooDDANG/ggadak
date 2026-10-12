@@ -1,6 +1,6 @@
 # Backend Layered Architecture, Clean Responsibilities, and Unified Vitest Tooling
 
-Status: accepted (design agreed; implementation scheduled after v1 model renewal)
+Status: accepted (implemented)
 
 ## Context
 
@@ -18,15 +18,21 @@ The backend service (`apps/be`) evolved rapidly alongside the v1 API and model r
    - **Repositories**: Must not know about HTTP DTOs or Zod parsers. Repositories receive pure domain entities or primitive database parameters and execute queries and transactions.
 
 2. **Base Repository Abstraction**:
-   - Introduce `BaseRepository` to centralize PrismaClient lifecycle, transaction context propagation (`withTransaction`), and common Prisma error translation (e.g., P2002/P2025 into domain `ConflictError`/`NotFoundError`).
+   - Introduce `BaseRepository` to share injected Prisma access, explicit transaction context propagation (`withTransaction`), and opt-in Prisma error classification (e.g., P2002 as `ConflictError`).
+   - Keep PrismaClient connect/disconnect lifecycle in the existing BE loader. A repository base class does not own process-level infrastructure lifecycle.
+   - Preserve caller-specific meanings for P2025 and conditional version updates: only map P2025 to `NotFoundError` where the operation requires an existing record; stale compare-and-swap updates remain `ConflictError`.
 
 3. **Package Manager and Formatting Consolidation**:
    - Commit strictly to `npm` workspaces. Remove leftover `pnpm-workspace.yaml`.
    - Exclude generated code (TSOA routes/specs, Orval API clients) from Prettier/ESLint to eliminate formatter noise.
 
 4. **Unified Vitest Runner and Test Directory Isolation**:
-   - Migrate from `node:test` to `vitest` across the monorepo for seamless TypeScript/ESM execution and Vite ecosystem alignment.
-   - Separate test suites from production source code: relocate backend unit/integration tests to `apps/be/tests/` and end-to-end suites to `tests/e2e/`.
+   - Use Vitest for the backend and end-to-end suites to support TypeScript/ESM execution and shared assertion/mocking tools.
+   - Relocate backend unit/integration tests from `apps/be/src/` into `apps/be/tests/`, keeping their layer-based subdirectories. Keep end-to-end tests separately under the repository-root `tests/e2e/` directory.
+   - This refactor does not move or change the test runners for Bot, FE, or shared packages.
 
 5. **Discussion Pipeline Preservation**:
    - Preserve existing `POST /api/discussions/analyze` endpoints and contracts to avoid breaking Discord Bot integration until a formal extraction redesign is scheduled.
+
+6. **Decision Edit Atomicity**:
+   - Services own edit policy (editable states, alternative identity validation, and interpreting stale versions as conflicts). Repositories retain the atomic conditional write (`id` and expected `version`) so concurrent edits cannot both succeed.

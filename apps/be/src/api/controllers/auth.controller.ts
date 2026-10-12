@@ -1,9 +1,11 @@
+import { requirePrincipal } from '../guards/authorization.js';
+import type { AuthUserDto } from '../../dto/auth.dto.js';
 import { Controller, Route, Tags, Get, Post, Request, Body, Security } from 'tsoa';
 import type { Request as ExpressRequest } from 'express';
 import { Service } from 'typedi';
-import { AuthService, AuthUser } from '../../services/auth.service.js';
+import { AuthService } from '../../services/auth.service.js';
 import { ApiResponse, apiSuccess } from '../../dto/api-response.dto.js';
-import { DiscordIdentity, DiscordGuild } from '../../adapters/discord-auth.adapter.js';
+import { DiscordGuild } from '../../adapters/discord-auth.adapter.js';
 @Tags('Auth')
 @Route('api/v1/auth')
 @Service()
@@ -23,7 +25,7 @@ export class AuthController extends Controller {
     @Body() body: { code: string; state: string },
     @Request() request: ExpressRequest,
   ): Promise<
-    ApiResponse<{ accessToken: string; tokenType: string; expiresAt: string; user: AuthUser }>
+    ApiResponse<{ accessToken: string; tokenType: string; expiresAt: string; user: AuthUserDto }>
   > {
     const result = await this.auth.login(body.code, body.state, request.headers.cookie);
     this.setHeader(
@@ -35,15 +37,15 @@ export class AuthController extends Controller {
   }
   @Security('jwt')
   @Get('me')
-  async getCurrentUser(@Request() request: ExpressRequest): Promise<ApiResponse<AuthUser>> {
-    return apiSuccess(await this.auth.me(request.user!));
+  async getCurrentUser(@Request() request: ExpressRequest): Promise<ApiResponse<AuthUserDto>> {
+    return apiSuccess(await this.auth.me(requirePrincipal(request)));
   }
   @Security('jwt')
   @Get('guilds')
   async listAuthGuilds(
     @Request() request: ExpressRequest,
   ): Promise<ApiResponse<{ guilds: DiscordGuild[] }>> {
-    return apiSuccess({ guilds: await this.auth.guilds(request.user!) });
+    return apiSuccess({ guilds: await this.auth.guilds(requirePrincipal(request)) });
   }
   @Security('jwt')
   @Post('refresh')
@@ -51,12 +53,12 @@ export class AuthController extends Controller {
     @Request() request: ExpressRequest,
   ): Promise<ApiResponse<{ accessToken: string; tokenType: string; expiresAt: string }>> {
     this.setHeader('Cache-Control', 'no-store');
-    return apiSuccess(await this.auth.refresh(request.user!));
+    return apiSuccess(await this.auth.refresh(requirePrincipal(request)));
   }
   @Security('jwt')
   @Post('logout')
   async logoutSession(@Request() request: ExpressRequest): Promise<ApiResponse<null>> {
-    await this.auth.logout(request.user!);
+    await this.auth.logout(requirePrincipal(request));
     return apiSuccess(null);
   }
 }

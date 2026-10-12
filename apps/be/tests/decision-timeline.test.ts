@@ -1,9 +1,7 @@
 import 'reflect-metadata';
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { test, expect } from 'vitest';
 import { DecisionSchema } from '@ggaddak/shared';
-import { isolatedRepository } from './repositories/test-database.js';
-import { DecisionRepository } from './repositories/decision.repository.js';
+import { isolatedRepository } from '../src/repositories/test-database.js';
 
 test('confirmed timeline groups by requested month and timezone, excludes missing dates, and applies a guild date range', async () => {
   const db = await isolatedRepository();
@@ -33,11 +31,10 @@ test('confirmed timeline groups by requested month and timezone, excludes missin
       from: '2024-02-01T00:00:00.000Z',
       to: '2024-02-02T00:00:00.000Z',
     });
-    assert.equal(timeline.totalElements, 2);
-    assert.deepEqual(
+    expect(timeline.totalElements).toBe(2);
+    expect(
       timeline.groups.map(group => [group.key, group.count, group.items.map(item => item.id)]),
-      [['2024-01', 2, ['feb-local', 'jan-local']]],
-    );
+    ).toEqual([['2024-01', 2, ['feb-local', 'jan-local']]]);
     const empty = await db.repo.getConfirmedTimeline({
       guildId: 'guild-a',
       groupBy: 'month',
@@ -45,10 +42,10 @@ test('confirmed timeline groups by requested month and timezone, excludes missin
       from: '2025-01-01T00:00:00.000Z',
       to: '2025-02-01T00:00:00.000Z',
     });
-    assert.deepEqual(
-      { totalElements: empty.totalElements, groups: empty.groups },
-      { totalElements: 0, groups: [] },
-    );
+    expect({ totalElements: empty.totalElements, groups: empty.groups }).toEqual({
+      totalElements: 0,
+      groups: [],
+    });
   } finally {
     await db.cleanup();
   }
@@ -57,23 +54,20 @@ test('confirmed timeline groups by requested month and timezone, excludes missin
 test('timeline rejects unsupported grouping and invalid timezone', async () => {
   const db = await isolatedRepository();
   try {
-    await assert.rejects(
+    await expect(
       db.repo.getConfirmedTimeline({ guildId: 'g', groupBy: 'year' as never, timezone: 'UTC' }),
-      /groupBy/i,
-    );
-    await assert.rejects(
+    ).rejects.toThrow(/groupBy/i);
+    await expect(
       db.repo.getConfirmedTimeline({ guildId: 'g', groupBy: 'month', timezone: 'Mars/Olympus' }),
-      /timezone/i,
-    );
-    await assert.rejects(
+    ).rejects.toThrow(/timezone/i);
+    await expect(
       db.repo.getConfirmedTimeline({
         guildId: 'g',
         groupBy: 'month',
         timezone: 'UTC',
         from: '2026-02-01',
       }),
-      /ISO 8601/i,
-    );
+    ).rejects.toThrow(/ISO 8601/i);
   } finally {
     await db.cleanup();
   }

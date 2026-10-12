@@ -1,3 +1,4 @@
+import { requirePrincipal } from '../guards/authorization.js';
 import type { Request as ExpressRequest } from 'express';
 import {
   Controller,
@@ -37,7 +38,7 @@ export class SyncJobsController extends Controller {
     @Query() guildId: string,
     @Body() body: { forceFullSync?: boolean },
   ): Promise<ApiResponse<SyncJobView>> {
-    await this.auth.requireGuild(request.user!, guildId, true);
+    await this.auth.requireGuild(requirePrincipal(request), guildId, true);
     const job = await this.jobs.create(guildId, body.forceFullSync === true);
     this.setStatus(202);
     return apiSuccess(job);
@@ -49,7 +50,7 @@ export class SyncJobsController extends Controller {
     @Path() jobId: string,
     @Query() guildId: string,
   ): Promise<ApiResponse<SyncJobView>> {
-    await this.auth.requireGuild(request.user!, guildId);
+    await this.auth.requireGuild(requirePrincipal(request), guildId);
     return apiSuccess(await this.jobs.get(jobId, guildId));
   }
 }

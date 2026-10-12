@@ -13,11 +13,13 @@
     "dev:fe": "npm run dev --workspace=@ggaddak/fe",
     "build": "npm run build --workspaces --if-present",
     "api:sync": "npm run swagger --workspace=@ggaddak/be && npm run codegen --workspace=@ggaddak/fe",
-    "test": "npm run build && npm run test --workspaces --if-present && tsc -p tsconfig.test.json && node --test dist-test/e2e.test.js",
+    "test": "npm run build && npm run test --workspaces --if-present && npm run test:e2e",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write \"**/*.{ts,js,json,html}\"",
-    "format:check": "prettier --check \"**/*.{ts,js,json,html}\""
+    "format:check": "prettier --check \"**/*.{ts,js,json,html}\"",
+    "test:e2e": "vitest run --config vitest.e2e.config.ts",
+    "typecheck": "npm run typecheck --workspace=@ggaddak/be && tsc -p tsconfig.test.json"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
@@ -27,6 +29,7 @@
     "eslint": "^10.11.0",
     "eslint-config-prettier": "^10.1.8",
     "prettier": "^3.9.9",
-    "typescript": "^5.4.5"
+    "typescript": "^5.4.5",
+    "vitest": "^2.1.9"
   }
 }

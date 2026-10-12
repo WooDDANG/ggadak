@@ -1,11 +1,10 @@
 import 'reflect-metadata';
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
-import { AiAdapter } from './ai.adapter.js';
+import { test, expect } from 'vitest';
+import { AiAdapter } from '../../src/adapters/ai.adapter.js';
 
 test('selected Gemini provider fails closed on missing key even when OpenAI is available', async () => {
   const adapter = new AiAdapter({ provider: 'gemini', openaiApiKey: 'unused' }, 'production');
-  await assert.rejects(adapter.analyzeTranscript('SQLite를 채택합시다'), /key/i);
+  await expect(adapter.analyzeTranscript('SQLite를 채택합시다')).rejects.toThrow(/key/i);
 });
 
 test('provider errors and malformed extraction are observable and never become heuristic candidates', async () => {
@@ -18,24 +17,21 @@ test('provider errors and malformed extraction are observable and never become h
       'production',
       async () => response,
     );
-    await assert.rejects(adapter.analyzeTranscript('SQLite를 채택합시다'));
+    await expect(adapter.analyzeTranscript('SQLite를 채택합시다')).rejects.toBeDefined();
   }
 });
 
 test('explicit development mock is allowed, while production mock and unknown providers fail', async () => {
-  await assert.rejects(
+  await expect(
     new AiAdapter({ provider: 'mock' }, 'production').analyzeTranscript('합의합시다'),
-    /Mock/,
-  );
-  await assert.rejects(
+  ).rejects.toThrow(/Mock/);
+  await expect(
     new AiAdapter({ provider: 'other' }, 'test').analyzeTranscript('합의합시다'),
-    /Unsupported/,
-  );
-  assert.equal(
+  ).rejects.toThrow(/Unsupported/);
+  expect(
     (await new AiAdapter({ provider: 'mock' }, 'test').analyzeTranscript('SQLite를 채택합시다'))
       .found,
-    true,
-  );
+  ).toBe(true);
 });
 
 test('fixed Gemini response validates without calling another provider', async () => {
@@ -43,7 +39,7 @@ test('fixed Gemini response validates without calling another provider', async (
     { provider: 'gemini', geminiApiKey: 'fixture', openaiApiKey: 'unused' },
     'production',
     async (_url, options) => {
-      assert.equal((options?.headers as Record<string, string>)['x-goog-api-key'], 'fixture');
+      expect((options?.headers as Record<string, string>)['x-goog-api-key']).toBe('fixture');
       return Response.json({
         candidates: [
           {
@@ -57,7 +53,7 @@ test('fixed Gemini response validates without calling another provider', async (
       });
     },
   );
-  assert.deepEqual(await adapter.analyzeTranscript('논의중'), {
+  expect(await adapter.analyzeTranscript('논의중')).toEqual({
     found: false,
     summary: 'No consensus',
     decisions: [],

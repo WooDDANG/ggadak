@@ -1,8 +1,7 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
-import { createServer } from './server.js';
-import { isolatedRepository } from './repositories/test-database.js';
-import { fakeAuthOptions, loginAsTestUser } from './test-support/auth.js';
+import { test, expect } from 'vitest';
+import { createServer } from '../src/server.js';
+import { isolatedRepository } from '../src/repositories/test-database.js';
+import { fakeAuthOptions, loginAsTestUser } from '../src/test-support/auth.js';
 import { DecisionSchema } from '@ggaddak/shared';
 
 test('authenticated guild members read confirmed timeline groups through the v1 API', async () => {
@@ -36,25 +35,20 @@ test('authenticated guild members read confirmed timeline groups through the v1 
       `${base}/api/v1/decisions/timeline?guildId=guild-1&groupBy=month&timezone=Asia%2FSeoul`,
       { headers },
     );
-    assert.equal(response.status, 200);
+    expect(response.status).toBe(200);
     const result = ((await response.json()) as any).data;
-    assert.equal(result.groupBy, 'month');
-    assert.equal(result.timezone, 'Asia/Seoul');
-    assert.equal(result.totalElements, 1);
-    assert.equal(result.groups[0].key, '2026-02');
-    assert.deepEqual(
-      result.groups[0].items.map((item: any) => item.id),
-      ['confirmed'],
-    );
-    assert.equal(
+    expect(result.groupBy).toBe('month');
+    expect(result.timezone).toBe('Asia/Seoul');
+    expect(result.totalElements).toBe(1);
+    expect(result.groups[0].key).toBe('2026-02');
+    expect(result.groups[0].items.map((item: any) => item.id)).toEqual(['confirmed']);
+    expect(
       (await fetch(`${base}/api/v1/decisions/timeline?guildId=missing`, { headers })).status,
-      403,
-    );
-    assert.equal(
+    ).toBe(403);
+    expect(
       (await fetch(`${base}/api/v1/decisions/timeline?guildId=guild-1&groupBy=year`, { headers }))
         .status,
-      400,
-    );
+    ).toBe(400);
   } finally {
     await new Promise<void>(resolve => server.close(() => resolve()));
     await db.cleanup();

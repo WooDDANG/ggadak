@@ -1,3 +1,4 @@
+import { requirePrincipal } from '../guards/authorization.js';
 import { Controller, Route, Tags, Get, Put, Body, Query, Request, Security } from 'tsoa';
 import type { Request as ExpressRequest } from 'express';
 import { Service } from 'typedi';
@@ -25,7 +26,7 @@ export class ChannelsController extends Controller {
     @Query() guildId: string,
     @Request() request: ExpressRequest,
   ): Promise<ApiResponse<ChannelSettings>> {
-    await this.auth.requireGuild(request.user!, guildId);
+    await this.auth.requireGuild(requirePrincipal(request), guildId);
     return apiSuccess(await this.channels.list(guildId));
   }
   @Security('jwt')
@@ -35,7 +36,7 @@ export class ChannelsController extends Controller {
     @Body() body: { channelIds: string[] },
     @Request() request: ExpressRequest,
   ): Promise<ApiResponse<ChannelSettings>> {
-    await this.auth.requireGuild(request.user!, guildId, true);
+    await this.auth.requireGuild(requirePrincipal(request), guildId, true);
     return apiSuccess(await this.channels.save(guildId, body.channelIds));
   }
 }
