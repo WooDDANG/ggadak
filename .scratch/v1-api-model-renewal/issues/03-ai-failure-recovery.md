@@ -21,3 +21,12 @@
 - ClientReady starts a bounded recovery pass (one delivery per minute, 50-second request timeout). Success removes failure/processing reactions; only actual candidates receive the note reaction. Event failures remove processing and mark warning. Scans throw before checkpoint advancement; no-decision completion may advance. Checkpoint writes propagate failures.
 - BE and bot TypeScript compilation passed. Adapter tests (4), durable delivery/Discord boundary tests (5), existing bot tests (6), isolated discussion/retry tests (9), repository/migration/extraction tests (18), HTTP server tests (8) passed. HTTP tests used an ephemeral local port outside the sandbox; no live database or external credentials were used.
 - Public successor seam: BackendApiService.analyzeDiscussion accepts optional caller-supplied requestId; retryPendingAnalyses(limit) returns recovered {payload,result}. Scan Range ordering and manual Sync Job coordination remain ticket 09.
+
+
+## Retry fairness follow-up
+
+- Automatic retries now persist attempt counts, exponential backoff (60 seconds then 120 seconds), and a three-attempt budget before every dispatch. This also bounds attempts interrupted by process termination. Permanent 4xx failures (except 408/429), invalid result shapes, and exhausted deliveries stay on disk but stop automatic retry.
+- The retry batch selects eligible work before applying its limit and orders by retry time, so a retained permanent failure or a request waiting for backoff cannot starve later deliveries.
+- Legacy bare-payload journal files remain readable. New journal envelopes preserve the exact original payload/request ID independently of retry metadata.
+- Explicit BackendApiService.retryAnalysisRequest(requestId) resets the retained request budget and retries its original payload; no new identity or evidence is generated.
+- Bot TypeScript compilation and seven delivery/Discord boundary tests pass, including permanent-first fairness, restart-persistent backoff/exhaustion, and explicit same-ID recovery.
