@@ -7,174 +7,6 @@
 		"requestBodies": {},
 		"responses": {},
 		"schemas": {
-			"HarvestingPolicyDto": {
-				"properties": {
-					"initialScanLimit": {
-						"type": "number",
-						"format": "double"
-					},
-					"contextWindowBefore": {
-						"type": "number",
-						"format": "double"
-					},
-					"contextWindowAfter": {
-						"type": "number",
-						"format": "double"
-					},
-					"maxMergedWindow": {
-						"type": "number",
-						"format": "double"
-					},
-					"reactionThreshold": {
-						"type": "number",
-						"format": "double"
-					},
-					"debounceMs": {
-						"type": "number",
-						"format": "double"
-					},
-					"agreementThreshold": {
-						"type": "number",
-						"format": "double"
-					},
-					"lookbackDays": {
-						"type": "number",
-						"format": "double"
-					}
-				},
-				"required": [
-					"initialScanLimit",
-					"contextWindowBefore",
-					"contextWindowAfter",
-					"maxMergedWindow",
-					"reactionThreshold",
-					"debounceMs",
-					"agreementThreshold",
-					"lookbackDays"
-				],
-				"type": "object",
-				"additionalProperties": false
-			},
-			"FeedbackSourceType": {
-				"type": "string",
-				"enum": [
-					"교수",
-					"심사위원",
-					"팀원",
-					"인터뷰이"
-				]
-			},
-			"ExternalFeedbackItemDto": {
-				"properties": {
-					"id": {
-						"type": "string"
-					},
-					"source": {
-						"$ref": "#/components/schemas/FeedbackSourceType"
-					},
-					"detail": {
-						"type": "string"
-					},
-					"content": {
-						"type": "string"
-					},
-					"channelId": {
-						"type": "string"
-					},
-					"createdAt": {
-						"type": "string"
-					}
-				},
-				"required": [
-					"id",
-					"source",
-					"content",
-					"channelId",
-					"createdAt"
-				],
-				"type": "object",
-				"additionalProperties": false
-			},
-			"FeedbackListResponseDto": {
-				"properties": {
-					"feedbacks": {
-						"items": {
-							"$ref": "#/components/schemas/ExternalFeedbackItemDto"
-						},
-						"type": "array"
-					}
-				},
-				"required": [
-					"feedbacks"
-				],
-				"type": "object",
-				"additionalProperties": false
-			},
-			"CreateFeedbackDto": {
-				"properties": {
-					"id": {
-						"type": "string"
-					},
-					"source": {
-						"$ref": "#/components/schemas/FeedbackSourceType"
-					},
-					"detail": {
-						"type": "string"
-					},
-					"content": {
-						"type": "string"
-					},
-					"channelId": {
-						"type": "string"
-					},
-					"createdAt": {
-						"type": "string"
-					}
-				},
-				"required": [
-					"id",
-					"source",
-					"content",
-					"channelId",
-					"createdAt"
-				],
-				"type": "object",
-				"additionalProperties": false
-			},
-			"CandidateHistoryEntry": {
-				"properties": {
-					"requestId": {
-						"type": "string"
-					},
-					"isManualOverride": {
-						"type": "boolean"
-					},
-					"previousRequestIds": {
-						"items": {
-							"type": "string"
-						},
-						"type": "array"
-					},
-					"relatedCandidateIds": {
-						"items": {
-							"type": "string"
-						},
-						"type": "array"
-					},
-					"createdAt": {
-						"type": "string"
-					}
-				},
-				"required": [
-					"requestId",
-					"isManualOverride",
-					"previousRequestIds",
-					"relatedCandidateIds",
-					"createdAt"
-				],
-				"type": "object",
-				"additionalProperties": false
-			},
 			"AlternativeItemDto": {
 				"properties": {
 					"option": {
@@ -383,6 +215,214 @@
 				"type": "object",
 				"additionalProperties": false
 			},
+			"DecisionListResponseDto": {
+				"properties": {
+					"decisions": {
+						"items": {
+							"$ref": "#/components/schemas/DecisionItemDto"
+						},
+						"type": "array"
+					}
+				},
+				"required": [
+					"decisions"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"ApiResponse_DecisionListResponseDto_": {
+				"description": "Shared v1 response contract. Domain payloads remain typed by each endpoint.",
+				"properties": {
+					"success": {
+						"type": "boolean"
+					},
+					"code": {
+						"type": "string"
+					},
+					"message": {
+						"type": "string"
+					},
+					"data": {
+						"$ref": "#/components/schemas/DecisionListResponseDto"
+					}
+				},
+				"required": [
+					"success",
+					"code",
+					"message",
+					"data"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"HarvestingPolicyDto": {
+				"properties": {
+					"initialScanLimit": {
+						"type": "number",
+						"format": "double"
+					},
+					"contextWindowBefore": {
+						"type": "number",
+						"format": "double"
+					},
+					"contextWindowAfter": {
+						"type": "number",
+						"format": "double"
+					},
+					"maxMergedWindow": {
+						"type": "number",
+						"format": "double"
+					},
+					"reactionThreshold": {
+						"type": "number",
+						"format": "double"
+					},
+					"debounceMs": {
+						"type": "number",
+						"format": "double"
+					},
+					"agreementThreshold": {
+						"type": "number",
+						"format": "double"
+					},
+					"lookbackDays": {
+						"type": "number",
+						"format": "double"
+					}
+				},
+				"required": [
+					"initialScanLimit",
+					"contextWindowBefore",
+					"contextWindowAfter",
+					"maxMergedWindow",
+					"reactionThreshold",
+					"debounceMs",
+					"agreementThreshold",
+					"lookbackDays"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"FeedbackSourceType": {
+				"type": "string",
+				"enum": [
+					"교수",
+					"심사위원",
+					"팀원",
+					"인터뷰이"
+				]
+			},
+			"ExternalFeedbackItemDto": {
+				"properties": {
+					"id": {
+						"type": "string"
+					},
+					"source": {
+						"$ref": "#/components/schemas/FeedbackSourceType"
+					},
+					"detail": {
+						"type": "string"
+					},
+					"content": {
+						"type": "string"
+					},
+					"channelId": {
+						"type": "string"
+					},
+					"createdAt": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"id",
+					"source",
+					"content",
+					"channelId",
+					"createdAt"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"FeedbackListResponseDto": {
+				"properties": {
+					"feedbacks": {
+						"items": {
+							"$ref": "#/components/schemas/ExternalFeedbackItemDto"
+						},
+						"type": "array"
+					}
+				},
+				"required": [
+					"feedbacks"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"CreateFeedbackDto": {
+				"properties": {
+					"id": {
+						"type": "string"
+					},
+					"source": {
+						"$ref": "#/components/schemas/FeedbackSourceType"
+					},
+					"detail": {
+						"type": "string"
+					},
+					"content": {
+						"type": "string"
+					},
+					"channelId": {
+						"type": "string"
+					},
+					"createdAt": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"id",
+					"source",
+					"content",
+					"channelId",
+					"createdAt"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"CandidateHistoryEntry": {
+				"properties": {
+					"requestId": {
+						"type": "string"
+					},
+					"isManualOverride": {
+						"type": "boolean"
+					},
+					"previousRequestIds": {
+						"items": {
+							"type": "string"
+						},
+						"type": "array"
+					},
+					"relatedCandidateIds": {
+						"items": {
+							"type": "string"
+						},
+						"type": "array"
+					},
+					"createdAt": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"requestId",
+					"isManualOverride",
+					"previousRequestIds",
+					"relatedCandidateIds",
+					"createdAt"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
 			"AnalyzeDiscussionResponseDto": {
 				"properties": {
 					"found": {
@@ -511,21 +551,6 @@
 				"required": [
 					"requestId",
 					"rawMessages"
-				],
-				"type": "object",
-				"additionalProperties": false
-			},
-			"DecisionListResponseDto": {
-				"properties": {
-					"decisions": {
-						"items": {
-							"$ref": "#/components/schemas/DecisionItemDto"
-						},
-						"type": "array"
-					}
-				},
-				"required": [
-					"decisions"
 				],
 				"type": "object",
 				"additionalProperties": false
@@ -760,6 +785,53 @@
 		"contact": {}
 	},
 	"paths": {
+		"/api/v1/decisions": {
+			"get": {
+				"operationId": "ListV1Decisions",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiResponse_DecisionListResponseDto_"
+								}
+							}
+						}
+					}
+				},
+				"tags": [
+					"v1 Decisions"
+				],
+				"security": [],
+				"parameters": [
+					{
+						"in": "query",
+						"name": "topic",
+						"required": false,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"in": "query",
+						"name": "state",
+						"required": false,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"in": "query",
+						"name": "categoryTag",
+						"required": false,
+						"schema": {
+							"type": "string"
+						}
+					}
+				]
+			}
+		},
 		"/api/config/policy": {
 			"get": {
 				"operationId": "Get",

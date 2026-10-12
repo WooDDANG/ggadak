@@ -8,6 +8,7 @@ import morgan from 'morgan';
 import { createLogger } from '@ggaddak/shared';
 import { RegisterRoutes } from '../api/routes/generated/routes.js';
 import { errorHandler } from '../api/middlewares/errorHandler.js';
+import { apiFailure, isV1Request } from '../dto/api-response.dto.js';
 import { apiLimiter } from '../api/middlewares/rateLimiter.js';
 
 export function initExpress({ app }: { app: Express }): void {
@@ -65,7 +66,9 @@ export function initExpress({ app }: { app: Express }): void {
   // 9. 404 Route Handler
   app.use((req, res) => {
     logger.warn(`[HTTP] Route not found: ${req.method} ${req.url}`);
-    res.status(404).json({ error: 'Not Found' });
+    res
+      .status(404)
+      .json(isV1Request(req.path) ? apiFailure('NOT_FOUND', 'Not Found') : { error: 'Not Found' });
   });
 
   // 10. Centralized Error Handler Middleware (must be last)
