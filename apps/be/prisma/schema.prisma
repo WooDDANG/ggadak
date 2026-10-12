@@ -146,6 +146,16 @@ model OAuthState {
   expiresAt DateTime
 }
 
+model DecisionEdit {
+ id String @id
+ decisionId String
+ actorId String
+ version Int
+ beforeJson String
+ createdAt DateTime @default(now())
+ @@unique([decisionId, version])
+}
+
 model MonitoredChannel {
   id String @id
   guildId String

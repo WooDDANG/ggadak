@@ -1,7 +1,7 @@
 import { Decision, ReviewAction } from '@ggaddak/shared';
 import { apiClient } from './client';
-import { listV1Decisions, getV1Decision, listV1ReviewQueue, reviewV1Candidate } from './generated';
-import type { ListV1DecisionsParams, V1DecisionDto } from './generated/model';
+import { listV1Decisions, getV1Decision, listV1ReviewQueue, reviewV1Candidate, editV1Decision } from './generated';
+import type { ListV1DecisionsParams, V1DecisionDto, DecisionEditDto } from './generated/model';
 
 export interface GetDecisionsParams {
   guildId: string;
@@ -32,6 +32,13 @@ export const decisionsApi = {
       if (page >= response.data.data.pageInfo.totalPages) return items;
       page++;
     }
+  },
+  edit: async (id: string, guildId: string, body: DecisionEditDto) => {
+    const response = await editV1Decision(id, body, { guildId });
+    if (response.status !== 200 || !response.data.success)
+      throw new Error(response.data.message || `HTTP ${response.status}`);
+    return response.data.data;
+
   },
   browse: async (params: ListV1DecisionsParams) => {
     const response = await listV1Decisions(params);

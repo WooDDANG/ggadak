@@ -45,6 +45,7 @@ export interface V1ReviewTicketDto {
   governanceScore?: number;
   governanceReason?: string;
   governancePassed?: boolean;
+  updatedAt?: string;
   status: DecisionStatus;
   category: string;
   /** @nullable */

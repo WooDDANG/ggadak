@@ -97,6 +97,7 @@ const models: TsoaRoute.Models = {
             "governanceScore": {"dataType":"double"},
             "governanceReason": {"dataType":"string"},
             "governancePassed": {"dataType":"boolean"},
+            "updatedAt": {"dataType":"string"},
             "status": {"ref":"DecisionStatus","required":true},
             "category": {"dataType":"string","required":true},
             "confirmedDate": {"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},
@@ -159,6 +160,7 @@ const models: TsoaRoute.Models = {
             "governanceScore": {"dataType":"double"},
             "governanceReason": {"dataType":"string"},
             "governancePassed": {"dataType":"boolean"},
+            "updatedAt": {"dataType":"string"},
             "status": {"ref":"DecisionStatus","required":true},
             "category": {"dataType":"string","required":true},
             "confirmedDate": {"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},
@@ -201,6 +203,19 @@ const models: TsoaRoute.Models = {
             "action": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["confirm"]},{"dataType":"enum","enums":["defer"]},{"dataType":"enum","enums":["reject"]}],"required":true},
         },
         "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "DecisionEditDto": {
+        "dataType": "refObject",
+        "properties": {
+            "expectedVersion": {"dataType":"double","required":true},
+            "title": {"dataType":"string","required":true},
+            "decision": {"dataType":"string","required":true},
+            "rationale": {"dataType":"string","required":true},
+            "category": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["타깃"]},{"dataType":"enum","enums":["문제정의"]},{"dataType":"enum","enums":["기능"]},{"dataType":"enum","enums":["기술"]},{"dataType":"enum","enums":["BM"]},{"dataType":"enum","enums":["기타"]}],"required":true},
+            "alternatives": {"dataType":"array","array":{"dataType":"nestedObjectLiteral","nestedProperties":{"reason":{"dataType":"string","required":true},"name":{"dataType":"string","required":true},"id":{"dataType":"string"}}},"required":true},
+        },
+        "additionalProperties": {"dataType":"any"},
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "AlternativeItemDto": {
@@ -676,6 +691,45 @@ export function RegisterRoutes(app: Router) {
 
               await templateService.apiHandler({
                 methodName: 'reviewV1Candidate',
+                controller,
+                response,
+                next,
+                validatedArgs,
+                successStatus: undefined,
+              });
+            } catch (err) {
+                return next(err);
+            }
+        });
+        // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+        const argsV1DecisionController_editV1Decision: Record<string, TsoaRoute.ParameterSchema> = {
+                request: {"in":"request","name":"request","required":true,"dataType":"object"},
+                id: {"in":"path","name":"id","required":true,"dataType":"string"},
+                guildId: {"in":"query","name":"guildId","required":true,"dataType":"string"},
+                body: {"in":"body","name":"body","required":true,"ref":"DecisionEditDto"},
+        };
+        app.put('/api/v1/decisions/:id',
+            authenticateMiddleware([{"jwt":[]}]),
+            ...(fetchMiddlewares<RequestHandler>(V1DecisionController)),
+            ...(fetchMiddlewares<RequestHandler>(V1DecisionController.prototype.editV1Decision)),
+
+            async function V1DecisionController_editV1Decision(request: ExRequest, response: ExResponse, next: any) {
+
+            // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+
+            let validatedArgs: any[] = [];
+            try {
+                validatedArgs = templateService.getValidatedArgs({ args: argsV1DecisionController_editV1Decision, request, response });
+
+                const container: IocContainer = typeof iocContainer === 'function' ? (iocContainer as IocContainerFactory)(request) : iocContainer;
+
+                const controller: any = await container.get<V1DecisionController>(V1DecisionController);
+                if (typeof controller['setStatus'] === 'function') {
+                controller.setStatus(undefined);
+                }
+
+              await templateService.apiHandler({
+                methodName: 'editV1Decision',
                 controller,
                 response,
                 next,

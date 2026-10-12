@@ -15,6 +15,14 @@ export interface QueryDecisionsFilter {
 export class DecisionService {
   constructor(private repo: DecisionRepository) {}
 
+  async editDecision(
+    id: string,
+    body: import('../dto/decision-edit.dto.js').DecisionEditDto,
+    actorId: string,
+  ) {
+    return this.repo.editDecision(id, body, actorId);
+  }
+
   async browseDecisions(filter: Parameters<DecisionRepository['browseDecisions']>[0]) {
     return this.repo.browseDecisions(filter);
   }

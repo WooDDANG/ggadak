@@ -15,6 +15,7 @@ export const CategoryTagSchema = z.enum(['타깃', '문제정의', '기능', '�
 export const FeedbackSourceTypeSchema = z.enum(['교수', '심사위원', '팀원', '인터뷰이']);
 
 export const AlternativeOptionSchema = z.object({
+  id: z.string().optional(),
   option: z.string(),
   reason: z.string(),
 });
@@ -81,6 +82,7 @@ export const DecisionSchema = z.object({
   source: DiscordSourceSchema,
   messageCreatedAt: z.string().optional(),
   createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime().optional(),
   governanceScore: z.number().optional(),
   governanceReason: z.string().optional(),
   governancePassed: z.boolean().optional(),

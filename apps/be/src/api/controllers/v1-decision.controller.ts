@@ -1,9 +1,15 @@
+import { DecisionEditDto } from '../../dto/decision-edit.dto.js';
 import type { Request as ExpressRequest } from 'express';
 import { AuthService, AuthPrincipal } from '../../services/auth.service.js';
-import { Controller, Route, Tags, Get, Query, Security, Request, Path } from 'tsoa';
+import { Controller, Put, Body, Route, Tags, Get, Query, Security, Request, Path } from 'tsoa';
 import { Service } from 'typedi';
 import { DecisionService } from '../../services/decision.service.js';
-import { V1DecisionDto, V1DecisionListDto, DecisionStatus, toV1Decision } from '../../dto/v1-decision.dto.js';
+import {
+  V1DecisionDto,
+  V1DecisionListDto,
+  DecisionStatus,
+  toV1Decision,
+} from '../../dto/v1-decision.dto.js';
 import { BadRequestError } from '../../errors/AppError.js';
 import { ApiResponse, apiSuccess } from '../../dto/api-response.dto.js';
 
@@ -12,12 +18,38 @@ import { ApiResponse, apiSuccess } from '../../dto/api-response.dto.js';
 @Security('jwt')
 @Service()
 export class V1DecisionController extends Controller {
-  constructor(private service: DecisionService, private auth: AuthService) {
+  constructor(
+    private service: DecisionService,
+    private auth: AuthService,
+  ) {
     super();
   }
 
+  @Put('{id}')
+  public async editV1Decision(
+    @Request() request: ExpressRequest,
+    @Path() id: string,
+    @Query() guildId: string,
+    @Body() body: DecisionEditDto,
+  ): Promise<ApiResponse<V1DecisionDto>> {
+    await this.auth.requireDecision(request.user!, id, guildId);
+    return apiSuccess(
+      toV1Decision(
+        (await this.service.editDecision(
+          id,
+          request.body as DecisionEditDto,
+          (request.user as AuthPrincipal).userId,
+        ))!,
+      ),
+    );
+  }
+
   @Get('{id}')
-  public async getV1Decision(@Request() request: ExpressRequest, @Path() id: string, @Query() guildId: string): Promise<ApiResponse<V1DecisionDto>> {
+  public async getV1Decision(
+    @Request() request: ExpressRequest,
+    @Path() id: string,
+    @Query() guildId: string,
+  ): Promise<ApiResponse<V1DecisionDto>> {
     await this.auth.requireDecision(request.user!, id, guildId);
     return apiSuccess(toV1Decision((await this.service.getDecisionById(id))!));
   }
@@ -37,9 +69,24 @@ export class V1DecisionController extends Controller {
     await this.auth.requireGuild(request.user as AuthPrincipal, guildId);
     if (!Number.isInteger(page) || page < 1 || !Number.isInteger(size) || size < 1 || size > 100)
       throw new BadRequestError('page must be positive and size between 1 and 100');
-    const states: Record<string, DecisionStatus> = {Draft: 'IN_REVIEW', Proposed: 'IN_REVIEW', Discussing: 'IN_REVIEW', Decided: 'CONFIRMED', Deferred: 'ON_HOLD', Rejected: 'DISCARDED', Superseded: 'SUPERSEDED'};
+    const states: Record<string, DecisionStatus> = {
+      Draft: 'IN_REVIEW',
+      Proposed: 'IN_REVIEW',
+      Discussing: 'IN_REVIEW',
+      Decided: 'CONFIRMED',
+      Deferred: 'ON_HOLD',
+      Rejected: 'DISCARDED',
+      Superseded: 'SUPERSEDED',
+    };
     if (state && !states[state]) throw new BadRequestError('Unknown decision state');
-    const result = await this.service.browseDecisions({guildId, topic, status: status ?? (state ? states[state] : undefined), category: category ?? categoryTag, page, size});
-    return apiSuccess({...result, items: result.decisions.map(toV1Decision)});
+    const result = await this.service.browseDecisions({
+      guildId,
+      topic,
+      status: status ?? (state ? states[state] : undefined),
+      category: category ?? categoryTag,
+      page,
+      size,
+    });
+    return apiSuccess({ ...result, items: result.decisions.map(toV1Decision) });
   }
 }

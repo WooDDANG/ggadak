@@ -42,6 +42,7 @@ export interface V1DecisionDto {
   governanceScore?: number;
   governanceReason?: string;
   governancePassed?: boolean;
+  updatedAt?: string;
   status: DecisionStatus;
   category: string;
   /** @nullable */
