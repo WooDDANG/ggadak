@@ -52,6 +52,27 @@ export class BackendApiService {
     return this.backendUrl;
   }
 
+  private async syncJobRequest(path: string, method: string, body?: unknown): Promise<any> {
+    if (!this.serviceToken) throw new Error('BOT_SERVICE_TOKEN is not configured');
+    const response = await this.transport(`${this.backendUrl}${path}`, {
+      method,
+      headers: { Authorization: `Bearer ${this.serviceToken}`, 'Content-Type': 'application/json' },
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!response.ok) throw new Error(`Sync Job API failed (${response.status})`);
+    const envelope = await response.json() as { data?: unknown };
+    return envelope.data;
+  }
+
+  async claimSyncJob(): Promise<any | null> {
+    return this.syncJobRequest('/api/v1/internal/sync-jobs/claim', 'POST', {});
+  }
+
+  async updateSyncJob(jobId: string, update: Record<string, unknown>): Promise<void> {
+    await this.syncJobRequest(`/api/v1/internal/sync-jobs/${encodeURIComponent(jobId)}`, 'PUT', update);
+  }
+
   /** Read persisted settings afresh. Missing credentials/access or BE outages disable harvesting. */
   async isMonitoredChannel(guildId: string | null | undefined, channelId: string): Promise<boolean> {
     if (!guildId || !this.serviceToken) return false;
