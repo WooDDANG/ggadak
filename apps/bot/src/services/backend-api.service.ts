@@ -2,7 +2,7 @@ import type { SyncJobClaim, SyncWorkerUpdate } from './sync-job-worker.js';
 import { analysisScheduler } from './channel-scheduler.js';
 import { createHash, randomUUID } from 'node:crypto';
 import { mkdir, readFile, readdir, link, open, unlink, rename } from 'node:fs/promises';
-import { resolve, join } from 'node:path';
+import { resolve, join, dirname } from 'node:path';
 import {
   HarvestingPolicyConfig,
   HarvestingPolicyConfigSchema,
@@ -48,6 +48,14 @@ export interface ScanRange {
   startMessageId: string;
   endMessageId: string;
 }
+export interface SyncScanManifest {
+  scannedCount: number;
+  entries: Array<{
+    payload: Parameters<BackendApiService['analyzeDiscussion']>[0];
+    scanRange: ScanRange;
+  }>;
+}
+
 export interface DeliveryRecord {
   scanRange?: ScanRange;
   payload: any;
@@ -146,6 +154,29 @@ export class BackendApiService {
       'PUT',
       update,
     );
+  }
+
+  async loadSyncScan(scanId: string): Promise<SyncScanManifest | null> {
+    const filename = join(
+      this.pendingDirectory,
+      'sync-scans',
+      `${createHash('sha256').update(scanId).digest('hex')}.json`,
+    );
+    try {
+      return JSON.parse(await readFile(filename, 'utf8')) as SyncScanManifest;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+      throw error;
+    }
+  }
+
+  /** Freeze every range before analysis can advance the Channel Checkpoint. */
+  async saveSyncScan(scanId: string, manifest: SyncScanManifest): Promise<SyncScanManifest> {
+    const directory = join(this.pendingDirectory, 'sync-scans');
+    await mkdir(directory, { recursive: true });
+    const filename = join(directory, `${createHash('sha256').update(scanId).digest('hex')}.json`);
+    await this.persistJson(manifest, filename, true);
+    return (await this.loadSyncScan(scanId))!;
   }
 
   /** Read persisted settings afresh. Missing credentials/access or BE outages disable harvesting. */
@@ -292,7 +323,7 @@ export class BackendApiService {
         const fresh = this.parseDelivery(await readFile(filename, 'utf8'));
         if (scanRange && !fresh.scanRange) {
           fresh.scanRange = scanRange;
-          await this.persistDelivery(fresh, filename);
+          await this.persistJson(fresh, filename);
         }
         return this.runDelivery(fresh, filename, onExecuting, onSettled);
       },
@@ -307,7 +338,7 @@ export class BackendApiService {
       : { payload: parsed, attempts: 0, nextAttemptAt: 0, stopped: false };
   }
 
-  private async persistDelivery(record: DeliveryRecord, filename: string): Promise<void> {
+  private async persistJson(record: unknown, filename: string, immutable = false): Promise<void> {
     const temporary = `${filename}.${randomUUID()}.tmp`;
     const file = await open(temporary, 'wx', 0o600);
     try {
@@ -316,8 +347,18 @@ export class BackendApiService {
     } finally {
       await file.close();
     }
-    await rename(temporary, filename);
-    const directory = await open(this.pendingDirectory, 'r');
+    if (immutable) {
+      try {
+        await link(temporary, filename);
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+      } finally {
+        await unlink(temporary);
+      }
+    } else {
+      await rename(temporary, filename);
+    }
+    const directory = await open(dirname(filename), 'r');
     try {
       await directory.sync();
     } finally {
@@ -377,7 +418,7 @@ export class BackendApiService {
       this.now() +
       Math.min(o.maxDelayMs, Math.round(delay * (1 - o.jitter + 2 * o.jitter * this.random())));
     if (record.attempts >= o.maxAttempts) record.stopped = true;
-    await this.persistDelivery(record, filename);
+    await this.persistJson(record, filename);
     let permanent = false;
     delete record.errorCategory;
     try {
@@ -411,7 +452,7 @@ export class BackendApiService {
       record.stopped = false;
       delete record.lastError;
       delete record.errorCategory;
-      await this.persistDelivery(record, filename);
+      await this.persistJson(record, filename);
       return result;
     } catch (error: any) {
       if (error instanceof SyntaxError) {
@@ -420,7 +461,7 @@ export class BackendApiService {
       }
       record.stopped ||= permanent;
       record.lastError = error.message;
-      await this.persistDelivery(record, filename);
+      await this.persistJson(record, filename);
       throw new AnalysisDeliveryError(
         error.message,
         record.stopped ? 'retained-failure' : 'retry-pending',
@@ -494,7 +535,7 @@ export class BackendApiService {
           record.stopped = false;
           delete record.lastError;
           if (commandId) record.retryCommandIds = [...(record.retryCommandIds || []), commandId];
-          await this.persistDelivery(record, entry.filename);
+          await this.persistJson(record, entry.filename);
         }
         return this.runDelivery(record, entry.filename);
       },

@@ -8,6 +8,77 @@ import { DecisionHarvestingEngine } from './decision-harvesting-engine.js';
 import { DiscussionHarvester } from './harvester.service.js';
 import { DEFAULT_HARVESTING_POLICY } from '@ggaddak/shared';
 
+test('a Sync Job replays its original range totals after checkpoint completion but before progress acknowledgement', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'sync-scan-replay-'));
+  let checkpoint = '100';
+  let aiCalls = 0;
+  const transport: typeof fetch = async (url, init) => {
+    if (String(url).includes('/monitoring'))
+      return Response.json({ data: { channelIds: ['channel'] } });
+    if (String(url).endsWith('/checkpoint')) {
+      if (init?.method === 'POST') checkpoint = JSON.parse(init.body as string).lastMessageId;
+      return Response.json({ lastMessageId: checkpoint });
+    }
+    aiCalls++;
+    return Response.json({ found: true, decisions: [{ id: 'candidate' }] });
+  };
+  const messages = ['101', '102'].map(id => ({
+    id,
+    author: { id: 'u', username: 'Lee', bot: false },
+    content: 'We decided to use SQLite',
+    createdAt: new Date('2026-10-13T00:00:00Z'),
+    reactions: { cache: new Map() },
+    url: `https://discord.com/channels/g/channel/${id}`,
+  }));
+  const channel = {
+    id: 'channel',
+    name: 'Channel',
+    guild: { id: 'g' },
+    messages: { fetch: async () => new Map(messages.map(message => [message.id, message])) },
+  };
+  const api = () =>
+    new BackendApiService('http://fixture', directory, transport, undefined, 'service');
+  try {
+    const options = { requestId: 'sync-job-channel', forceFullSync: false };
+    assert.deepEqual(
+      await new DiscussionHarvester(api()).scanChannel(
+        channel as any,
+        DEFAULT_HARVESTING_POLICY,
+        options,
+      ),
+      {
+        scannedCount: 2,
+        decisionsCount: 1,
+      },
+    );
+    assert.equal(checkpoint, '102');
+    messages.push({ ...messages[1], id: '103', content: 'A later decision' });
+    // Simulate process loss before the worker can report the channel result to BE.
+    assert.deepEqual(
+      await new DiscussionHarvester(api()).scanChannel(
+        channel as any,
+        DEFAULT_HARVESTING_POLICY,
+        options,
+      ),
+      {
+        scannedCount: 2,
+        decisionsCount: 1,
+      },
+    );
+    assert.equal(aiCalls, 1);
+    assert.deepEqual(
+      await new DiscussionHarvester(api()).scanChannel(channel as any, DEFAULT_HARVESTING_POLICY, {
+        requestId: 'sync-later-job-channel',
+        forceFullSync: false,
+      }),
+      { scannedCount: 1, decisionsCount: 1 },
+    );
+    assert.equal(aiCalls, 2);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test('failed early range blocks later completion across restart; response-loss and old acknowledgements recover monotonically', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'scan-coverage-'));
   let checkpoint = '100';

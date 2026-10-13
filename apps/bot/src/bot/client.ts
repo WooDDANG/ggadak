@@ -92,7 +92,7 @@ export class DecisionTrackerBot {
         return this.analysisService.scanChannel(channel as any, this.policy, {
           full: job.forceFullSync,
           forceFullSync: job.forceFullSync,
-          requestId: job.forceFullSync ? `sync-${job.jobId}-${channelId}` : undefined,
+          requestId: `sync-${job.jobId}-${channelId}`,
         });
       });
       const processSyncJob = () =>

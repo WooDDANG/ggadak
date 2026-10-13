@@ -5,7 +5,11 @@ import {
   createLogger,
   calculateDiscussionScore,
 } from '@ggaddak/shared';
-import { AnalysisDeliveryError, BackendApiService } from './backend-api.service.js';
+import {
+  AnalysisDeliveryError,
+  BackendApiService,
+  type SyncScanManifest,
+} from './backend-api.service.js';
 import { CONSENSUS_REGEX } from '../handlers/message.handler.js';
 
 const logger = createLogger('DISCUSSION-HARVESTER');
@@ -315,6 +319,13 @@ export class DiscussionHarvester {
   ): Promise<{ scannedCount: number; decisionsCount: number }> {
     if (!(await this.backendApi.requireMonitoredChannel(channel.guild.id, channel.id)))
       return { scannedCount: 0, decisionsCount: 0 };
+    const scanId = options.requestId
+      ? `${options.requestId}:${channel.guild.id}:${channel.id}`
+      : undefined;
+    if (scanId) {
+      const saved = await this.backendApi.loadSyncScan(scanId);
+      if (saved) return this.executeScan(saved);
+    }
     const channelName = channel.name;
     await this.backendApi
       .recoverScanCheckpoints()
@@ -375,9 +386,8 @@ export class DiscussionHarvester {
       return { scannedCount: 0, decisionsCount: 0 };
     }
 
-    let decisionsFound = 0;
     let afterMessageId = boundary || (BigInt(fetchedMessages[0].id) - 1n).toString();
-    const failures: Error[] = [];
+    const manifest: SyncScanManifest = { scannedCount: fetchedMessages.length, entries: [] };
     for (let offset = 0; offset < fetchedMessages.length; offset += 100) {
       const messages = fetchedMessages.slice(offset, offset + 100);
       const newest = messages[messages.length - 1];
@@ -387,37 +397,52 @@ export class DiscussionHarvester {
         (sum, m) => sum + this.extractReactions(m).reactionCount,
         0,
       );
+      manifest.entries.push({
+        payload: {
+          requestId: options.requestId ? `${options.requestId}:${newest.id}` : undefined,
+          rawMessages: messages.map(m => ({
+            id: m.id,
+            author: m.author?.username || 'unknown',
+            isBot: m.author?.bot || false,
+            content: m.content || '',
+            createdAt: m.createdAt.toISOString(),
+            replyingTo: m.reference?.messageId,
+            ...this.extractReactions(m),
+            isTrigger: m.id === newest.id,
+          })),
+          guildId: channel.guild.id,
+          channelId: channel.id,
+          channelName,
+          triggerMessageId: newest.id,
+          messageUrl: newest.url,
+          isManualOverride: options.forceFullSync === true,
+          participantCount: participants.size,
+          reactionsCount,
+        },
+        scanRange,
+      });
+      afterMessageId = newest.id;
+    }
+    const saved = scanId ? await this.backendApi.saveSyncScan(scanId, manifest) : manifest;
+    return this.executeScan(saved);
+  }
+
+  private async executeScan(
+    manifest: SyncScanManifest,
+  ): Promise<{ scannedCount: number; decisionsCount: number }> {
+    let decisionsFound = 0;
+    const failures: Error[] = [];
+    for (const entry of manifest.entries) {
       try {
         const result = await this.backendApi.analyzeDiscussion(
-          {
-            requestId: options.requestId ? `${options.requestId}:${newest.id}` : undefined,
-            rawMessages: messages.map(m => ({
-              id: m.id,
-              author: m.author?.username || 'unknown',
-              isBot: m.author?.bot || false,
-              content: m.content || '',
-              createdAt: m.createdAt.toISOString(),
-              replyingTo: m.reference?.messageId,
-              ...this.extractReactions(m),
-              isTrigger: m.id === newest.id,
-            })),
-            guildId: channel.guild.id,
-            channelId: channel.id,
-            channelName,
-            triggerMessageId: newest.id,
-            messageUrl: newest.url,
-            isManualOverride: options.forceFullSync === true,
-            participantCount: participants.size,
-            reactionsCount,
-          },
+          entry.payload,
           undefined,
-          scanRange,
+          entry.scanRange,
         );
         decisionsFound += result.decisions.length;
       } catch (error) {
         failures.push(error as Error);
       }
-      afterMessageId = newest.id;
     }
     await this.backendApi.recoverScanCheckpoints();
     if (failures.length) {
@@ -425,13 +450,13 @@ export class DiscussionHarvester {
         error => error instanceof AnalysisDeliveryError && error.outcome === 'retry-pending',
       ).length;
       throw new ScanIncompleteError(
-        Math.ceil(fetchedMessages.length / 100) - failures.length,
+        manifest.entries.length - failures.length,
         pending,
         failures.length - pending,
         failures[0].message,
       );
     }
-    return { scannedCount: fetchedMessages.length, decisionsCount: decisionsFound };
+    return { scannedCount: manifest.scannedCount, decisionsCount: decisionsFound };
   }
 
   /** @internal Adapter operation; event and manual scan callers use engine.harvest(). */

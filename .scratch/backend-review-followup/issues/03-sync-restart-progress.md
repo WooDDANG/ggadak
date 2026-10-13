@@ -36,3 +36,7 @@ Blocked by: none
 SyncJob에 채널별 결과 JSON을 additive migration으로 추가했다. BE가 채널별 결과에서 집계를 계산하고 성공 채널을 재획득 목록에서 제외한다. 재보고는 결과를 교체하여 멱등적이며 실패 채널의 성공 복구는 실패 건수를 제거한다. Bot SyncJobWorker는 채널 결과만 보고한다. 재시작·중복 보고·실패 복구 및 기존 Job migration 보존을 검증했다.
 
 검증: [verification.md](../verification.md).
+
+## Review follow-up
+
+스캔 후 checkpoint가 전진했지만 채널 결과를 BE에 보고하기 전에 종료되는 경계를 회귀 테스트로 재현했다. Bot은 분석 전에 Job/channel별 원본 스캔 manifest를 fsync하여 저장한다. 재시작 시 같은 payload와 Analysis Request ID 및 저장된 결과를 재사용하여 원래 메시지·후보 집계를 복구한다. 이후 새 메시지는 별도 Job에서 처리한다. Sync Job Prisma 조회와 조건부 저장은 SyncJobRepository로 분리했다.
