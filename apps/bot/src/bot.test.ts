@@ -1,15 +1,22 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import { DiscussionHarvester, RawMessageData } from './services/harvester.service.js';
-import { DEFAULT_HARVESTING_POLICY, Decision } from '@ggaddak/shared';
+import { DecisionHarvestingEngine } from './services/decision-harvesting-engine.js';
+import { DiscussionHarvester } from './services/harvester.service.js';
+import { DEFAULT_HARVESTING_POLICY } from '@ggaddak/shared';
 
 describe('DiscussionHarvester Deep Module', () => {
   it('harvests asymmetric context window (before 15, after 5) in text channels', async () => {
-    const harvester = new DiscussionHarvester({
-      analyzeDiscussion: async () => ({ found: false, decisions: [] }),
+    let harvested: any[] = [];
+    const api = {
+      isMonitoredChannel: async () => true,
+      analyzeDiscussion: async (payload: any) => {
+        harvested = payload.rawMessages;
+        return { found: false, decisions: [] };
+      },
       getCheckpoint: async () => null,
       saveCheckpoint: async () => true,
-    } as any);
+    };
+    const engine = new DecisionHarvestingEngine(api, new DiscussionHarvester(api as any));
 
     const mockMessages: any[] = [];
     for (let i = 1; i <= 30; i++) {
@@ -50,16 +57,21 @@ describe('DiscussionHarvester Deep Module', () => {
 
     triggerMsg.channel = mockChannel;
 
-    const harvested = await harvester.harvestContextMessages(triggerMsg, DEFAULT_HARVESTING_POLICY);
+    const result = await engine.harvest(
+      { type: 'EVENT', message: triggerMsg, isManualOverride: true },
+      DEFAULT_HARVESTING_POLICY,
+    );
+    assert.strictEqual(result.success, true);
     assert.strictEqual(harvested.length, 21); // 15 before + 1 trigger + 5 after
     assert.strictEqual(harvested[0].id, 'msg-5');
     assert.strictEqual(harvested[15].id, 'msg-20');
     assert.strictEqual(harvested[20].id, 'msg-25');
   });
 
-  it('acquires in-flight lock and rejects concurrent duplicate analyses on the same channel', async () => {
+  it('retains concurrent event analyses rather than dropping the later trigger', async () => {
     let analyzeCallCount = 0;
     const harvester = new DiscussionHarvester({
+      isMonitoredChannel: async () => true,
       analyzeDiscussion: async () => {
         analyzeCallCount++;
         await new Promise(r => setTimeout(r, 50));
@@ -90,15 +102,14 @@ describe('DiscussionHarvester Deep Module', () => {
       url: 'https://discord.com/channels/1/2/3',
     };
 
-    // First call acquires lock
-    const p1 = harvester.processAnalysis(msg, DEFAULT_HARVESTING_POLICY, false);
-    // Second concurrent call on same channel without manual override
-    const p2 = harvester.processAnalysis(msg, DEFAULT_HARVESTING_POLICY, false);
+    const engine = new DecisionHarvestingEngine({} as any, harvester);
+    const p1 = engine.harvest({ type: 'EVENT', message: msg, isManualOverride: true });
+    const p2 = engine.harvest({ type: 'EVENT', message: msg, isManualOverride: true });
 
     const [res1, res2] = await Promise.all([p1, p2]);
-    assert.ok(res1 !== null);
-    assert.strictEqual(res2, null); // skipped by lock
-    assert.strictEqual(analyzeCallCount, 1);
+    assert.strictEqual(res1.success, true);
+    assert.strictEqual(res2.success, true);
+    assert.strictEqual(analyzeCallCount, 2);
   });
 
   it('CONSENSUS_REGEX accurately matches agreement phrases and ignores casual talk', async () => {
@@ -119,7 +130,6 @@ describe('DiscussionHarvester Deep Module', () => {
   it('triggers message handler on semantic decision phrases even without strict keywords', async () => {
     const { MessageHandler } = await import('./handlers/message.handler.js');
     let triggerCount = 0;
-    let reactionCount = 0;
 
     const fakeEngine = {
       harvest: async () => {
@@ -128,9 +138,7 @@ describe('DiscussionHarvester Deep Module', () => {
       },
     };
 
-    const handler = new MessageHandler(fakeEngine as any, async (_msg: any, emoji: string) => {
-      if (emoji === '👀') reactionCount++;
-    });
+    const handler = new MessageHandler(fakeEngine as any);
 
     const semanticMsg: any = {
       id: 'sem-1',
@@ -145,7 +153,6 @@ describe('DiscussionHarvester Deep Module', () => {
       debounceMs: 5,
     });
 
-    assert.strictEqual(reactionCount, 1);
     assert.strictEqual(triggerCount, 1);
   });
 
@@ -171,15 +178,17 @@ describe('DiscussionHarvester Deep Module', () => {
     // First call acquires in-flight lock (manual override to bypass debounce)
     const p1 = engine.harvest({ type: 'EVENT', message: testMsg, isManualOverride: true });
     // Second concurrent call on same channel is deduplicated/locked
-    const p2 = engine.harvest({ type: 'EVENT', message: testMsg, isManualOverride: false });
+    const p2 = engine.harvest(
+      { type: 'EVENT', message: testMsg, isManualOverride: false },
+      { ...DEFAULT_HARVESTING_POLICY, debounceMs: 1 },
+    );
 
     const [res1, res2] = await Promise.all([p1, p2]);
 
     assert.strictEqual(res1.success, true);
     assert.strictEqual(res1.decisionsCount, 1);
-    assert.strictEqual(res2.success, false);
-    assert.strictEqual(res2.summary, 'in-flight locked');
-    assert.strictEqual(sinkCalls, 1);
+    assert.strictEqual(res2.success, true);
+    assert.strictEqual(sinkCalls, 2);
   });
 
   it('DecisionHarvestingEngine properly resolves debounce timer on normal event triggers', async () => {

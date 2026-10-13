@@ -65,13 +65,13 @@ export function filterTier1Messages(messages: RawMessageItem[]): Tier1FilterResu
     }
 
     // 3. Drop pure casual chatter and empty exclamations
-    if (CASUAL_EXCLAMATION_REGEX.test(trimmed)) {
+    if (CASUAL_EXCLAMATION_REGEX.test(trimmed) && !(m.isTrigger && m.reactionCount)) {
       filteredCount++;
       continue;
     }
 
     // 4. Agreement short phrases: absorb as synthetic reaction into previous clean message
-    if (AGREEMENT_SHORT_REGEX.test(trimmed)) {
+    if (AGREEMENT_SHORT_REGEX.test(trimmed) && !(m.isTrigger && cleanMessages.length === 0)) {
       filteredCount++;
       if (cleanMessages.length > 0) {
         const lastMsg = cleanMessages[cleanMessages.length - 1];
@@ -80,7 +80,7 @@ export function filterTier1Messages(messages: RawMessageItem[]): Tier1FilterResu
           ...(lastMsg.originalMessages ?? [{ ...lastMsg, originalMessages: undefined }]),
           { ...m },
         ];
-        lastMsg.reactionCount = (lastMsg.reactionCount || 0) + 1;
+        lastMsg.reactionCount = (lastMsg.reactionCount || 0) + 1 + (m.reactionCount || 0);
       }
       continue;
     }

@@ -36,6 +36,8 @@ test('Bot skips unselected channels and fails closed when settings cannot be ref
         },
       },
     };
+    await assert.rejects(harvester.scanChannel(channel as any, DEFAULT_HARVESTING_POLICY), /503/);
+    available = true;
     assert.deepEqual(await harvester.scanChannel(channel as any, DEFAULT_HARVESTING_POLICY), {
       scannedCount: 0,
       decisionsCount: 0,
@@ -69,7 +71,7 @@ test('Message and reaction triggers do not react or dispatch outside monitored c
     content: '확정합시다',
     partial: false,
   };
-  await new MessageHandler(engine as any, addReaction, allowed).handleMessage(
+  await new MessageHandler(engine as any, allowed).handleMessage(
     message as any,
     DEFAULT_HARVESTING_POLICY,
   );

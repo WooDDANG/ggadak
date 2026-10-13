@@ -1,12 +1,7 @@
+import { ChannelScheduler } from './channel-scheduler.js';
+import { AnalysisDeliveryError } from './backend-api.service.js';
 import { Message, TextChannel, Guild } from 'discord.js';
-import {
-  Decision,
-  HarvestingPolicyConfig,
-  DEFAULT_HARVESTING_POLICY,
-  createLogger,
-  evaluateSemanticDecision,
-  CONSENSUS_REGEX,
-} from '@ggaddak/shared';
+import { HarvestingPolicyConfig, DEFAULT_HARVESTING_POLICY } from '@ggaddak/shared';
 import {
   IDecisionHarvestingEngine,
   HarvestTrigger,
@@ -15,13 +10,20 @@ import {
 } from './decision-harvesting-engine.types.js';
 import { DiscussionHarvester } from './harvester.service.js';
 
-const logger = createLogger('DECISION-HARVESTING-ENGINE');
+const standaloneScheduler = new ChannelScheduler();
 
 export class DecisionHarvestingEngine implements IDecisionHarvestingEngine {
-  private inFlightChannels = new Set<string>();
-  private debounceTimers = new Map<string, NodeJS.Timeout>();
-  private firstTriggerTimes = new Map<string, number>();
-  private readonly maxDebounceMs = 60000;
+  private pending = new Map<
+    string,
+    {
+      timer: NodeJS.Timeout;
+      firstAt: number;
+      message: Message;
+      resolve: (result: HarvestResult) => void;
+      traceId: string;
+      triggers: Message[];
+    }
+  >();
 
   constructor(
     private sink: DecisionSink,
@@ -52,6 +54,23 @@ export class DecisionHarvestingEngine implements IDecisionHarvestingEngine {
     };
   }
 
+  async cancelPending(channelId?: string): Promise<void> {
+    for (const [id, entry] of this.pending) {
+      if (channelId && id !== channelId) continue;
+      clearTimeout(entry.timer);
+      this.pending.delete(id);
+      entry.resolve({
+        success: false,
+        outcome: 'canceled',
+        decisions: [],
+        decisionsCount: 0,
+        messageCount: 0,
+        traceId: entry.traceId,
+      });
+      await this.harvester?.removeReactionSafely(entry.message, '👀');
+    }
+  }
+
   /**
    * Internal Event Harvest Pipeline with In-Flight Lock & Debounce
    */
@@ -63,72 +82,51 @@ export class DecisionHarvestingEngine implements IDecisionHarvestingEngine {
   ): Promise<HarvestResult> {
     const channelId = message.channelId;
 
-    // Check in-flight lock before scheduling debounce
-    if (this.inFlightChannels.has(channelId) && !isManualOverride) {
-      logger.info(`Channel #${channelId} is in-flight. Skipping duplicate trigger.`, {
-        stage: 'LOCK',
-        traceId,
-      });
-      return {
+    const existing = this.pending.get(channelId);
+    const triggers = [
+      ...new Map([...(existing?.triggers || []), message].map(m => [m.id, m])).values(),
+    ];
+    if (existing) {
+      clearTimeout(existing.timer);
+      this.pending.delete(channelId);
+      void this.harvester?.removeReactionSafely(existing.message, '👀');
+      existing.resolve({
         success: false,
+        outcome: 'merged',
         decisions: [],
         decisionsCount: 0,
         messageCount: 0,
-        summary: 'in-flight locked',
-        traceId,
-      };
-    }
-
-    // 1. Manual override executes immediately, clearing pending debounce
-    if (isManualOverride) {
-      this.clearDebounce(channelId);
-      return this.executeHarvestAnalysis(message, true, policy, traceId);
-    }
-
-    // 2. Sliding window debounce scheduling
-    const now = Date.now();
-    const firstTrigger = this.firstTriggerTimes.get(channelId);
-
-    if (firstTrigger && now - firstTrigger >= this.maxDebounceMs) {
-      this.clearDebounce(channelId);
-      logger.info(`Max debounce limit reached (60s) for #${channelId}. Executing immediately.`, {
-        stage: 'DEBOUNCE',
-        traceId,
+        traceId: existing.traceId,
+        summary: 'merged into later trigger',
       });
-      return this.executeHarvestAnalysis(message, false, policy, traceId);
     }
-
-    if (!firstTrigger) {
-      this.firstTriggerTimes.set(channelId, now);
-    }
-
-    if (this.debounceTimers.has(channelId)) {
-      clearTimeout(this.debounceTimers.get(channelId)!);
-    }
-
-    return new Promise<HarvestResult>(resolve => {
-      const timer = setTimeout(async () => {
-        this.clearDebounce(channelId);
-        const res = await this.executeHarvestAnalysis(message, false, policy, traceId);
-        resolve(res);
-      }, policy.debounceMs);
-
-      this.debounceTimers.set(channelId, timer);
-      logger.info(`Scheduled analysis for #${channelId} in ${policy.debounceMs / 1000}s`, {
-        stage: 'DEBOUNCE',
-        traceId,
-        debounceMs: policy.debounceMs,
-      });
+    if (isManualOverride)
+      return this.executeHarvestAnalysis(message, true, policy, traceId, triggers);
+    const firstAt = existing?.firstAt ?? Date.now();
+    return new Promise(resolve => {
+      const timer = setTimeout(
+        () => {
+          this.pending.delete(channelId);
+          void this.executeHarvestAnalysis(message, false, policy, traceId, triggers).then(
+            resolve,
+            async error => {
+              await this.harvester?.removeReactionSafely(message, '👀');
+              resolve({
+                success: false,
+                outcome: 'retained-failure',
+                decisions: [],
+                decisionsCount: 0,
+                messageCount: 0,
+                traceId,
+                summary: error.message,
+              });
+            },
+          );
+        },
+        Math.max(0, Math.min(policy.debounceMs, 60000 - (Date.now() - firstAt))),
+      );
+      this.pending.set(channelId, { timer, firstAt, message, resolve, traceId, triggers });
     });
-  }
-
-  private clearDebounce(channelId: string): void {
-    const existing = this.debounceTimers.get(channelId);
-    if (existing) {
-      clearTimeout(existing);
-      this.debounceTimers.delete(channelId);
-    }
-    this.firstTriggerTimes.delete(channelId);
   }
 
   private async executeHarvestAnalysis(
@@ -136,36 +134,27 @@ export class DecisionHarvestingEngine implements IDecisionHarvestingEngine {
     isManualOverride: boolean,
     policy: HarvestingPolicyConfig,
     traceId: string,
+    triggers: Message[] = [message],
   ): Promise<HarvestResult> {
     const channelId = message.channelId;
 
-    if (this.inFlightChannels.has(channelId) && !isManualOverride) {
-      logger.info(`Channel #${channelId} is in-flight. Skipping duplicate trigger.`, {
-        stage: 'LOCK',
-        traceId,
-      });
-      return {
-        success: false,
-        decisions: [],
-        decisionsCount: 0,
-        messageCount: 0,
-        summary: 'in-flight locked',
-        traceId,
-      };
-    }
-
-    this.inFlightChannels.add(channelId);
     try {
+      if (!this.harvester)
+        return await standaloneScheduler.run(channelId, () =>
+          this.executeStandalone(message, traceId),
+        );
       if (this.harvester) {
         const decisions = await this.harvester.processAnalysis(
           message,
           policy,
           isManualOverride,
           traceId,
+          triggers,
         );
         if (!decisions || decisions.length === 0) {
           return {
-            success: false,
+            success: true,
+            outcome: 'completed-no-decision',
             decisions: [],
             decisionsCount: 0,
             messageCount: 0,
@@ -175,6 +164,7 @@ export class DecisionHarvestingEngine implements IDecisionHarvestingEngine {
         }
         return {
           success: true,
+          outcome: 'completed-with-candidates',
           decisions,
           decisionsCount: decisions.length,
           messageCount: decisions.length,
@@ -183,24 +173,36 @@ export class DecisionHarvestingEngine implements IDecisionHarvestingEngine {
         };
       }
 
-      // Standalone sink for pure isolated tests
-      const res = await this.sink.analyzeDiscussion({
-        rawMessages: [{ id: message.id, content: message.content }],
-        channelId,
-        traceId,
-      });
-      const decisions = res.decisions || [];
+      return this.executeStandalone(message, traceId);
+    } catch (error: any) {
       return {
-        success: res.found || false,
-        decisions,
-        decisionsCount: decisions.length,
-        messageCount: 1,
-        summary: res.summary,
+        success: false,
+        outcome: error instanceof AnalysisDeliveryError ? error.outcome : 'retained-failure',
+        decisions: [],
+        decisionsCount: 0,
+        messageCount: 0,
         traceId,
+        summary: error.message,
       };
-    } finally {
-      this.inFlightChannels.delete(channelId);
     }
+  }
+
+  private async executeStandalone(message: Message, traceId: string): Promise<HarvestResult> {
+    const res = await this.sink.analyzeDiscussion({
+      rawMessages: [{ id: message.id, content: message.content }],
+      channelId: message.channelId,
+      traceId,
+    });
+    const decisions = res.decisions || [];
+    return {
+      success: true,
+      outcome: decisions.length ? 'completed-with-candidates' : 'completed-no-decision',
+      decisions,
+      decisionsCount: decisions.length,
+      messageCount: 1,
+      traceId,
+      summary: res.summary,
+    };
   }
 
   /**

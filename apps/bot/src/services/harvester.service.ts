@@ -5,8 +5,7 @@ import {
   createLogger,
   calculateDiscussionScore,
 } from '@ggaddak/shared';
-import { BotEmbedView } from '../views/embed.view.js';
-import { BackendApiService } from './backend-api.service.js';
+import { AnalysisDeliveryError, BackendApiService } from './backend-api.service.js';
 import { CONSENSUS_REGEX } from '../handlers/message.handler.js';
 
 const logger = createLogger('DISCUSSION-HARVESTER');
@@ -17,6 +16,7 @@ export interface RawMessageData {
   authorName: string;
   content: string;
   createdAt: Date;
+  isBot?: boolean;
   referenceMessageId?: string;
   reactionCount?: number;
   reactions?: Array<{ emoji: string; count: number }>;
@@ -32,9 +32,21 @@ export interface ScanOptions {
   requestId?: string;
 }
 
+export class ScanIncompleteError extends Error {
+  constructor(
+    public readonly completed: number,
+    public readonly pending: number,
+    public readonly failed: number,
+    detail: string,
+  ) {
+    super(
+      `Scan incomplete: ${completed} completed, ${pending} pending, ${failed} failed. ${detail}`,
+    );
+  }
+}
+
 export class DiscussionHarvester {
   private static instance: DiscussionHarvester | null = null;
-  private inFlightChannels = new Set<string>();
 
   constructor(private backendApi: BackendApiService) {
     DiscussionHarvester.instance = this;
@@ -50,13 +62,13 @@ export class DiscussionHarvester {
   } {
     const reactions = Array.from(m.reactions?.cache?.values() || []).map((r: any) => ({
       emoji: r.emoji?.name || 'emoji',
-      count: r.count || 0,
+      count: Math.max(0, (r.count || 0) - (r.me ? 1 : 0)),
     }));
     const reactionCount = reactions.reduce((sum, r) => sum + r.count, 0);
     return { reactionCount, reactions };
   }
 
-  async harvestContextMessages(
+  private async harvestContextMessages(
     message: Message,
     policy: HarvestingPolicyConfig,
   ): Promise<RawMessageData[]> {
@@ -72,7 +84,7 @@ export class DiscussionHarvester {
       logger.info(
         `[Context] Channel #${channelName} is a Discord Thread. Harvesting thread history...`,
       );
-      const threadLimit = Math.max(policy.maxMergedWindow, 100);
+      const threadLimit = Math.min(100, policy.maxMergedWindow);
       const fetchedThread = await channel.messages.fetch({ limit: threadLimit });
       rawMessages = Array.from(fetchedThread.values())
         .reverse()
@@ -82,6 +94,7 @@ export class DiscussionHarvester {
             id: m.id,
             authorId: m.author?.id || 'unknown',
             authorName: m.author?.username || 'unknown',
+            isBot: m.author?.bot || false,
             content: m.content || '',
             createdAt: m.createdAt || new Date(),
             referenceMessageId: m.reference?.messageId,
@@ -106,6 +119,7 @@ export class DiscussionHarvester {
             id: m.id,
             authorId: m.author?.id || 'unknown',
             authorName: m.author?.username || 'unknown',
+            isBot: m.author?.bot || false,
             content: m.content || '',
             createdAt: m.createdAt || new Date(),
             referenceMessageId: m.reference?.messageId,
@@ -124,6 +138,7 @@ export class DiscussionHarvester {
             id: m.id,
             authorId: m.author?.id || 'unknown',
             authorName: m.author?.username || 'unknown',
+            isBot: m.author?.bot || false,
             content: m.content || '',
             createdAt: m.createdAt || new Date(),
             referenceMessageId: m.reference?.messageId,
@@ -140,6 +155,7 @@ export class DiscussionHarvester {
           id: message.id,
           authorId: message.author?.id || 'unknown',
           authorName: message.author?.username || 'unknown',
+          isBot: message.author?.bot || false,
           content: message.content || '',
           createdAt: message.createdAt || new Date(),
           referenceMessageId: message.reference?.messageId,
@@ -159,11 +175,13 @@ export class DiscussionHarvester {
     return rawMessages;
   }
 
+  /** @internal Adapter operation; event and manual scan callers use engine.harvest(). */
   async processAnalysis(
     message: Message,
     policy: HarvestingPolicyConfig,
     isManualOverride: boolean = false,
     traceId?: string,
+    triggers: Message[] = [message],
   ): Promise<Decision[] | null> {
     const channel = message.channel;
     if (!channel || !channel.isTextBased()) return null;
@@ -172,38 +190,29 @@ export class DiscussionHarvester {
     const currentTraceId =
       traceId || `trc-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
     const startTime = Date.now();
-    const channelId = channel.id;
     const channelName = 'name' in channel ? (channel.name as string) : 'dm';
-
-    if (this.inFlightChannels.has(channelId) && !isManualOverride) {
-      logger.info(`Channel #${channelId} is already in-flight. Skipping duplicate trigger.`, {
-        stage: 'LOCK',
-        traceId: currentTraceId,
-        channel: channelName,
-      });
-      return null;
-    }
-
-    this.inFlightChannels.add(channelId);
-    logger.info(`Acquired in-flight processing lock for #${channelName}`, {
-      stage: 'LOCK',
-      traceId: currentTraceId,
-      channel: channelName,
-    });
-
-    const lockSafetyTimeout = setTimeout(() => {
-      if (this.inFlightChannels.has(channelId)) {
-        logger.warn(`Channel #${channelName} lock exceeded 60s safety TTL. Force releasing.`, {
-          stage: 'LOCK',
-          traceId: currentTraceId,
-        });
-        this.inFlightChannels.delete(channelId);
-      }
-    }, 60000);
 
     try {
       const harvestStart = Date.now();
       const rawMessages = await this.harvestContextMessages(message, policy);
+      for (const trigger of triggers) {
+        const existing = rawMessages.find(m => m.id === trigger.id);
+        if (existing) existing.isTrigger = true;
+        else
+          rawMessages.push({
+            id: trigger.id,
+            authorId: trigger.author?.id || 'unknown',
+            authorName: trigger.author?.username || 'unknown',
+            isBot: trigger.author?.bot || false,
+            content: trigger.content || '',
+            createdAt: trigger.createdAt || new Date(),
+            referenceMessageId: trigger.reference?.messageId,
+            ...this.extractReactions(trigger),
+            isTrigger: true,
+          });
+      }
+      rawMessages.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+
       const harvestDuration = Date.now() - harvestStart;
       const participants = Array.from(new Set(rawMessages.map(m => m.authorName)));
       const totalReactions = rawMessages.reduce((sum, m) => sum + (m.reactionCount || 0), 0);
@@ -228,28 +237,38 @@ export class DiscussionHarvester {
       );
 
       const beStart = Date.now();
-      const result = await this.backendApi.analyzeDiscussion({
-        rawMessages: rawMessages.map(m => ({
-          id: m.id,
-          author: m.authorName,
-          content: m.content,
-          createdAt: m.createdAt.toISOString(),
-          replyingTo: m.referenceMessageId,
-          reactionCount: m.reactionCount || 0,
-          reactions: m.reactions || [],
-          isTrigger: m.isTrigger || false,
-        })),
-        guildId: message.guildId || undefined,
-        channelId: message.channelId,
-        channelName,
-        triggerMessageId: message.id,
-        messageUrl: message.url,
-        isManualOverride,
-        traceId: currentTraceId,
-        score: scoreResult.score,
-        participantCount: participants.length,
-        reactionsCount: totalReactions,
-      });
+      const result = await this.backendApi.analyzeDiscussion(
+        {
+          rawMessages: rawMessages.map(m => ({
+            id: m.id,
+            author: m.authorName,
+            isBot: m.isBot || false,
+            content: m.content,
+            createdAt: m.createdAt.toISOString(),
+            replyingTo: m.referenceMessageId,
+            reactionCount: m.reactionCount || 0,
+            reactions: m.reactions || [],
+            isTrigger: m.isTrigger || false,
+          })),
+          guildId: message.guildId || undefined,
+          channelId: message.channelId,
+          channelName,
+          triggerMessageId: message.id,
+          messageUrl: message.url,
+          isManualOverride,
+          traceId: currentTraceId,
+          score: scoreResult.score,
+          participantCount: participants.length,
+          reactionsCount: totalReactions,
+        },
+        () => this.addReactionSafely(message, '👀'),
+        undefined,
+        async result => {
+          await this.removeReactionSafely(message, '👀');
+          await this.removeReactionSafely(message, '⚠️');
+          if (result?.found && result.decisions.length) await this.addReactionSafely(message, '📝');
+        },
+      );
       const beDuration = Date.now() - beStart;
 
       if (!result.found || !result.decisions || result.decisions.length === 0) {
@@ -262,14 +281,8 @@ export class DiscussionHarvester {
             summary: result.summary,
           },
         );
-        await this.removeReactionSafely(message, '👀');
-        await this.removeReactionSafely(message, '⚠️');
         return null;
       }
-
-      await this.removeReactionSafely(message, '👀');
-      await this.removeReactionSafely(message, '⚠️');
-      await this.addReactionSafely(message, '📝');
 
       const totalDuration = Date.now() - startTime;
       logger.info(
@@ -290,159 +303,138 @@ export class DiscussionHarvester {
         traceId: currentTraceId,
         stack: err.stack,
       });
-      await this.removeReactionSafely(message, '👀');
-      await this.addReactionSafely(message, '⚠️');
-      return null;
-    } finally {
-      clearTimeout(lockSafetyTimeout);
-      this.inFlightChannels.delete(channelId);
-      logger.info(`Released processing lock for #${channelName}`, {
-        stage: 'LOCK',
-        traceId: currentTraceId,
-      });
+      throw err;
     }
   }
 
-  // Alias for backward-compatible call sites
-  async executeAnalysis(
-    message: Message,
-    policy: HarvestingPolicyConfig,
-    isManualOverride: boolean = false,
-    traceId?: string,
-  ): Promise<Decision[] | null> {
-    return this.processAnalysis(message, policy, isManualOverride, traceId);
-  }
-
+  /** @internal Adapter operation; event and manual scan callers use engine.harvest(). */
   async scanChannel(
     channel: TextChannel,
     policy: HarvestingPolicyConfig,
     options: ScanOptions = {},
   ): Promise<{ scannedCount: number; decisionsCount: number }> {
-    if (!(await this.backendApi.isMonitoredChannel(channel.guild.id, channel.id)))
+    if (!(await this.backendApi.requireMonitoredChannel(channel.guild.id, channel.id)))
       return { scannedCount: 0, decisionsCount: 0 };
     const channelName = channel.name;
+    await this.backendApi
+      .recoverScanCheckpoints()
+      .catch(error => logger.warn(`Checkpoint acknowledgement retained: ${error.message}`));
     const lastCheckpoint = await this.backendApi.getCheckpoint(channel.id);
 
     if (options.initialOnly && lastCheckpoint) {
+      await this.backendApi.recoverScanCheckpoints();
       logger.info(
         `[Scan] Channel #${channelName} already has checkpoint ${lastCheckpoint}. Skipping initial scan.`,
       );
       return { scannedCount: 0, decisionsCount: 0 };
     }
 
-    const timeCutoff = options.hours ? Date.now() - options.hours * 60 * 60 * 1000 : null;
+    const pendingBoundary = await this.backendApi.getScanBoundary(channel.id, lastCheckpoint);
+    const incremental = !options.full && !options.hours && !options.forceFullSync;
+    const boundary = incremental ? pendingBoundary || lastCheckpoint : null;
+    const timeCutoff = options.hours
+      ? Date.now() - options.hours * 3600000
+      : options.initialOnly
+        ? Date.now() - policy.lookbackDays * 86400000
+        : null;
+    const limit = options.limit ?? (options.initialOnly ? policy.initialScanLimit : undefined);
     let fetchedMessages: Message[] = [];
-
-    if (!options.full && !options.hours && lastCheckpoint) {
-      let lastId = lastCheckpoint;
-      while (true) {
-        const batch = await channel.messages.fetch({ limit: 100, after: lastId });
-        if (batch.size === 0) break;
-        const sorted = Array.from(batch.values()).sort(
-          (a, b) => a.createdTimestamp - b.createdTimestamp,
-        );
-        fetchedMessages.push(...sorted);
-        lastId = sorted[sorted.length - 1].id;
-        if (options.limit && fetchedMessages.length >= options.limit) break;
-        if (batch.size < 100) break;
-      }
-    } else {
-      let oldestId: string | undefined = undefined;
-      let reachedCutoff = false;
-
-      while (true) {
-        const fetchOpts: { limit: number; before?: string } = { limit: 100 };
-        if (oldestId) fetchOpts.before = oldestId;
-
-        const batch = await channel.messages.fetch(fetchOpts);
-        if (batch.size === 0) break;
-
-        const items = Array.from(batch.values());
-        for (const msg of items) {
-          if (timeCutoff && msg.createdTimestamp < timeCutoff) {
-            reachedCutoff = true;
-            break;
-          }
-          fetchedMessages.push(msg);
-        }
-
-        if (reachedCutoff) break;
-        if (options.limit && fetchedMessages.length >= options.limit) break;
-        if (batch.size < 100) break;
-
-        oldestId = items[items.length - 1].id;
-      }
-
-      fetchedMessages.sort((a, b) => a.createdTimestamp - b.createdTimestamp);
+    let before: string | undefined;
+    while (true) {
+      const batch = await channel.messages.fetch({ limit: 100, ...(before ? { before } : {}) });
+      if (!batch.size) break;
+      const items = [...batch.values()].sort((a, b) =>
+        BigInt(a.id) < BigInt(b.id) ? -1 : BigInt(a.id) > BigInt(b.id) ? 1 : 0,
+      );
+      fetchedMessages.push(
+        ...items.filter(
+          m =>
+            (!boundary || BigInt(m.id) > BigInt(boundary)) &&
+            (!timeCutoff || m.createdTimestamp >= timeCutoff),
+        ),
+      );
+      const oldest = items[0];
+      if (
+        (boundary && BigInt(oldest.id) <= BigInt(boundary)) ||
+        (timeCutoff && oldest.createdTimestamp < timeCutoff) ||
+        batch.size < 100 ||
+        (!boundary && limit && fetchedMessages.length >= limit)
+      )
+        break;
+      if (before === oldest.id) throw new Error('Discord pagination did not advance');
+      before = oldest.id;
     }
-
-    if (options.limit && fetchedMessages.length > options.limit) {
-      fetchedMessages = fetchedMessages.slice(-options.limit);
-    }
+    fetchedMessages = [...new Map(fetchedMessages.map(m => [m.id, m])).values()].sort((a, b) =>
+      BigInt(a.id) < BigInt(b.id) ? -1 : BigInt(a.id) > BigInt(b.id) ? 1 : 0,
+    );
+    if (limit)
+      fetchedMessages = boundary ? fetchedMessages.slice(0, limit) : fetchedMessages.slice(-limit);
 
     if (fetchedMessages.length === 0) {
+      await this.backendApi.recoverScanCheckpoints();
       return { scannedCount: 0, decisionsCount: 0 };
     }
 
-    logger.info(`[Scan] Scanning ${fetchedMessages.length} messages in #${channelName}...`);
     let decisionsFound = 0;
-    const newestMessage = fetchedMessages[fetchedMessages.length - 1];
-    const participants = Array.from(
-      new Set(fetchedMessages.map(m => m.author?.username || 'unknown')),
-    );
-    const totalReactions = fetchedMessages.reduce((sum, m) => {
-      const rx = this.extractReactions(m);
-      return sum + rx.reactionCount;
-    }, 0);
-    const hasConsensusKeyword = fetchedMessages.some(m => CONSENSUS_REGEX.test(m.content || ''));
-
-    const scoreResult = calculateDiscussionScore({
-      participantCount: participants.length,
-      reactionsCount: totalReactions,
-      messageCount: fetchedMessages.length,
-      hasConsensusKeyword,
-    });
-
-    try {
-      const result = await this.backendApi.analyzeDiscussion({
-        requestId: options.requestId,
-        rawMessages: fetchedMessages.map(m => {
-          const rx = this.extractReactions(m);
-          return {
-            id: m.id,
-            author: m.author?.username || 'unknown',
-            content: m.content || '',
-            createdAt: (m.createdAt || new Date()).toISOString(),
-            replyingTo: m.reference?.messageId,
-            reactionCount: rx.reactionCount,
-            reactions: rx.reactions,
-            isTrigger: m.id === newestMessage.id,
-          };
-        }),
-        guildId: channel.guildId || undefined,
-        channelId: channel.id,
-        channelName,
-        triggerMessageId: newestMessage.id,
-        messageUrl: newestMessage.url,
-        isManualOverride: options.forceFullSync === true,
-        score: scoreResult.score,
-        participantCount: participants.length,
-        reactionsCount: totalReactions,
-      });
-
-      if (result.found && result.decisions && result.decisions.length > 0) {
-        decisionsFound = result.decisions.length;
+    let afterMessageId = boundary || (BigInt(fetchedMessages[0].id) - 1n).toString();
+    const failures: Error[] = [];
+    for (let offset = 0; offset < fetchedMessages.length; offset += 100) {
+      const messages = fetchedMessages.slice(offset, offset + 100);
+      const newest = messages[messages.length - 1];
+      const scanRange = { afterMessageId, startMessageId: messages[0].id, endMessageId: newest.id };
+      const participants = new Set(messages.map(m => m.author?.id || m.author?.username));
+      const reactionsCount = messages.reduce(
+        (sum, m) => sum + this.extractReactions(m).reactionCount,
+        0,
+      );
+      try {
+        const result = await this.backendApi.analyzeDiscussion(
+          {
+            requestId: options.requestId ? `${options.requestId}:${newest.id}` : undefined,
+            rawMessages: messages.map(m => ({
+              id: m.id,
+              author: m.author?.username || 'unknown',
+              isBot: m.author?.bot || false,
+              content: m.content || '',
+              createdAt: m.createdAt.toISOString(),
+              replyingTo: m.reference?.messageId,
+              ...this.extractReactions(m),
+              isTrigger: m.id === newest.id,
+            })),
+            guildId: channel.guild.id,
+            channelId: channel.id,
+            channelName,
+            triggerMessageId: newest.id,
+            messageUrl: newest.url,
+            isManualOverride: options.forceFullSync === true,
+            participantCount: participants.size,
+            reactionsCount,
+          },
+          undefined,
+          scanRange,
+        );
+        decisionsFound += result.decisions.length;
+      } catch (error) {
+        failures.push(error as Error);
       }
-    } catch (err: any) {
-      logger.error(`[Scan] Error analyzing scanned messages for #${channelName}: ${err.message}`);
-      throw err;
+      afterMessageId = newest.id;
     }
-
-    await this.backendApi.saveCheckpoint(channel.id, newestMessage.id);
-
+    await this.backendApi.recoverScanCheckpoints();
+    if (failures.length) {
+      const pending = failures.filter(
+        error => error instanceof AnalysisDeliveryError && error.outcome === 'retry-pending',
+      ).length;
+      throw new ScanIncompleteError(
+        Math.ceil(fetchedMessages.length / 100) - failures.length,
+        pending,
+        failures.length - pending,
+        failures[0].message,
+      );
+    }
     return { scannedCount: fetchedMessages.length, decisionsCount: decisionsFound };
   }
 
+  /** @internal Adapter operation; event and manual scan callers use engine.harvest(). */
   async scanGuild(
     guild: { channels: { cache: Map<string, any> }; name: string },
     policy: HarvestingPolicyConfig,
@@ -451,6 +443,10 @@ export class DiscussionHarvester {
     let totalMessages = 0;
     let totalDecisions = 0;
     let channelCount = 0;
+    const failures: string[] = [];
+    let completedRanges = 0;
+    let pendingRanges = 0;
+    let failedRanges = 0;
 
     for (const channel of guild.channels.cache.values()) {
       if (
@@ -465,14 +461,29 @@ export class DiscussionHarvester {
         totalMessages += res.scannedCount;
         totalDecisions += res.decisionsCount;
         channelCount++;
+        completedRanges += Math.ceil(res.scannedCount / 100);
       } catch (err: any) {
         logger.warn(`[Scan] Error scanning #${channel.name}: ${err.message}`);
+        failures.push(`${channel.name}: ${err.message}`);
+        if (err instanceof ScanIncompleteError) {
+          completedRanges += err.completed;
+          pendingRanges += err.pending;
+          failedRanges += err.failed;
+        } else failedRanges++;
       }
     }
 
+    if (failures.length)
+      throw new ScanIncompleteError(
+        completedRanges,
+        pendingRanges,
+        failedRanges,
+        failures.join('; '),
+      );
     return { channelCount, scannedCount: totalMessages, decisionsCount: totalDecisions };
   }
 
+  /** @internal Adapter operation; event and manual scan callers use engine.harvest(). */
   async scanAllChannels(
     client: Client,
     policy: HarvestingPolicyConfig,
@@ -498,6 +509,7 @@ export class DiscussionHarvester {
     return { channelCount, scannedCount: totalMessages, decisionsCount: totalDecisions };
   }
 
+  /** @internal Adapter operation; event and manual scan callers use engine.harvest(). */
   async addReactionSafely(message: Message, emoji: string): Promise<void> {
     try {
       if (message.react) await message.react(emoji);
@@ -506,12 +518,12 @@ export class DiscussionHarvester {
     }
   }
 
+  /** @internal Adapter operation; event and manual scan callers use engine.harvest(). */
   async removeReactionSafely(message: Message, emoji: string): Promise<void> {
     try {
       const existing = message.reactions?.cache?.find((r: any) => r.emoji.name === emoji);
-      if (existing && existing.remove) {
-        await existing.remove().catch(() => {});
-      }
+      const botId = message.client?.user?.id;
+      if (existing && botId && existing.users?.remove) await existing.users.remove(botId);
     } catch (err: any) {
       logger.warn(`[Reaction] Failed to remove '${emoji}' reaction: ${err.message}`);
     }

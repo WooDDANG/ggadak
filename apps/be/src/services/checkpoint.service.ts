@@ -1,3 +1,5 @@
+import { SaveCheckpointDtoSchema } from '../dto/checkpoint.dto.js';
+import { BadRequestError } from '../errors/AppError.js';
 import { Service } from 'typedi';
 import { DecisionRepository } from '../repositories/decision.repository.js';
 
@@ -10,6 +12,8 @@ export class CheckpointService {
   }
 
   async saveCheckpoint(channelId: string, lastMessageId: string): Promise<void> {
-    await this.repo.saveCheckpoint(channelId, lastMessageId);
+    const parsed = SaveCheckpointDtoSchema.safeParse({ lastMessageId });
+    if (!parsed.success) throw new BadRequestError('Invalid channel checkpoint');
+    await this.repo.saveCheckpoint(channelId, parsed.data.lastMessageId);
   }
 }

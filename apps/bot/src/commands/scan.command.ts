@@ -1,7 +1,8 @@
 import { CommandInteraction, ApplicationCommandOptionType, TextChannel } from 'discord.js';
 import { Discord, Slash, SlashOption, SlashChoice } from 'discordx';
 import { DEFAULT_HARVESTING_POLICY, createLogger } from '@ggaddak/shared';
-import { BackendApiService } from '../services/backend-api.service.js';
+import { AnalysisDeliveryError, BackendApiService } from '../services/backend-api.service.js';
+import { ScanIncompleteError } from '../services/harvester.service.js';
 import { AnalysisService, DecisionHarvestingEngine } from '../services/analysis.service.js';
 
 const logger = createLogger('SCAN-CMD');
@@ -60,10 +61,13 @@ export class ScanCommand {
     interaction: CommandInteraction,
   ): Promise<void> {
     await interaction.deferReply({ ephemeral: true });
+    const reviewLink = process.env.REVIEW_WEB_URL || process.env.WEB_URL || 'http://localhost:5173';
+    const reply = async (content: string) =>
+      interaction.editReply(`${content}\n검토·분석 복구: ${reviewLink}`);
 
     const harvester = AnalysisService.getInstance();
     if (!harvester) {
-      await interaction.editReply('⚠️ 봇 분석 서비스(AnalysisService)가 초기화되지 않았습니다.');
+      await reply('⚠️ 봇 분석 서비스(AnalysisService)가 초기화되지 않았습니다.');
       return;
     }
 
@@ -72,6 +76,7 @@ export class ScanCommand {
 
     try {
       const scanOptions = {
+        forceFullSync: true,
         full: full ?? (hours ? false : false),
         hours,
         limit: limit || (full ? undefined : 50),
@@ -85,11 +90,11 @@ export class ScanCommand {
 
       if (scope === 'server') {
         if (!interaction.guild) {
-          await interaction.editReply('⚠️ 서버 내부에서만 서버 전체 스캔을 실행할 수 있습니다.');
+          await reply('⚠️ 서버 내부에서만 서버 전체 스캔을 실행할 수 있습니다.');
           return;
         }
 
-        await interaction.editReply(
+        await reply(
           `🔍 **[서버 전체 스캔 시작]** ${timeText} 대화를 탐색 중입니다... (채널 수에 따라 수초 소요될 수 있습니다)`,
         );
 
@@ -98,17 +103,17 @@ export class ScanCommand {
           policy,
         );
 
-        await interaction.editReply(
+        await reply(
           `✅ **[서버 전체 스캔 완료]**\n- 📂 대상 채널: **${res.channelCount || 0}개**\n- 💬 검사한 메시지: **${res.messageCount}개**\n- 📌 추출된 의사결정: **${res.decisionsCount}건**`,
         );
       } else {
         const channel = interaction.channel;
         if (!channel || !channel.isTextBased() || channel.isThread()) {
-          await interaction.editReply('⚠️ 일반 텍스트 채널에서만 채널 스캔을 실행할 수 있습니다.');
+          await reply('⚠️ 일반 텍스트 채널에서만 채널 스캔을 실행할 수 있습니다.');
           return;
         }
 
-        await interaction.editReply(
+        await reply(
           `🔍 **[채널 스캔 시작]** #${'name' in channel ? channel.name : 'channel'}의 ${timeText} 대화를 탐색 중입니다...`,
         );
 
@@ -117,13 +122,23 @@ export class ScanCommand {
           policy,
         );
 
-        await interaction.editReply(
+        await reply(
           `✅ **[채널 스캔 완료]**\n- 📂 채널: **#${'name' in channel ? channel.name : 'channel'}**\n- 💬 검사한 메시지: **${res.messageCount}개**\n- 📌 추출된 의사결정: **${res.decisionsCount}건**`,
         );
       }
     } catch (err: any) {
       logger.error(`Error during scan command: ${err.message}`, { stack: err.stack });
-      await interaction.editReply(`⚠️ 스캔 중 오류 발생: ${err.message}`);
+      if (err instanceof ScanIncompleteError) {
+        await reply(
+          `⚠️ 스캔 일부가 미완료입니다. 분석 구간 ${err.completed}개 완료 · ${err.pending}개 재시도 대기 · ${err.failed}개 확인 필요`,
+        );
+        return;
+      }
+      const status =
+        err instanceof AnalysisDeliveryError && err.outcome === 'retry-pending'
+          ? '분석 요청을 보관했습니다. 연결 복구 후 자동 재시도합니다.'
+          : '스캔을 완료하지 못했습니다. 보관된 실패 요청을 확인해 주세요.';
+      await reply(`⚠️ ${status}`);
     }
   }
 }

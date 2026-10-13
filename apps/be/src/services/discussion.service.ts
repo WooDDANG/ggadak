@@ -1,6 +1,14 @@
 import crypto from 'node:crypto';
+import { AnalyzeDiscussionRequestDtoSchema } from '../dto/discussion.dto.js';
+import { BadRequestError } from '../errors/AppError.js';
 import { Inject, Service } from 'typedi';
-import { Decision, createLogger } from '@ggaddak/shared';
+import {
+  Decision,
+  createLogger,
+  admitsDiscussion,
+  humanReactionCount,
+  getHarvestingPolicyFromEnv,
+} from '@ggaddak/shared';
 import { DecisionRepository } from '../repositories/decision.repository.js';
 import { AiAdapter, IAiAdapter } from '../adapters/ai.adapter.js';
 import { DecisionExtractorCore } from '../engine/extractor-core.js';
@@ -46,6 +54,10 @@ export class DiscussionService {
   ) {}
 
   async analyzeDiscussion(params: AnalyzeDiscussionParams): Promise<AnalyzeDiscussionResult> {
+    const parsed = AnalyzeDiscussionRequestDtoSchema.safeParse(params);
+    if (!parsed.success)
+      throw new BadRequestError('Invalid discussion payload', parsed.error.flatten());
+    params = parsed.data;
     const requests = new AnalysisRequestRepository(this.repo);
     const claim = await requests.claim(params);
     if (claim.result) return claim.result;
@@ -111,7 +123,7 @@ export class DiscussionService {
         isBot: m.isBot || m.author?.bot,
         replyingTo: m.replyingTo || m.referenceMessageId,
         attachments: m.attachments,
-        reactionCount: m.reactionCount || 0,
+        reactionCount: humanReactionCount(m),
         reactions: m.reactions,
         isTrigger: m.isTrigger,
       })),
@@ -205,13 +217,18 @@ export class DiscussionService {
       // 5. Stage 5: Decision Signal Escalation Gate (Union 3-way gate)
       const gateStart = Date.now();
       const hasManualOverride = Boolean(isManualOverride);
+      const originalIds = new Set(
+        sessionMessages.flatMap(m => m.originalMessages?.map(original => original.id) ?? [m.id]),
+      );
+      const originalSignals = rawMessages.filter(m => originalIds.has(m.id));
+      const policy = getHarvestingPolicyFromEnv();
       const totalReactionsCount = sessionMessages.reduce(
         (sum: number, m: any) => sum + (m.reactionCount || 0),
         0,
       );
-      const hasReactionSignal = totalReactionsCount >= 3;
+      const hasReactionSignal = totalReactionsCount >= policy.reactionThreshold;
       const hasConsensusSuffix = sessionMessages.some(m => CONSENSUS_REGEX.test(m.content || ''));
-      const passesGate = hasManualOverride || hasReactionSignal || hasConsensusSuffix;
+      const passesGate = admitsDiscussion(originalSignals, policy, hasManualOverride);
       const gateDuration = Date.now() - gateStart;
 
       logger.info(
@@ -238,9 +255,6 @@ export class DiscussionService {
         continue;
       }
 
-      const originalIds = new Set(
-        sessionMessages.flatMap(m => m.originalMessages?.map(original => original.id) ?? [m.id]),
-      );
       const originalMessages = rawMessages
         .filter(m => originalIds.has(m.id))
         .map(m => ({

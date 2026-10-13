@@ -2,24 +2,36 @@ import { z } from 'zod';
 import { DecisionItemDto } from './decision.dto.js';
 
 export interface RawMessageItemDto {
-  id?: string;
+  isBot?: boolean;
+  id: string;
   author: string;
   content: string;
   createdAt?: string;
   replyingTo?: string;
   reactionCount?: number;
-  reactions?: Array<{ emoji: string; count: number }>;
+  reactions?: Array<{ emoji: string; count: number; botCount?: number }>;
   isTrigger?: boolean;
 }
 
 export const RawMessageItemDtoSchema = z.object({
-  id: z.string().optional(),
+  isBot: z.boolean().optional(),
+  id: z.string().trim().min(1),
   author: z.string(),
   content: z.string(),
-  createdAt: z.string().optional(),
+  createdAt: z.string().datetime({ offset: true }).optional(),
   replyingTo: z.string().optional(),
-  reactionCount: z.number().optional(),
-  reactions: z.array(z.object({ emoji: z.string(), count: z.number() })).optional(),
+  reactionCount: z.number().int().nonnegative().optional(),
+  reactions: z
+    .array(
+      z
+        .object({
+          emoji: z.string(),
+          count: z.number().int().nonnegative(),
+          botCount: z.number().int().nonnegative().optional(),
+        })
+        .refine(r => (r.botCount || 0) <= r.count),
+    )
+    .optional(),
   isTrigger: z.boolean().optional(),
 });
 
@@ -49,8 +61,8 @@ export const AnalyzeDiscussionRequestDtoSchema = z.object({
   isManualOverride: z.boolean().optional(),
   traceId: z.string().optional(),
   score: z.number().optional(),
-  participantCount: z.number().optional(),
-  reactionsCount: z.number().optional(),
+  participantCount: z.number().int().nonnegative().optional(),
+  reactionsCount: z.number().int().nonnegative().optional(),
 });
 
 export interface AnalyzeDiscussionResponseDto {

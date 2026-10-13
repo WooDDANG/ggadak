@@ -14,7 +14,6 @@ export { CONSENSUS_REGEX };
 export class MessageHandler {
   constructor(
     private engine: IDecisionHarvestingEngine,
-    private onAddReaction: (message: Message, emoji: string) => Promise<void>,
     private isMonitored: (
       guildId: string | null,
       channelId: string,
@@ -26,7 +25,7 @@ export class MessageHandler {
     if (!(await this.isMonitored(message.guildId, message.channelId))) return;
 
     const isKeywordMatch = CONSENSUS_REGEX.test(message.content);
-    const semanticMatch = evaluateSemanticDecision(message.content);
+    const semanticMatch = evaluateSemanticDecision(message.content, policy.semanticThreshold);
 
     if (isKeywordMatch || semanticMatch.isCandidate) {
       const traceId = `trc-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
@@ -43,8 +42,6 @@ export class MessageHandler {
           author: message.author.username,
         },
       );
-
-      await this.onAddReaction(message, '👀');
 
       // Thin delegation to the deep engine — engine encapsulates debounce and in-flight locks
       await this.engine.harvest(

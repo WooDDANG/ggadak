@@ -5,7 +5,7 @@ export interface SaveCheckpointDto {
 }
 
 export const SaveCheckpointDtoSchema = z.object({
-  lastMessageId: z.string().min(1, 'lastMessageId is required'),
+  lastMessageId: z.string().regex(/^\d+$/, 'A Discord message ID is required'),
 });
 
 export interface CheckpointResponseDto {

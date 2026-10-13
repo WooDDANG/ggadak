@@ -50,7 +50,9 @@ export function ReviewResolution({ candidate, records, disabled, onConfirm }: Pr
       </label>
       {predecessor && (
         <div className="text-xs space-y-2 max-w-sm">
-          <p>기존 결정 v{predecessor.version}을 교체합니다. 완료 이력은 보존됩니다.</p>
+          <p>기존 결정을 교체합니다. 완료 이력은 보존됩니다.</p>
+          <p className="text-slate-200">{predecessor.decisionContent || predecessor.decision}</p>
+          <p className="text-slate-400">{predecessor.rationaleSummary || predecessor.rationale}</p>
           {tasks.map(task => (
             <div key={task.id} className="border border-slate-700 p-2 rounded">
               <p>

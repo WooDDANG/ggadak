@@ -6,6 +6,7 @@
  */
 
 export interface HarvestingPolicyDto {
+  semanticThreshold: number;
   initialScanLimit: number;
   contextWindowBefore: number;
   contextWindowAfter: number;

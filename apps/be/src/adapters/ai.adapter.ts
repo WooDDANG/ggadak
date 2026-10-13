@@ -1,3 +1,4 @@
+import { AppError } from '../errors/AppError.js';
 import { generateObject } from 'ai';
 import { createOpenAI } from '@ai-sdk/openai';
 import { Service } from 'typedi';
@@ -23,6 +24,35 @@ export class AiAdapter implements IAiAdapter {
     transcript: string,
     feedbacks: ExternalFeedback[] = [],
   ): Promise<ExtractionResult> {
+    try {
+      return await this.extract(transcript, feedbacks);
+    } catch (error: any) {
+      if (error instanceof AppError) throw error;
+      const permanent =
+        /Missing API key|Unsupported AI_PROVIDER|Mock AI requires|returned no content/.test(
+          error.message,
+        ) ||
+        error.name === 'ZodError' ||
+        error instanceof SyntaxError ||
+        [400, 401, 403, 404].includes(error.statusCode);
+      const configuration = /Missing API key|Unsupported AI_PROVIDER|Mock AI requires/.test(
+        error.message,
+      );
+      throw new AppError(
+        configuration
+          ? error.message
+          : permanent
+            ? 'AI configuration or structured output requires intervention'
+            : 'AI provider temporarily unavailable',
+        permanent ? 422 : 503,
+      );
+    }
+  }
+
+  private async extract(
+    transcript: string,
+    feedbacks: ExternalFeedback[] = [],
+  ): Promise<ExtractionResult> {
     const { provider, geminiApiKey, openaiApiKey } = this.options;
     if (!['gemini', 'openai', 'mock'].includes(provider))
       throw new Error(`Unsupported AI_PROVIDER: ${provider}`);
@@ -38,7 +68,7 @@ export class AiAdapter implements IAiAdapter {
     const prompt = `다음 디스코드 대화록을 분석하십시오:\n${transcript}\n외부 피드백:\n${feedbacks.map(f => `${f.source}: ${f.content}`).join('\n')}`;
     if (provider === 'gemini') {
       const response = await this.transport(
-        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
+        `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(this.options.model || 'gemini-2.5-flash')}:generateContent`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'x-goog-api-key': geminiApiKey! },
@@ -50,7 +80,11 @@ export class AiAdapter implements IAiAdapter {
           }),
         },
       );
-      if (!response.ok) throw new Error(`Gemini extraction failed (HTTP ${response.status})`);
+      if (!response.ok)
+        throw new AppError(
+          'AI provider request failed',
+          [400, 401, 403, 404].includes(response.status) ? 422 : 503,
+        );
       const data = (await response.json()) as {
         candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
       };
@@ -59,7 +93,7 @@ export class AiAdapter implements IAiAdapter {
       return ExtractionResultSchema.parse(JSON.parse(text));
     }
     const result = await generateObject({
-      model: createOpenAI({ apiKey: openaiApiKey! })('gpt-4o-mini') as any,
+      model: createOpenAI({ apiKey: openaiApiKey! })(this.options.model || 'gpt-4o-mini') as any,
       system: EXTRACTION_SYSTEM_PROMPT,
       prompt,
       schema: ExtractionResultSchema,
