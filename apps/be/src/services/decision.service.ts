@@ -1,9 +1,10 @@
+import { AnalysisRequestRepository } from '../repositories/analysis-request.repository.js';
 import { randomUUID } from 'node:crypto';
 import { DecisionEditSchema, type DecisionEditDto } from '../dto/decision-edit.dto.js';
 import type { QueryDecisionsFilter } from '../dto/v1-decision.dto.js';
 import { BadRequestError, ConflictError } from '../errors/AppError.js';
 import { Service } from 'typedi';
-import { Decision, ReviewAction, createLogger } from '@ggaddak/shared';
+import { Decision, DecisionSchema, ReviewAction, createLogger } from '@ggaddak/shared';
 import { DecisionRepository } from '../repositories/decision.repository.js';
 
 const logger = createLogger('BE-DECISION-SERVICE');
@@ -11,6 +12,10 @@ const logger = createLogger('BE-DECISION-SERVICE');
 @Service()
 export class DecisionService {
   constructor(private repo: DecisionRepository) {}
+
+  async getHistory(id: string) {
+    return new AnalysisRequestRepository(this.repo).history(id);
+  }
 
   async editDecision(id: string, body: DecisionEditDto, actorId: string) {
     const parsed = DecisionEditSchema.safeParse(body);
@@ -58,7 +63,10 @@ export class DecisionService {
   }
 
   async saveDecision(decision: Decision): Promise<void> {
-    await this.repo.saveDecision(decision);
+    const parsed = DecisionSchema.safeParse(decision);
+    if (!parsed.success)
+      throw new BadRequestError('Invalid decision payload', parsed.error.flatten());
+    await this.repo.saveDecision(parsed.data);
   }
 
   async reviewDecision(

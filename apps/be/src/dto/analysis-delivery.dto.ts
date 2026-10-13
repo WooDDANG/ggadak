@@ -2,6 +2,7 @@ export interface AnalysisDeliveryStatusDto {
   requestId: string;
   guildId: string;
   channelId: string;
+  channelName?: string;
   status:
     | 'pending'
     | 'retry-pending'
@@ -12,6 +13,7 @@ export interface AnalysisDeliveryStatusDto {
   nextAttemptAt: number;
   errorCategory?: string;
   lastError?: string;
+  scanRange?: { afterMessageId: string; startMessageId: string; endMessageId: string };
 }
 
 export interface AnalysisDeliveryViewDto extends AnalysisDeliveryStatusDto {

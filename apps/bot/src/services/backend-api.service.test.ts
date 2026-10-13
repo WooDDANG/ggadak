@@ -101,14 +101,17 @@ test('event analysis failure removes processing reaction, marks failure and keep
     reactions: {
       cache: {
         values: () => [],
-        find: () => ({
-          emoji: { name: '👀' },
-          users: {
-            remove: async () => {
-              reactions.push('removed 👀');
+        find: (predicate: (r: any) => boolean) => {
+          const reaction = {
+            emoji: { name: '👀' },
+            users: {
+              remove: async () => {
+                reactions.push('removed 👀');
+              },
             },
-          },
-        }),
+          };
+          return predicate(reaction) ? reaction : undefined;
+        },
       },
     },
     react: async (emoji: string) => {
@@ -120,7 +123,7 @@ test('event analysis failure removes processing reaction, marks failure and keep
       new DiscussionHarvester(api).processAnalysis(message, DEFAULT_HARVESTING_POLICY),
       /503/,
     );
-    assert.deepEqual(reactions, ['👀', 'removed 👀', '⚠️']);
+    assert.deepEqual(reactions, ['👀', 'removed 👀']);
     assert.equal((await readdir(directory)).length, 1);
   } finally {
     await rm(directory, { recursive: true, force: true });
@@ -133,6 +136,7 @@ test('scan failure never advances checkpoint; a successful no-decision retry can
   const directory = await mkdtemp(join(tmpdir(), 'analysis-scan-'));
   let offline = true;
   let checkpointWrites = 0;
+  let lastMessageId: string | null = null;
   const api = new BackendApiService(
     'http://fixture',
     directory,
@@ -140,8 +144,11 @@ test('scan failure never advances checkpoint; a successful no-decision retry can
       if (String(url).includes('/internal/monitoring'))
         return Response.json({ data: { channelIds: ['channel'] } });
       if (String(url).endsWith('/checkpoint')) {
-        if (init?.method === 'POST') checkpointWrites++;
-        return Response.json({});
+        if (init?.method === 'POST') {
+          checkpointWrites++;
+          lastMessageId = JSON.parse(init.body as string).lastMessageId;
+        }
+        return Response.json({ lastMessageId });
       }
       return offline
         ? new Response('', { status: 503 })
@@ -183,7 +190,7 @@ test('scan failure never advances checkpoint; a successful no-decision retry can
     );
     await api.retryAnalysisRequest(retained.payload.requestId);
     assert.deepEqual(await harvester.scanChannel(channel, DEFAULT_HARVESTING_POLICY), {
-      scannedCount: 1,
+      scannedCount: 0,
       decisionsCount: 0,
     });
     assert.equal(checkpointWrites, 1);

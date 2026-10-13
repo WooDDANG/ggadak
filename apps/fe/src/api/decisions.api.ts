@@ -1,5 +1,6 @@
 import { Decision, ReviewAction } from '@ggaddak/shared';
 import {
+  getV1DecisionHistory,
   listV1Decisions,
   getV1Decision,
   getDecisionTimeline,
@@ -30,6 +31,8 @@ function asDecision(item: V1DecisionDto): Decision {
 }
 
 export const decisionsApi = {
+  history: async (id: string, guildId: string) =>
+    unwrapApiResponse(await getV1DecisionHistory(id, { guildId })),
   getReviewQueue: async (
     guildId: string,
     status: 'IN_REVIEW' | 'ON_HOLD' = 'IN_REVIEW',

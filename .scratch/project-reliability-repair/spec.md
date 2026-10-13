@@ -1,6 +1,6 @@
 # Project Reliability Repair
 
-Status: ready-for-agent
+Status: resolved
 
 ## Problem
 
@@ -89,3 +89,7 @@ Required final checks: build, normal full test command, lint, and format check f
 ## Delivery sequence
 
 01 database authority → 02 idempotent analysis → 03 durable delivery → 04 scan coverage → 05 admission/feedback. Work on 06 review after 01; integrate 07 Web after 03 and 06; finish 08 regression verification across all tickets. Ticket completion is based on passing behavioral acceptance criteria, not presence of scaffolding.
+
+## Implementation completion
+
+All eight implementation tickets are resolved. See [verification.md](verification.md) for behavioral evidence and [delivery-operations.md](delivery-operations.md) for deployment configuration.

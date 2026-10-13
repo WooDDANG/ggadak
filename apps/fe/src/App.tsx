@@ -1,3 +1,5 @@
+import { reviewWithConflictReload } from './api/review-workflow';
+import { AnalysisRecovery } from './features/review-queue/AnalysisRecovery';
 import { Dashboard } from './features/Dashboard';
 import { dashboardQueryKey } from './api/dashboard.api';
 import { WhySearch } from './features/WhySearch';
@@ -19,8 +21,11 @@ export function App() {
 }
 
 function ServerApp({ guildId }: { guildId: string }) {
-  const [activeTab, setActiveTab] = useState<'review' | 'timeline' | 'feedback' | 'settings' | 'search' | 'sync' | 'dashboard'>('dashboard');
+  const [activeTab, setActiveTab] = useState<
+    'review' | 'timeline' | 'feedback' | 'settings' | 'search' | 'sync' | 'dashboard'
+  >('dashboard');
   const queryClient = useQueryClient();
+  const [reviewRevision, setReviewRevision] = useState(0);
 
   // 1. Fetch Decisions Query
   const {
@@ -70,7 +75,16 @@ function ServerApp({ guildId }: { guildId: string }) {
   });
 
   const handleReview = async (id: string, action: ReviewAction) => {
-    await reviewMutation.mutateAsync({ id, action });
+    await reviewWithConflictReload(
+      () => reviewMutation.mutateAsync({ id, action }),
+      async () => {
+        await queryClient.refetchQueries(
+          { queryKey: decisionsQueryKey(guildId) },
+          { throwOnError: true },
+        );
+        setReviewRevision(value => value + 1);
+      },
+    );
   };
 
   const draftCount = reviewCandidates.filter(d => d.state !== 'Deferred').length;
@@ -89,6 +103,7 @@ function ServerApp({ guildId }: { guildId: string }) {
         {activeTab === 'search' && <WhySearch key={guildId} guildId={guildId} />}
         {activeTab === 'settings' && <ChannelSettings key={guildId} guildId={guildId} />}
         {activeTab === 'sync' && <ManualSync key={guildId} guildId={guildId} />}
+        {activeTab === 'review' && <AnalysisRecovery guildId={guildId} />}
         {activeTab === 'review' && queueError && (
           <p role="alert" className="text-rose-300">
             검수 큐를 불러오지 못했습니다. {queueError.message}
@@ -96,6 +111,8 @@ function ServerApp({ guildId }: { guildId: string }) {
         )}
         {activeTab === 'review' && !queueError && (
           <ReviewQueue
+            guildId={guildId}
+            revision={reviewRevision}
             decisions={reviewCandidates}
             records={decisions}
             onReview={handleReview}

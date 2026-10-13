@@ -338,7 +338,7 @@ test('startup scan, message, reaction, command-created engine and restart recove
       api.retryPendingAnalyses(),
     ]);
     assert.equal(peak, 1);
-    for (const id of ['recover', 'startup', 'command']) assert.ok(sent.includes(id));
+    for (const id of ['recover', 'startup:100', 'command:100']) assert.ok(sent.includes(id));
     assert.ok(sent.some(id => id.startsWith('bot-')));
   } finally {
     await rm(directory, { recursive: true, force: true });
@@ -367,6 +367,94 @@ test('a stalled response body releases its channel after the configured deadline
     assert.equal(results[0].status, 'rejected');
     assert.equal(results[1].status, 'fulfilled');
   } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test('Bot processing reactions cannot trigger human agreement and cleanup removes only the Bot user', async () => {
+  const { ReactionHandler } = await import('../handlers/reaction.handler.js');
+  const { DiscussionHarvester } = await import('./harvester.service.js');
+  let calls = 0;
+  const removed: string[] = [];
+  const cached: any = {
+    count: 3,
+    me: true,
+    emoji: { name: '👀' },
+    users: {
+      remove: async (id: string) => {
+        removed.push(id);
+      },
+    },
+    remove: async () => {
+      throw new Error('must not remove users reactions');
+    },
+  };
+  const message: any = {
+    id: '100',
+    channelId: 'channel',
+    guildId: 'guild',
+    client: { user: { id: 'bot' } },
+    reactions: {
+      cache: { reduce: (fn: any, initial: number) => fn(initial, cached), find: () => cached },
+    },
+  };
+  const handler = new ReactionHandler(
+    '📌',
+    {
+      harvest: async () => {
+        calls++;
+        return { success: true, decisions: [], decisionsCount: 0, messageCount: 0 };
+      },
+    },
+    async () => {},
+  );
+  await handler.handleReactionAdd(
+    { message, emoji: { name: '👀' } } as any,
+    { bot: false, username: 'Lee' } as any,
+    DEFAULT_HARVESTING_POLICY,
+  );
+  assert.equal(calls, 0);
+  await new DiscussionHarvester({} as any).removeReactionSafely(message, '👀');
+  assert.deepEqual(removed, ['bot']);
+});
+
+test('settlement and restart reaction reconciliation finish before the next channel execution', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'reaction-settle-'));
+  let finishCleanup!: () => void;
+  let beginCleanup!: () => void;
+  const cleanupStarted = new Promise<void>(resolve => {
+    beginCleanup = resolve;
+  });
+  const cleanupGate = new Promise<void>(resolve => {
+    finishCleanup = resolve;
+  });
+  const order: string[] = [];
+  const api = new BackendApiService(
+    'http://fixture',
+    directory,
+    async (_url, init) => {
+      order.push(JSON.parse(init!.body as string).requestId);
+      return noDecision();
+    },
+    undefined,
+    'service',
+    { ...options, timeoutMs: 1000 },
+  );
+  try {
+    const first = api.analyzeDiscussion(payload('first'), undefined, undefined, async () => {
+      beginCleanup();
+      await cleanupGate;
+      order.push('first cleanup');
+    });
+    await cleanupStarted;
+    const second = api.analyzeDiscussion(payload('second'));
+    await new Promise(r => setTimeout(r, 10));
+    assert.deepEqual(order, ['first']);
+    finishCleanup();
+    await Promise.all([first, second]);
+    assert.deepEqual(order, ['first', 'first cleanup', 'second']);
+  } finally {
+    finishCleanup();
     await rm(directory, { recursive: true, force: true });
   }
 });

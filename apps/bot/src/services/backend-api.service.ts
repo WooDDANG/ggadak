@@ -4,8 +4,8 @@ import { mkdir, readFile, readdir, link, open, unlink, rename } from 'node:fs/pr
 import { resolve, join } from 'node:path';
 import {
   HarvestingPolicyConfig,
+  HarvestingPolicyConfigSchema,
   DEFAULT_HARVESTING_POLICY,
-  getHarvestingPolicyFromEnv,
   createLogger,
 } from '@ggaddak/shared';
 
@@ -42,7 +42,13 @@ export class AnalysisDeliveryError extends Error {
     super(message);
   }
 }
+export interface ScanRange {
+  afterMessageId: string;
+  startMessageId: string;
+  endMessageId: string;
+}
 export interface DeliveryRecord {
+  scanRange?: ScanRange;
   payload: any;
   attempts: number;
   nextAttemptAt: number;
@@ -56,7 +62,9 @@ export interface DeliveryRecord {
 
 export class BackendApiService {
   private backendUrl: string;
+  private lastPolicy: HarvestingPolicyConfig = DEFAULT_HARVESTING_POLICY;
   private retryCommandsInFlight = new Set<string>();
+  private deliveryObserver?: (payload: any, result?: any, error?: unknown) => Promise<void>;
 
   constructor(
     backendUrl: string,
@@ -90,6 +98,24 @@ export class BackendApiService {
     )
       throw new Error('Invalid analysis delivery configuration');
     this.backendUrl = backendUrl.replace(/\/+$/, '');
+  }
+
+  observeDeliveries(
+    observer: (payload: any, result?: any, error?: unknown) => Promise<void>,
+  ): void {
+    this.deliveryObserver = observer;
+  }
+
+  async reconcileDeliveryReactions(): Promise<void> {
+    for (const { record } of await this.deliveryRecords()) {
+      if (record.result) continue;
+      await analysisScheduler.run(
+        `${this.pendingDirectory}:${record.payload.channelId || 'unknown'}`,
+        async () => {
+          await this.deliveryObserver?.(record.payload);
+        },
+      );
+    }
   }
 
   get baseUrl(): string {
@@ -143,14 +169,27 @@ export class BackendApiService {
     }
   }
 
+  async requireMonitoredChannel(guildId: string, channelId: string): Promise<boolean> {
+    const settings = await this.syncJobRequest(
+      `/api/v1/internal/monitoring?guildId=${encodeURIComponent(guildId)}`,
+      'GET',
+    );
+    if (!Array.isArray(settings?.channelIds))
+      throw new Error('Channel monitoring settings are unavailable');
+    return settings.channelIds.includes(channelId);
+  }
+
   async syncPolicy(): Promise<HarvestingPolicyConfig> {
     try {
-      const res = await this.transport(`${this.backendUrl}/api/config/policy`);
+      const res = await this.transport(`${this.backendUrl}/api/config/policy`, {
+        signal: AbortSignal.timeout(15000),
+      });
       if (res.ok) {
-        const policy = (await res.json()) as HarvestingPolicyConfig;
+        const policy = HarvestingPolicyConfigSchema.parse(await res.json());
         logger.info(
           `[Policy] Synced centralized policy: ReactionThreshold=${policy.reactionThreshold}, Debounce=${policy.debounceMs}ms, MaxWindow=${policy.maxMergedWindow}`,
         );
+        this.lastPolicy = policy;
         return policy;
       }
     } catch (err: any) {
@@ -158,7 +197,7 @@ export class BackendApiService {
         `[Policy] Could not fetch policy from backend: ${err.message}. Using env/defaults.`,
       );
     }
-    return getHarvestingPolicyFromEnv() || DEFAULT_HARVESTING_POLICY;
+    return this.lastPolicy;
   }
 
   async analyzeDiscussion(
@@ -177,11 +216,27 @@ export class BackendApiService {
       reactionsCount?: number;
     },
     onExecuting?: () => Promise<void>,
+    scanRange?: ScanRange,
+    onSettled?: (result?: any, error?: unknown) => Promise<void>,
   ): Promise<any> {
-    return this.enqueueAnalysis(payload, onExecuting);
+    return this.enqueueAnalysis(payload, onExecuting, scanRange, onSettled);
   }
 
-  private async enqueueAnalysis(payload: any, onExecuting?: () => Promise<void>): Promise<any> {
+  private async enqueueAnalysis(
+    payload: any,
+    onExecuting?: () => Promise<void>,
+    scanRange?: ScanRange,
+    onSettled?: (result?: any, error?: unknown) => Promise<void>,
+  ): Promise<any> {
+    if (
+      scanRange &&
+      (![scanRange.afterMessageId, scanRange.startMessageId, scanRange.endMessageId].every(id =>
+        /^\d+$/.test(id),
+      ) ||
+        BigInt(scanRange.afterMessageId) >= BigInt(scanRange.startMessageId) ||
+        BigInt(scanRange.startMessageId) > BigInt(scanRange.endMessageId))
+    )
+      throw new Error('Invalid Scan Range');
     // Persist the complete request before dispatch; retries always use this exact payload.
     const requestId =
       payload.requestId ||
@@ -200,6 +255,7 @@ export class BackendApiService {
       if (error.code !== 'ENOENT') throw error;
       record = {
         payload: { ...payload, requestId },
+        scanRange,
         attempts: 0,
         nextAttemptAt: 0,
         stopped: false,
@@ -233,7 +289,11 @@ export class BackendApiService {
       `${this.pendingDirectory}:${payload.channelId || 'unknown'}`,
       async () => {
         const fresh = this.parseDelivery(await readFile(filename, 'utf8'));
-        return this.deliverAnalysis(fresh, filename, onExecuting);
+        if (scanRange && !fresh.scanRange) {
+          fresh.scanRange = scanRange;
+          await this.persistDelivery(fresh, filename);
+        }
+        return this.runDelivery(fresh, filename, onExecuting, onSettled);
       },
     );
   }
@@ -261,6 +321,32 @@ export class BackendApiService {
       await directory.sync();
     } finally {
       await directory.close();
+    }
+  }
+
+  private async runDelivery(
+    record: DeliveryRecord,
+    filename: string,
+    onExecuting?: () => Promise<void>,
+    onSettled?: (result?: any, error?: unknown) => Promise<void>,
+  ): Promise<any> {
+    let result: any;
+    let failure: unknown;
+    try {
+      result = await this.deliverAnalysis(record, filename, onExecuting);
+      return result;
+    } catch (error) {
+      failure = error;
+      throw error;
+    } finally {
+      try {
+        await onSettled?.(result, failure);
+        await this.deliveryObserver?.(record.payload, result, failure);
+      } catch (error: any) {
+        logger.warn(
+          `Analysis completed but Discord feedback could not be updated: ${error.message}`,
+        );
+      }
     }
   }
 
@@ -380,7 +466,7 @@ export class BackendApiService {
             `${this.pendingDirectory}:${record.payload.channelId || 'unknown'}`,
             async () => {
               const fresh = this.parseDelivery(await readFile(filename, 'utf8'));
-              return this.deliverAnalysis(fresh, filename);
+              return this.runDelivery(fresh, filename);
             },
           ),
         });
@@ -409,7 +495,7 @@ export class BackendApiService {
           if (commandId) record.retryCommandIds = [...(record.retryCommandIds || []), commandId];
           await this.persistDelivery(record, entry.filename);
         }
-        return this.deliverAnalysis(record, entry.filename);
+        return this.runDelivery(record, entry.filename);
       },
     );
   }
@@ -455,6 +541,73 @@ export class BackendApiService {
     );
   }
 
+  async getScanBoundary(channelId: string, checkpoint?: string | null): Promise<string | null> {
+    const ranges = (await this.deliveryRecords())
+      .filter(({ record }) => record.payload.channelId === channelId && record.scanRange)
+      .map(({ record }) => record.scanRange!);
+    if (!ranges.length) return checkpoint ?? null;
+    const remote = checkpoint === undefined ? await this.getCheckpoint(channelId) : checkpoint;
+    let boundary = remote
+      ? BigInt(remote)
+      : ranges.reduce(
+          (min, range) => (BigInt(range.afterMessageId) < min ? BigInt(range.afterMessageId) : min),
+          BigInt(ranges[0].afterMessageId),
+        );
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const range of ranges) {
+        if (BigInt(range.afterMessageId) <= boundary && BigInt(range.endMessageId) > boundary) {
+          boundary = BigInt(range.endMessageId);
+          changed = true;
+        }
+      }
+    }
+    return boundary.toString();
+  }
+
+  async recoverScanCheckpoints(): Promise<void> {
+    const entries = await this.deliveryRecords();
+    const channels = new Set(
+      entries
+        .filter(({ record }) => record.scanRange)
+        .map(({ record }) => record.payload.channelId as string),
+    );
+    for (const channelId of channels) {
+      const records = entries
+        .filter(({ record }) => record.payload.channelId === channelId && record.scanRange)
+        .map(({ record }) => record);
+      const remote = await this.getCheckpoint(channelId);
+      let boundary = remote
+        ? BigInt(remote)
+        : records.reduce(
+            (min, r) =>
+              BigInt(r.scanRange!.afterMessageId) < min ? BigInt(r.scanRange!.afterMessageId) : min,
+            BigInt(records[0].scanRange!.afterMessageId),
+          );
+      let changed = true;
+      while (changed) {
+        changed = false;
+        for (const record of records) {
+          const range = record.scanRange!;
+          if (
+            record.result &&
+            BigInt(range.afterMessageId) <= boundary &&
+            BigInt(range.endMessageId) > boundary
+          ) {
+            boundary = BigInt(range.endMessageId);
+            changed = true;
+          }
+        }
+      }
+      if (
+        records.some(r => r.result && BigInt(r.scanRange!.endMessageId) <= boundary) &&
+        (!remote || boundary > BigInt(remote))
+      )
+        await this.saveCheckpoint(channelId, boundary.toString());
+    }
+  }
+
   async synchronizeDeliveryStatus(): Promise<void> {
     const records = await this.deliveryRecords();
     const requests = records
@@ -463,6 +616,7 @@ export class BackendApiService {
         requestId: record.payload.requestId,
         guildId: record.payload.guildId,
         channelId: record.payload.channelId || '',
+        channelName: record.payload.channelName,
         status: record.result
           ? record.result.decisions.length
             ? 'completed-with-candidates'
@@ -477,6 +631,7 @@ export class BackendApiService {
         errorCategory:
           record.errorCategory || (record.lastError ? 'network-or-timeout' : undefined),
         lastError: record.lastError,
+        scanRange: record.scanRange,
       }));
     const commands = await this.syncJobRequest(
       '/api/v1/internal/analysis-deliveries/sync',
@@ -525,15 +680,19 @@ export class BackendApiService {
 
   async getCheckpoint(channelId: string): Promise<string | null> {
     try {
-      const res = await this.transport(`${this.backendUrl}/api/channels/${channelId}/checkpoint`);
+      const res = await this.transport(`${this.backendUrl}/api/channels/${channelId}/checkpoint`, {
+        headers: this.serviceToken ? { Authorization: `Bearer ${this.serviceToken}` } : {},
+        signal: AbortSignal.timeout(15000),
+      });
       if (res.ok) {
         const data = (await res.json()) as { lastMessageId?: string };
         return data.lastMessageId || null;
       }
+      throw new Error(`Checkpoint read failed (HTTP ${res.status})`);
     } catch (err: any) {
       logger.warn(`[Checkpoint] Failed to get checkpoint for ${channelId}: ${err.message}`);
+      throw err;
     }
-    return null;
   }
 
   async saveCheckpoint(channelId: string, lastMessageId: string): Promise<void> {
@@ -541,7 +700,10 @@ export class BackendApiService {
       `${this.backendUrl}/api/channels/${channelId}/checkpoint`,
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(this.serviceToken ? { Authorization: `Bearer ${this.serviceToken}` } : {}),
+        },
         body: JSON.stringify({ lastMessageId }),
         signal: AbortSignal.timeout(15_000),
       },

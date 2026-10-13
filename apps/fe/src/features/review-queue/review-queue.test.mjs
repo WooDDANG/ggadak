@@ -19,7 +19,11 @@ function moduleUrl(url) {
   }).outputText;
   const linked = compiled.replace(/from (['"])([^'"]+)\1/g, (_all, _quote, path) => {
     const target = path.startsWith('.')
-      ? moduleUrl(new URL(path + '.tsx', url))
+      ? moduleUrl(
+          [path + '.tsx', path + '.ts', path + '/index.ts']
+            .map(p => new URL(p, url))
+            .find(p => fs.existsSync(p)),
+        )
       : pathToFileURL(require.resolve(path)).href;
     return `from ${JSON.stringify(target)}`;
   });
@@ -56,5 +60,7 @@ test('held candidates remain reviewable and replacement picker offers only confi
   assert.match(html, /보류/);
   assert.match(html, /독립적으로 확정/);
   assert.match(html, /교체: Current record/);
-  assert.doesNotMatch(html, /Retired record/);
+  assert.match(html, /확정·반려 이력/);
+  assert.match(html, /Retired record/);
+  assert.doesNotMatch(html, /교체: Retired record/);
 });

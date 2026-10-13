@@ -994,6 +994,68 @@
 				"type": "object",
 				"additionalProperties": {}
 			},
+			"CandidateHistoryEntry": {
+				"properties": {
+					"requestId": {
+						"type": "string"
+					},
+					"isManualOverride": {
+						"type": "boolean"
+					},
+					"previousRequestIds": {
+						"items": {
+							"type": "string"
+						},
+						"type": "array"
+					},
+					"relatedCandidateIds": {
+						"items": {
+							"type": "string"
+						},
+						"type": "array"
+					},
+					"createdAt": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"requestId",
+					"isManualOverride",
+					"previousRequestIds",
+					"relatedCandidateIds",
+					"createdAt"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"ApiResponse_CandidateHistoryEntry-Array_": {
+				"description": "Shared v1 response contract. Domain payloads remain typed by each endpoint.",
+				"properties": {
+					"success": {
+						"type": "boolean"
+					},
+					"code": {
+						"type": "string"
+					},
+					"message": {
+						"type": "string"
+					},
+					"data": {
+						"items": {
+							"$ref": "#/components/schemas/CandidateHistoryEntry"
+						},
+						"type": "array"
+					}
+				},
+				"required": [
+					"success",
+					"code",
+					"message",
+					"data"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
 			"AlternativeItemDto": {
 				"properties": {
 					"option": {
@@ -1446,6 +1508,10 @@
 			},
 			"HarvestingPolicyDto": {
 				"properties": {
+					"semanticThreshold": {
+						"type": "number",
+						"format": "double"
+					},
 					"initialScanLimit": {
 						"type": "number",
 						"format": "double"
@@ -1480,6 +1546,7 @@
 					}
 				},
 				"required": [
+					"semanticThreshold",
 					"initialScanLimit",
 					"contextWindowBefore",
 					"contextWindowAfter",
@@ -1578,40 +1645,6 @@
 				"type": "object",
 				"additionalProperties": false
 			},
-			"CandidateHistoryEntry": {
-				"properties": {
-					"requestId": {
-						"type": "string"
-					},
-					"isManualOverride": {
-						"type": "boolean"
-					},
-					"previousRequestIds": {
-						"items": {
-							"type": "string"
-						},
-						"type": "array"
-					},
-					"relatedCandidateIds": {
-						"items": {
-							"type": "string"
-						},
-						"type": "array"
-					},
-					"createdAt": {
-						"type": "string"
-					}
-				},
-				"required": [
-					"requestId",
-					"isManualOverride",
-					"previousRequestIds",
-					"relatedCandidateIds",
-					"createdAt"
-				],
-				"type": "object",
-				"additionalProperties": false
-			},
 			"AnalyzeDiscussionResponseDto": {
 				"properties": {
 					"found": {
@@ -1643,6 +1676,9 @@
 			},
 			"RawMessageItemDto": {
 				"properties": {
+					"isBot": {
+						"type": "boolean"
+					},
 					"id": {
 						"type": "string"
 					},
@@ -1665,6 +1701,10 @@
 					"reactions": {
 						"items": {
 							"properties": {
+								"botCount": {
+									"type": "number",
+									"format": "double"
+								},
 								"count": {
 									"type": "number",
 									"format": "double"
@@ -1686,6 +1726,7 @@
 					}
 				},
 				"required": [
+					"id",
 					"author",
 					"content"
 				],
@@ -2257,6 +2298,9 @@
 					"channelId": {
 						"type": "string"
 					},
+					"channelName": {
+						"type": "string"
+					},
 					"status": {
 						"type": "string",
 						"enum": [
@@ -2280,6 +2324,25 @@
 					},
 					"lastError": {
 						"type": "string"
+					},
+					"scanRange": {
+						"properties": {
+							"endMessageId": {
+								"type": "string"
+							},
+							"startMessageId": {
+								"type": "string"
+							},
+							"afterMessageId": {
+								"type": "string"
+							}
+						},
+						"required": [
+							"endMessageId",
+							"startMessageId",
+							"afterMessageId"
+						],
+						"type": "object"
 					},
 					"synchronizedAt": {
 						"type": "string"
@@ -2439,6 +2502,9 @@
 					"channelId": {
 						"type": "string"
 					},
+					"channelName": {
+						"type": "string"
+					},
 					"status": {
 						"type": "string",
 						"enum": [
@@ -2462,6 +2528,25 @@
 					},
 					"lastError": {
 						"type": "string"
+					},
+					"scanRange": {
+						"properties": {
+							"endMessageId": {
+								"type": "string"
+							},
+							"startMessageId": {
+								"type": "string"
+							},
+							"afterMessageId": {
+								"type": "string"
+							}
+						},
+						"required": [
+							"endMessageId",
+							"startMessageId",
+							"afterMessageId"
+						],
+						"type": "object"
 					}
 				},
 				"required": [
@@ -2744,6 +2829,49 @@
 							"application/json": {
 								"schema": {
 									"$ref": "#/components/schemas/ApiResponse_V1DecisionDto_"
+								}
+							}
+						}
+					}
+				},
+				"tags": [
+					"v1 Decisions"
+				],
+				"security": [
+					{
+						"jwt": []
+					}
+				],
+				"parameters": [
+					{
+						"in": "path",
+						"name": "id",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"in": "query",
+						"name": "guildId",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				]
+			}
+		},
+		"/api/v1/decisions/{id}/history": {
+			"get": {
+				"operationId": "GetV1DecisionHistory",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiResponse_CandidateHistoryEntry-Array_"
 								}
 							}
 						}
@@ -3360,7 +3488,11 @@
 				"tags": [
 					"Checkpoints"
 				],
-				"security": [],
+				"security": [
+					{
+						"service": []
+					}
+				],
 				"parameters": [
 					{
 						"in": "path",
@@ -3405,7 +3537,11 @@
 				"tags": [
 					"Checkpoints"
 				],
-				"security": [],
+				"security": [
+					{
+						"service": []
+					}
+				],
 				"parameters": [
 					{
 						"in": "path",
@@ -3724,7 +3860,7 @@
 		},
 		"/api/v1/analysis-deliveries": {
 			"get": {
-				"operationId": "List",
+				"operationId": "ListAnalysisDeliveries",
 				"responses": {
 					"200": {
 						"description": "Ok",
@@ -3759,10 +3895,10 @@
 		},
 		"/api/v1/analysis-deliveries/{requestId}/retry": {
 			"post": {
-				"operationId": "Retry",
+				"operationId": "RetryAnalysisRequest",
 				"responses": {
-					"200": {
-						"description": "Ok",
+					"202": {
+						"description": "Retry accepted",
 						"content": {
 							"application/json": {
 								"schema": {

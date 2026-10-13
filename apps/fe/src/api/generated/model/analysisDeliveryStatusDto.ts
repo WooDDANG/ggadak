@@ -4,15 +4,18 @@
  * @ggaddak/be
  * OpenAPI spec version: 1.0.0
  */
+import type { AnalysisDeliveryStatusDtoScanRange } from './analysisDeliveryStatusDtoScanRange';
 import type { AnalysisDeliveryStatusDtoStatus } from './analysisDeliveryStatusDtoStatus';
 
 export interface AnalysisDeliveryStatusDto {
   requestId: string;
   guildId: string;
   channelId: string;
+  channelName?: string;
   status: AnalysisDeliveryStatusDtoStatus;
   attempts: number;
   nextAttemptAt: number;
   errorCategory?: string;
   lastError?: string;
+  scanRange?: AnalysisDeliveryStatusDtoScanRange;
 }

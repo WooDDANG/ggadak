@@ -6,6 +6,7 @@
  */
 
 export type RawMessageItemDtoReactionsItem = {
+  botCount?: number;
   count: number;
   emoji: string;
 };

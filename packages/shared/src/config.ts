@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 export const HarvestingPolicyConfigSchema = z.object({
+  semanticThreshold: z.number().min(0).max(1).default(0.7),
   initialScanLimit: z.number().int().positive().default(50),
   contextWindowBefore: z.number().int().positive().default(15),
   contextWindowAfter: z.number().int().positive().default(5),
@@ -14,6 +15,7 @@ export const HarvestingPolicyConfigSchema = z.object({
 export type HarvestingPolicyConfig = z.infer<typeof HarvestingPolicyConfigSchema>;
 
 export const DEFAULT_HARVESTING_POLICY: HarvestingPolicyConfig = {
+  semanticThreshold: 0.7,
   initialScanLimit: 50,
   contextWindowBefore: 15,
   contextWindowAfter: 5,
@@ -28,6 +30,9 @@ export function getHarvestingPolicyFromEnv(
   env: Record<string, string | undefined> = process.env,
 ): HarvestingPolicyConfig {
   return HarvestingPolicyConfigSchema.parse({
+    semanticThreshold: env.SEMANTIC_THRESHOLD
+      ? Number(env.SEMANTIC_THRESHOLD)
+      : DEFAULT_HARVESTING_POLICY.semanticThreshold,
     initialScanLimit: env.SCAN_INITIAL_LIMIT
       ? parseInt(env.SCAN_INITIAL_LIMIT, 10)
       : DEFAULT_HARVESTING_POLICY.initialScanLimit,

@@ -7,7 +7,8 @@
 import type { RawMessageItemDtoReactionsItem } from './rawMessageItemDtoReactionsItem';
 
 export interface RawMessageItemDto {
-  id?: string;
+  isBot?: boolean;
+  id: string;
   author: string;
   content: string;
   createdAt?: string;

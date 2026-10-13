@@ -31,12 +31,24 @@ export class DecisionRepository extends BaseRepository {
     lastMessageId: string,
     tx?: Prisma.TransactionClient,
   ): Promise<void> {
-    await (tx ?? this.prisma).channelCheckpoint.upsert({
-      where: { channelId },
-      update: { lastMessageId, updatedAt: new Date() },
-      create: { channelId, lastMessageId },
-    });
+    const write = async (client: Prisma.TransactionClient) => {
+      const previous = await client.channelCheckpoint.findUnique({ where: { channelId } });
+      if (
+        previous &&
+        /^\d+$/.test(previous.lastMessageId) &&
+        /^\d+$/.test(lastMessageId) &&
+        BigInt(lastMessageId) <= BigInt(previous.lastMessageId)
+      )
+        return;
+      await client.channelCheckpoint.upsert({
+        where: { channelId },
+        update: { lastMessageId, updatedAt: new Date() },
+        create: { channelId, lastMessageId },
+      });
+    };
+    await this.withTransaction(write, tx);
   }
+
   async saveFeedback(fb: ExternalFeedback, tx?: Prisma.TransactionClient): Promise<void> {
     const data = {
       decisionId: fb.channelId,

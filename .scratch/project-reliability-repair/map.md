@@ -2,7 +2,7 @@
 
 ## Notes
 
-Whole-project review identified persistence, checkpoint, semantic admission, conflict resolution, and debounce defects. This effort is in design interview; application implementation authorized by the user invoking implement-spec.
+Whole-project review identified persistence, checkpoint, semantic admission, conflict resolution, and debounce defects. The accepted implementation scope is complete; all eight tickets are resolved and verified.
 
 ## Decisions so far
 
@@ -41,3 +41,8 @@ Whole-project review identified persistence, checkpoint, semantic admission, con
 - Approved test seams: persistent repository/review APIs, production discussion analysis API with injected AI, Bot delivery/harvesting public interfaces, and Web review/recovery HTTP behavior, as specified in spec.md.
 
 - Ticket 03 resumed on `codex/reliability-03-resume` from the completed backend architecture refactor on `main`; 120 full-suite tests and required checks pass.
+
+- Continuous scan coverage resolved: durable ranges, bounded gaps, monotonic authenticated checkpoints and restart recovery. [Ticket 04](issues/04-scan-coverage-and-checkpoints.md).
+- Shared admission and silent feedback resolved: original semantic evidence, validated central policy, own-user reaction cleanup and accurate private scan replies. [Ticket 05](issues/05-semantic-admission-and-silent-feedback.md).
+- Web review/recovery resolved: related/reanalysis history, explicit comparison/task disposition, stale review reload and idempotent retry state. [Ticket 07](issues/07-web-review-and-failure-recovery.md).
+- Regression integration resolved: 133 tests, isolated databases, external-network barrier and connected production HTTP recovery E2E. [Ticket 08](issues/08-regression-verification-and-api-contracts.md).

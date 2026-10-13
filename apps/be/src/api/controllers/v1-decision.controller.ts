@@ -1,3 +1,4 @@
+import { CandidateHistoryEntry } from '../../repositories/analysis-request.repository.js';
 import { authorizeDecisions, requirePrincipal } from '../guards/authorization.js';
 import { DecisionEditDto } from '../../dto/decision-edit.dto.js';
 import type { Request as ExpressRequest } from 'express';
@@ -67,6 +68,16 @@ export class V1DecisionController extends Controller {
     );
     if (!updated) throw new NotFoundError('Decision not found');
     return apiSuccess(toV1Decision(updated));
+  }
+
+  @Get('{id}/history')
+  public async getV1DecisionHistory(
+    @Request() request: ExpressRequest,
+    @Path() id: string,
+    @Query() guildId: string,
+  ): Promise<ApiResponse<CandidateHistoryEntry[]>> {
+    await authorizeDecisions(this.auth, request, guildId, [id]);
+    return apiSuccess(await this.service.getHistory(id));
   }
 
   @Get('{id}')

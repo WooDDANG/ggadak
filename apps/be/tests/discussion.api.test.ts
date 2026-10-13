@@ -22,7 +22,7 @@ test('discussion analysis and candidate history require Bot service authenticati
   const base = `http://127.0.0.1:${(server.address() as any).port}`;
   const payload = {
     requestId: 'auth-check',
-    rawMessages: [{ author: 'member', content: 'We discussed this.' }],
+    rawMessages: [{ id: '1', author: 'member', content: 'We discussed this.' }],
   };
   try {
     for (const request of [

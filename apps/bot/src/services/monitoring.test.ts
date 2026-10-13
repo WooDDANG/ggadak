@@ -36,6 +36,8 @@ test('Bot skips unselected channels and fails closed when settings cannot be ref
         },
       },
     };
+    await assert.rejects(harvester.scanChannel(channel as any, DEFAULT_HARVESTING_POLICY), /503/);
+    available = true;
     assert.deepEqual(await harvester.scanChannel(channel as any, DEFAULT_HARVESTING_POLICY), {
       scannedCount: 0,
       decisionsCount: 0,

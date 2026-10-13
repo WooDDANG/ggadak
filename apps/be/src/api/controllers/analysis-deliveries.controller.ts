@@ -1,5 +1,17 @@
 import type { Request as ExpressRequest } from 'express';
-import { Controller, Route, Tags, Security, Get, Post, Body, Path, Query, Request } from 'tsoa';
+import {
+  SuccessResponse,
+  Controller,
+  Route,
+  Tags,
+  Security,
+  Get,
+  Post,
+  Body,
+  Path,
+  Query,
+  Request,
+} from 'tsoa';
 import { Service } from 'typedi';
 import { requirePrincipal } from '../guards/authorization.js';
 import { AuthService } from '../../services/auth.service.js';
@@ -25,7 +37,7 @@ export class AnalysisDeliveriesController extends Controller {
     super();
   }
   @Get()
-  async list(
+  async listAnalysisDeliveries(
     @Request() request: ExpressRequest,
     @Query() guildId: string,
   ): Promise<ApiResponse<AnalysisDeliveryQueueDto>> {
@@ -33,7 +45,8 @@ export class AnalysisDeliveriesController extends Controller {
     return apiSuccess(await this.deliveries.list(guildId));
   }
   @Post('{requestId}/retry')
-  async retry(
+  @SuccessResponse('202', 'Retry accepted')
+  async retryAnalysisRequest(
     @Request() request: ExpressRequest,
     @Query() guildId: string,
     @Path() requestId: string,

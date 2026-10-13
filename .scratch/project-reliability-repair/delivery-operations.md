@@ -21,4 +21,8 @@ Set the same `BOT_SERVICE_TOKEN` on Bot and BE. The Bot publishes status every f
 
 Missing credentials, unsupported providers/models and invalid structured AI output fail explicitly. Production never uses mock extraction. Configure a valid model and credentials operationally; tests use injected providers and never call external AI.
 
-Queue status and retry APIs are generated for the FE. The recovery screen belongs to ticket 07; continuous Scan Range checkpoint recovery belongs to ticket 04.
+The Web Review Queue now includes the recovery screen and confirmed/rejected history. Scan Ranges persist with queued payloads and completed results; retain those journal files so recovery can acknowledge continuously completed coverage after restart.
+
+Deployment must also apply `202610120002_scan_range` through the migration command above. It adds Scan Range metadata and channel names to BE snapshots. Checkpoint reads/writes now require `BOT_SERVICE_TOKEN`.
+
+`SEMANTIC_THRESHOLD` defaults to `0.7` and is validated between 0 and 1 by the backend policy. The Bot synchronizes policy periodically and retains the last valid policy when synchronization fails. `REVIEW_WEB_URL` (or `WEB_URL`) sets the private scan-command review/recovery link. Initial scans use `SCAN_INITIAL_LIMIT` and `DECISION_LOOKBACK_DAYS`; manual bounded scans do not claim omitted history. Existing checkpoint records are preserved; this change does not fabricate historical Scan Ranges.

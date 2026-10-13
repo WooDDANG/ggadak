@@ -33,6 +33,7 @@ import type {
   ApiResponseAnalysisRetryCommandDtoArray,
   ApiResponseAnyOrNull,
   ApiResponseAuthUserDto,
+  ApiResponseCandidateHistoryEntryArray,
   ApiResponseChannelIdsStringArray,
   ApiResponseChannelSettings,
   ApiResponseDashboardDto,
@@ -58,16 +59,17 @@ import type {
   GetDecisionTimelineParams,
   GetMonitoredChannelsParams,
   GetParams,
+  GetV1DecisionHistoryParams,
   GetV1DecisionParams,
   HarvestingPolicyDto,
+  ListAnalysisDeliveriesParams,
   ListDiscordChannelsParams,
   ListFeedbacksParams,
-  ListParams,
   ListV1DecisionsParams,
   ListV1ReviewQueueParams,
   LoginDiscordBody,
-  RetryBody,
-  RetryParams,
+  RetryAnalysisRequestBody,
+  RetryAnalysisRequestParams,
   ReviewV1CandidateParams,
   Save200,
   SaveCheckpointDto,
@@ -650,6 +652,128 @@ export function useGetV1Decision<TData = Awaited<ReturnType<typeof getV1Decision
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetV1DecisionQueryOptions(id,params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export type getV1DecisionHistoryResponse200 = {
+  data: ApiResponseCandidateHistoryEntryArray
+  status: 200
+}
+
+export type getV1DecisionHistoryResponseSuccess = (getV1DecisionHistoryResponse200) & {
+  headers: Headers;
+};
+;
+
+export type getV1DecisionHistoryResponse = (getV1DecisionHistoryResponseSuccess)
+
+export const getGetV1DecisionHistoryUrl = (id: string,
+    params: GetV1DecisionHistoryParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/decisions/${id}/history?${stringifiedParams}` : `/api/v1/decisions/${id}/history`
+}
+
+export const getV1DecisionHistory = async (id: string,
+    params: GetV1DecisionHistoryParams, options?: Parameters<typeof authenticatedClient>[1]): Promise<getV1DecisionHistoryResponse> => {
+
+  return authenticatedClient<getV1DecisionHistoryResponse>(getGetV1DecisionHistoryUrl(id,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetV1DecisionHistoryQueryKey = (id: string,
+    params?: GetV1DecisionHistoryParams,) => {
+    return [
+    `/api/v1/decisions/${id}/history`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetV1DecisionHistoryQueryOptions = <TData = Awaited<ReturnType<typeof getV1DecisionHistory>>, TError = unknown>(id: string,
+    params: GetV1DecisionHistoryParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getV1DecisionHistory>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetV1DecisionHistoryQueryKey(id,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getV1DecisionHistory>>> = ({ signal }) => getV1DecisionHistory(id,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getV1DecisionHistory>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetV1DecisionHistoryQueryResult = NonNullable<Awaited<ReturnType<typeof getV1DecisionHistory>>>
+export type GetV1DecisionHistoryQueryError = unknown
+
+
+export function useGetV1DecisionHistory<TData = Awaited<ReturnType<typeof getV1DecisionHistory>>, TError = unknown>(
+ id: string,
+    params: GetV1DecisionHistoryParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getV1DecisionHistory>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getV1DecisionHistory>>,
+          TError,
+          Awaited<ReturnType<typeof getV1DecisionHistory>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetV1DecisionHistory<TData = Awaited<ReturnType<typeof getV1DecisionHistory>>, TError = unknown>(
+ id: string,
+    params: GetV1DecisionHistoryParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getV1DecisionHistory>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getV1DecisionHistory>>,
+          TError,
+          Awaited<ReturnType<typeof getV1DecisionHistory>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetV1DecisionHistory<TData = Awaited<ReturnType<typeof getV1DecisionHistory>>, TError = unknown>(
+ id: string,
+    params: GetV1DecisionHistoryParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getV1DecisionHistory>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+
+export function useGetV1DecisionHistory<TData = Awaited<ReturnType<typeof getV1DecisionHistory>>, TError = unknown>(
+ id: string,
+    params: GetV1DecisionHistoryParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getV1DecisionHistory>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetV1DecisionHistoryQueryOptions(id,params,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
@@ -3029,19 +3153,19 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       return useMutation(getLogoutSessionMutationOptions(options), queryClient);
     }
 
-export type listResponse200 = {
+export type listAnalysisDeliveriesResponse200 = {
   data: ApiResponseAnalysisDeliveryQueueDto
   status: 200
 }
 
-export type listResponseSuccess = (listResponse200) & {
+export type listAnalysisDeliveriesResponseSuccess = (listAnalysisDeliveriesResponse200) & {
   headers: Headers;
 };
 ;
 
-export type listResponse = (listResponseSuccess)
+export type listAnalysisDeliveriesResponse = (listAnalysisDeliveriesResponseSuccess)
 
-export const getListUrl = (params: ListParams,) => {
+export const getListAnalysisDeliveriesUrl = (params: ListAnalysisDeliveriesParams,) => {
   const normalizedParams = new URLSearchParams();
 
   Object.entries(params || {}).forEach(([key, value]) => {
@@ -3056,9 +3180,9 @@ export const getListUrl = (params: ListParams,) => {
   return stringifiedParams.length > 0 ? `/api/v1/analysis-deliveries?${stringifiedParams}` : `/api/v1/analysis-deliveries`
 }
 
-export const list = async (params: ListParams, options?: Parameters<typeof authenticatedClient>[1]): Promise<listResponse> => {
+export const listAnalysisDeliveries = async (params: ListAnalysisDeliveriesParams, options?: Parameters<typeof authenticatedClient>[1]): Promise<listAnalysisDeliveriesResponse> => {
 
-  return authenticatedClient<listResponse>(getListUrl(params),
+  return authenticatedClient<listAnalysisDeliveriesResponse>(getListAnalysisDeliveriesUrl(params),
   {
     ...options,
     method: 'GET'
@@ -3071,66 +3195,66 @@ export const list = async (params: ListParams, options?: Parameters<typeof authe
 
 
 
-export const getListQueryKey = (params?: ListParams,) => {
+export const getListAnalysisDeliveriesQueryKey = (params?: ListAnalysisDeliveriesParams,) => {
     return [
     `/api/v1/analysis-deliveries`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getListQueryOptions = <TData = Awaited<ReturnType<typeof list>>, TError = unknown>(params: ListParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof list>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
+export const getListAnalysisDeliveriesQueryOptions = <TData = Awaited<ReturnType<typeof listAnalysisDeliveries>>, TError = unknown>(params: ListAnalysisDeliveriesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAnalysisDeliveries>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getListQueryKey(params);
+  const queryKey =  queryOptions?.queryKey ?? getListAnalysisDeliveriesQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof list>>> = ({ signal }) => list(params, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listAnalysisDeliveries>>> = ({ signal }) => listAnalysisDeliveries(params, { signal, ...requestOptions });
 
 
 
 
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof list>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAnalysisDeliveries>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
-export type ListQueryResult = NonNullable<Awaited<ReturnType<typeof list>>>
-export type ListQueryError = unknown
+export type ListAnalysisDeliveriesQueryResult = NonNullable<Awaited<ReturnType<typeof listAnalysisDeliveries>>>
+export type ListAnalysisDeliveriesQueryError = unknown
 
 
-export function useList<TData = Awaited<ReturnType<typeof list>>, TError = unknown>(
- params: ListParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof list>>, TError, TData>> & Pick<
+export function useListAnalysisDeliveries<TData = Awaited<ReturnType<typeof listAnalysisDeliveries>>, TError = unknown>(
+ params: ListAnalysisDeliveriesParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAnalysisDeliveries>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof list>>,
+          Awaited<ReturnType<typeof listAnalysisDeliveries>>,
           TError,
-          Awaited<ReturnType<typeof list>>
+          Awaited<ReturnType<typeof listAnalysisDeliveries>>
         > , 'initialData'
       >, request?: SecondParameter<typeof authenticatedClient>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useList<TData = Awaited<ReturnType<typeof list>>, TError = unknown>(
- params: ListParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof list>>, TError, TData>> & Pick<
+export function useListAnalysisDeliveries<TData = Awaited<ReturnType<typeof listAnalysisDeliveries>>, TError = unknown>(
+ params: ListAnalysisDeliveriesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAnalysisDeliveries>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof list>>,
+          Awaited<ReturnType<typeof listAnalysisDeliveries>>,
           TError,
-          Awaited<ReturnType<typeof list>>
+          Awaited<ReturnType<typeof listAnalysisDeliveries>>
         > , 'initialData'
       >, request?: SecondParameter<typeof authenticatedClient>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useList<TData = Awaited<ReturnType<typeof list>>, TError = unknown>(
- params: ListParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof list>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
+export function useListAnalysisDeliveries<TData = Awaited<ReturnType<typeof listAnalysisDeliveries>>, TError = unknown>(
+ params: ListAnalysisDeliveriesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAnalysisDeliveries>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 
-export function useList<TData = Awaited<ReturnType<typeof list>>, TError = unknown>(
- params: ListParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof list>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
+export function useListAnalysisDeliveries<TData = Awaited<ReturnType<typeof listAnalysisDeliveries>>, TError = unknown>(
+ params: ListAnalysisDeliveriesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAnalysisDeliveries>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getListQueryOptions(params,options)
+  const queryOptions = getListAnalysisDeliveriesQueryOptions(params,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
@@ -3143,20 +3267,20 @@ export function useList<TData = Awaited<ReturnType<typeof list>>, TError = unkno
 
 
 
-export type retryResponse200 = {
+export type retryAnalysisRequestResponse202 = {
   data: ApiResponseAnalysisRetryCommandDto
-  status: 200
+  status: 202
 }
 
-export type retryResponseSuccess = (retryResponse200) & {
+export type retryAnalysisRequestResponseSuccess = (retryAnalysisRequestResponse202) & {
   headers: Headers;
 };
 ;
 
-export type retryResponse = (retryResponseSuccess)
+export type retryAnalysisRequestResponse = (retryAnalysisRequestResponseSuccess)
 
-export const getRetryUrl = (requestId: string,
-    params: RetryParams,) => {
+export const getRetryAnalysisRequestUrl = (requestId: string,
+    params: RetryAnalysisRequestParams,) => {
   const normalizedParams = new URLSearchParams();
 
   Object.entries(params || {}).forEach(([key, value]) => {
@@ -3171,9 +3295,9 @@ export const getRetryUrl = (requestId: string,
   return stringifiedParams.length > 0 ? `/api/v1/analysis-deliveries/${requestId}/retry?${stringifiedParams}` : `/api/v1/analysis-deliveries/${requestId}/retry`
 }
 
-export const retry = async (requestId: string,
-    retryBody: RetryBody,
-    params: RetryParams, options?: Parameters<typeof authenticatedClient>[1]): Promise<retryResponse> => {
+export const retryAnalysisRequest = async (requestId: string,
+    retryAnalysisRequestBody: RetryAnalysisRequestBody,
+    params: RetryAnalysisRequestParams, options?: Parameters<typeof authenticatedClient>[1]): Promise<retryAnalysisRequestResponse> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -3189,12 +3313,12 @@ export const retry = async (requestId: string,
     }
     return headers;
   };
-return authenticatedClient<retryResponse>(getRetryUrl(requestId,params),
+return authenticatedClient<retryAnalysisRequestResponse>(getRetryAnalysisRequestUrl(requestId,params),
   {
     ...options,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-    body: JSON.stringify(retryBody)
+    body: JSON.stringify(retryAnalysisRequestBody)
   }
 );}
 
@@ -3202,13 +3326,13 @@ return authenticatedClient<retryResponse>(getRetryUrl(requestId,params),
 
 
 
-export const getRetryMutationKey = () => ['retry'] as const;
+export const getRetryAnalysisRequestMutationKey = () => ['retryAnalysisRequest'] as const;
 
-export const getRetryMutationOptions = <TError = unknown,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof retry>>, TError,RetryMutationVariables, TContext>, request?: SecondParameter<typeof authenticatedClient>}
-): UseMutationOptions<Awaited<ReturnType<typeof retry>>, TError,RetryMutationVariables, TContext> => {
+export const getRetryAnalysisRequestMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof retryAnalysisRequest>>, TError,RetryAnalysisRequestMutationVariables, TContext>, request?: SecondParameter<typeof authenticatedClient>}
+): UseMutationOptions<Awaited<ReturnType<typeof retryAnalysisRequest>>, TError,RetryAnalysisRequestMutationVariables, TContext> => {
 
-const mutationKey = getRetryMutationKey();
+const mutationKey = getRetryAnalysisRequestMutationKey();
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -3218,10 +3342,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof retry>>, RetryMutationVariables> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof retryAnalysisRequest>>, RetryAnalysisRequestMutationVariables> = (props) => {
           const {requestId,data,params} = props ?? {};
 
-          return  retry(requestId,data,params,requestOptions)
+          return  retryAnalysisRequest(requestId,data,params,requestOptions)
         }
 
 
@@ -3231,20 +3355,20 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type RetryMutationResult = NonNullable<Awaited<ReturnType<typeof retry>>>
-    export type RetryMutationBody = RetryBody
-    export type RetryMutationError = unknown
-    export type RetryMutationVariables = {requestId: string;data: RetryBody;params: RetryParams}
+    export type RetryAnalysisRequestMutationResult = NonNullable<Awaited<ReturnType<typeof retryAnalysisRequest>>>
+    export type RetryAnalysisRequestMutationBody = RetryAnalysisRequestBody
+    export type RetryAnalysisRequestMutationError = unknown
+    export type RetryAnalysisRequestMutationVariables = {requestId: string;data: RetryAnalysisRequestBody;params: RetryAnalysisRequestParams}
 
-    export const useRetry = <TError = unknown,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof retry>>, TError,RetryMutationVariables, TContext>, request?: SecondParameter<typeof authenticatedClient>}
+    export const useRetryAnalysisRequest = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof retryAnalysisRequest>>, TError,RetryAnalysisRequestMutationVariables, TContext>, request?: SecondParameter<typeof authenticatedClient>}
  , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof retry>>,
+        Awaited<ReturnType<typeof retryAnalysisRequest>>,
         TError,
-        RetryMutationVariables,
+        RetryAnalysisRequestMutationVariables,
         TContext
       > => {
-      return useMutation(getRetryMutationOptions(options), queryClient);
+      return useMutation(getRetryAnalysisRequestMutationOptions(options), queryClient);
     }
 
 export type synchronizeResponse200 = {

@@ -26,6 +26,7 @@ test('queue snapshots and retry acknowledgements persist; duplicate Web commands
     await service.synchronize([request]);
     expect((await service.list('guild')).available).toBe(true);
     const command = await service.retry('guild', 'request', 'command');
+    expect((await service.retry('guild', 'request', 'coalesced-command')).id).toBe(command.id);
     expect(
       (await new AnalysisDeliveryService(db.repo).retry('guild', 'request', 'command')).id,
     ).toBe(command.id);

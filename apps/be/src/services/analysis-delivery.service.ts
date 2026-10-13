@@ -49,8 +49,20 @@ export class AnalysisDeliveryService {
           (previous.guildId !== request.guildId || previous.channelId !== request.channelId)
         )
           throw new ConflictError('Analysis Request scope changed');
+        const { scanRange, ...status } = request;
+        if (
+          scanRange &&
+          (![scanRange.afterMessageId, scanRange.startMessageId, scanRange.endMessageId].every(id =>
+            /^\d+$/.test(id),
+          ) ||
+            BigInt(scanRange.afterMessageId) >= BigInt(scanRange.startMessageId) ||
+            BigInt(scanRange.startMessageId) > BigInt(scanRange.endMessageId))
+        )
+          throw new BadRequestError('Invalid Scan Range');
         const data = {
-          ...request,
+          ...status,
+          channelName: status.channelName ?? null,
+          scanRangeJson: scanRange ? JSON.stringify(scanRange) : null,
           lastError: request.lastError ?? null,
           errorCategory: request.errorCategory ?? null,
           synchronizedAt: now,
@@ -81,6 +93,8 @@ export class AnalysisDeliveryService {
     return {
       requests: requests.map(r => ({
         ...r,
+        channelName: r.channelName ?? undefined,
+        scanRange: r.scanRangeJson ? JSON.parse(r.scanRangeJson) : undefined,
         status: r.status as AnalysisDeliveryStatus['status'],
         errorCategory: r.errorCategory ?? undefined,
         lastError: r.lastError ?? undefined,

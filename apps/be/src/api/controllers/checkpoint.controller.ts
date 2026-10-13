@@ -1,8 +1,9 @@
-import { Controller, Route, Tags, Get, Post, Body, Path } from 'tsoa';
+import { Controller, Route, Tags, Get, Post, Body, Path, Security } from 'tsoa';
 import { Service } from 'typedi';
 import { CheckpointService } from '../../services/checkpoint.service.js';
 import { SaveCheckpointDto, CheckpointResponseDto } from '../../dto/checkpoint.dto.js';
 
+@Security('service')
 @Tags('Checkpoints')
 @Route('api/channels')
 @Service()
@@ -23,6 +24,10 @@ export class CheckpointController extends Controller {
     @Body() body: SaveCheckpointDto,
   ): Promise<{ status: string; channelId: string; lastMessageId: string }> {
     await this.service.saveCheckpoint(channelId, body.lastMessageId);
-    return { status: 'ok', channelId, lastMessageId: body.lastMessageId };
+    return {
+      status: 'ok',
+      channelId,
+      lastMessageId: (await this.service.getCheckpoint(channelId))!,
+    };
   }
 }

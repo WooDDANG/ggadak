@@ -47,7 +47,10 @@ export class ReactionHandler {
       }
 
       // Count total reactions across all emojis on this message
-      const totalReactions = message.reactions.cache.reduce((sum, r) => sum + r.count, 0);
+      const totalReactions = message.reactions.cache.reduce(
+        (sum, r) => sum + Math.max(0, r.count - (r.me ? 1 : 0)),
+        0,
+      );
       if (totalReactions >= policy.reactionThreshold) {
         logger.info(
           `[Trigger] Reaction threshold (${totalReactions} >= ${policy.reactionThreshold}) reached on msg ${message.id}`,

@@ -1,3 +1,11 @@
+export class ApiHttpError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number,
+  ) {
+    super(message);
+  }
+}
 import { getAccessToken, setAccessToken } from './session';
 export async function authorizedFetch(url: string, options: RequestInit = {}) {
   const headers = new Headers(options.headers);
@@ -13,6 +21,10 @@ export async function authorizedFetch(url: string, options: RequestInit = {}) {
 export async function authenticatedClient<T>(url: string, options: RequestInit = {}): Promise<T> {
   const response = await authorizedFetch(url, options);
   const data = response.status === 204 ? null : await response.json();
-  if (!response.ok) throw new Error(data?.message ?? data?.error ?? `HTTP ${response.status}`);
+  if (!response.ok)
+    throw new ApiHttpError(
+      data?.message ?? data?.error ?? `HTTP ${response.status}`,
+      response.status,
+    );
   return { data, status: response.status, headers: response.headers } as T;
 }

@@ -26,7 +26,7 @@ export class MessageHandler {
     if (!(await this.isMonitored(message.guildId, message.channelId))) return;
 
     const isKeywordMatch = CONSENSUS_REGEX.test(message.content);
-    const semanticMatch = evaluateSemanticDecision(message.content);
+    const semanticMatch = evaluateSemanticDecision(message.content, policy.semanticThreshold);
 
     if (isKeywordMatch || semanticMatch.isCandidate) {
       const traceId = `trc-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;

@@ -1,3 +1,5 @@
+import { ReviewHistory } from './ReviewHistory';
+import { CandidateHistory } from './CandidateHistory';
 import React, { useState } from 'react';
 import { ReviewResolution } from './ReviewResolution';
 import { Decision, ReviewAction } from '@ggaddak/shared';
@@ -16,6 +18,8 @@ import { Badge } from '../../components/Badge';
 import { DiscordTranscriptViewer } from '../../components/DiscordTranscriptViewer';
 
 interface ReviewQueueProps {
+  guildId?: string;
+  revision?: number;
   decisions: Decision[];
   onReview: (id: string, action: ReviewAction) => Promise<void>;
   isLoading: boolean;
@@ -25,6 +29,8 @@ interface ReviewQueueProps {
 export const ReviewQueue: React.FC<ReviewQueueProps> = ({
   decisions,
   records,
+  guildId,
+  revision = 0,
   onReview,
   isLoading,
 }) => {
@@ -58,21 +64,25 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({
 
   if (draftDecisions.length === 0) {
     return (
-      <div className="bg-slate-800/50 border border-slate-700/60 rounded-2xl p-12 text-center max-w-2xl mx-auto my-12 backdrop-blur">
-        <div className="w-12 h-12 bg-emerald-500/20 text-emerald-400 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-emerald-500/30">
-          <Check className="w-6 h-6" />
+      <>
+        <ReviewHistory records={records} guildId={guildId} />
+        <div className="bg-slate-800/50 border border-slate-700/60 rounded-2xl p-12 text-center max-w-2xl mx-auto my-12 backdrop-blur">
+          <div className="w-12 h-12 bg-emerald-500/20 text-emerald-400 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-emerald-500/30">
+            <Check className="w-6 h-6" />
+          </div>
+          <h3 className="text-lg font-bold text-white mb-1">검토 대기 중인 의사결정이 없습니다</h3>
+          <p className="text-sm text-slate-400 mb-6">
+            Discord 채널에서 📌 이모지를 달거나 합의 키워드(~합시다, 결정 등)가 나오면 AI가 자동으로
+            후보를 추출합니다.
+          </p>
         </div>
-        <h3 className="text-lg font-bold text-white mb-1">검토 대기 중인 의사결정이 없습니다</h3>
-        <p className="text-sm text-slate-400 mb-6">
-          Discord 채널에서 📌 이모지를 달거나 합의 키워드(~합시다, 결정 등)가 나오면 AI가 자동으로
-          후보를 추출합니다.
-        </p>
-      </div>
+      </>
     );
   }
 
   return (
     <div className="space-y-6">
+      <ReviewHistory records={records} guildId={guildId} />
       {error && (
         <p role="alert" className="text-rose-300">
           {error}
@@ -119,6 +129,7 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({
               {/* Action Buttons */}
               <div className="flex items-center space-x-2">
                 <ReviewResolution
+                  key={`${dec.id}:${revision}`}
                   candidate={dec}
                   records={records}
                   disabled={pending}
@@ -231,6 +242,7 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({
               </div>
             )}
 
+            {guildId && <CandidateHistory decisionId={dec.id} guildId={guildId} />}
             {/* Discord Conversation Transcript */}
             <DiscordTranscriptViewer source={dec.source} rawTranscript={dec.rawTranscript} />
 

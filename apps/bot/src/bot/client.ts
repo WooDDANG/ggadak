@@ -64,7 +64,28 @@ export class DecisionTrackerBot {
       silent: false,
     });
 
+    this.backendApi.observeDeliveries(async (payload, result) => {
+      if (!payload.channelId || !payload.triggerMessageId) return;
+      try {
+        const channel = await this.client.channels.fetch(payload.channelId);
+        if (!channel || !channel.isTextBased() || !('messages' in channel)) return;
+        const message = await channel.messages.fetch(payload.triggerMessageId);
+        await this.analysisService.removeReactionSafely(message, '👀');
+        await this.analysisService.removeReactionSafely(message, '⚠️');
+        if (result?.found && result.decisions.length)
+          await this.analysisService.addReactionSafely(message, '📝');
+      } catch (error: any) {
+        logger.warn(`Could not reconcile Discord processing reaction: ${error.message}`);
+      }
+    });
+
     this.client.once(Events.ClientReady, () => {
+      const policyTimer = setInterval(() => {
+        void this.backendApi.syncPolicy().then(policy => {
+          this.policy = policy;
+        });
+      }, 60000);
+      policyTimer.unref();
       let syncWorkerBusy = false;
       const processSyncJob = async () => {
         if (syncWorkerBusy) return;
@@ -146,31 +167,28 @@ export class DecisionTrackerBot {
         if (recovering) return;
         recovering = true;
         try {
-          for (const { payload, result } of await this.backendApi.retryPendingAnalyses(1)) {
-            if (!payload.channelId || !payload.triggerMessageId) continue;
-            try {
-              const channel = await this.client.channels.fetch(payload.channelId);
-              if (!channel || !channel.isTextBased() || !('messages' in channel)) continue;
-              const message = await channel.messages.fetch(payload.triggerMessageId);
-              await this.analysisService.removeReactionSafely(message, '👀');
-              await this.analysisService.removeReactionSafely(message, '⚠️');
-              if (result.found && result.decisions.length)
-                await this.analysisService.addReactionSafely(message, '📝');
-            } catch (error: any) {
-              logger.warn(
-                `Recovered analysis but could not update Discord reaction: ${error.message}`,
-              );
-            }
-          }
+          await this.backendApi
+            .recoverScanCheckpoints()
+            .catch(error => logger.warn(`Checkpoint acknowledgement retained: ${error.message}`));
+          await this.backendApi.retryPendingAnalyses(1);
+          await this.backendApi
+            .recoverScanCheckpoints()
+            .catch(error => logger.warn(`Checkpoint acknowledgement retained: ${error.message}`));
         } catch (error: any) {
           logger.warn(`Analysis recovery unavailable: ${error.message}`);
         } finally {
           recovering = false;
         }
       };
-      void recover();
+      void this.backendApi
+        .reconcileDeliveryReactions()
+        .then(recover)
+        .catch(error => logger.warn(`Processing reaction recovery failed: ${error.message}`));
       const retryTimer = setInterval(() => {
-        void recover();
+        void this.backendApi
+          .reconcileDeliveryReactions()
+          .then(recover)
+          .catch(error => logger.warn(`Processing reaction recovery failed: ${error.message}`));
       }, 1_000);
       retryTimer.unref();
     });

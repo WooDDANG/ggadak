@@ -223,6 +223,7 @@ describe('E2E Full Pipeline: Discord Messages ➔ Backend AI Core ➔ Review Que
         requestId: 'e2e-chatter',
         rawMessages: [
           {
+            id: 'chatter-1',
             author: 'wooddang',
             content: '오늘 점심 뭐 먹을까요?',
             createdAt: '2026-09-28T12:00:00Z',

@@ -13,7 +13,7 @@ describe('BE Server & Ingestion API', () => {
   beforeAll(async () => {
     database = await isolatedRepository();
     repo = database.repo;
-    server = await createServer(repo);
+    server = await createServer(repo, undefined, { serviceToken: 'fixture-service' });
     await new Promise<void>(resolve => {
       server.listen(0, () => {
         const addr = server.address() as any;
@@ -82,7 +82,9 @@ describe('BE Server & Ingestion API', () => {
 
   it('manages channel checkpoints via GET and POST /api/channels/:channelId/checkpoint', async () => {
     // 1. Initial GET should return null for lastMessageId
-    const res1 = await fetch(`http://localhost:${port}/api/channels/test-chan-1/checkpoint`);
+    const res1 = await fetch(`http://localhost:${port}/api/channels/test-chan-1/checkpoint`, {
+      headers: { Authorization: 'Bearer fixture-service' },
+    });
     expect(res1.status).toBe(200);
     const data1 = (await res1.json()) as any;
     expect(data1.channelId).toBe('test-chan-1');
@@ -91,16 +93,18 @@ describe('BE Server & Ingestion API', () => {
     // 2. POST to save checkpoint
     const res2 = await fetch(`http://localhost:${port}/api/channels/test-chan-1/checkpoint`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ lastMessageId: 'msg-999' }),
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer fixture-service' },
+      body: JSON.stringify({ lastMessageId: '1400000000000000000' }),
     });
     expect(res2.status).toBe(200);
 
     // 3. GET should return updated lastMessageId
-    const res3 = await fetch(`http://localhost:${port}/api/channels/test-chan-1/checkpoint`);
+    const res3 = await fetch(`http://localhost:${port}/api/channels/test-chan-1/checkpoint`, {
+      headers: { Authorization: 'Bearer fixture-service' },
+    });
     expect(res3.status).toBe(200);
     const data3 = (await res3.json()) as any;
-    expect(data3.lastMessageId).toBe('msg-999');
+    expect(data3.lastMessageId).toBe('1400000000000000000');
   });
 
   it('exposes centralized harvesting policy via GET /api/config/policy', async () => {

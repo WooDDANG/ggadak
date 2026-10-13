@@ -203,6 +203,8 @@ model DecisionEmbedding {
 }
 
 model AnalysisDelivery {
+  channelName String?
+  scanRangeJson String?
   requestId String @id
   guildId String
   channelId String
