@@ -14,7 +14,6 @@ export { CONSENSUS_REGEX };
 export class MessageHandler {
   constructor(
     private engine: IDecisionHarvestingEngine,
-    private onAddReaction: (message: Message, emoji: string) => Promise<void>,
     private isMonitored: (
       guildId: string | null,
       channelId: string,

@@ -321,7 +321,7 @@ test('startup scan, message, reaction, command-created engine and restart recove
         full: true,
         requestId: 'startup',
       }),
-      new MessageHandler(engine, async () => {}).handleMessage(message, policy),
+      new MessageHandler(engine).handleMessage(message, policy),
       new ReactionHandler('📌', engine, async () => {}).handleReactionAdd(
         { message: { ...message, id: '201' }, emoji: { name: '📌' } } as any,
         { bot: false, username: 'Lee' } as any,

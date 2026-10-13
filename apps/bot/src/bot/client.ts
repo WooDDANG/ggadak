@@ -40,10 +40,8 @@ export class DecisionTrackerBot {
     this.analysisService = new DiscussionHarvester(this.backendApi);
     this.engine = new DecisionHarvestingEngine(this.backendApi, this.analysisService);
 
-    this.messageHandler = new MessageHandler(
-      this.engine,
-      (msg: Message, emoji: string) => this.analysisService.addReactionSafely(msg, emoji),
-      (guildId, channelId) => this.backendApi.isMonitoredChannel(guildId, channelId),
+    this.messageHandler = new MessageHandler(this.engine, (guildId, channelId) =>
+      this.backendApi.isMonitoredChannel(guildId, channelId),
     );
 
     this.reactionHandler = new ReactionHandler(

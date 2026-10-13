@@ -71,7 +71,7 @@ test('Message and reaction triggers do not react or dispatch outside monitored c
     content: '확정합시다',
     partial: false,
   };
-  await new MessageHandler(engine as any, addReaction, allowed).handleMessage(
+  await new MessageHandler(engine as any, allowed).handleMessage(
     message as any,
     DEFAULT_HARVESTING_POLICY,
   );

@@ -120,7 +120,6 @@ describe('DiscussionHarvester Deep Module', () => {
   it('triggers message handler on semantic decision phrases even without strict keywords', async () => {
     const { MessageHandler } = await import('./handlers/message.handler.js');
     let triggerCount = 0;
-    let reactionCount = 0;
 
     const fakeEngine = {
       harvest: async () => {
@@ -129,9 +128,7 @@ describe('DiscussionHarvester Deep Module', () => {
       },
     };
 
-    const handler = new MessageHandler(fakeEngine as any, async (_msg: any, emoji: string) => {
-      if (emoji === '👀') reactionCount++;
-    });
+    const handler = new MessageHandler(fakeEngine as any);
 
     const semanticMsg: any = {
       id: 'sem-1',
@@ -146,7 +143,6 @@ describe('DiscussionHarvester Deep Module', () => {
       debounceMs: 5,
     });
 
-    assert.strictEqual(reactionCount, 0);
     assert.strictEqual(triggerCount, 1);
   });
 
