@@ -1,24 +1,12 @@
+import type { SyncJobView, SyncJobClaimDto } from '../dto/sync-job.dto.js';
+import type { SyncChannelResult, SyncJobUpdate } from '@ggaddak/shared';
+import type { SyncJob } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import { Service } from 'typedi';
 import { DecisionRepository } from '../repositories/decision.repository.js';
 import { ConflictError, NotFoundError, BadRequestError } from '../errors/AppError.js';
 
-export type SyncJobView = {
-  jobId: string;
-  guildId: string;
-  forceFullSync: boolean;
-  status: string;
-  totalChannels: number;
-  completedChannels: number;
-  failedChannels: number;
-  decisionsFound: number;
-  messagesScanned: number;
-  errorMessage: string | null;
-  createdAt: string;
-  startedAt: string | null;
-  completedAt: string | null;
-};
-const view = (job: any): SyncJobView => ({
+const view = (job: SyncJob): SyncJobView => ({
   jobId: job.id,
   guildId: job.guildId,
   forceFullSync: job.forceFullSync,
@@ -52,11 +40,7 @@ export class SyncJobService {
         const lock = await tx.syncJobLock.findUnique({ where: { guildId } });
         if (lock) {
           const current = await tx.syncJob.findUnique({ where: { id: lock.jobId } });
-          if (
-            current &&
-            ['QUEUED', 'PROCESSING'].includes(current.status) &&
-            (!current.leaseUntil || current.leaseUntil > new Date())
-          )
+          if (current && ['QUEUED', 'PROCESSING'].includes(current.status))
             throw new ConflictError('A sync is already active for this server');
           await tx.syncJobLock.delete({ where: { guildId } });
         }
@@ -85,8 +69,9 @@ export class SyncJobService {
     return view(job);
   }
 
-  async claim(): Promise<any | null> {
+  async claim(): Promise<SyncJobClaimDto | null> {
     const now = new Date();
+    const owner = randomUUID();
     const prisma = this.repo.prisma;
     const job = await prisma.syncJob.findFirst({
       where: { OR: [{ status: 'QUEUED' }, { status: 'PROCESSING', leaseUntil: { lte: now } }] },
@@ -100,41 +85,79 @@ export class SyncJobService {
       },
       data: {
         status: 'PROCESSING',
+        owner,
         startedAt: job.startedAt ?? now,
         leaseUntil: new Date(now.getTime() + 120_000),
       },
     });
     if (!changed.count) return null;
+    const results = JSON.parse(job.channelResultsJson) as Record<string, SyncChannelResult>;
     return {
       ...view({ ...job, status: 'PROCESSING', startedAt: job.startedAt ?? now }),
-      channelIds: JSON.parse(job.channelIdsJson),
+      owner,
+      channelIds: (JSON.parse(job.channelIdsJson) as string[]).filter(
+        id => results[id]?.status !== 'COMPLETED',
+      ),
     };
   }
 
-  async update(
-    jobId: string,
-    update: {
-      completedChannels?: number;
-      failedChannels?: number;
-      decisionsFound?: number;
-      messagesScanned?: number;
-      errorMessage?: string | null;
-      status?: 'PROCESSING' | 'COMPLETED' | 'FAILED';
-    },
-  ): Promise<void> {
-    const prisma = this.repo.prisma;
-    const job = await prisma.syncJob.findUnique({ where: { id: jobId } });
-    if (!job || job.status === 'COMPLETED' || job.status === 'FAILED') return;
-    const terminal = update.status === 'COMPLETED' || update.status === 'FAILED';
-    await prisma.$transaction(async tx => {
-      await tx.syncJob.update({
-        where: { id: jobId },
+  async update(jobId: string, update: SyncJobUpdate): Promise<void> {
+    await this.repo.withTransaction(async tx => {
+      const job = await tx.syncJob.findUnique({ where: { id: jobId } });
+      if (!job) throw new NotFoundError('Sync Job not found');
+      if (!update.owner || job.owner !== update.owner)
+        throw new ConflictError('Sync worker lost its lease');
+      if (job.status === 'COMPLETED' || job.status === 'FAILED') return;
+      if (job.status !== 'PROCESSING' || !job.leaseUntil || job.leaseUntil <= new Date())
+        throw new ConflictError('Sync worker lost its lease');
+      const channelIds = JSON.parse(job.channelIdsJson) as string[];
+      const results = JSON.parse(job.channelResultsJson) as Record<string, SyncChannelResult>;
+      const result = update.channelResult;
+      if (result) {
+        if (
+          !channelIds.includes(result.channelId) ||
+          !['COMPLETED', 'FAILED'].includes(result.status) ||
+          !Number.isSafeInteger(result.messagesScanned) ||
+          result.messagesScanned < 0 ||
+          !Number.isSafeInteger(result.decisionsFound) ||
+          result.decisionsFound < 0
+        )
+          throw new BadRequestError('Invalid channel result');
+        results[result.channelId] = result;
+      }
+      const values = Object.values(results);
+      const completedChannels = values.filter(item => item.status === 'COMPLETED').length;
+      const failedChannels = values.filter(item => item.status === 'FAILED').length;
+      const terminal = update.status === 'COMPLETED' || update.status === 'FAILED';
+      if (terminal && values.length !== channelIds.length)
+        throw new ConflictError('Sync still has unfinished channels');
+      const status = terminal ? (failedChannels ? 'FAILED' : 'COMPLETED') : 'PROCESSING';
+      const saved = await tx.syncJob.updateMany({
+        where: {
+          id: jobId,
+          owner: update.owner,
+          status: 'PROCESSING',
+          leaseUntil: { gt: new Date() },
+        },
         data: {
-          ...update,
+          channelResultsJson: JSON.stringify(results),
+          completedChannels,
+          failedChannels,
+          messagesScanned: values.reduce((sum, item) => sum + item.messagesScanned, 0),
+          decisionsFound: values.reduce((sum, item) => sum + item.decisionsFound, 0),
+          status,
+          errorMessage:
+            terminal && failedChannels
+              ? values
+                  .filter(item => item.status === 'FAILED')
+                  .map(item => item.errorMessage ?? `${item.channelId}: scan failed`)
+                  .join('; ')
+              : null,
           leaseUntil: terminal ? null : new Date(Date.now() + 120_000),
-          completedAt: terminal ? new Date() : undefined,
+          completedAt: terminal ? new Date() : null,
         },
       });
+      if (saved.count !== 1) throw new ConflictError('Sync worker lost its lease');
       if (terminal) await tx.syncJobLock.deleteMany({ where: { guildId: job.guildId, jobId } });
     });
   }

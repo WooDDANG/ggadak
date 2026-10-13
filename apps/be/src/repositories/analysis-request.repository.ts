@@ -1,10 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { Decision, DecisionSchema } from '@ggaddak/shared';
+import { Decision } from '@ggaddak/shared';
 import { DecisionRepository } from './decision.repository.js';
-import type {
-  AnalyzeDiscussionParams,
-  AnalyzeDiscussionResult,
-} from '../services/discussion.service.js';
+import type { AnalyzeDiscussionParams, AnalyzeDiscussionResult } from '../domain/analysis.js';
 
 export class AnalysisRequestError extends Error {
   constructor(
@@ -195,7 +192,7 @@ export class AnalysisRequestRepository {
               },
             });
         } else {
-          decision = DecisionSchema.parse({
+          decision = {
             ...draft.decision,
             version: 1,
             actionItems: draft.decision.actionItems.map(item => ({
@@ -203,7 +200,7 @@ export class AnalysisRequestRepository {
               id: item.id ?? randomUUID(),
               state: item.state ?? 'open',
             })),
-          });
+          };
           await tx.decision.create({
             data: { id: decision.id, ...this.repo.decisionData(decision) },
           });

@@ -1,3 +1,4 @@
+import { DecisionSchema } from '@ggaddak/shared';
 import { test, expect, vi } from 'vitest';
 import { AuthService } from '../src/services/auth.service.js';
 import { fakeAuthOptions, FakeDiscordAuth, loginAsTestUser } from '../src/test-support/auth.js';
@@ -30,17 +31,19 @@ test('Discord login binds state to browser, rejects reuse, and returns server-sc
       body: JSON.stringify({ code: 'valid-code', state: login.state }),
     });
     expect(replay.status).toBe(401);
-    await db.repo.saveDecision({
-      id: 'DEC-1',
-      topic: 'Architecture',
-      decision: 'Use SQLite',
-      rationale: 'Existing storage',
-      state: 'Decided',
-      actionItems: [],
-      supersedesId: null,
-      source: { guildId: 'guild-1', channelId: 'c1', triggerMessageId: 'm1', participants: [] },
-      createdAt: '2026-10-12T00:00:00Z',
-    } as any);
+    await db.repo.saveDecision(
+      DecisionSchema.parse({
+        id: 'DEC-1',
+        topic: 'Architecture',
+        decision: 'Use SQLite',
+        rationale: 'Existing storage',
+        state: 'Decided',
+        actionItems: [],
+        supersedesId: null,
+        source: { guildId: 'guild-1', channelId: 'c1', triggerMessageId: 'm1', participants: [] },
+        createdAt: '2026-10-12T00:00:00Z',
+      }),
+    );
     const list = await fetch(`${base}/decisions?guildId=guild-1`, { headers });
     expect(list.status).toBe(200);
     expect(((await list.json()) as any).data.decisions[0].id).toBe('DEC-1');

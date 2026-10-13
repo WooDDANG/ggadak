@@ -1,3 +1,4 @@
+import { DecisionService } from '../src/services/decision.service.js';
 import { test, expect } from 'vitest';
 import { createServer } from '../src/server.js';
 import { isolatedRepository } from '../src/repositories/test-database.js';
@@ -44,7 +45,7 @@ test('dashboard returns empty server metrics then reflects review, recent record
     let data = await summary();
     expect(data.counts).toEqual({ confirmed: 1, onHold: 1, inReview: 1 });
     expect(data.recentDecisions.map((d: any) => d.id)).toEqual(['confirmed']);
-    await db.repo.reviewDecision('draft', 'confirm', {
+    await new DecisionService(db.repo).reviewDecision('draft', 'confirm', {
       expectedVersion: 1,
       resolution: 'independent',
     });
@@ -55,8 +56,17 @@ test('dashboard returns empty server metrics then reflects review, recent record
     });
     const jobs = new SyncJobService(db.repo);
     const completed = await jobs.create('guild-1', false);
-    await jobs.claim();
-    await jobs.update(completed.jobId, { completedChannels: 1, status: 'COMPLETED' });
+    const completedClaim = (await jobs.claim())!;
+    await jobs.update(completed.jobId, {
+      owner: completedClaim.owner,
+      status: 'COMPLETED',
+      channelResult: {
+        channelId: 'channel-sync',
+        status: 'COMPLETED',
+        messagesScanned: 10,
+        decisionsFound: 1,
+      },
+    });
     const successful = (await jobs.get(completed.jobId, 'guild-1')).completedAt;
     data = await summary();
     expect(data.sync.lastSuccessfulAt).toBe(successful);
@@ -66,13 +76,19 @@ test('dashboard returns empty server metrics then reflects review, recent record
     expect(data.sync.latestJob.jobId).toBe(active.jobId);
     expect(data.sync.latestJob.status).toBe('QUEUED');
     expect(data.sync.lastSuccessfulAt).toBe(successful);
-    await jobs.claim();
+    const activeClaim = (await jobs.claim())!;
     data = await summary();
     expect(data.sync.latestJob.status).toBe('PROCESSING');
     await jobs.update(active.jobId, {
-      failedChannels: 1,
+      owner: activeClaim.owner,
       status: 'FAILED',
-      errorMessage: 'AI unavailable',
+      channelResult: {
+        channelId: 'channel-sync',
+        status: 'FAILED',
+        messagesScanned: 0,
+        decisionsFound: 0,
+        errorMessage: 'AI unavailable',
+      },
     });
     data = await summary();
     expect(data.sync.latestJob.status).toBe('FAILED');

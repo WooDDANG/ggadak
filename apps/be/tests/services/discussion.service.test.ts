@@ -1,3 +1,4 @@
+import { DecisionService } from '../../src/services/decision.service.js';
 import 'reflect-metadata';
 import { test, expect, vi } from 'vitest';
 import { isolatedRepository } from '../../src/repositories/test-database.js';
@@ -187,7 +188,7 @@ test('exact reanalysis preserves reviewer edits and rejection while unrelated de
   try {
     const first = await service.analyzeDiscussion(input);
     const original = first.decisions[0];
-    await db.repo.reviewDecision(original.id, 'edit', {
+    await new DecisionService(db.repo).reviewDecision(original.id, 'edit', {
       expectedVersion: original.version!,
       decisionContent: 'Reviewer edited text',
     });
@@ -195,7 +196,7 @@ test('exact reanalysis preserves reviewer edits and rejection while unrelated de
     expect(manual.decisions[0].id).toBe(original.id);
     expect(manual.decisions[0].state).toBe('Draft');
     expect(manual.decisions[0].decisionContent).toBe('Reviewer edited text');
-    await db.repo.reviewDecision(original.id, 'reject', {
+    await new DecisionService(db.repo).reviewDecision(original.id, 'reject', {
       expectedVersion: manual.decisions[0].version!,
     });
     output = ExtractionResultSchema.parse({
@@ -210,7 +211,7 @@ test('exact reanalysis preserves reviewer edits and rejection while unrelated de
     });
     expect(automatic.decisions.length).toBe(1);
     expect(automatic.decisions[0].decision).toBe('Deploy on Monday');
-    await db.repo.reviewDecision(automatic.decisions[0].id, 'confirm', {
+    await new DecisionService(db.repo).reviewDecision(automatic.decisions[0].id, 'confirm', {
       expectedVersion: automatic.decisions[0].version!,
       approvedBy: 'Kim',
     });

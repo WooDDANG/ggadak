@@ -1,3 +1,4 @@
+import type { SyncJobClaim, SyncWorkerUpdate } from './sync-job-worker.js';
 import { analysisScheduler } from './channel-scheduler.js';
 import { createHash, randomUUID } from 'node:crypto';
 import { mkdir, readFile, readdir, link, open, unlink, rename } from 'node:fs/promises';
@@ -135,11 +136,11 @@ export class BackendApiService {
     return envelope.data;
   }
 
-  async claimSyncJob(): Promise<any | null> {
+  async claimSyncJob(): Promise<SyncJobClaim | null> {
     return this.syncJobRequest('/api/v1/internal/sync-jobs/claim', 'POST', {});
   }
 
-  async updateSyncJob(jobId: string, update: Record<string, unknown>): Promise<void> {
+  async updateSyncJob(jobId: string, update: SyncWorkerUpdate): Promise<void> {
     await this.syncJobRequest(
       `/api/v1/internal/sync-jobs/${encodeURIComponent(jobId)}`,
       'PUT',

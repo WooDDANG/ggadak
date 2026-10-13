@@ -53,11 +53,21 @@ test('Sync Job API returns 202, scopes status to guild membership, and exposes w
       body: '{}',
     });
     expect(claimed.status).toBe(200);
-    expect(((await claimed.json()) as any).data.jobId).toBe(job.jobId);
+    const claim = ((await claimed.json()) as any).data;
+    expect(claim.jobId).toBe(job.jobId);
     const update = await fetch(`${base}/api/v1/internal/sync-jobs/${job.jobId}`, {
       method: 'PUT',
       headers: bot,
-      body: JSON.stringify({ status: 'COMPLETED', completedChannels: 1 }),
+      body: JSON.stringify({
+        owner: claim.owner,
+        status: 'COMPLETED',
+        channelResult: {
+          channelId: 'sync-channel',
+          status: 'COMPLETED',
+          messagesScanned: 10,
+          decisionsFound: 1,
+        },
+      }),
     });
     expect(update.status).toBe(200);
     expect(

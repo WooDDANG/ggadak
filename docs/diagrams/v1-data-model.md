@@ -35,6 +35,8 @@ erDiagram
     int decisionsFound
     int messagesScanned
     datetime leaseUntil
+    string owner "Claim generation; internal only"
+    string channelResultsJson "Per-channel outcomes; internal only"
     datetime createdAt
     datetime completedAt
   }
@@ -89,3 +91,7 @@ MonitoredChannel is the persisted positive selection, replaced atomically per Gu
 CORS_ORIGINS is an explicit comma-separated allowlist (default localhost:5173 and localhost:3000). Wildcard entries are ignored because authenticated browser requests include cookies. BOT_SERVICE_TOKEN must match in BE and Bot; it authenticates internal monitoring, discussion analysis, and candidate-history requests.
 
 SyncJob snapshots the selected MonitoredChannel IDs when accepted. A per-guild lock rejects overlapping work with HTTP 409; the accepted job is persisted before HTTP 202. The Bot claims queued jobs with a renewable lease and records progress. An expired processing lease can be reclaimed after restart. Completed channels advance their Channel Checkpoint only after Analysis Request completion is acknowledged. `forceFullSync` scans all history and creates a stable, job-scoped Analysis Request identity so a retry after restart reuses the completed result; distinct jobs are intentional reanalysis and retain candidate identity/history rules.
+
+Sync Job recovery preserves completed per-channel results and retries only unfinished or failed channels. Aggregate progress is derived from those persisted results rather than incremented after each replay. The Bot renews a 120-second lease every 30 seconds during scans; claim ownership fences progress and heartbeat writes. Lease expiration enables recovery of the same Job and does not release its guild lock for a second Job.
+
+The additive `202610130001_sync_channel_results` and `202610130002_sync_owner` migrations preserve existing Job rows and public status fields. Existing active Jobs lack per-channel results, so their next recovered execution rebuilds progress from channel results; existing completed/failed Jobs retain their historical aggregates. BE and Bot must be updated together because internal updates now require the claim owner and channel result instead of caller-supplied aggregate counters. Public Sync Job responses remain compatible and FE files are unchanged.

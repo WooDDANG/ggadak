@@ -361,13 +361,35 @@ const models: TsoaRoute.Models = {
         "additionalProperties": false,
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
-    "ApiResponse_any-or-null_": {
+    "SyncJobClaimDto": {
+        "dataType": "refObject",
+        "properties": {
+            "completedAt": {"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},
+            "startedAt": {"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},
+            "createdAt": {"dataType":"string","required":true},
+            "errorMessage": {"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},
+            "messagesScanned": {"dataType":"double","required":true},
+            "decisionsFound": {"dataType":"double","required":true},
+            "failedChannels": {"dataType":"double","required":true},
+            "completedChannels": {"dataType":"double","required":true},
+            "totalChannels": {"dataType":"double","required":true},
+            "status": {"dataType":"string","required":true},
+            "forceFullSync": {"dataType":"boolean","required":true},
+            "guildId": {"dataType":"string","required":true},
+            "jobId": {"dataType":"string","required":true},
+            "owner": {"dataType":"string","required":true},
+            "channelIds": {"dataType":"array","array":{"dataType":"string"},"required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "ApiResponse_SyncJobClaimDto-or-null_": {
         "dataType": "refObject",
         "properties": {
             "success": {"dataType":"boolean","required":true},
             "code": {"dataType":"string","required":true},
             "message": {"dataType":"string","required":true},
-            "data": {"dataType":"union","subSchemas":[{"dataType":"any"},{"dataType":"enum","enums":[null]}],"required":true},
+            "data": {"dataType":"union","subSchemas":[{"ref":"SyncJobClaimDto"},{"dataType":"enum","enums":[null]}],"required":true},
         },
         "additionalProperties": false,
     },
@@ -381,6 +403,33 @@ const models: TsoaRoute.Models = {
             "data": {"dataType":"enum","enums":[null],"required":true},
         },
         "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "SyncChannelResult": {
+        "dataType": "refObject",
+        "properties": {
+            "channelId": {"dataType":"string","required":true},
+            "status": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["COMPLETED"]},{"dataType":"enum","enums":["FAILED"]}],"required":true},
+            "messagesScanned": {"dataType":"double","required":true},
+            "decisionsFound": {"dataType":"double","required":true},
+            "errorMessage": {"dataType":"string"},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "SyncJobUpdate": {
+        "dataType": "refObject",
+        "properties": {
+            "owner": {"dataType":"string","required":true},
+            "channelResult": {"ref":"SyncChannelResult"},
+            "status": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["PROCESSING"]},{"dataType":"enum","enums":["COMPLETED"]},{"dataType":"enum","enums":["FAILED"]}]},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "SyncJobUpdateDto": {
+        "dataType": "refAlias",
+        "type": {"ref":"SyncJobUpdate","validators":{}},
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "SearchResult": {
@@ -480,7 +529,7 @@ const models: TsoaRoute.Models = {
         "additionalProperties": false,
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
-    "RawMessageItemDto": {
+    "DiscussionMessage": {
         "dataType": "refObject",
         "properties": {
             "isBot": {"dataType":"boolean"},
@@ -496,11 +545,16 @@ const models: TsoaRoute.Models = {
         "additionalProperties": false,
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "RawMessageItemDto": {
+        "dataType": "refAlias",
+        "type": {"ref":"DiscussionMessage","validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "AnalyzeDiscussionRequestDto": {
         "dataType": "refObject",
         "properties": {
             "requestId": {"dataType":"string","required":true},
-            "rawMessages": {"dataType":"array","array":{"dataType":"refObject","ref":"RawMessageItemDto"},"required":true},
+            "rawMessages": {"dataType":"array","array":{"dataType":"refAlias","ref":"RawMessageItemDto"},"required":true},
             "guildId": {"dataType":"string"},
             "channelId": {"dataType":"string"},
             "channelName": {"dataType":"string"},
@@ -1179,7 +1233,7 @@ export function RegisterRoutes(app: Router) {
         // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
         const argsInternalSyncJobsController_update: Record<string, TsoaRoute.ParameterSchema> = {
                 jobId: {"in":"path","name":"jobId","required":true,"dataType":"string"},
-                body: {"in":"body","name":"body","required":true,"dataType":"nestedObjectLiteral","nestedProperties":{"status":{"dataType":"union","subSchemas":[{"dataType":"enum","enums":["PROCESSING"]},{"dataType":"enum","enums":["COMPLETED"]},{"dataType":"enum","enums":["FAILED"]}]},"errorMessage":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}]},"messagesScanned":{"dataType":"double"},"decisionsFound":{"dataType":"double"},"failedChannels":{"dataType":"double"},"completedChannels":{"dataType":"double"}}},
+                body: {"in":"body","name":"body","required":true,"ref":"SyncJobUpdateDto"},
         };
         app.put('/api/v1/internal/sync-jobs/:jobId',
             authenticateMiddleware([{"service":[]}]),

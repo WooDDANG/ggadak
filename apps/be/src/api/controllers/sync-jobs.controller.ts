@@ -1,3 +1,4 @@
+import type { SyncJobView, SyncJobClaimDto, SyncJobUpdateDto } from '../../dto/sync-job.dto.js';
 import { requirePrincipal } from '../guards/authorization.js';
 import type { Request as ExpressRequest } from 'express';
 import {
@@ -16,7 +17,7 @@ import {
 } from 'tsoa';
 import { Service } from 'typedi';
 import { AuthService } from '../../services/auth.service.js';
-import { SyncJobService, SyncJobView } from '../../services/sync-job.service.js';
+import { SyncJobService } from '../../services/sync-job.service.js';
 import { ApiResponse, apiSuccess } from '../../dto/api-response.dto.js';
 
 @Tags('v1 Sync Jobs')
@@ -65,22 +66,14 @@ export class InternalSyncJobsController extends Controller {
   }
 
   @Post('claim')
-  public async claim(): Promise<ApiResponse<any | null>> {
+  public async claim(): Promise<ApiResponse<SyncJobClaimDto | null>> {
     return apiSuccess(await this.jobs.claim());
   }
 
   @Put('{jobId}')
   public async update(
     @Path() jobId: string,
-    @Body()
-    body: {
-      completedChannels?: number;
-      failedChannels?: number;
-      decisionsFound?: number;
-      messagesScanned?: number;
-      errorMessage?: string | null;
-      status?: 'PROCESSING' | 'COMPLETED' | 'FAILED';
-    },
+    @Body() body: SyncJobUpdateDto,
   ): Promise<ApiResponse<null>> {
     await this.jobs.update(jobId, body);
     return apiSuccess(null);

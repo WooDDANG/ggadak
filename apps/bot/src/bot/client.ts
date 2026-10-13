@@ -1,3 +1,4 @@
+import { SyncJobWorker } from '../services/sync-job-worker.js';
 import 'reflect-metadata';
 import { GatewayIntentBits, Partials, Message, Events } from 'discord.js';
 import { Client } from 'discordx';
@@ -84,58 +85,22 @@ export class DecisionTrackerBot {
         });
       }, 60000);
       policyTimer.unref();
-      let syncWorkerBusy = false;
-      const processSyncJob = async () => {
-        if (syncWorkerBusy) return;
-        syncWorkerBusy = true;
-        try {
-          const job = await this.backendApi.claimSyncJob();
-          if (!job) return;
-          let completedChannels = job.completedChannels ?? 0;
-          let failedChannels = job.failedChannels ?? 0;
-          let decisionsFound = job.decisionsFound ?? 0;
-          let messagesScanned = job.messagesScanned ?? 0;
-          for (const channelId of job.channelIds as string[]) {
-            try {
-              const channel = await this.client.channels.fetch(channelId);
-              if (!channel || !channel.isTextBased() || channel.isThread() || !('guild' in channel))
-                throw new Error('Monitored text channel is inaccessible');
-              const result = await this.analysisService.scanChannel(channel as any, this.policy, {
-                full: Boolean(job.forceFullSync),
-                forceFullSync: Boolean(job.forceFullSync),
-                requestId: job.forceFullSync ? `sync-${job.jobId}-${channelId}` : undefined,
-              });
-              completedChannels++;
-              messagesScanned += result.scannedCount;
-              decisionsFound += result.decisionsCount;
-            } catch (error: any) {
-              failedChannels++;
-              logger.warn(`[Sync Job ${job.jobId}] Channel ${channelId} failed: ${error.message}`);
-            }
-            await this.backendApi.updateSyncJob(job.jobId, {
-              completedChannels,
-              failedChannels,
-              decisionsFound,
-              messagesScanned,
-              status: 'PROCESSING',
-            });
-          }
-          await this.backendApi.updateSyncJob(job.jobId, {
-            completedChannels,
-            failedChannels,
-            decisionsFound,
-            messagesScanned,
-            status: failedChannels ? 'FAILED' : 'COMPLETED',
-            errorMessage: failedChannels
-              ? `${failedChannels} channel scan(s) failed; failed ranges remain available for retry.`
-              : null,
-          });
-        } catch (error: any) {
-          logger.warn(`Sync Job worker unavailable: ${error.message}`);
-        } finally {
-          syncWorkerBusy = false;
-        }
-      };
+      const syncWorker = new SyncJobWorker(this.backendApi, async (job, channelId) => {
+        const channel = await this.client.channels.fetch(channelId);
+        if (!channel || !channel.isTextBased() || channel.isThread() || !('guild' in channel))
+          throw new Error('Monitored text channel is inaccessible');
+        return this.analysisService.scanChannel(channel as any, this.policy, {
+          full: job.forceFullSync,
+          forceFullSync: job.forceFullSync,
+          requestId: job.forceFullSync ? `sync-${job.jobId}-${channelId}` : undefined,
+        });
+      });
+      const processSyncJob = () =>
+        syncWorker.runOnce().catch((error: unknown) => {
+          logger.warn(
+            `Sync Job worker unavailable: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        });
       void processSyncJob();
       const syncTimer = setInterval(() => {
         void processSyncJob();

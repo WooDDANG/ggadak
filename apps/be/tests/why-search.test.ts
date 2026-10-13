@@ -1,3 +1,4 @@
+import { DecisionService } from '../src/services/decision.service.js';
 import { test, expect } from 'vitest';
 import { DecisionSchema } from '@ggaddak/shared';
 import { PrismaClient } from '@prisma/client';
@@ -139,7 +140,10 @@ test('review confirmation indexes a candidate, document-provider failure survive
     );
     const service = new SearchService(db.repo, provider);
     expect((await service.search('guild-1', '빠르게')).items.length).toBe(0);
-    await db.repo.reviewDecision('review', 'confirm', { expectedVersion: 1, approvedBy: 'Lee' });
+    await new DecisionService(db.repo).reviewDecision('review', 'confirm', {
+      expectedVersion: 1,
+      approvedBy: 'Lee',
+    });
     expect((await service.search('guild-1', '빠르게')).items[0].decision.status).toBe('CONFIRMED');
     const updated = (await db.repo.getDecisionById('review'))!;
     await db.repo.saveDecision({ ...updated, rationale: 'Changed Rationale' });

@@ -1,3 +1,4 @@
+import type { AnalyzeDiscussionParams, AnalyzeDiscussionResult } from '../domain/analysis.js';
 import crypto from 'node:crypto';
 import { AnalyzeDiscussionRequestDtoSchema } from '../dto/discussion.dto.js';
 import { BadRequestError } from '../errors/AppError.js';
@@ -21,29 +22,6 @@ import {
 } from '../repositories/analysis-request.repository.js';
 
 const logger = createLogger('BE-DISCUSSION-SERVICE');
-
-export interface AnalyzeDiscussionParams {
-  requestId: string;
-  rawMessages: any[];
-  guildId?: string;
-  channelId?: string;
-  channelName?: string;
-  triggerMessageId?: string;
-  messageUrl?: string;
-  isManualOverride?: boolean;
-  traceId?: string;
-  score?: number;
-  participantCount?: number;
-  reactionsCount?: number;
-}
-
-export interface AnalyzeDiscussionResult {
-  found: boolean;
-  summary: string;
-  decisions: Decision[];
-  hasConflict?: boolean;
-  conflictingDecision?: Decision;
-}
 
 @Service()
 export class DiscussionService {
@@ -114,15 +92,13 @@ export class DiscussionService {
     const tier1Start = Date.now();
     const { filterTier1Messages } = await import('@ggaddak/shared');
     const tier1Result = filterTier1Messages(
-      rawMessages.map((m: any) => ({
+      rawMessages.map(m => ({
         id: m.id,
-        author: m.author || m.authorName || 'unknown',
-        authorId: m.authorId,
+        author: m.author || 'unknown',
         content: m.content || '',
-        createdAt: m.createdAt,
-        isBot: m.isBot || m.author?.bot,
-        replyingTo: m.replyingTo || m.referenceMessageId,
-        attachments: m.attachments,
+        createdAt: m.createdAt ?? '1970-01-01T00:00:00.000Z',
+        isBot: m.isBot ?? false,
+        replyingTo: m.replyingTo,
         reactionCount: humanReactionCount(m),
         reactions: m.reactions,
         isTrigger: m.isTrigger,
@@ -223,7 +199,7 @@ export class DiscussionService {
       const originalSignals = rawMessages.filter(m => originalIds.has(m.id));
       const policy = getHarvestingPolicyFromEnv();
       const totalReactionsCount = sessionMessages.reduce(
-        (sum: number, m: any) => sum + (m.reactionCount || 0),
+        (sum, m) => sum + (m.reactionCount || 0),
         0,
       );
       const hasReactionSignal = totalReactionsCount >= policy.reactionThreshold;
@@ -259,12 +235,10 @@ export class DiscussionService {
         .filter(m => originalIds.has(m.id))
         .map(m => ({
           id: m.id,
-          author: m.author || m.authorName || 'unknown',
+          author: m.author || 'unknown',
           content: m.content || '',
           createdAt: m.createdAt || '1970-01-01T00:00:00.000Z',
-          ...(m.replyingTo || m.referenceMessageId
-            ? { replyingTo: m.replyingTo || m.referenceMessageId }
-            : {}),
+          ...(m.replyingTo ? { replyingTo: m.replyingTo } : {}),
         }))
         .sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
       const rawEvidence = originalMessages.map(m => m.id);

@@ -1,17 +1,8 @@
+import type { AnalyzeDiscussionParams, DiscussionMessage } from '../domain/analysis.js';
 import { z } from 'zod';
 import { DecisionItemDto } from './decision.dto.js';
 
-export interface RawMessageItemDto {
-  isBot?: boolean;
-  id: string;
-  author: string;
-  content: string;
-  createdAt?: string;
-  replyingTo?: string;
-  reactionCount?: number;
-  reactions?: Array<{ emoji: string; count: number; botCount?: number }>;
-  isTrigger?: boolean;
-}
+export type RawMessageItemDto = DiscussionMessage;
 
 export const RawMessageItemDtoSchema = z.object({
   isBot: z.boolean().optional(),
@@ -35,19 +26,8 @@ export const RawMessageItemDtoSchema = z.object({
   isTrigger: z.boolean().optional(),
 });
 
-export interface AnalyzeDiscussionRequestDto {
-  requestId: string;
+export interface AnalyzeDiscussionRequestDto extends AnalyzeDiscussionParams {
   rawMessages: RawMessageItemDto[];
-  guildId?: string;
-  channelId?: string;
-  channelName?: string;
-  triggerMessageId?: string;
-  messageUrl?: string;
-  isManualOverride?: boolean;
-  traceId?: string;
-  score?: number;
-  participantCount?: number;
-  reactionsCount?: number;
 }
 
 export const AnalyzeDiscussionRequestDtoSchema = z.object({

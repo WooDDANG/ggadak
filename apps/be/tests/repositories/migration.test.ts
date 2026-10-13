@@ -70,9 +70,19 @@ test('checked-in additive migrations preserve a legacy-schema fixture and missin
       `INSERT INTO Decision SELECT 'historical-string-id',guildId,channelId,messageId,title,decisionSummary,keyReason,status,decisionMaker,participants,alternatives,tags,supersedesId,supersededById,sourceJumpUrl,evidenceSummary,evidenceHash,governanceScore,governanceReason,governancePassed,createdAt,updatedAt,archivedAt,?,7 FROM Decision WHERE id='legacy'`,
       JSON.stringify(historical),
     );
+    const syncMigration = await readFile(
+      join(root, 'apps/be/prisma/migrations/202610120009_sync_jobs/migration.sql'),
+      'utf8',
+    );
+    for (const statement of syncMigration.split(';').filter(part => part.trim()))
+      await client.$executeRawUnsafe(statement);
+    await client.$executeRawUnsafe(
+      `INSERT INTO SyncJob (id,guildId,status,channelIdsJson,totalChannels,completedChannels,messagesScanned) VALUES ('legacy-sync','g','COMPLETED','["c"]',1,1,20)`,
+    );
     await client.$disconnect();
     migrate(url, 'resolve', '--applied', '202610100001_legacy');
     migrate(url, 'resolve', '--applied', '202610100002_domain');
+    migrate(url, 'resolve', '--applied', '202610120009_sync_jobs');
     migrate(url, 'deploy');
     const repo = new DecisionRepository(client);
     const recovered = await repo.getDecisionById('legacy');
@@ -80,6 +90,13 @@ test('checked-in additive migrations preserve a legacy-schema fixture and missin
     expect(recovered?.source.guildId).toBe('g');
     expect((await client.guild.findUnique({ where: { id: 'g' } }))?.name).toBe('g');
     expect(await client.membership.count()).toBe(0);
+    const { SyncJobService } = await import('../../src/services/sync-job.service.js');
+    expect(await new SyncJobService(repo).get('legacy-sync', 'g')).toMatchObject({
+      status: 'COMPLETED',
+      totalChannels: 1,
+      completedChannels: 1,
+      messagesScanned: 20,
+    });
 
     expect(recovered?.createdAt).toBe('2020-01-01T00:00:00.000Z');
     expect(recovered?.approvedBy).toBe(null);

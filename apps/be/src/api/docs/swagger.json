@@ -1386,7 +1386,86 @@
 				"type": "object",
 				"additionalProperties": false
 			},
-			"ApiResponse_any-or-null_": {
+			"SyncJobClaimDto": {
+				"properties": {
+					"completedAt": {
+						"type": "string",
+						"nullable": true
+					},
+					"startedAt": {
+						"type": "string",
+						"nullable": true
+					},
+					"createdAt": {
+						"type": "string"
+					},
+					"errorMessage": {
+						"type": "string",
+						"nullable": true
+					},
+					"messagesScanned": {
+						"type": "number",
+						"format": "double"
+					},
+					"decisionsFound": {
+						"type": "number",
+						"format": "double"
+					},
+					"failedChannels": {
+						"type": "number",
+						"format": "double"
+					},
+					"completedChannels": {
+						"type": "number",
+						"format": "double"
+					},
+					"totalChannels": {
+						"type": "number",
+						"format": "double"
+					},
+					"status": {
+						"type": "string"
+					},
+					"forceFullSync": {
+						"type": "boolean"
+					},
+					"guildId": {
+						"type": "string"
+					},
+					"jobId": {
+						"type": "string"
+					},
+					"owner": {
+						"type": "string"
+					},
+					"channelIds": {
+						"items": {
+							"type": "string"
+						},
+						"type": "array"
+					}
+				},
+				"required": [
+					"completedAt",
+					"startedAt",
+					"createdAt",
+					"errorMessage",
+					"messagesScanned",
+					"decisionsFound",
+					"failedChannels",
+					"completedChannels",
+					"totalChannels",
+					"status",
+					"forceFullSync",
+					"guildId",
+					"jobId",
+					"owner",
+					"channelIds"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"ApiResponse_SyncJobClaimDto-or-null_": {
 				"description": "Shared v1 response contract. Domain payloads remain typed by each endpoint.",
 				"properties": {
 					"success": {
@@ -1399,6 +1478,11 @@
 						"type": "string"
 					},
 					"data": {
+						"allOf": [
+							{
+								"$ref": "#/components/schemas/SyncJobClaimDto"
+							}
+						],
 						"nullable": true
 					}
 				},
@@ -1439,6 +1523,65 @@
 				],
 				"type": "object",
 				"additionalProperties": false
+			},
+			"SyncChannelResult": {
+				"properties": {
+					"channelId": {
+						"type": "string"
+					},
+					"status": {
+						"type": "string",
+						"enum": [
+							"COMPLETED",
+							"FAILED"
+						]
+					},
+					"messagesScanned": {
+						"type": "number",
+						"format": "double"
+					},
+					"decisionsFound": {
+						"type": "number",
+						"format": "double"
+					},
+					"errorMessage": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"channelId",
+					"status",
+					"messagesScanned",
+					"decisionsFound"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"SyncJobUpdate": {
+				"properties": {
+					"owner": {
+						"type": "string"
+					},
+					"channelResult": {
+						"$ref": "#/components/schemas/SyncChannelResult"
+					},
+					"status": {
+						"type": "string",
+						"enum": [
+							"PROCESSING",
+							"COMPLETED",
+							"FAILED"
+						]
+					}
+				},
+				"required": [
+					"owner"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"SyncJobUpdateDto": {
+				"$ref": "#/components/schemas/SyncJobUpdate"
 			},
 			"SearchResult": {
 				"properties": {
@@ -1674,7 +1817,7 @@
 				"type": "object",
 				"additionalProperties": false
 			},
-			"RawMessageItemDto": {
+			"DiscussionMessage": {
 				"properties": {
 					"isBot": {
 						"type": "boolean"
@@ -1732,6 +1875,9 @@
 				],
 				"type": "object",
 				"additionalProperties": false
+			},
+			"RawMessageItemDto": {
+				"$ref": "#/components/schemas/DiscussionMessage"
 			},
 			"AnalyzeDiscussionRequestDto": {
 				"properties": {
@@ -3102,7 +3248,7 @@
 						"content": {
 							"application/json": {
 								"schema": {
-									"$ref": "#/components/schemas/ApiResponse_any-or-null_"
+									"$ref": "#/components/schemas/ApiResponse_SyncJobClaimDto-or-null_"
 								}
 							}
 						}
@@ -3157,37 +3303,7 @@
 					"content": {
 						"application/json": {
 							"schema": {
-								"properties": {
-									"status": {
-										"type": "string",
-										"enum": [
-											"PROCESSING",
-											"COMPLETED",
-											"FAILED"
-										]
-									},
-									"errorMessage": {
-										"type": "string",
-										"nullable": true
-									},
-									"messagesScanned": {
-										"type": "number",
-										"format": "double"
-									},
-									"decisionsFound": {
-										"type": "number",
-										"format": "double"
-									},
-									"failedChannels": {
-										"type": "number",
-										"format": "double"
-									},
-									"completedChannels": {
-										"type": "number",
-										"format": "double"
-									}
-								},
-								"type": "object"
+								"$ref": "#/components/schemas/SyncJobUpdateDto"
 							}
 						}
 					}
