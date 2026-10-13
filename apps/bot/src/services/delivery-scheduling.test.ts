@@ -458,3 +458,26 @@ test('settlement and restart reaction reconciliation finish before the next chan
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+test('a failed manual harvest settles as a result and queued same-channel work still completes', async () => {
+  const engine = new DecisionHarvestingEngine({
+    analyzeDiscussion: async payload => {
+      if (payload.rawMessages[0].id === 'failed') throw new Error('analysis unavailable');
+      return { found: false, decisions: [] };
+    },
+  });
+  const trigger = (id: string) => ({
+    type: 'EVENT' as const,
+    message: { id, channelId: 'failure-release', content: 'agree' } as any,
+    isManualOverride: true,
+  });
+  const results = await Promise.all([
+    engine.harvest(trigger('failed')),
+    engine.harvest(trigger('later')),
+  ]);
+  assert.deepEqual(
+    results.map(result => result.outcome),
+    ['retained-failure', 'completed-no-decision'],
+  );
+  assert.equal(results[0].summary, 'analysis unavailable');
+});

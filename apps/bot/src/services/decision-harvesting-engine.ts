@@ -138,9 +138,11 @@ export class DecisionHarvestingEngine implements IDecisionHarvestingEngine {
   ): Promise<HarvestResult> {
     const channelId = message.channelId;
 
-    if (!this.harvester)
-      return standaloneScheduler.run(channelId, () => this.executeStandalone(message, traceId));
     try {
+      if (!this.harvester)
+        return await standaloneScheduler.run(channelId, () =>
+          this.executeStandalone(message, traceId),
+        );
       if (this.harvester) {
         const decisions = await this.harvester.processAnalysis(
           message,
