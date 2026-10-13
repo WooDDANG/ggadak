@@ -4,6 +4,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { BackendApiService } from './backend-api.service.js';
+import { DecisionHarvestingEngine } from './decision-harvesting-engine.js';
 import { DiscussionHarvester } from './harvester.service.js';
 import { DEFAULT_HARVESTING_POLICY } from '@ggaddak/shared';
 
@@ -133,10 +134,9 @@ test('initial bounded scan preserves large snowflake ordering and declares only 
     messages: { fetch: async () => new Map(messages.map(m => [m.id, m])) },
   };
   try {
-    await new DiscussionHarvester(api).scanChannel(
-      channel,
+    await new DecisionHarvestingEngine(api, new DiscussionHarvester(api)).harvest(
+      { type: 'SCAN', target: channel, options: { initialOnly: true, full: true } },
       { ...DEFAULT_HARVESTING_POLICY, initialScanLimit: 3 },
-      { initialOnly: true, full: true },
     );
     assert.deepEqual(
       sent[0].rawMessages.map((m: any) => m.id),
@@ -196,7 +196,10 @@ test('pagination traverses backwards without precision loss and retains later pa
   };
   try {
     await assert.rejects(
-      new DiscussionHarvester(api).scanChannel(channel, DEFAULT_HARVESTING_POLICY),
+      new DecisionHarvestingEngine(api, new DiscussionHarvester(api)).harvest(
+        { type: 'SCAN', target: channel },
+        DEFAULT_HARVESTING_POLICY,
+      ),
       /1 pending/,
     );
     assert.deepEqual(

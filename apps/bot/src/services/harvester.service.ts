@@ -68,7 +68,7 @@ export class DiscussionHarvester {
     return { reactionCount, reactions };
   }
 
-  async harvestContextMessages(
+  private async harvestContextMessages(
     message: Message,
     policy: HarvestingPolicyConfig,
   ): Promise<RawMessageData[]> {
@@ -175,6 +175,7 @@ export class DiscussionHarvester {
     return rawMessages;
   }
 
+  /** @internal Adapter operation; event and manual scan callers use engine.harvest(). */
   async processAnalysis(
     message: Message,
     policy: HarvestingPolicyConfig,
@@ -306,16 +307,7 @@ export class DiscussionHarvester {
     }
   }
 
-  // Alias for backward-compatible call sites
-  async executeAnalysis(
-    message: Message,
-    policy: HarvestingPolicyConfig,
-    isManualOverride: boolean = false,
-    traceId?: string,
-  ): Promise<Decision[] | null> {
-    return this.processAnalysis(message, policy, isManualOverride, traceId);
-  }
-
+  /** @internal Adapter operation; event and manual scan callers use engine.harvest(). */
   async scanChannel(
     channel: TextChannel,
     policy: HarvestingPolicyConfig,
@@ -442,6 +434,7 @@ export class DiscussionHarvester {
     return { scannedCount: fetchedMessages.length, decisionsCount: decisionsFound };
   }
 
+  /** @internal Adapter operation; event and manual scan callers use engine.harvest(). */
   async scanGuild(
     guild: { channels: { cache: Map<string, any> }; name: string },
     policy: HarvestingPolicyConfig,
@@ -490,6 +483,7 @@ export class DiscussionHarvester {
     return { channelCount, scannedCount: totalMessages, decisionsCount: totalDecisions };
   }
 
+  /** @internal Adapter operation; event and manual scan callers use engine.harvest(). */
   async scanAllChannels(
     client: Client,
     policy: HarvestingPolicyConfig,
@@ -515,6 +509,7 @@ export class DiscussionHarvester {
     return { channelCount, scannedCount: totalMessages, decisionsCount: totalDecisions };
   }
 
+  /** @internal Adapter operation; event and manual scan callers use engine.harvest(). */
   async addReactionSafely(message: Message, emoji: string): Promise<void> {
     try {
       if (message.react) await message.react(emoji);
@@ -523,6 +518,7 @@ export class DiscussionHarvester {
     }
   }
 
+  /** @internal Adapter operation; event and manual scan callers use engine.harvest(). */
   async removeReactionSafely(message: Message, emoji: string): Promise<void> {
     try {
       const existing = message.reactions?.cache?.find((r: any) => r.emoji.name === emoji);

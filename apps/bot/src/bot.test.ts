@@ -1,15 +1,22 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
+import { DecisionHarvestingEngine } from './services/decision-harvesting-engine.js';
 import { DiscussionHarvester } from './services/harvester.service.js';
 import { DEFAULT_HARVESTING_POLICY } from '@ggaddak/shared';
 
 describe('DiscussionHarvester Deep Module', () => {
   it('harvests asymmetric context window (before 15, after 5) in text channels', async () => {
-    const harvester = new DiscussionHarvester({
-      analyzeDiscussion: async () => ({ found: false, decisions: [] }),
+    let harvested: any[] = [];
+    const api = {
+      isMonitoredChannel: async () => true,
+      analyzeDiscussion: async (payload: any) => {
+        harvested = payload.rawMessages;
+        return { found: false, decisions: [] };
+      },
       getCheckpoint: async () => null,
       saveCheckpoint: async () => true,
-    } as any);
+    };
+    const engine = new DecisionHarvestingEngine(api, new DiscussionHarvester(api as any));
 
     const mockMessages: any[] = [];
     for (let i = 1; i <= 30; i++) {
@@ -50,7 +57,11 @@ describe('DiscussionHarvester Deep Module', () => {
 
     triggerMsg.channel = mockChannel;
 
-    const harvested = await harvester.harvestContextMessages(triggerMsg, DEFAULT_HARVESTING_POLICY);
+    const result = await engine.harvest(
+      { type: 'EVENT', message: triggerMsg, isManualOverride: true },
+      DEFAULT_HARVESTING_POLICY,
+    );
+    assert.strictEqual(result.success, true);
     assert.strictEqual(harvested.length, 21); // 15 before + 1 trigger + 5 after
     assert.strictEqual(harvested[0].id, 'msg-5');
     assert.strictEqual(harvested[15].id, 'msg-20');
@@ -91,14 +102,13 @@ describe('DiscussionHarvester Deep Module', () => {
       url: 'https://discord.com/channels/1/2/3',
     };
 
-    // First call acquires lock
-    const p1 = harvester.processAnalysis(msg, DEFAULT_HARVESTING_POLICY, false);
-    // Second concurrent call on same channel without manual override
-    const p2 = harvester.processAnalysis(msg, DEFAULT_HARVESTING_POLICY, false);
+    const engine = new DecisionHarvestingEngine({} as any, harvester);
+    const p1 = engine.harvest({ type: 'EVENT', message: msg, isManualOverride: true });
+    const p2 = engine.harvest({ type: 'EVENT', message: msg, isManualOverride: true });
 
     const [res1, res2] = await Promise.all([p1, p2]);
-    assert.ok(res1 !== null);
-    assert.ok(res2 !== null);
+    assert.strictEqual(res1.success, true);
+    assert.strictEqual(res2.success, true);
     assert.strictEqual(analyzeCallCount, 2);
   });
 
