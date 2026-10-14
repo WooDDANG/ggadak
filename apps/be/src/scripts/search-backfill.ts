@@ -1,4 +1,4 @@
-import 'dotenv/config';
+import '../config/index.js';
 import 'reflect-metadata';
 import { PrismaClient } from '@prisma/client';
 import { DecisionRepository } from '../repositories/decision.repository.js';

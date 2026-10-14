@@ -1,13 +1,14 @@
 import { z } from 'zod';
 import { AppError } from '../errors/AppError.js';
 import dotenv from 'dotenv';
+import { fileURLToPath } from 'node:url';
 import {
   DEFAULT_HARVESTING_POLICY,
   HarvestingPolicyConfig,
   getHarvestingPolicyFromEnv,
 } from '@ggaddak/shared';
 
-dotenv.config();
+dotenv.config({ path: fileURLToPath(new URL('../../../../.env', import.meta.url)) });
 
 export interface AuthConfig {
   clientId: string;
@@ -61,8 +62,6 @@ export interface AppConfig {
 }
 
 export const config: AppConfig = {
-  // index.ts discovers workspace/root .env files after ESM dependencies initialize.
-  // Snapshot auth when the service is constructed, after that discovery completes.
   get auth() {
     return parseAuthConfig(process.env);
   },

@@ -1,5 +1,5 @@
 ---
-triage: ready-for-agent
+triage: resolved
 topic: discord-transcript-viewer
 created: 2026-09-30
 ---

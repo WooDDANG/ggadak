@@ -71,6 +71,8 @@ npm install
 cp .env.example .env
 ```
 
+BE와 Bot은 실행 디렉터리와 관계없이 이 루트 `.env`를 읽습니다. `apps/be/.env`와 `apps/bot/.env`는 런타임 설정에 사용하지 않습니다. `db:generate`, `db:migrate`, `db:baseline`도 루트 설정을 사용합니다. FE의 Vite 환경 변수도 루트에서 읽으며, 브라우저에 필요한 값만 `VITE_` 접두사로 설정합니다. 실행 환경에서 직접 주입한 환경 변수는 `.env`보다 우선합니다. 변경 후 BE와 Bot을 재시작하세요.
+
 주요 환경 변수:
 ```env
 DISCORD_BOT_TOKEN=your_discord_bot_token_here

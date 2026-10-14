@@ -5,9 +5,13 @@
 
 **Blocked by:** 10 — 대화 세션 슬라이싱(30분 공백) 및 4단계 거버넌스 루브릭 채점 엔진
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [x] 백엔드 `POST /api/discussions/analyze` 요청 DTO 및 스키마에 `isManualOverride` 불리언 필드 지원
 - [x] `DiscussionService`에서 이미 반려된 `evidenceHash` 조회 시, `isManualOverride === false`이면 분석을 스킵하고 사유를 반환
 - [x] `isManualOverride === true`인 경우 반려 해시 제한을 우회하여 재분석 및 새 결정 후보 등록 수행
 - [x] 수동 오버라이드 및 자동 차단 동작을 검증하는 통합 단위 테스트 작성
+
+## Comments
+
+2026-10-14: Evidence Hash 차단과 manual override 및 관련 테스트 구현 확인. [대조 기록](../../ticket-audit-2026-10-14.md).

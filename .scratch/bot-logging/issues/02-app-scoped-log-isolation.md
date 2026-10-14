@@ -1,7 +1,7 @@
 # Issue 02: App-Scoped Log Directory Isolation
 
 - **Category**: core-logging
-- **Status**: Open
+- **Status**: resolved
 - **Spec Reference**: `../spec-app-scoped-logging.md`
 
 ## Summary
@@ -19,3 +19,7 @@
    - 백엔드 디렉터리(`apps/be/logs/`): `be.log`, `preprocessing.log`, `error.log`
 3. `.gitignore`에 `apps/*/logs` 및 루트 `logs`가 등록되어 있는지 확인 및 누락 시 추가.
 4. 단위 테스트 및 통합 테스트 작성: `packages/shared/src/logger.test.ts`에서 각 서비스명에 따라 올바른 앱 디렉터리에 로그 파일이 생성되는지 검증.
+
+## Comments
+
+2026-10-14: logger.ts와 logger.test.ts에서 라벨·앱별 파일 분리 구현 및 검증을 확인했다.

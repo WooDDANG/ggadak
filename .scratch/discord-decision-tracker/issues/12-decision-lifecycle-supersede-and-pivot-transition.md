@@ -5,9 +5,13 @@
 
 **Blocked by:** 10 — 대화 세션 슬라이싱(30분 공백) 및 4단계 거버넌스 루브릭 채점 엔진
 
-**Status:** ready-for-agent
+**Status:** needs-triage
 
 - [x] `DecisionService.reviewDecision()`에서 `supersedesId` 제공 시 대상 결정 상태를 `Superseded`로 원자적 트랜잭션 전이
 - [x] 대체된 과거 결정의 미완료 액션 아이템을 취소 처리하거나 새 결정으로 승계하는 로직 처리
-- [x] 프론트엔드 `ReviewQueue` 및 `DecisionTimeline` 카드에 거버넌스 점수 뱃지(4.0 강한 합의, 1.0 주의 등) 및 대체 체인 렌더링
+- [ ] 프론트엔드 `ReviewQueue` 및 `DecisionTimeline` 카드에 거버넌스 점수 뱃지(4.0 강한 합의, 1.0 주의 등) 및 대체 체인 렌더링
 - [x] 피봇 및 대체 상태 전이의 무결성을 검증하는 단위 테스트 작성
+
+## Comments
+
+2026-10-14: 서버의 원자적 Supersede/Action Item 이관과 테스트는 구현됐다. 남은 범위는 Timeline Governance Score 및 탐색 가능한 대체 체인 UI이며 최신 v1 범위에 맞춰 재명세 필요.

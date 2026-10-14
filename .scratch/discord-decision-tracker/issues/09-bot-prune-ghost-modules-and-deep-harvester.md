@@ -5,9 +5,13 @@
 
 **Blocked by:** None — can start immediately
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [x] `apps/bot`에서 실제 런타임에서 쓰이지 않는 4개 레거시 모듈 디렉토리(`extractor/`, `context/`, `conflict/`, `egress/`) 삭제
 - [x] `HarvesterService`와 `AnalysisService`를 응집도 높은 `DiscussionHarvester` 심층 모듈로 통합 및 인터페이스 단순화
 - [x] `MessageHandler`, `ReactionHandler`, `ScanCommand`, `ready.event`, `guildCreate.event`가 통합된 심층 모듈을 단일 진입점으로 호출하도록 리팩터링
 - [x] `bot.test.ts`를 유령 모듈 더미 테스트 대신 실제 메시지 윈도우 수확 및 통합 파이프라인 중심 단위 테스트로 교체
+
+## Comments
+
+2026-10-14: 후속 harvesting engine/harvester로 통합 완료. 시작/초대 자동 스캔은 최신 정책에 따라 제거됐다. [대조 기록](../../ticket-audit-2026-10-14.md).
