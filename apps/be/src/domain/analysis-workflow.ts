@@ -6,6 +6,10 @@ export type AnalysisPhase =
   'extract' | 'check' | 'verify' | 'repair' | 'recheck' | 'reverify' | 'done';
 export interface StageAttempt {
   phase: AnalysisPhase;
+  owner?: string;
+  deadline?: number;
+  verification?: unknown;
+  error?: { message: string; status: number };
   startedAt: number;
   timeoutMs: number;
   endedAt?: number;
@@ -20,6 +24,7 @@ export interface AnalysisSession {
   phase: AnalysisPhase;
   value?: unknown;
   feedback: string[];
+  verification?: unknown;
   repairs: number;
   elapsedMs: number;
   calls: AnalysisPhase[];

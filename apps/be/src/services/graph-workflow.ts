@@ -3,6 +3,7 @@ import type { IAiAdapter, AiResult } from '../adapters/ai.adapter.js';
 import type {
   AnalysisWorkflow,
   AnalysisSession,
+  StageAttempt,
 } from '../domain/analysis-workflow.js';
 import {
   GraphSchema,
@@ -21,11 +22,13 @@ export class GraphWorkflow {
     workflow: AnalysisWorkflow,
     save: () => Promise<void>,
     signal: AbortSignal,
+    owner?: string,
   ): Promise<void> {
     if (session.active !== undefined) {
       const interrupted = session.attempts[session.active];
       interrupted.endedAt = Date.now();
       interrupted.outcome = 'interrupted';
+      interrupted.error = { message: 'Previous attempt was interrupted', status: 503 };
       session.elapsedMs += Math.min(
         interrupted.timeoutMs,
         Math.max(0, Date.now() - interrupted.startedAt),
@@ -42,8 +45,14 @@ export class GraphWorkflow {
         const issues = checked.success
           ? graphIssues(checked.data)
           : checked.error.issues.map(issue => `${issue.path.join('.')}: ${issue.message}`);
-        if (issues.length) this.requestRepair(session, issues);
-        else {
+        if (issues.length) {
+          try {
+            this.requestRepair(session, issues);
+          } catch (error) {
+            await save();
+            throw error;
+          }
+        } else {
           session.value = checked.success ? checked.data : session.value;
           session.phase = session.repairs ? 'reverify' : 'verify';
         }
@@ -59,7 +68,14 @@ export class GraphWorkflow {
       if (session.calls.length > 4 || session.repairs > 1)
         throw new AppError('Analysis call budget exhausted', 422);
       const timeoutMs = Math.min(45000, 180000 - session.elapsedMs);
-      const attempt = { phase, startedAt: Date.now(), timeoutMs };
+      const startedAt = Date.now();
+      const attempt: StageAttempt = {
+        phase,
+        owner,
+        startedAt,
+        timeoutMs,
+        deadline: startedAt + timeoutMs,
+      };
       session.attempts.push(attempt);
       session.active = session.attempts.length - 1;
       await save();
@@ -99,6 +115,8 @@ export class GraphWorkflow {
           session.value = result.value;
           session.phase = phase === 'extract' ? 'check' : 'recheck';
         } else {
+          session.verification = result.value;
+          attempt.verification = result.value;
           const verified = VerificationSchema.safeParse(result.value);
           if (!verified.success) throw new AppError('Invalid AI verification response', 422);
           if (!verified.data.valid)
@@ -113,7 +131,11 @@ export class GraphWorkflow {
           }
         }
       } catch (error) {
-        Object.assign(attempt, { outcome: 'failed' });
+        attempt.outcome = 'failed';
+        attempt.error = {
+          message: error instanceof Error ? error.message : 'Analysis stage failed',
+          status: error instanceof AppError ? error.statusCode : 500,
+        };
         throw error;
       } finally {
         if (timer) clearTimeout(timer);
@@ -129,9 +151,9 @@ export class GraphWorkflow {
   }
 
   private requestRepair(session: AnalysisSession, feedback: string[]): void {
+    session.feedback = feedback;
     if (session.repairs || session.calls.includes('repair'))
       throw new AppError('Analysis validation failed after repair', 422);
-    session.feedback = feedback;
     session.phase = 'repair';
   }
 

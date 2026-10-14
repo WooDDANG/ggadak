@@ -54,7 +54,7 @@ export class DiscussionService {
       await save();
       const algorithm = new GraphWorkflow(this.extractor);
       for (const session of workflow.sessions)
-        await algorithm.run(session, workflow, save, controller.signal);
+        await algorithm.run(session, workflow, save, controller.signal, claim.owner);
       const drafts: CandidateDraft[] = [];
       for (const session of workflow.sessions) drafts.push(...this.project(session, params));
       await save();

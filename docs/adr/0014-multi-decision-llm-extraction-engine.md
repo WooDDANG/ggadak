@@ -4,4 +4,6 @@ We implement the AI extraction engine in `@ggaddak/be` supporting multi-decision
 
 ## Policy amendment — 2026-10-14
 
-The exclusion of unconfirmed proposals is superseded by the agreed [candidate semantics decision](../../.scratch/be-agentic-decision-design/issues/02-candidate-semantics.md). This is an agreed design change pending implementation; it does not describe the current extraction code. Human confirmation remains required under [ADR-0019](0019-web-owned-decision-review.md).
+The exclusion of unconfirmed proposals is superseded by the agreed [candidate semantics decision](../../.scratch/be-agentic-decision-design/issues/02-candidate-semantics.md). The Agentic workflow implements this policy; the original single-call algorithm is retained only as an evaluation baseline. Human confirmation remains required under [ADR-0019](0019-web-owned-decision-review.md).
+
+The BE provider transport choice is superseded by [ADR-0022](0022-explicit-provider-http-for-bounded-analysis.md).

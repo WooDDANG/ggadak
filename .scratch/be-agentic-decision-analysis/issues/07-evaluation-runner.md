@@ -4,17 +4,21 @@
 
 **Blocked by:** 03: 재시작 복구와 다중 세션의 원자 공개; 06: 사람이 검수하는 서비스 평가 정답 준비 도구.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] baseline은 기존 단일 호출 prompt/응답 의미의 고정 버전으로 재현하고 production heuristic fallback이나 구형 승인 경로를 활성화하지 않는다.
-- [ ] 공식 AMI dev 20/test 20 분할을 유지하고 대화만 입력한다. 두 방식에 동일 입력/세션 분할/provider/model 조건을 적용하고 긴 대화는 회의 단위로 결과를 모은다.
-- [ ] gold 도구의 인간 검수된 의미 대응을 읽어 기반 결정 누락/왜곡과 완전 주석 서비스 후보·관계 precision/recall을 분리해 보고한다. 없는 분모·한국어 gold는 N/A/미검증이다.
-- [ ] 허위 합의/입력 밖 근거·담당자·기한과 구조 오류, 수정 성공률·실패율·호출/통신 시도·토큰·지연을 함께 집계하고 실패 요청을 결과에서 숨기지 않는다.
-- [ ] prompt/schema/model/config·원본 checksum·gold 버전·usage·실행 예산을 manifest로 고정한다. 출력 한도/총 호출·토큰 또는 금액 예산이 없으면 유료 batch를 시작하지 않는다.
-- [ ] live smoke는 공급자 설정·실제 통신·구조화 출력 확인을 최소 입력으로 수행하는 별도 경로다. 정상/미설정/실패/중단을 구별하고 실제 비용이 드는 호출을 테스트 suite에 넣지 않는다.
-- [ ] offline fixture로 runner 입력/정답 누출 방지·대화 분할/재조합·예산 소진·실패 집계·N/A·완전 gold의 합격 판정을 검증한다. 도구 구현 완료를 실제 모델 90% 달성으로 보고하지 않는다.
-- [ ] 실행 방법·데이터 라벨 한계·실제 AI 실행 여부·한국어 검증 공백을 문서화한다. 외부 AI 호출/한국어 gold 확보/유료 평가 실제 실행은 별도 실행 단계로 남긴다.
+- [x] baseline은 기존 단일 호출 prompt/응답 의미의 고정 버전으로 재현하고 production heuristic fallback이나 구형 승인 경로를 활성화하지 않는다.
+- [x] 공식 AMI dev 20/test 20 분할을 유지하고 대화만 입력한다. 두 방식에 동일 입력/세션 분할/provider/model 조건을 적용하고 긴 대화는 회의 단위로 결과를 모은다.
+- [x] gold 도구의 인간 검수된 의미 대응을 읽어 기반 결정 누락/왜곡과 완전 주석 서비스 후보·관계 precision/recall을 분리해 보고한다. 없는 분모·한국어 gold는 N/A/미검증이다.
+- [x] 허위 합의/입력 밖 근거·담당자·기한과 구조 오류, 수정 성공률·실패율·호출/통신 시도·토큰·지연을 함께 집계하고 실패 요청을 결과에서 숨기지 않는다.
+- [x] prompt/schema/model/config·원본 checksum·gold 버전·usage·실행 예산을 manifest로 고정한다. 출력 한도/총 호출·토큰 또는 금액 예산이 없으면 유료 batch를 시작하지 않는다.
+- [x] live smoke는 공급자 설정·실제 통신·구조화 출력 확인을 최소 입력으로 수행하는 별도 경로다. 정상/미설정/실패/중단을 구별하고 실제 비용이 드는 호출을 테스트 suite에 넣지 않는다.
+- [x] offline fixture로 runner 입력/정답 누출 방지·대화 분할/재조합·예산 소진·실패 집계·N/A·완전 gold의 합격 판정을 검증한다. 도구 구현 완료를 실제 모델 90% 달성으로 보고하지 않는다.
+- [x] 실행 방법·데이터 라벨 한계·실제 AI 실행 여부·한국어 검증 공백을 문서화한다. 외부 AI 호출/한국어 gold 확보/유료 평가 실제 실행은 별도 실행 단계로 남긴다.
 
 ## Scope clarification
 
 기존 production 분석 알고리즘과 호출부를 새 workflow로 전환하는 리팩토링이다. 구형 경로·중복 정책은 전환 뒤 제거하고 단일 호출 baseline만 평가 도구에 보존한다. 주 검증 경계는 승인된 실제 HTTP API·임시 SQLite·고정 AI 응답이다.
+
+## Answer
+
+2026-10-14: 구현과 최종 회귀 검증 완료. [구현 검증 기록](../implementation-verification.md)과 [공급자 경계 ADR](../../../docs/adr/0022-explicit-provider-http-for-bounded-analysis.md)을 참고한다. FE 소스·운영 DB 적용·유료 AI 실행은 이번 완료 범위에 포함하지 않는다. 평가 도구 완료는 실제 모델 정확도나 한국어 gold 확보 완료를 뜻하지 않는다.

@@ -119,6 +119,7 @@ async function withApi(
     ) => Promise<Response>,
     token: string,
     restart: () => Promise<string>,
+    db: Awaited<ReturnType<typeof isolatedRepository>>,
   ) => Promise<void>,
 ) {
   const db = await isolatedRepository();
@@ -170,7 +171,7 @@ async function withApi(
   };
   try {
     const { token } = await loginAsTestUser(base);
-    await run(base, send, token, restart);
+    await run(base, send, token, restart, db);
   } finally {
     server.closeAllConnections();
     await new Promise<void>(resolve => server.close(() => resolve()));
@@ -468,6 +469,46 @@ test('a problem-only context graph is verified and completes without manufacturi
         type: 'Issue',
         summary: 'Login is slow',
       });
+    },
+  );
+});
+
+test('final critic issues and failed attempt diagnostics survive terminal replay', async () => {
+  let verifications = 0;
+  const issues = (message: string) => ({
+    valid: false,
+    issues: [{ message, nodeIds: ['candidate'], edgeIds: ['e2'] }],
+  });
+  await withApi(
+    {
+      extractGraph: async () => ({ value: structuredClone(graph) }),
+      repairGraph: async () => ({ value: structuredClone(graph) }),
+      verifyGraph: async () => ({
+        value: issues(
+          ++verifications === 1 ? 'Agreement is inaccurate' : 'Rationale is outside the input',
+        ),
+      }),
+    },
+    async (_base, send, _token, _restart, db) => {
+      expect((await send('critic-diagnostics')).status).toBe(422);
+      expect((await send('critic-diagnostics')).status).toBe(422);
+      const row = await db.client.analysisRequest.findUniqueOrThrow({
+        where: { id: 'critic-diagnostics' },
+      });
+      const workflow = JSON.parse(row.workflowJson!);
+      const session = workflow.sessions[0];
+      expect(session.feedback).toEqual(['Rationale is outside the input']);
+      const attempt = session.attempts.at(-1);
+      expect(attempt).toMatchObject({
+        phase: 'reverify',
+        outcome: 'failed',
+        verification: issues('Rationale is outside the input'),
+        error: { status: 422 },
+      });
+      expect(attempt.owner).toEqual(expect.any(String));
+      expect(attempt.deadline).toBe(attempt.startedAt + attempt.timeoutMs);
+      expect(session.verification).toEqual(issues('Rationale is outside the input'));
+      expect(verifications).toBe(2);
     },
   );
 });

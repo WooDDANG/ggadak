@@ -4,17 +4,21 @@
 
 **Blocked by:** 02: 오류 결과의 한 번 수정과 실행 예산 적용.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] 원본 입력·설정/prompt/schema 버전·세션 분할을 최초 요청에 고정하고 동일 ID·다른 입력은 conflict다. 설정 변경은 새 재분석 요청으로만 적용한다.
-- [ ] 단계 완료 결과·임시 참조/BE ID 매핑·검증 결과·수정 소비·시간 소비를 DB에 보존하고 재시작에서 같은 값을 재사용한다.
-- [ ] 통신 장애 뒤 완료한 추출을 반복하지 않고 검증부터 이어간다. 활성 시도 시작/deadline을 저장해 crash 소비 시간을 보수적으로 정산하며 retry 대기만 제외한다.
-- [ ] checkpoint와 최종 commit에 owner/lease fencing을 적용한다. 소유권을 잃은 실행은 다음 호출·저장을 중단하고 late response를 버린다.
-- [ ] 다중 세션의 중간 후보/그래프는 카드 목록·검수 큐·검색·완료 graph API에 노출되지 않는다. 한 세션 terminal이면 요청 전체 실패, transient이면 완료 세션을 재사용한다.
-- [ ] Graph·후보 생성/재사용·분석 연결·요청 완료를 한 transaction으로 공개한다. commit 장애·응답 유실·동시 재전송 뒤 같은 카드/graph/result가 유지된다.
-- [ ] AI 응답과 checkpoint 사이 crash는 외부 exactly-once 보장이 아님을 명시하고, 재호출 시 예산을 잊지 않으며 중복 공개를 막는다.
-- [ ] HTTP API·임시 SQLite를 재시작해 단계 재개·수정/시간 예산·stale owner·마지막 세션 실패·commit 실패를 검증한다. additive migration과 상태 조회/Swagger를 함께 갱신한다.
+- [x] 원본 입력·설정/prompt/schema 버전·세션 분할을 최초 요청에 고정하고 동일 ID·다른 입력은 conflict다. 설정 변경은 새 재분석 요청으로만 적용한다.
+- [x] 단계 완료 결과·임시 참조/BE ID 매핑·검증 결과·수정 소비·시간 소비를 DB에 보존하고 재시작에서 같은 값을 재사용한다.
+- [x] 통신 장애 뒤 완료한 추출을 반복하지 않고 검증부터 이어간다. 활성 시도 시작/deadline을 저장해 crash 소비 시간을 보수적으로 정산하며 retry 대기만 제외한다.
+- [x] checkpoint와 최종 commit에 owner/lease fencing을 적용한다. 소유권을 잃은 실행은 다음 호출·저장을 중단하고 late response를 버린다.
+- [x] 다중 세션의 중간 후보/그래프는 카드 목록·검수 큐·검색·완료 graph API에 노출되지 않는다. 한 세션 terminal이면 요청 전체 실패, transient이면 완료 세션을 재사용한다.
+- [x] Graph·후보 생성/재사용·분석 연결·요청 완료를 한 transaction으로 공개한다. commit 장애·응답 유실·동시 재전송 뒤 같은 카드/graph/result가 유지된다.
+- [x] AI 응답과 checkpoint 사이 crash는 외부 exactly-once 보장이 아님을 명시하고, 재호출 시 예산을 잊지 않으며 중복 공개를 막는다.
+- [x] HTTP API·임시 SQLite를 재시작해 단계 재개·수정/시간 예산·stale owner·마지막 세션 실패·commit 실패를 검증한다. additive migration과 상태 조회/Swagger를 함께 갱신한다.
 
 ## Scope clarification
 
 기존 production 분석 알고리즘과 호출부를 새 workflow로 전환하는 리팩토링이다. 구형 경로·중복 정책은 전환 뒤 제거하고 단일 호출 baseline만 평가 도구에 보존한다. 주 검증 경계는 승인된 실제 HTTP API·임시 SQLite·고정 AI 응답이다.
+
+## Answer
+
+2026-10-14: 구현과 최종 회귀 검증 완료. [구현 검증 기록](../implementation-verification.md)과 [공급자 경계 ADR](../../../docs/adr/0022-explicit-provider-http-for-bounded-analysis.md)을 참고한다. FE 소스·운영 DB 적용·유료 AI 실행은 이번 완료 범위에 포함하지 않는다. 평가 도구 완료는 실제 모델 정확도나 한국어 gold 확보 완료를 뜻하지 않는다.
