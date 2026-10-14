@@ -46,6 +46,17 @@ function strictSchema(value: unknown): unknown {
   return result;
 }
 
+// Gemini rejects the graph's large array bounds; Zod still enforces them locally.
+function geminiSchema(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(geminiSchema);
+  if (!value || typeof value !== 'object') return value;
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([key]) => key !== 'maxItems')
+      .map(([key, child]) => [key, geminiSchema(child)]),
+  );
+}
+
 @Service({ factory: () => new AiAdapter() })
 export class AiAdapter implements IAiAdapter {
   readonly settings: AiSettings;
@@ -147,7 +158,7 @@ export class AiAdapter implements IAiAdapter {
                 contents: [{ role: 'user', parts: [{ text: prompt }] }],
                 generationConfig: {
                   responseMimeType: 'application/json',
-                  responseJsonSchema: schema,
+                  responseJsonSchema: geminiSchema(schema),
                   maxOutputTokens,
                 },
               }

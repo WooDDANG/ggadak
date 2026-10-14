@@ -37,3 +37,14 @@ Sync Job worker / Queue status synchronization 경고는 BOT_SERVICE_TOKEN 미�
 - 원본에서 maxItems만 제거: HTTP 200 STOP, totalTokenCount=638.
 
 따라서 이 요청의 배열 maxItems 제약이 포함된 schema와 공급자 처리의 호환성 문제로 좁혀졌다. 정확히 어떤 배열/최댓값이 문제인지는 추가 분할하지 않았다. 현재 graph에는 nodes<=500, edges<=2000, discussionProblems<=500을 전송한다. 내부 검증용 Zod 한도를 유지하면서 Gemini에 전송하는 schema에서 maxItems를 생략하는 것이 가능한 수정 방향이다. 코드 수정과 전체 graph/critic smoke는 아직 하지 않았다.
+
+## 수정 후 실제 smoke 성공
+
+- Gemini에 전송하는 스키마에서만 maxItems를 재귀적으로 생략했다. GraphSchema/VerificationSchema의 서버 한도와 OpenAI 요청은 유지한다.
+- provider 요청 회귀 테스트를 먼저 실패시킨 뒤 수정해 관련 7개 테스트가 통과했다. 추출·수정·검증 요청, 로컬 한도, OpenAI 한도 보존을 확인한다.
+- 수정된 production adapter로 gemini-3.8-flash live smoke 성공: providerConnected=true, structureValidated=true, semanticVerdict=true.
+- 호출 2회, total token consumption 1914. 보고서: `.data/evaluation/live-smoke-2026-10-14.json` (ignored). 운영 DB는 사용하지 않았다.
+- 루트 .env의 비어 있던 AI_MODEL에 실제 검증 모델 gemini-3.8-flash를 명시했다. 환경 파일은 커밋하지 않는다.
+- typecheck와 lint 통과 (기존 logger 테스트 경고 1개). Standards/Spec 리뷰 확정 지적 없음.
+- npm test는 sandbox 포트 제한(listen EPERM)을 제외하기 위해 권한 허용 환경에서 재실행해 전체 통과했다. BE 90개, E2E 6개 포함.
+- 이 smoke는 입력 한 건의 실제 연결·형식·critic 응답 검사다. 서비스 품질 목표를 증명하는 평가가 아니다.

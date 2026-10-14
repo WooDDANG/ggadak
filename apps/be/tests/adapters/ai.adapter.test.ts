@@ -1,11 +1,44 @@
 import 'reflect-metadata';
 import { test, expect } from 'vitest';
 import { AiAdapter } from '../../src/adapters/ai.adapter.js';
+import { GraphSchema, VerificationSchema } from '../../src/domain/decision-graph.js';
 const context = (adapter: AiAdapter) => ({
   signal: new AbortController().signal,
   settings: adapter.settings,
 });
 const graph = { summary: 'Context only', nodes: [], edges: [], discussionProblems: [] };
+
+test('Gemini extraction, repair and verification omit array bounds rejected by the provider', async () => {
+  const schemas: unknown[] = [];
+  const adapter = new AiAdapter(
+    { provider: 'gemini', geminiApiKey: 'fixture' },
+    'production',
+    async (_url, options) => {
+      const body = JSON.parse(options!.body as string);
+      schemas.push(body.generationConfig.responseJsonSchema);
+      return Response.json({
+        candidates: [
+          { finishReason: 'STOP', content: { parts: [{ text: JSON.stringify(graph) }] } },
+        ],
+      });
+    },
+  );
+  await adapter.extractGraph('input', context(adapter));
+  await adapter.repairGraph('input', graph, ['missing candidate'], context(adapter));
+  await adapter.verifyGraph('input', graph, context(adapter));
+  for (const schema of schemas) expect(JSON.stringify(schema)).not.toContain('"maxItems"');
+  expect(schemas).toHaveLength(3);
+});
+
+test('server validation retains graph and critic array limits', () => {
+  const node = { id: 'issue', type: 'Issue', summary: 'Context' };
+  expect(GraphSchema.safeParse({ ...graph, nodes: Array(501).fill(node) }).success).toBe(false);
+  expect(GraphSchema.safeParse({ ...graph, nodes: Array(500).fill(node) }).success).toBe(true);
+  const issue = { message: 'Invalid relation', nodeIds: [], edgeIds: [] };
+  expect(
+    VerificationSchema.safeParse({ valid: false, issues: Array(501).fill(issue) }).success,
+  ).toBe(false);
+});
 
 test('selected provider fails closed on missing key and production mock', async () => {
   const adapter = new AiAdapter({ provider: 'gemini', openaiApiKey: 'unused' }, 'production');
@@ -57,6 +90,7 @@ test('OpenAI uses instance transport with strict schema and no hidden SDK retrie
       expect(body.response_format.json_schema.strict).toBe(true);
       const schema = body.response_format.json_schema.schema;
       expect(schema.required).toEqual(Object.keys(schema.properties));
+      expect(schema.properties.issues.maxItems).toBe(500);
       return Response.json({
         choices: [
           {
