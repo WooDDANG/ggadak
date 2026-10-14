@@ -27,3 +27,13 @@ Sync Job worker / Queue status synchronization 경고는 BOT_SERVICE_TOKEN 미�
 - 현재 루트 .env를 읽는 graph smoke는 HTTP 400 INVALID_ARGUMENT를 반환했다. 루트/BE 키는 서로 다르다.
 - 루트 키의 기본 생성(`Reply with OK.`, maxOutputTokens=256, thinkingLevel=LOW) 1회는 HTTP 200, finishReason=STOP, 응답 `OK.`, totalTokenCount=6으로 성공했다.
 - 따라서 루트 키의 기본 생성 연결은 확인됐지만 production graph/critic 요청 검증은 아직 실패 상태다. 그래프 요청의 형식/스키마와 현재 모델의 호환성을 좁혀야 한다. 기본 생성 성공을 전체 분석 smoke 성공으로 간주하지 않는다.
+
+## HTTP 400 원인 비교
+
+같은 gemini-3.8-flash, graph prompt, 입력, thinkingLevel=LOW에서 요청 JSON Schema를 비교했다.
+
+- 원본 GraphSchema: HTTP 400 INVALID_ARGUMENT.
+- 길이/배열 bounds를 제거: HTTP 200 STOP, totalTokenCount=494.
+- 원본에서 maxItems만 제거: HTTP 200 STOP, totalTokenCount=638.
+
+따라서 이 요청의 배열 maxItems 제약이 포함된 schema와 공급자 처리의 호환성 문제로 좁혀졌다. 정확히 어떤 배열/최댓값이 문제인지는 추가 분할하지 않았다. 현재 graph에는 nodes<=500, edges<=2000, discussionProblems<=500을 전송한다. 내부 검증용 Zod 한도를 유지하면서 Gemini에 전송하는 schema에서 maxItems를 생략하는 것이 가능한 수정 방향이다. 코드 수정과 전체 graph/critic smoke는 아직 하지 않았다.
