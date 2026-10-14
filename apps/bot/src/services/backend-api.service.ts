@@ -87,7 +87,7 @@ export class BackendApiService {
       maxAttempts: Number(process.env.ANALYSIS_MAX_ATTEMPTS || 5),
       initialDelayMs: Number(process.env.ANALYSIS_RETRY_DELAY_MS || 5000),
       maxDelayMs: Number(process.env.ANALYSIS_MAX_DELAY_MS || 300000),
-      timeoutMs: Number(process.env.ANALYSIS_TIMEOUT_MS || 50000),
+      timeoutMs: Number(process.env.ANALYSIS_TIMEOUT_MS || 190000),
       jitter: Number(process.env.ANALYSIS_RETRY_JITTER || 0.2),
     },
     private readonly random: () => number = Math.random,
@@ -439,7 +439,12 @@ export class BackendApiService {
       if (!response.ok) {
         permanent =
           response.status >= 400 && response.status < 500 && ![408, 429].includes(response.status);
-        record.errorCategory = permanent ? 'configuration-or-payload' : 'backend-unavailable';
+        record.errorCategory =
+          response.status === 422
+            ? 'analysis-terminal'
+            : permanent
+              ? 'configuration-or-payload'
+              : 'backend-unavailable';
         throw new Error(`Backend AI returned status ${response.status}`);
       }
       if (typeof result.found !== 'boolean' || !Array.isArray(result.decisions)) {
@@ -529,6 +534,12 @@ export class BackendApiService {
       async () => {
         const record = this.parseDelivery(await readFile(entry.filename, 'utf8'));
         if (record.result) return record.result;
+        if (record.errorCategory === 'analysis-terminal')
+          throw new AnalysisDeliveryError(
+            'Analysis is terminal; request a new manual analysis',
+            'retained-failure',
+            requestId,
+          );
         if (!commandId || !record.retryCommandIds?.includes(commandId)) {
           record.attempts = 0;
           record.nextAttemptAt = 0;

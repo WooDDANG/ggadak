@@ -82,6 +82,11 @@ model AnalysisRequest {
   owner String?
   leaseUntil DateTime?
   resultJson String?
+  inputJson String?
+  configJson String?
+  workflowJson String?
+  graphJson String?
+  errorJson String?
   createdAt DateTime @default(now())
   completedAt DateTime?
 }

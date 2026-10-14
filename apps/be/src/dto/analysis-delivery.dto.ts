@@ -17,6 +17,7 @@ export interface AnalysisDeliveryStatusDto {
 }
 
 export interface AnalysisDeliveryViewDto extends AnalysisDeliveryStatusDto {
+  requiresNewAnalysis?: boolean;
   synchronizedAt: string;
 }
 

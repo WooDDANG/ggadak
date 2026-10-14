@@ -26,6 +26,8 @@ export interface DecisionItemDto {
   title?: string;
   decisionContent?: string;
   rationale: string;
+  rationaleStatus?: 'stated' | 'not_stated';
+  observation?: 'proposed' | 'agreed' | 'withdrawn' | 'unclear';
   rationaleSummary?: string;
   rationaleQuotes?: string[];
   alternatives?: AlternativeItemDto[];

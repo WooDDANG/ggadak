@@ -20,7 +20,9 @@ export function errorHandler(err: any, req: Request, res: Response, _next: NextF
             403: 'FORBIDDEN',
             404: 'NOT_FOUND',
             409: 'CONFLICT',
+            422: 'VALIDATION_ERROR',
             429: 'RATE_LIMITED',
+            503: 'SERVICE_UNAVAILABLE',
           } as Record<number, string>
         )[status] ?? 'INTERNAL_ERROR');
     if (status >= 500)

@@ -19,7 +19,7 @@ export const DecisionEditSchema = z
     expectedVersion: z.number().int().positive(),
     title: z.string().trim().min(1).max(200),
     decision: z.string().trim().min(1).max(10000),
-    rationale: z.string().trim().min(1).max(10000),
+    rationale: z.string().trim().max(10000),
     category: z.enum(['타깃', '문제정의', '기능', '기술', 'BM', '기타']),
     alternatives: z
       .array(
@@ -27,7 +27,7 @@ export const DecisionEditSchema = z
           .object({
             id: z.string().min(1).optional(),
             name: z.string().trim().min(1).max(200),
-            reason: z.string().trim().min(1).max(2000),
+            reason: z.string().trim().max(2000),
           })
           .strict(),
       )

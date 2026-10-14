@@ -1,3 +1,4 @@
+import { fixtureAiAdapter } from '../../src/test-support/ai-fixture.js';
 import { DecisionService } from '../../src/services/decision.service.js';
 import 'reflect-metadata';
 import { test, expect, vi } from 'vitest';
@@ -5,7 +6,7 @@ import { isolatedRepository } from '../../src/repositories/test-database.js';
 import { DiscussionService } from '../../src/services/discussion.service.js';
 import { DecisionExtractorCore } from '../../src/engine/extractor-core.js';
 import { IAiAdapter } from '../../src/adapters/ai.adapter.js';
-import { ExtractionResultSchema } from '../../src/extractor/schemas.js';
+import { ExtractionResultSchema } from '../../src/evaluation/baseline/schemas.js';
 import { DecisionRepository } from '../../src/repositories/decision.repository.js';
 import { PrismaClient } from '@prisma/client';
 import { createHash } from 'node:crypto';
@@ -24,12 +25,12 @@ const input = {
 test('lost-response retry survives restart and does not repeat paid extraction, including no-decision', async () => {
   const db = await isolatedRepository();
   let calls = 0;
-  const adapter: IAiAdapter = {
+  const adapter: IAiAdapter = fixtureAiAdapter({
     async analyzeTranscript() {
       calls++;
       return { found: false, summary: 'No decision', decisions: [] };
     },
-  };
+  });
   try {
     const first = await new DiscussionService(
       db.repo,
@@ -60,13 +61,13 @@ const extracted = (decision = 'Use SQLite') =>
 
 test('original burst message IDs and reply targets remain available to extraction and stored evidence', async () => {
   const db = await isolatedRepository();
-  const adapter: IAiAdapter = {
+  const adapter: IAiAdapter = fixtureAiAdapter({
     async analyzeTranscript(transcript) {
-      expect(transcript).toMatch(/\[101\]/);
-      expect(transcript).toMatch(/replying to 101/);
+      expect(transcript).toContain('"id":"101"');
+      expect(transcript).toContain('"replyingTo":"101"');
       return extracted();
     },
-  };
+  });
   try {
     const result = await new DiscussionService(
       db.repo,
@@ -109,14 +110,14 @@ test('concurrent same-ID deliveries produce one committed candidate and changed 
     resume = resolve;
   });
   let calls = 0;
-  const adapter: IAiAdapter = {
+  const adapter: IAiAdapter = fixtureAiAdapter({
     async analyzeTranscript() {
       calls++;
       entered();
       await waiting;
       return extracted();
     },
-  };
+  });
   const service = new DiscussionService(db.repo, adapter, new DecisionExtractorCore());
   try {
     const first = service.analyzeDiscussion(input);
@@ -145,13 +146,13 @@ test('a failed later session commits no partial candidates and retry can recover
   const db = await isolatedRepository();
   let calls = 0;
   let shouldFail = true;
-  const adapter: IAiAdapter = {
+  const adapter: IAiAdapter = fixtureAiAdapter({
     async analyzeTranscript() {
       calls++;
       if (calls === 2 && shouldFail) throw new Error('Provider unavailable');
       return extracted();
     },
-  };
+  });
   const service = new DiscussionService(db.repo, adapter, new DecisionExtractorCore());
   const params = {
     ...input,
@@ -167,7 +168,7 @@ test('a failed later session commits no partial candidates and retry can recover
     const result = await service.analyzeDiscussion(params);
     expect(result.decisions.length).toBe(2);
     expect((await service.analyzeDiscussion(params)).decisions.length).toBe(2);
-    expect(calls).toBe(4);
+    expect(calls).toBe(3);
   } finally {
     await db.cleanup();
   }
@@ -178,11 +179,11 @@ test('exact reanalysis preserves reviewer edits and rejection while unrelated de
   let output = extracted();
   const service = new DiscussionService(
     db.repo,
-    {
+    fixtureAiAdapter({
       async analyzeTranscript() {
         return output;
       },
-    },
+    }),
     new DecisionExtractorCore(),
   );
   try {
@@ -240,22 +241,22 @@ test('an abandoned claim recovers after lease expiry and its stale owner cannot 
   });
   const old = new DiscussionService(
     db.repo,
-    {
+    fixtureAiAdapter({
       async analyzeTranscript() {
         entered();
         await waiting;
         return extracted('Old owner');
       },
-    },
+    }),
     new DecisionExtractorCore(),
   );
   const restarted = new DiscussionService(
     db.repo,
-    {
+    fixtureAiAdapter({
       async analyzeTranscript() {
         return extracted('Recovered owner');
       },
-    },
+    }),
     new DecisionExtractorCore(),
   );
   try {
@@ -279,11 +280,11 @@ test('partial overlap remains related and delivery reactions do not change canon
   const db = await isolatedRepository();
   const service = new DiscussionService(
     db.repo,
-    {
+    fixtureAiAdapter({
       async analyzeTranscript() {
         return extracted();
       },
-    },
+    }),
     new DecisionExtractorCore(),
   );
   try {
@@ -325,11 +326,11 @@ test('a persistence failure rolls back candidates and completion together; the o
   const db = await isolatedRepository();
   const service = new DiscussionService(
     db.repo,
-    {
+    fixtureAiAdapter({
       async analyzeTranscript() {
         return extracted();
       },
-    },
+    }),
     new DecisionExtractorCore(),
   );
   try {
@@ -373,7 +374,7 @@ test('legacy rejected evidence suppresses its original decision rather than ever
     await db.repo.recordRejectedEvidence(legacyHash);
     const service = new DiscussionService(
       db.repo,
-      {
+      fixtureAiAdapter({
         async analyzeTranscript() {
           return ExtractionResultSchema.parse({
             found: true,
@@ -381,7 +382,7 @@ test('legacy rejected evidence suppresses its original decision rather than ever
             decisions: [...extracted().decisions, ...extracted('Deploy on Monday').decisions],
           });
         },
-      },
+      }),
       new DecisionExtractorCore(),
     );
     const result = await service.analyzeDiscussion({ ...input, isManualOverride: false });

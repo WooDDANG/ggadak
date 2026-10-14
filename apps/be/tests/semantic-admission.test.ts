@@ -1,20 +1,21 @@
+import { fixtureAiAdapter } from '../src/test-support/ai-fixture.js';
 import { test, expect } from 'vitest';
 import { isolatedRepository } from '../src/repositories/test-database.js';
 import { DiscussionService } from '../src/services/discussion.service.js';
 import { DecisionExtractorCore } from '../src/engine/extractor-core.js';
 import { CONSENSUS_REGEX, evaluateSemanticDecision } from '@ggaddak/shared';
 
-test('Korean and English semantic-only signals reach the production AI seam while Bot processing reactions do not admit noise', async () => {
+test('received Korean and English context reaches the AI seam without requiring consensus or human reactions', async () => {
   const db = await isolatedRepository();
   let calls = 0;
   const service = new DiscussionService(
     db.repo,
-    {
+    fixtureAiAdapter({
       analyzeTranscript: async () => {
         calls++;
         return { found: false, summary: 'No decision', decisions: [] };
       },
-    },
+    }),
     new DecisionExtractorCore(),
   );
   try {
@@ -58,7 +59,7 @@ test('Korean and English semantic-only signals reach the production AI seam whil
         },
       ],
     });
-    expect(calls).toBe(2);
+    expect(calls).toBe(3);
     await expect(
       service.analyzeDiscussion({
         requestId: 'malformed',

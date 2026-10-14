@@ -1,27 +1,28 @@
-import type { AnalyzeDiscussionParams, AnalyzeDiscussionResult } from '../domain/analysis.js';
 import crypto from 'node:crypto';
-import { AnalyzeDiscussionRequestDtoSchema } from '../dto/discussion.dto.js';
-import { BadRequestError } from '../errors/AppError.js';
 import { Inject, Service } from 'typedi';
-import {
-  Decision,
-  createLogger,
-  admitsDiscussion,
-  humanReactionCount,
-  getHarvestingPolicyFromEnv,
-} from '@ggaddak/shared';
+import { Decision, DecisionSchema, humanReactionCount } from '@ggaddak/shared';
+import type { AnalyzeDiscussionParams, AnalyzeDiscussionResult } from '../domain/analysis.js';
+import type {
+  AnalysisWorkflow,
+  AnalysisSession,
+  AnalysisStatus,
+} from '../domain/analysis-workflow.js';
+import type { GraphSnapshot } from '../domain/decision-graph.js';
+import { AnalyzeDiscussionRequestDtoSchema } from '../dto/discussion.dto.js';
+import { AppError, BadRequestError, NotFoundError, ConflictError } from '../errors/AppError.js';
+import { AuthError } from '../errors/AuthError.js';
 import { DecisionRepository } from '../repositories/decision.repository.js';
 import { AiAdapter, IAiAdapter } from '../adapters/ai.adapter.js';
+import { GRAPH_PROMPT_VERSION } from '../extractor/graph-prompt.js';
 import { DecisionExtractorCore } from '../engine/extractor-core.js';
-
 import {
   AnalysisRequestRepository,
   CandidateDraft,
   hash,
   stableJson,
 } from '../repositories/analysis-request.repository.js';
-
-const logger = createLogger('BE-DISCUSSION-SERVICE');
+import { GraphWorkflow } from './graph-workflow.js';
+import { prepareAnalysis } from './discussion-preprocessing.js';
 
 @Service()
 export class DiscussionService {
@@ -39,356 +40,240 @@ export class DiscussionService {
     const requests = new AnalysisRequestRepository(this.repo);
     const claim = await requests.claim(params);
     if (claim.result) return claim.result;
-    const drafts: CandidateDraft[] = [];
-    let leaseFailure: unknown;
+    const stored = await requests.get(params.requestId);
+    const workflow: AnalysisWorkflow = stored?.workflowJson
+      ? JSON.parse(stored.workflowJson)
+      : this.prepare(params);
+    const controller = new AbortController();
     const heartbeat = setInterval(() => {
-      void requests.renew(params.requestId, claim.owner).catch(error => {
-        leaseFailure = error;
-      });
-    }, 20_000);
+      void requests.renew(params.requestId, claim.owner).catch(error => controller.abort(error));
+    }, 20000);
     heartbeat.unref();
+    const save = () => requests.checkpoint(params.requestId, claim.owner, workflow, params);
     try {
-      const result = await this.extractDiscussion(params, drafts);
-      if (leaseFailure) throw leaseFailure;
-      return await requests.complete(params, claim.owner, result, drafts);
+      await save();
+      const algorithm = new GraphWorkflow(this.extractor);
+      for (const session of workflow.sessions)
+        await algorithm.run(session, workflow, save, controller.signal);
+      const drafts: CandidateDraft[] = [];
+      for (const session of workflow.sessions) drafts.push(...this.project(session, params));
+      await save();
+      if (controller.signal.aborted) throw new AppError('Analysis ownership lost', 503);
+      const snapshot: GraphSnapshot = {
+        id: 'graph-' + params.requestId,
+        schemaVersion: 1,
+        requestId: params.requestId,
+        guildId: params.guildId ?? 'discord',
+        sessions: workflow.sessions.map(session => session.graph!),
+      };
+      return await requests.complete(
+        params,
+        claim.owner,
+        {
+          found: drafts.length > 0,
+          summary: workflow.skipped
+            ? 'Discussion skipped by deterministic noise rules'
+            : workflow.sessions.map(s => s.graph!.summary).join(' / ') || 'No candidates',
+          decisions: drafts.map(d => d.decision),
+          requestId: params.requestId,
+          graphId: snapshot.id,
+          graphAvailable: true,
+          hasConflict: snapshot.sessions.some(
+            s => s.discussionProblems.length > 0 || s.edges.some(e => e.type === 'conflicts_with'),
+          ),
+        },
+        drafts,
+        snapshot,
+      );
     } catch (error) {
-      await requests.release(params.requestId, claim.owner);
+      const status =
+        error instanceof AppError
+          ? error.statusCode
+          : ((error as { status?: number }).status ?? 500);
+      const retryable = status >= 500;
+      await requests.fail(params.requestId, claim.owner, {
+        category: status === 422 ? 'validation-or-budget' : 'provider-or-storage',
+        message:
+          status === 422
+            ? 'Analysis requires a new manual reanalysis'
+            : 'Analysis temporarily unavailable',
+        status,
+        retryable,
+      });
       throw error;
     } finally {
       clearInterval(heartbeat);
     }
   }
 
-  async getCandidateHistory(decisionId: string) {
+  getCandidateHistory(decisionId: string) {
     return new AnalysisRequestRepository(this.repo).history(decisionId);
   }
 
-  private async extractDiscussion(
-    params: AnalyzeDiscussionParams,
-    drafts: CandidateDraft[],
-  ): Promise<AnalyzeDiscussionResult> {
-    const {
-      rawMessages,
-      guildId,
-      channelId,
-      channelName,
-      triggerMessageId,
-      messageUrl,
-      isManualOverride,
-      traceId,
-    } = params;
-    const currentTraceId =
-      traceId || `trc-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
-    const pipelineStartTime = Date.now();
+  private async scoped(requestId: string, guildId: string) {
+    const row = await new AnalysisRequestRepository(this.repo).get(requestId);
+    if (!row) throw new NotFoundError('Analysis Request not found');
+    if (row.guildId !== guildId) throw new AuthError('Analysis belongs to another guild', 403);
+    return row;
+  }
 
-    if (!rawMessages || rawMessages.length === 0) {
-      return { found: false, summary: '분석할 메시지가 없습니다.', decisions: [] };
-    }
+  async getStatus(requestId: string, guildId: string): Promise<AnalysisStatus> {
+    const row = await this.scoped(requestId, guildId);
+    const workflow: AnalysisWorkflow | null = row.workflowJson
+      ? JSON.parse(row.workflowJson)
+      : null;
+    const error = row.errorJson ? JSON.parse(row.errorJson) : null;
+    return {
+      requestId,
+      state: row.state,
+      graphAvailable: Boolean(row.graphJson),
+      retryable: error?.retryable ?? false,
+      error,
+      sessions:
+        workflow?.sessions.map(s => ({
+          sessionId: s.id,
+          phase: s.phase,
+          repairs: s.repairs,
+          elapsedMs: s.elapsedMs,
+          logicalCalls: s.calls.length,
+          attempts: s.attempts.length,
+          inputTokens: s.attempts.reduce((n, a) => n + (a.inputTokens ?? 0), 0),
+          outputTokens: s.attempts.reduce((n, a) => n + (a.outputTokens ?? 0), 0),
+        })) ?? [],
+    };
+  }
 
-    // 2. Retrieve recent external feedbacks for context injection
-    const recentFeedbacks = await this.repo.getRecentFeedbacks(channelId, 3);
-
-    // 2.5. Stage 2: Tier 1 Zero-Cost Rule Filtering & Synthetic Reaction Absorption
-    const tier1Start = Date.now();
-    const { filterTier1Messages } = await import('@ggaddak/shared');
-    const tier1Result = filterTier1Messages(
-      rawMessages.map(m => ({
-        id: m.id,
-        author: m.author || 'unknown',
-        content: m.content || '',
-        createdAt: m.createdAt ?? '1970-01-01T00:00:00.000Z',
-        isBot: m.isBot ?? false,
-        replyingTo: m.replyingTo,
-        reactionCount: humanReactionCount(m),
-        reactions: m.reactions,
-        isTrigger: m.isTrigger,
-      })),
-    );
-    const tier1Duration = Date.now() - tier1Start;
-
-    if (tier1Result.cleanMessages.length === 0) {
-      logger.info(
-        `All ${rawMessages.length} messages filtered out by Tier 1 rule filter. (Commands/Casual noise)`,
-        {
-          stage: 'TIER1-FILTER',
-          traceId: currentTraceId,
-          durationMs: tier1Duration,
-          rawCount: rawMessages.length,
-          filteredCount: tier1Result.filteredCount,
-        },
-      );
-      return {
-        found: false,
-        summary: '의사결정 신호가 없는 일상 잡담/명령어 구간입니다.',
-        decisions: [],
-      };
-    }
-
-    logger.info(
-      `Tier 1 filtering complete: ${rawMessages.length} raw -> ${tier1Result.cleanMessages.length} clean (${tier1Result.filteredCount} dropped, ${Object.keys(tier1Result.syntheticReactions).length} synthetic reactions absorbed)`,
-      {
-        stage: 'TIER1-FILTER',
-        traceId: currentTraceId,
-        durationMs: tier1Duration,
-        rawCount: rawMessages.length,
-        cleanCount: tier1Result.cleanMessages.length,
-        filteredCount: tier1Result.filteredCount,
-        syntheticCount: Object.keys(tier1Result.syntheticReactions).length,
-      },
-    );
-
-    // 3. Stage 3: Conversation Disentanglement (Directed Forest & Burst Merging)
-    const disentangleStart = Date.now();
-    const { disentangleConversations, CONSENSUS_REGEX } = await import('@ggaddak/shared');
-    const threads = disentangleConversations(tier1Result.cleanMessages, {
-      channelId,
-      syntheticReactions: tier1Result.syntheticReactions,
-    });
-    const disentangleDuration = Date.now() - disentangleStart;
-
-    logger.info(
-      `Disentangled ${tier1Result.cleanMessages.length} clean messages into ${threads.length} causal conversation thread(s)`,
-      {
-        stage: 'DISENTANGLE',
-        traceId: currentTraceId,
-        durationMs: disentangleDuration,
-        threadCount: threads.length,
-        threadLengths: threads.map(t => t.messages.length),
-      },
-    );
-
-    // 4. Stage 4: Session Slicing with 30-min Idle Gap & TextTiling Topic Drift
-    const sliceStart = Date.now();
-    const candidateSessions: Array<typeof tier1Result.cleanMessages> = [];
-    for (const thread of threads) {
-      const topicChunks = this.core.sliceSessionWithTopicDrift(thread.messages, 30, 0.35);
-      for (const chunk of topicChunks) {
-        if (chunk.length > 0) {
-          candidateSessions.push(chunk);
+  async getGraph(requestId: string, guildId: string): Promise<GraphSnapshot> {
+    const row = await this.scoped(requestId, guildId);
+    if (row.state === 'terminal') throw new AppError('Analysis failed validation', 422);
+    if (row.state !== 'completed') throw new ConflictError('Analysis not completed');
+    if (!row.graphJson) throw new NotFoundError('Graph unavailable for this legacy analysis');
+    const snapshot: GraphSnapshot = JSON.parse(row.graphJson);
+    for (const node of snapshot.sessions.flatMap(s => s.nodes)) {
+      if (node.decisionId) {
+        const current = await this.repo.getDecisionById(node.decisionId);
+        if (current) {
+          node.currentDecisionVersion = current.version ?? 1;
+          node.stale = node.currentDecisionVersion !== node.decisionVersion;
         }
       }
     }
-    const sliceDuration = Date.now() - sliceStart;
+    return snapshot;
+  }
 
-    logger.info(
-      `Topic slicing complete: ${threads.length} thread(s) sliced into ${candidateSessions.length} session chunk(s)`,
-      {
-        stage: 'TOPIC-SLICE',
-        traceId: currentTraceId,
-        durationMs: sliceDuration,
-        sessionCount: candidateSessions.length,
-        sessionSizes: candidateSessions.map(s => s.length),
+  private prepare(params: AnalyzeDiscussionParams): AnalysisWorkflow {
+    return prepareAnalysis(
+      params,
+      this.extractor.settings ?? {
+        provider: 'fixture',
+        model: 'fixture',
+        promptVersion: GRAPH_PROMPT_VERSION,
+        maxOutputTokens: 8192,
+        maxInputChars: 100000,
       },
+      this.core,
     );
+  }
 
-    const allExtractedDecisions: Decision[] = [];
-    let lastSummary = '대화가 분석되었습니다.';
-    const lastConflict: { hasConflict: boolean; conflictingDecision?: Decision } = {
-      hasConflict: false,
-    };
-
-    for (let sessionIdx = 0; sessionIdx < candidateSessions.length; sessionIdx++) {
-      const sessionMessages = candidateSessions[sessionIdx];
-
-      // 5. Stage 5: Decision Signal Escalation Gate (Union 3-way gate)
-      const gateStart = Date.now();
-      const hasManualOverride = Boolean(isManualOverride);
-      const originalIds = new Set(
-        sessionMessages.flatMap(m => m.originalMessages?.map(original => original.id) ?? [m.id]),
-      );
-      const originalSignals = rawMessages.filter(m => originalIds.has(m.id));
-      const policy = getHarvestingPolicyFromEnv();
-      const totalReactionsCount = sessionMessages.reduce(
-        (sum, m) => sum + (m.reactionCount || 0),
-        0,
-      );
-      const hasReactionSignal = totalReactionsCount >= policy.reactionThreshold;
-      const hasConsensusSuffix = sessionMessages.some(m => CONSENSUS_REGEX.test(m.content || ''));
-      const passesGate = admitsDiscussion(originalSignals, policy, hasManualOverride);
-      const gateDuration = Date.now() - gateStart;
-
-      logger.info(
-        `Union 3-Way Gate evaluated for session [${sessionIdx + 1}/${candidateSessions.length}]: ` +
-          `Override=${hasManualOverride}, Reactions=${totalReactionsCount}(>=3:${hasReactionSignal}), Suffix=${hasConsensusSuffix} -> Result=${passesGate ? 'PASS' : 'DROP'}`,
-        {
-          stage: '3WAY-GATE',
-          traceId: currentTraceId,
-          durationMs: gateDuration,
-          sessionIndex: sessionIdx,
-          passesGate,
-          hasManualOverride,
-          totalReactionsCount,
-          hasReactionSignal,
-          hasConsensusSuffix,
-        },
-      );
-
-      if (!passesGate) {
-        logger.info(
-          `Session [${sessionIdx + 1}/${candidateSessions.length}] dropped by Union 3-Way Gate. Executing silent cleanup (0 token cost).`,
-          { stage: '3WAY-GATE', traceId: currentTraceId, sessionIndex: sessionIdx },
-        );
-        continue;
-      }
-
-      const originalMessages = rawMessages
-        .filter(m => originalIds.has(m.id))
-        .map(m => ({
-          id: m.id,
-          author: m.author || 'unknown',
-          content: m.content || '',
-          createdAt: m.createdAt || '1970-01-01T00:00:00.000Z',
-          ...(m.replyingTo ? { replyingTo: m.replyingTo } : {}),
-        }))
-        .sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
-      const rawEvidence = originalMessages.map(m => m.id);
-      const evidenceJson = stableJson({
-        guildId: guildId || 'discord',
-        channelId: channelId || 'channel',
-        messages: originalMessages,
-      });
-      const evidenceHash = hash(JSON.parse(evidenceJson));
-      const legacyHash = crypto.createHash('sha256').update(rawEvidence.join('|')).digest('hex');
-
-      const transcript = originalMessages
-        .map((m: any) => {
-          const time = m.createdAt ? new Date(m.createdAt).toISOString().substring(11, 19) : '';
-          const reply = m.replyingTo ? ` (replying to ${m.replyingTo})` : '';
-          return `[${m.id}] [${time}] ${m.author}${reply}: ${m.content}`;
-        })
-        .join('\n');
-
-      const aiStart = Date.now();
-      logger.info(
-        `Escalating session [${sessionIdx + 1}/${candidateSessions.length}] (${sessionMessages.length} msgs) to AI Core...`,
-        { stage: 'AI-CORE', traceId: currentTraceId, msgCount: sessionMessages.length },
-      );
-      const extraction = await this.extractor.analyzeTranscript(transcript, recentFeedbacks);
-      const aiDuration = Date.now() - aiStart;
-
-      if (!extraction.found || extraction.decisions.length === 0) {
-        logger.info(
-          `AI Core returned no verified decision candidates for session [${sessionIdx + 1}/${candidateSessions.length}].`,
-          { stage: 'AI-CORE', traceId: currentTraceId, durationMs: aiDuration },
-        );
-        continue;
-      }
-
-      logger.info(
-        `AI Core successfully extracted ${extraction.decisions.length} decision candidate(s).`,
-        {
-          stage: 'AI-CORE',
-          traceId: currentTraceId,
-          durationMs: aiDuration,
-          extractedCount: extraction.decisions.length,
-        },
-      );
-
-      lastSummary = extraction.summary;
-      const participants = Array.from(
-        new Set(sessionMessages.map((m: any) => m.author)),
-      ) as string[];
-      for (const item of extraction.decisions) {
-        const decisionId = `DEC-${crypto.randomUUID()}`;
-
-        // Calculate 4-tier governance score entirely on Backend Core
-        const govResult = this.core.calculateGovernanceScore({
+  private project(session: AnalysisSession, params: AnalyzeDiscussionParams): CandidateDraft[] {
+    const graph = session.graph!;
+    const byId = new Map(graph.nodes.map(n => [n.id, n]));
+    const evidenceMessages = session.messages.map(m => ({
+      id: m.id,
+      author: m.author,
+      content: m.content,
+      ...(m.createdAt ? { createdAt: m.createdAt } : {}),
+      ...(m.replyingTo ? { replyingTo: m.replyingTo } : {}),
+    }));
+    const evidenceJson = stableJson({
+      guildId: params.guildId ?? 'discord',
+      channelId: params.channelId ?? 'channel',
+      messages: evidenceMessages,
+    });
+    const evidenceHash = hash(JSON.parse(evidenceJson));
+    const legacyHash = crypto
+      .createHash('sha256')
+      .update(session.messages.map(m => m.id).join('|'))
+      .digest('hex');
+    const participants = [...new Set(session.messages.map(m => m.author))];
+    return graph.nodes
+      .filter(n => n.type === 'DecisionCandidate')
+      .map(node => {
+        const related = (type: string) =>
+          graph.edges
+            .filter(e => e.type === type && e.sourceId === node.id)
+            .map(e => byId.get(e.targetId)!);
+        const alternatives = related('has_alternative');
+        const targets = new Set([node.id, ...alternatives.map(n => n.id)]);
+        const reasons = graph.edges
+          .filter(e => ['supports', 'opposes'].includes(e.type) && targets.has(e.targetId))
+          .map(e => byId.get(e.sourceId)!.summary);
+        const rationale = [...new Set(reasons)].join('\n');
+        const parents = graph.edges
+          .filter(e => e.type === 'contains' && e.targetId === node.id)
+          .map(e => byId.get(e.sourceId)!);
+        const topic =
+          parents.find(n => n.type === 'Topic') ??
+          graph.edges
+            .filter(e => e.type === 'contains' && parents.some(p => p.id === e.targetId))
+            .map(e => byId.get(e.sourceId)!)
+            .find(n => n.type === 'Topic');
+        const actionItems = related('triggers').map(n => ({
+          id: n.id,
+          task: n.summary,
+          ...(n.assignee ? { assignee: n.assignee } : {}),
+          ...(n.dueDate ? { dueDate: n.dueDate } : {}),
+        }));
+        const governance = this.core.calculateGovernanceScore({
           participantCount: participants.length,
-          reactionsCount: totalReactionsCount,
-          rationale: item.rationale,
-          actionItemsCount: item.actionItems?.length || 0,
-          hasExternalFeedback: recentFeedbacks.length > 0,
+          reactionsCount: session.messages.reduce((n, m) => n + humanReactionCount(m), 0),
+          rationale,
+          actionItemsCount: actionItems.length,
+          hasExternalFeedback: false,
         });
-
-        // Only explicit extraction evidence identifies a strategic Pivot. Topic matches are review comparisons.
-        const isPivot = Boolean(item.isPivot);
-
-        const finalScore = govResult.score;
-
-        const newDecision: Decision = {
+        const decisionId = (session.idMap['decision:' + node.id] ??= 'DEC-' + crypto.randomUUID());
+        const decision: Decision = DecisionSchema.parse({
           id: decisionId,
-          topic: item.topic,
-          decision: item.decision,
-          title: item.title || item.topic,
-          decisionContent: item.decisionContent || item.decision,
-          rationale: item.rationale,
-          rationaleSummary: item.rationaleSummary || undefined,
-          rationaleQuotes: item.rationaleQuotes || [],
-          alternatives: item.alternatives || [],
-          categoryTag: item.categoryTag || '기타',
-          actionItems: item.actionItems || [],
+          topic: topic?.summary ?? parents[0]?.summary ?? node.summary,
+          title: node.summary,
+          decision: node.summary,
+          decisionContent: node.summary,
+          rationale,
+          rationaleStatus: node.rationaleStatus,
+          observation: node.observation,
+          alternatives: alternatives.map(n => ({
+            id: n.id,
+            option: n.summary,
+            reason: graph.edges
+              .filter(e => e.type === 'opposes' && e.targetId === n.id)
+              .map(e => byId.get(e.sourceId)!.summary)
+              .join('\n'),
+          })),
+          actionItems,
+          categoryTag: node.category ?? '기타',
           state: 'Draft',
           supersedesId: null,
-          isPivot,
+          isPivot: false,
           approvedBy: null,
           decisionConfirmedDate: null,
-          feedbackSourceType: null,
-          feedbackSourceDetail: null,
-          feedbackReceivedDate: null,
-          rawEvidence,
+          rawEvidence: session.messages.map(m => m.id),
           evidenceHash,
-          rawTranscript: transcript,
+          rawTranscript: session.transcript,
           source: {
-            guildId: guildId || 'discord',
-            channelId: channelId || 'channel',
-            channelName: channelName || undefined,
-            triggerMessageId: triggerMessageId || 'msg-unknown',
-            messageUrl: messageUrl || undefined,
+            guildId: params.guildId ?? 'discord',
+            channelId: params.channelId ?? 'channel',
+            channelName: params.channelName,
+            triggerMessageId: params.triggerMessageId ?? session.messages[0].id,
+            messageUrl: params.messageUrl,
             participants,
-            rawMessages: originalMessages,
+            rawMessages: evidenceMessages,
           },
-          messageCreatedAt: sessionMessages[sessionMessages.length - 1]?.createdAt
-            ? new Date(sessionMessages[sessionMessages.length - 1].createdAt).toISOString()
-            : new Date().toISOString(),
           createdAt: new Date().toISOString(),
-          governanceScore: finalScore,
-          governanceReason: govResult.reason,
-          governancePassed: finalScore >= 3.0,
-        };
-
-        drafts.push({ decision: newDecision, evidenceJson, legacyHash });
-        allExtractedDecisions.push(newDecision);
-
-        logger.info(
-          `Staged DRAFT Candidate [${newDecision.id}] Score=${finalScore} (${govResult.strength}) Title="${newDecision.title}"`,
-          {
-            stage: 'GOVERNANCE',
-            traceId: currentTraceId,
-            decisionId: newDecision.id,
-            score: finalScore,
-            strength: govResult.strength,
-            title: newDecision.title,
-            passed: newDecision.governancePassed,
-          },
-        );
-      }
-    }
-
-    const totalPipelineDuration = Date.now() - pipelineStartTime;
-    logger.info(
-      `Analysis pipeline completed with ${allExtractedDecisions.length} extracted decision(s) (+${totalPipelineDuration}ms)`,
-      {
-        stage: 'AI-CORE',
-        traceId: currentTraceId,
-        durationMs: totalPipelineDuration,
-        decisionsCount: allExtractedDecisions.length,
-      },
-    );
-
-    if (allExtractedDecisions.length === 0) {
-      return {
-        found: false,
-        summary: '논의에서 구체적인 의사결정이 발견되지 않았습니다.',
-        decisions: [],
-      };
-    }
-
-    return {
-      found: true,
-      summary: lastSummary,
-      decisions: allExtractedDecisions,
-      hasConflict: lastConflict.hasConflict,
-      conflictingDecision: lastConflict.conflictingDecision,
-    };
+          governanceScore: governance.score,
+          governanceReason: governance.reason,
+          governancePassed: governance.score >= 3,
+        });
+        return { decision, evidenceJson, legacyHash, graphNodeId: node.id };
+      });
   }
 }

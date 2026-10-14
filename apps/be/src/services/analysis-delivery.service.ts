@@ -1,4 +1,5 @@
 import { Service } from 'typedi';
+import { AnalysisRequestRepository } from '../repositories/analysis-request.repository.js';
 import { DecisionRepository } from '../repositories/decision.repository.js';
 import { ConflictError, NotFoundError, BadRequestError } from '../errors/AppError.js';
 
@@ -93,6 +94,7 @@ export class AnalysisDeliveryService {
     return {
       requests: requests.map(r => ({
         ...r,
+        requiresNewAnalysis: r.errorCategory === 'analysis-terminal',
         channelName: r.channelName ?? undefined,
         scanRange: r.scanRangeJson ? JSON.parse(r.scanRangeJson) : undefined,
         status: r.status as AnalysisDeliveryStatus['status'],
@@ -115,6 +117,9 @@ export class AnalysisDeliveryService {
   ): Promise<AnalysisRetryCommandDto> {
     if (!commandId.trim() || commandId.length > 200)
       throw new BadRequestError('Retry command ID is required');
+    const analysis = await new AnalysisRequestRepository(this.repo).get(requestId);
+    if (analysis?.guildId === guildId && analysis.state === 'terminal')
+      throw new ConflictError('Analysis is terminal; request a new manual analysis');
     const command = await this.repo.withTransaction(async tx => {
       const existing = await tx.analysisRetryCommand.findUnique({ where: { id: commandId } });
       if (existing) {

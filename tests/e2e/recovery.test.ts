@@ -1,3 +1,4 @@
+import { fixtureAiAdapter } from '../../apps/be/src/test-support/ai-fixture.js';
 import { test, expect } from 'vitest';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -13,12 +14,12 @@ test('a restarted Bot claims an idempotent Web retry, persists no-decision compl
   let aiCalls = 0;
   const server = await createServer(
     db.repo,
-    {
+    fixtureAiAdapter({
       analyzeTranscript: async () => {
         aiCalls++;
         return { found: false, summary: 'No decision', decisions: [] };
       },
-    },
+    }),
     { ...fakeAuthOptions(), serviceToken: 'service' },
   );
   await new Promise<void>((resolve, reject) => {

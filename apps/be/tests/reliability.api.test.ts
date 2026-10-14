@@ -1,3 +1,4 @@
+import { fixtureAiAdapter } from '../src/test-support/ai-fixture.js';
 import { test, expect } from 'vitest';
 import { isolatedRepository } from '../src/repositories/test-database.js';
 import { createServer } from '../src/server.js';
@@ -7,7 +8,7 @@ test('Web history preserves a rejected candidate after manual reanalysis; checkp
   const db = await isolatedRepository();
   const server = await createServer(
     db.repo,
-    {
+    fixtureAiAdapter({
       analyzeTranscript: async () => ({
         found: true,
         summary: 'candidate',
@@ -24,7 +25,7 @@ test('Web history preserves a rejected candidate after manual reanalysis; checkp
           },
         ],
       }),
-    },
+    }),
     { ...fakeAuthOptions(), serviceToken: 'service' },
   );
   await new Promise<void>((resolve, reject) => {

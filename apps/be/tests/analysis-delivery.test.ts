@@ -1,3 +1,4 @@
+import { fixtureAiAdapter } from '../src/test-support/ai-fixture.js';
 import 'reflect-metadata';
 import { test, expect } from 'vitest';
 import { isolatedRepository } from '../src/repositories/test-database.js';
@@ -74,7 +75,9 @@ test('HTTP queue control enforces service auth, guild access, input validation a
   const db = await isolatedRepository();
   const server = await createServer(
     db.repo,
-    { analyzeTranscript: async () => ({ found: false, summary: '', decisions: [] }) },
+    fixtureAiAdapter({
+      analyzeTranscript: async () => ({ found: false, summary: '', decisions: [] }),
+    }),
     { ...fakeAuthOptions(), serviceToken: 'service' },
   );
   try {

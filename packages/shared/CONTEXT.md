@@ -5,7 +5,7 @@ Shared domain entities, Zod validation schemas, and API payload contracts shared
 ## Language
 
 **Decision Candidate**:
-An unverified draft proposal of a decision extracted from chat discussions by the AI engine, awaiting human confirmation in the Review Queue.
+An unverified proposal or reported agreement extracted from chat discussions by the AI engine, awaiting human confirmation in the Review Queue. Agreement or withdrawal observed in the discussion is distinct from the candidate's human review state.
 _Avoid_: Draft Decision, Temporary Decision, Suggestion, Scratch Note
 
 **Decision Record**:
@@ -13,7 +13,7 @@ A finalized, verified conclusion confirmed by team members, archived with its Ra
 _Avoid_: Final Decision, Note, Ticket, Document, Row
 
 **Rationale**:
-The explicit reasons, background context, and tradeoffs that led to a specific Decision Record.
+The reasons, background context, and tradeoffs expressed in the discussion for a Decision Candidate or Decision Record. When no reason is stated, it remains unspecified rather than being invented.
 _Avoid_: Reason, Context, Background, Justification
 
 **Supersede**:
@@ -36,8 +36,12 @@ _Avoid_: Comment, Review, Feedback Note, Evaluation
 A distinct subject or discussion domain from which Decisions emerge.
 _Avoid_: Subject, Agenda, Issue, Thread
 
+**Issue**:
+A problem or question raised within a Topic that proposals or decisions seek to resolve. An Issue may remain unresolved without a Decision Candidate.
+_Avoid_: Topic, Implementation Ticket
+
 **Action Item**:
-A concrete follow-up task assigned to a member as a direct consequence of a Decision Record.
+A concrete follow-up activity stated in the discussion in connection with a Decision Candidate or Decision Record. Assignment and timing remain unspecified when not stated.
 _Avoid_: Task, Todo, Job, Work Item
 
 **Decision State**:

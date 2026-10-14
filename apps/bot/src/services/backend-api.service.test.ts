@@ -5,6 +5,18 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { BackendApiService } from './backend-api.service.js';
 
+test('terminal analysis is retained across restart and explicit delivery retry cannot reset it', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'terminal-analysis-'));
+  let calls = 0;
+  try {
+    const api = new BackendApiService('http://fixture', directory, async () => { calls++; return new Response('', { status: 422 }); });
+    await assert.rejects(api.analyzeDiscussion({ requestId: 'terminal', guildId: 'guild', channelId: 'channel', rawMessages: [{ id: '100', content: 'Redis를 검토하자' }] }), /422/);
+    const restarted = new BackendApiService('http://fixture', directory, async () => { calls++; return Response.json({ found: false, decisions: [] }); });
+    await assert.rejects(restarted.retryAnalysisRequest('terminal', 'retry-command'), /new manual analysis/);
+    assert.equal(calls, 1);
+  } finally { await rm(directory, { recursive: true, force: true }); }
+});
+
 test('failed delivery survives restart and retry retains its Analysis Request and original payload', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'analysis-delivery-'));
   const sent: any[] = [];

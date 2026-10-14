@@ -1,81 +1,126 @@
 import 'reflect-metadata';
 import { test, expect } from 'vitest';
 import { AiAdapter } from '../../src/adapters/ai.adapter.js';
+const context = (adapter: AiAdapter) => ({
+  signal: new AbortController().signal,
+  settings: adapter.settings,
+});
+const graph = { summary: 'Context only', nodes: [], edges: [], discussionProblems: [] };
 
-test('selected Gemini provider fails closed on missing key even when OpenAI is available', async () => {
+test('selected provider fails closed on missing key and production mock', async () => {
   const adapter = new AiAdapter({ provider: 'gemini', openaiApiKey: 'unused' }, 'production');
-  await expect(adapter.analyzeTranscript('SQLite를 채택합시다')).rejects.toThrow(/key/i);
+  await expect(adapter.extractGraph('대화', context(adapter))).rejects.toMatchObject({
+    statusCode: 422,
+  });
+  for (const provider of ['mock', 'other']) {
+    const instance = new AiAdapter({ provider }, 'production');
+    await expect(instance.extractGraph('대화', context(instance))).rejects.toMatchObject({
+      statusCode: 422,
+    });
+  }
 });
 
-test('provider errors and malformed extraction are observable and never become heuristic candidates', async () => {
-  for (const response of [
-    new Response('unavailable', { status: 503 }),
-    Response.json({ candidates: [{ content: { parts: [{ text: '{"found":true}' }] } }] }),
-  ]) {
+test('Gemini receives graph schema, output limit and only supplied input; usage survives', async () => {
+  const adapter = new AiAdapter(
+    { provider: 'gemini', model: 'configured', geminiApiKey: 'fixture' },
+    'production',
+    async (url, options) => {
+      expect(String(url)).toContain('/configured:generateContent');
+      const body = JSON.parse(options!.body as string);
+      expect(body.generationConfig.responseJsonSchema.type).toBe('object');
+      expect(body.generationConfig.responseJsonSchema.properties.nodes).toBeDefined();
+      expect(body.generationConfig.maxOutputTokens).toBe(8192);
+      expect(body.contents[0].parts[0].text).toBe(JSON.stringify({ transcript: '논의중' }));
+      return Response.json({
+        candidates: [
+          { finishReason: 'STOP', content: { parts: [{ text: JSON.stringify(graph) }] } },
+        ],
+        usageMetadata: { promptTokenCount: 12, candidatesTokenCount: 5 },
+      });
+    },
+  );
+  expect(await adapter.extractGraph('논의중', context(adapter))).toEqual({
+    value: graph,
+    usage: { inputTokens: 12, outputTokens: 5 },
+  });
+});
+
+test('OpenAI uses instance transport with strict schema and no hidden SDK retries', async () => {
+  let requests = 0;
+  const adapter = new AiAdapter(
+    { provider: 'openai', openaiApiKey: 'fixture' },
+    'production',
+    async (url, options) => {
+      requests++;
+      expect(url).toBe('https://api.openai.com/v1/chat/completions');
+      const body = JSON.parse(options!.body as string);
+      expect(body.response_format.json_schema.strict).toBe(true);
+      const schema = body.response_format.json_schema.schema;
+      expect(schema.required).toEqual(Object.keys(schema.properties));
+      return Response.json({
+        choices: [
+          {
+            finish_reason: 'stop',
+            message: { content: JSON.stringify({ valid: true, issues: [] }) },
+          },
+        ],
+        usage: { prompt_tokens: 10, completion_tokens: 2 },
+      });
+    },
+  );
+  expect((await adapter.verifyGraph('input', graph, context(adapter))).value).toEqual({
+    valid: true,
+    issues: [],
+  });
+  expect(requests).toBe(1);
+});
+
+test('provider rejection, refusal, truncation, malformed JSON and outages remain distinguishable failures', async () => {
+  for (const [response, statusCode] of [
+    [new Response('', { status: 404 }), 422],
+    [new Response('', { status: 429 }), 503],
+    [new Response('', { status: 503 }), 503],
+    [
+      Response.json({
+        candidates: [{ finishReason: 'MAX_TOKENS', content: { parts: [{ text: '{}' }] } }],
+      }),
+      422,
+    ],
+    [
+      Response.json({
+        candidates: [{ finishReason: 'STOP', content: { parts: [{ text: '{bad' }] } }],
+      }),
+      422,
+    ],
+  ] as const) {
     const adapter = new AiAdapter(
       { provider: 'gemini', geminiApiKey: 'fixture' },
       'production',
       async () => response,
     );
-    await expect(adapter.analyzeTranscript('SQLite를 채택합시다')).rejects.toBeDefined();
-  }
-});
-
-test('explicit development mock is allowed, while production mock and unknown providers fail', async () => {
-  await expect(
-    new AiAdapter({ provider: 'mock' }, 'production').analyzeTranscript('합의합시다'),
-  ).rejects.toThrow(/Mock/);
-  await expect(
-    new AiAdapter({ provider: 'other' }, 'test').analyzeTranscript('합의합시다'),
-  ).rejects.toThrow(/Unsupported/);
-  expect(
-    (await new AiAdapter({ provider: 'mock' }, 'test').analyzeTranscript('SQLite를 채택합시다'))
-      .found,
-  ).toBe(true);
-});
-
-test('fixed Gemini response validates without calling another provider', async () => {
-  const adapter = new AiAdapter(
-    { provider: 'gemini', geminiApiKey: 'fixture', openaiApiKey: 'unused' },
-    'production',
-    async (_url, options) => {
-      expect((options?.headers as Record<string, string>)['x-goog-api-key']).toBe('fixture');
-      return Response.json({
-        candidates: [
-          {
-            content: {
-              parts: [
-                { text: JSON.stringify({ found: false, summary: 'No consensus', decisions: [] }) },
-              ],
-            },
-          },
-        ],
-      });
-    },
-  );
-  expect(await adapter.analyzeTranscript('논의중')).toEqual({
-    found: false,
-    summary: 'No consensus',
-    decisions: [],
-  });
-});
-
-test('configured model is used and unavailable models are permanent failures while provider outages are retryable', async () => {
-  for (const [status, expected] of [
-    [404, 422],
-    [429, 503],
-    [503, 503],
-  ]) {
-    const adapter = new AiAdapter(
-      { provider: 'gemini', model: 'configured-model', geminiApiKey: 'fixture' },
-      'production',
-      async url => {
-        expect(String(url)).toContain('/models/configured-model:generateContent');
-        return new Response('', { status });
-      },
-    );
-    await expect(adapter.analyzeTranscript('SQLite를 채택합시다')).rejects.toMatchObject({
-      statusCode: expected,
+    await expect(adapter.extractGraph('input', context(adapter))).rejects.toMatchObject({
+      statusCode,
     });
   }
+});
+
+test('input budget rejects rather than truncating; development fixture does not invent candidates', async () => {
+  const fixture = new AiAdapter({ provider: 'mock' }, 'test');
+  expect((await fixture.extractGraph('SQLite로 가자', context(fixture))).value).toMatchObject({
+    nodes: [],
+    edges: [],
+  });
+  const adapter = new AiAdapter(
+    { provider: 'openai', openaiApiKey: 'fixture' },
+    'production',
+    async () => {
+      throw new Error('should not call');
+    },
+  );
+  await expect(
+    adapter.extractGraph('too long', {
+      ...context(adapter),
+      settings: { ...adapter.settings, maxInputChars: 1 },
+    }),
+  ).rejects.toMatchObject({ statusCode: 422 });
 });

@@ -35,7 +35,7 @@ export const RawMessageEntrySchema = z.object({
   id: z.string().optional(),
   author: z.string(),
   content: z.string(),
-  createdAt: z.string(),
+  createdAt: z.string().optional(),
   replyingTo: z.string().optional(),
 });
 
@@ -59,7 +59,9 @@ export const DecisionSchema = z.object({
   decision: z.string().min(1),
   title: z.string().optional(),
   decisionContent: z.string().optional(),
-  rationale: z.string().min(1),
+  rationale: z.string(),
+  rationaleStatus: z.enum(['stated', 'not_stated']).optional(),
+  observation: z.enum(['proposed', 'agreed', 'withdrawn', 'unclear']).optional(),
   rationaleSummary: z.string().optional(),
   rationaleQuotes: z.array(z.string()).default([]),
   alternatives: z.array(AlternativeOptionSchema).default([]),

@@ -28,6 +28,9 @@ export interface AnalyzeDiscussionParams {
 }
 
 export interface AnalyzeDiscussionResult {
+  requestId?: string;
+  graphAvailable?: boolean;
+  graphId?: string;
   found: boolean;
   summary: string;
   decisions: Decision[];

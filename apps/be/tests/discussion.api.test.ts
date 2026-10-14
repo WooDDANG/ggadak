@@ -1,3 +1,4 @@
+import { fixtureAiAdapter } from '../src/test-support/ai-fixture.js';
 import { test, expect } from 'vitest';
 import { createServer } from '../src/server.js';
 import { isolatedRepository } from '../src/repositories/test-database.js';
@@ -6,13 +7,13 @@ test('discussion analysis and candidate history require Bot service authenticati
   const db = await isolatedRepository();
   const server = await createServer(
     db.repo,
-    {
+    fixtureAiAdapter({
       analyzeTranscript: async () => ({
         found: false,
         summary: 'No decision found',
         decisions: [],
       }),
-    },
+    }),
     { serviceToken: 'discussion-service-secret' },
   );
   await new Promise<void>((resolve, reject) => {

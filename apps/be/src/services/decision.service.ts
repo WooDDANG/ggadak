@@ -42,6 +42,7 @@ export class DecisionService {
       decision: edit.decision,
       decisionContent: edit.decision,
       rationale: edit.rationale,
+      rationaleStatus: edit.rationale ? 'stated' : 'not_stated',
       rationaleSummary: edit.rationale,
       categoryTag: edit.category,
       version: edit.expectedVersion + 1,
@@ -178,6 +179,8 @@ export class DecisionService {
         replacement = predecessor;
       }
       updated.version = (existing.version ?? 1) + 1;
+      if (params.rationale !== undefined)
+        updated.rationaleStatus = updated.rationale ? 'stated' : 'not_stated';
       if (
         replacement &&
         !(await this.repo.writeReviewedDecision(replacement, params.predecessorVersion!, tx, true))

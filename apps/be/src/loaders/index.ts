@@ -1,4 +1,5 @@
 import { DashboardService } from '../services/dashboard.service.js';
+import { AnalysisRequestController } from '../api/controllers/analysis-request.controller.js';
 import { DashboardController } from '../api/controllers/dashboard.controller.js';
 import { SearchService, EmbeddingProvider } from '../services/search.service.js';
 import { SearchController } from '../api/controllers/search.controller.js';
@@ -106,6 +107,7 @@ export async function initLoaders({
   container.set(FeedbackService, feedbackService);
   container.set(DecisionService, decisionService);
   container.set(DiscussionService, discussionService);
+  container.set(AnalysisRequestController, new AnalysisRequestController(discussionService, authService));
 
   // 5. Controller Layer Binding for TSOA IoC Container
   container.set(PolicyController, new PolicyController(policyService));

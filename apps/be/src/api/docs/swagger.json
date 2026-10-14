@@ -90,6 +90,22 @@
 					"rationale": {
 						"type": "string"
 					},
+					"rationaleStatus": {
+						"type": "string",
+						"enum": [
+							"stated",
+							"not_stated"
+						]
+					},
+					"observation": {
+						"type": "string",
+						"enum": [
+							"proposed",
+							"agreed",
+							"withdrawn",
+							"unclear"
+						]
+					},
 					"rationaleSummary": {
 						"type": "string"
 					},
@@ -219,6 +235,22 @@
 					},
 					"rationale": {
 						"type": "string"
+					},
+					"rationaleStatus": {
+						"type": "string",
+						"enum": [
+							"stated",
+							"not_stated"
+						]
+					},
+					"observation": {
+						"type": "string",
+						"enum": [
+							"proposed",
+							"agreed",
+							"withdrawn",
+							"unclear"
+						]
 					},
 					"rationaleSummary": {
 						"type": "string"
@@ -481,6 +513,22 @@
 					},
 					"rationale": {
 						"type": "string"
+					},
+					"rationaleStatus": {
+						"type": "string",
+						"enum": [
+							"stated",
+							"not_stated"
+						]
+					},
+					"observation": {
+						"type": "string",
+						"enum": [
+							"proposed",
+							"agreed",
+							"withdrawn",
+							"unclear"
+						]
 					},
 					"rationaleSummary": {
 						"type": "string"
@@ -1016,6 +1064,15 @@
 					},
 					"createdAt": {
 						"type": "string"
+					},
+					"graphAvailable": {
+						"type": "boolean"
+					},
+					"candidateNodeIds": {
+						"items": {
+							"type": "string"
+						},
+						"type": "array"
 					}
 				},
 				"required": [
@@ -1099,6 +1156,22 @@
 					},
 					"rationale": {
 						"type": "string"
+					},
+					"rationaleStatus": {
+						"type": "string",
+						"enum": [
+							"stated",
+							"not_stated"
+						]
+					},
+					"observation": {
+						"type": "string",
+						"enum": [
+							"proposed",
+							"agreed",
+							"withdrawn",
+							"unclear"
+						]
 					},
 					"rationaleSummary": {
 						"type": "string"
@@ -1790,6 +1863,15 @@
 			},
 			"AnalyzeDiscussionResponseDto": {
 				"properties": {
+					"requestId": {
+						"type": "string"
+					},
+					"graphAvailable": {
+						"type": "boolean"
+					},
+					"graphId": {
+						"type": "string"
+					},
 					"found": {
 						"type": "boolean"
 					},
@@ -2433,6 +2515,439 @@
 				"type": "object",
 				"additionalProperties": false
 			},
+			"GraphNode": {
+				"properties": {
+					"id": {
+						"type": "string"
+					},
+					"type": {
+						"type": "string",
+						"enum": [
+							"Topic",
+							"Issue",
+							"DecisionCandidate",
+							"Alternative",
+							"Rationale",
+							"ActionItem"
+						]
+					},
+					"summary": {
+						"type": "string"
+					},
+					"observation": {
+						"type": "string",
+						"enum": [
+							"proposed",
+							"agreed",
+							"withdrawn",
+							"unclear",
+							"adopted",
+							"rejected",
+							null
+						],
+						"nullable": true
+					},
+					"rationaleStatus": {
+						"type": "string",
+						"enum": [
+							"stated",
+							"not_stated",
+							null
+						],
+						"nullable": true
+					},
+					"category": {
+						"type": "string",
+						"enum": [
+							"타깃",
+							"문제정의",
+							"기능",
+							"기술",
+							"BM",
+							"기타",
+							null
+						],
+						"nullable": true
+					},
+					"history": {
+						"items": {
+							"properties": {
+								"at": {
+									"type": "string",
+									"nullable": true
+								},
+								"summary": {
+									"type": "string"
+								},
+								"observation": {
+									"type": "string",
+									"enum": [
+										"proposed",
+										"agreed",
+										"withdrawn",
+										"unclear"
+									]
+								}
+							},
+							"required": [
+								"at",
+								"summary",
+								"observation"
+							],
+							"type": "object"
+						},
+						"type": "array",
+						"nullable": true
+					},
+					"assignee": {
+						"type": "string",
+						"nullable": true
+					},
+					"dueDate": {
+						"type": "string",
+						"nullable": true
+					}
+				},
+				"required": [
+					"id",
+					"type",
+					"summary"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"LinkedGraphNode": {
+				"allOf": [
+					{
+						"$ref": "#/components/schemas/GraphNode"
+					},
+					{
+						"properties": {
+							"suppressed": {
+								"type": "boolean"
+							},
+							"stale": {
+								"type": "boolean"
+							},
+							"currentDecisionVersion": {
+								"type": "number",
+								"format": "double"
+							},
+							"decisionVersion": {
+								"type": "number",
+								"format": "double"
+							},
+							"decisionId": {
+								"type": "string"
+							}
+						},
+						"type": "object"
+					}
+				]
+			},
+			"GraphEdge": {
+				"properties": {
+					"id": {
+						"type": "string"
+					},
+					"type": {
+						"type": "string",
+						"enum": [
+							"contains",
+							"has_alternative",
+							"supports",
+							"opposes",
+							"triggers",
+							"conflicts_with",
+							"depends_on"
+						]
+					},
+					"sourceId": {
+						"type": "string"
+					},
+					"targetId": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"id",
+					"type",
+					"sourceId",
+					"targetId"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"GraphSession": {
+				"properties": {
+					"summary": {
+						"type": "string"
+					},
+					"nodes": {
+						"items": {
+							"$ref": "#/components/schemas/LinkedGraphNode"
+						},
+						"type": "array"
+					},
+					"edges": {
+						"items": {
+							"$ref": "#/components/schemas/GraphEdge"
+						},
+						"type": "array"
+					},
+					"discussionProblems": {
+						"items": {
+							"properties": {
+								"edgeIds": {
+									"items": {
+										"type": "string"
+									},
+									"type": "array"
+								},
+								"nodeIds": {
+									"items": {
+										"type": "string"
+									},
+									"type": "array"
+								},
+								"summary": {
+									"type": "string"
+								}
+							},
+							"required": [
+								"edgeIds",
+								"nodeIds",
+								"summary"
+							],
+							"type": "object"
+						},
+						"type": "array"
+					},
+					"sessionId": {
+						"type": "string"
+					},
+					"inputMessageIds": {
+						"items": {
+							"type": "string"
+						},
+						"type": "array"
+					}
+				},
+				"required": [
+					"summary",
+					"nodes",
+					"edges",
+					"discussionProblems",
+					"sessionId",
+					"inputMessageIds"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"GraphSnapshot": {
+				"properties": {
+					"id": {
+						"type": "string"
+					},
+					"schemaVersion": {
+						"type": "number",
+						"enum": [
+							1
+						],
+						"nullable": false
+					},
+					"requestId": {
+						"type": "string"
+					},
+					"guildId": {
+						"type": "string"
+					},
+					"sessions": {
+						"items": {
+							"$ref": "#/components/schemas/GraphSession"
+						},
+						"type": "array"
+					}
+				},
+				"required": [
+					"id",
+					"schemaVersion",
+					"requestId",
+					"guildId",
+					"sessions"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"ApiResponse_GraphSnapshot_": {
+				"description": "Shared v1 response contract. Domain payloads remain typed by each endpoint.",
+				"properties": {
+					"success": {
+						"type": "boolean"
+					},
+					"code": {
+						"type": "string"
+					},
+					"message": {
+						"type": "string"
+					},
+					"data": {
+						"$ref": "#/components/schemas/GraphSnapshot"
+					}
+				},
+				"required": [
+					"success",
+					"code",
+					"message",
+					"data"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"AnalysisFailure": {
+				"properties": {
+					"category": {
+						"type": "string"
+					},
+					"message": {
+						"type": "string"
+					},
+					"status": {
+						"type": "number",
+						"format": "double"
+					},
+					"retryable": {
+						"type": "boolean"
+					}
+				},
+				"required": [
+					"category",
+					"message",
+					"status",
+					"retryable"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"AnalysisPhase": {
+				"type": "string",
+				"enum": [
+					"extract",
+					"check",
+					"verify",
+					"repair",
+					"recheck",
+					"reverify",
+					"done"
+				]
+			},
+			"AnalysisStatus": {
+				"properties": {
+					"requestId": {
+						"type": "string"
+					},
+					"state": {
+						"type": "string"
+					},
+					"graphAvailable": {
+						"type": "boolean"
+					},
+					"retryable": {
+						"type": "boolean"
+					},
+					"error": {
+						"allOf": [
+							{
+								"$ref": "#/components/schemas/AnalysisFailure"
+							}
+						],
+						"nullable": true
+					},
+					"sessions": {
+						"items": {
+							"properties": {
+								"outputTokens": {
+									"type": "number",
+									"format": "double"
+								},
+								"inputTokens": {
+									"type": "number",
+									"format": "double"
+								},
+								"attempts": {
+									"type": "number",
+									"format": "double"
+								},
+								"logicalCalls": {
+									"type": "number",
+									"format": "double"
+								},
+								"elapsedMs": {
+									"type": "number",
+									"format": "double"
+								},
+								"repairs": {
+									"type": "number",
+									"format": "double"
+								},
+								"phase": {
+									"$ref": "#/components/schemas/AnalysisPhase"
+								},
+								"sessionId": {
+									"type": "string"
+								}
+							},
+							"required": [
+								"outputTokens",
+								"inputTokens",
+								"attempts",
+								"logicalCalls",
+								"elapsedMs",
+								"repairs",
+								"phase",
+								"sessionId"
+							],
+							"type": "object"
+						},
+						"type": "array"
+					}
+				},
+				"required": [
+					"requestId",
+					"state",
+					"graphAvailable",
+					"retryable",
+					"error",
+					"sessions"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"ApiResponse_AnalysisStatus_": {
+				"description": "Shared v1 response contract. Domain payloads remain typed by each endpoint.",
+				"properties": {
+					"success": {
+						"type": "boolean"
+					},
+					"code": {
+						"type": "string"
+					},
+					"message": {
+						"type": "string"
+					},
+					"data": {
+						"$ref": "#/components/schemas/AnalysisStatus"
+					}
+				},
+				"required": [
+					"success",
+					"code",
+					"message",
+					"data"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
 			"AnalysisDeliveryViewDto": {
 				"properties": {
 					"requestId": {
@@ -2489,6 +3004,9 @@
 							"afterMessageId"
 						],
 						"type": "object"
+					},
+					"requiresNewAnalysis": {
+						"type": "boolean"
 					},
 					"synchronizedAt": {
 						"type": "string"
@@ -3972,6 +4490,172 @@
 					}
 				],
 				"parameters": []
+			}
+		},
+		"/api/v1/analysis-requests/{requestId}/graph": {
+			"get": {
+				"operationId": "Graph",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiResponse_GraphSnapshot_"
+								}
+							}
+						}
+					},
+					"401": {
+						"description": "Authentication required",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiResponse_null_"
+								}
+							}
+						}
+					},
+					"403": {
+						"description": "Guild access denied",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiResponse_null_"
+								}
+							}
+						}
+					},
+					"404": {
+						"description": "Request or legacy graph unavailable",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiResponse_null_"
+								}
+							}
+						}
+					},
+					"409": {
+						"description": "Analysis not completed",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiResponse_null_"
+								}
+							}
+						}
+					},
+					"422": {
+						"description": "Terminal analysis failure",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiResponse_null_"
+								}
+							}
+						}
+					}
+				},
+				"tags": [
+					"Analysis Requests"
+				],
+				"security": [
+					{
+						"jwt": []
+					}
+				],
+				"parameters": [
+					{
+						"in": "path",
+						"name": "requestId",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"in": "query",
+						"name": "guildId",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				]
+			}
+		},
+		"/api/v1/analysis-requests/{requestId}": {
+			"get": {
+				"operationId": "Status",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiResponse_AnalysisStatus_"
+								}
+							}
+						}
+					},
+					"401": {
+						"description": "Authentication required",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiResponse_null_"
+								}
+							}
+						}
+					},
+					"403": {
+						"description": "Guild access denied",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiResponse_null_"
+								}
+							}
+						}
+					},
+					"404": {
+						"description": "Request unavailable",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiResponse_null_"
+								}
+							}
+						}
+					}
+				},
+				"tags": [
+					"Analysis Requests"
+				],
+				"security": [
+					{
+						"jwt": []
+					}
+				],
+				"parameters": [
+					{
+						"in": "path",
+						"name": "requestId",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"in": "query",
+						"name": "guildId",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				]
 			}
 		},
 		"/api/v1/analysis-deliveries": {

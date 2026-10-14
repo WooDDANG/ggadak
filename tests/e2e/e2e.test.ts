@@ -1,3 +1,4 @@
+import { fixtureAiAdapter } from '../../apps/be/src/test-support/ai-fixture.js';
 import { describe, it, expect } from 'vitest';
 import { createServer } from '../../apps/be/src/server.js';
 import { isolatedRepository } from '../../apps/be/src/repositories/test-database.js';
@@ -5,7 +6,7 @@ import type { IAiAdapter } from '../../apps/be/src/adapters/ai.adapter.js';
 import { fakeAuthOptions, loginAsTestUser } from '../../apps/be/src/test-support/auth.js';
 
 // Fixed AI responses keep this pipeline regression independent of providers and API keys.
-const decisionExtractor: IAiAdapter = {
+const decisionExtractor: IAiAdapter = fixtureAiAdapter({
   async analyzeTranscript() {
     return {
       found: true,
@@ -34,13 +35,13 @@ const decisionExtractor: IAiAdapter = {
       ],
     };
   },
-};
+});
 
-const noDecisionExtractor: IAiAdapter = {
+const noDecisionExtractor: IAiAdapter = fixtureAiAdapter({
   async analyzeTranscript() {
     return { found: false, summary: '의사결정 없음', decisions: [] };
   },
-};
+});
 
 describe('E2E Full Pipeline: Discord Messages ➔ Backend AI Core ➔ Review Queue ➔ DB ➔ Query', () => {
   it('extracts multi-decision candidates in DRAFT state and confirms via Review Queue', async () => {
