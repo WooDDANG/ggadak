@@ -3,6 +3,7 @@ import { createLogger } from '@ggaddak/shared';
 import { ValidateError } from 'tsoa';
 import { apiFailure, isV1Request } from '../../dto/api-response.dto.js';
 import { AppError } from '../../errors/AppError.js';
+import { AuthConfigurationError } from '../../errors/AuthConfigurationError.js';
 
 const logger = createLogger('ERROR-HANDLER');
 
@@ -34,7 +35,7 @@ export function errorHandler(err: any, req: Request, res: Response, _next: NextF
           code,
           validation
             ? 'Request validation failed'
-            : status >= 500
+            : status >= 500 && !(err instanceof AuthConfigurationError)
               ? 'Internal Server Error'
               : err.message,
           validation && err.fields ? err.fields : null,

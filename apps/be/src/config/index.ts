@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { AppError } from '../errors/AppError.js';
+import { AuthConfigurationError } from '../errors/AuthConfigurationError.js';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'node:url';
 import type { AiStage } from '../domain/ai-call.js';
@@ -32,8 +32,12 @@ const AuthConfigSchema = z.object({
 
 // Validate when login is used so installations with only Bot service auth can start.
 export function validateAuthConfig(auth: AuthConfig): void {
-  if (!AuthConfigSchema.safeParse(auth).success)
-    throw new AppError('Discord login is not configured', 503);
+  const result = AuthConfigSchema.safeParse(auth);
+  if (!result.success) {
+    throw new AuthConfigurationError(
+      result.error.issues.map(issue => issue.path[0] as keyof AuthConfig),
+    );
+  }
 }
 
 export function parseAuthConfig(env: NodeJS.ProcessEnv): AuthConfig {
