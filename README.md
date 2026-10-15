@@ -14,7 +14,7 @@ GGADDAK은 디스코드(Discord) 협업 채널에서 휘발되기 쉬운 중요�
 
 ## 2. 주요 기능
 
-현재 구현 범위와 운영 검증 상태는 [의사결정 기능과 AI 분석 흐름](docs/decision-features.md)에 Mermaid 다이어그램과 함께 정리되어 있습니다.
+현재 구현 범위와 운영 검증 상태는 [의사결정 기능과 AI 분석 흐름](docs/decision-features.md)에 Mermaid 다이어그램과 함께 정리되어 있습니다. 전체 조회 전 준비와 오류별 조치는 [Discord 스캔 운영 문서](docs/operations/discord-scan.md)를 참고하세요.
 
 - **디스코드 실시간 모니터링 및 트리거 감지**: 특정 이모지(📌) 반응이나 합의성 발언 패턴을 포착하여 비동기 대화 수집(Harvesting Window) 실행
 - **LLM 다중 의사결정 자동 추출**: agy CLI를 기본으로 후보·근거·Action Item 추출, 구조 검사·AI 의미 검증·필요 시 한 번 수정 및 재검증

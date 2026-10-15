@@ -165,3 +165,7 @@ AI graph는 분석 당시 snapshot이다. 카드 편집은 현재 카드와 변�
 - 대표 한국어 gold 50개와 90% 품질 목표는 검증하지 않았다.
 
 다음 단계로 실제 Discord부터 사람 확정까지의 검증을 우선하고, 단계별 명시적 모델 선택을 유지하며, 요청 전체 자원 예산을 추가하기로 합의했다. 실행 환경·예산 수치·소진 처리 정책은 아직 설계 중이다. [설계 인터뷰 기록](../.scratch/ai-agent-next-steps/map.md), [기능 점검 원본](../.scratch/decision-features-2026-10-15.md)을 참고한다.
+
+## 운영 준비 후속 기록 — 2026-10-15
+
+위 운영 점검 이후 루트 BOT_SERVICE_TOKEN을 설정하고 실제 서버의 내부 API 인증 200을 확인했다. 활성·legacy DB를 백업한 뒤 미적용 agentic migration을 적용했고, 기존 Decision 305건의 내용 보존과 DB 무결성을 검증했다. 모니터링 채널 선택과 실제 Discord 스캔 검증은 아직 남아 있다. 상세 절차와 시점별 결과는 [Discord 스캔 운영 기록](operations/discord-scan.md)을 따른다.
