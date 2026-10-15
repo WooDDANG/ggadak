@@ -11,6 +11,7 @@ import {
 } from '../extractor/graph-prompt.js';
 
 import type { AiSettings, AiCallContext, AiResult } from '../domain/ai-call.js';
+import { runAgyCli, type AgyTransport } from './agy-cli.js';
 export type { AiSettings, AiCallContext, AiResult } from '../domain/ai-call.js';
 export interface IAiAdapter {
   readonly settings?: AiSettings;
@@ -65,14 +66,22 @@ export class AiAdapter implements IAiAdapter {
     private readonly options: AppConfig['ai'] = config.ai,
     private readonly environment = config.nodeEnv,
     private readonly transport: typeof fetch = fetch,
+    private readonly agyTransport: AgyTransport = runAgyCli,
   ) {
     this.settings = {
       provider: options.provider,
-      model: options.model || (options.provider === 'gemini' ? 'gemini-3.8-flash' : 'gpt-4o-mini'),
+      model:
+        options.model ||
+        (options.provider === 'agy'
+          ? 'gemini-3.8-flash-low'
+          : options.provider === 'gemini'
+            ? 'gemini-3.8-flash'
+            : 'gpt-4o-mini'),
       promptVersion: GRAPH_PROMPT_VERSION,
       maxOutputTokens: Number(process.env.AI_MAX_OUTPUT_TOKENS || 8192),
       maxInputChars: Number(
-        process.env.AI_MAX_INPUT_CHARS ?? (options.provider === 'gemini' ? 0 : 100000),
+        process.env.AI_MAX_INPUT_CHARS ??
+          (['gemini', 'agy'].includes(options.provider) ? 0 : 100000),
       ),
       ...(process.env.AI_MAX_INPUT_TOKENS
         ? { maxInputTokens: Number(process.env.AI_MAX_INPUT_TOKENS) }
@@ -130,7 +139,7 @@ export class AiAdapter implements IAiAdapter {
           context.settings.maxInputTokens <= 0))
     )
       throw new AppError('Invalid AI limits', 422);
-    if (!['gemini', 'openai', 'mock'].includes(provider))
+    if (!['gemini', 'openai', 'agy', 'mock'].includes(provider))
       throw new AppError('Unsupported AI_PROVIDER', 422);
     if (provider === 'mock') {
       if (!['development', 'test'].includes(this.environment))
@@ -147,12 +156,29 @@ export class AiAdapter implements IAiAdapter {
               },
       };
     }
-    const key = provider === 'gemini' ? this.options.geminiApiKey : this.options.openaiApiKey;
-    if (!key) throw new AppError('Missing API key for AI_PROVIDER=' + provider, 422);
     const prompt = JSON.stringify(input);
     if (maxInputChars > 0 && prompt.length > maxInputChars)
       throw new AppError('AI input limit exceeded', 422);
     const schema = strictSchema(zodToJsonSchema(outputSchema, { $refStrategy: 'none' }));
+    if (provider === 'agy') {
+      if (context.settings.maxInputTokens !== undefined)
+        throw new AppError(
+          'AGY does not support exact input-token preflight; remove AI_MAX_INPUT_TOKENS for CLI mode',
+          422,
+        );
+      const response = await this.agyTransport({
+        executable: this.options.agyExecutable || 'agy',
+        model,
+        prompt: system + '\n\nSupplied conversation data:\n' + prompt,
+        schema: geminiSchema(schema),
+        signal: context.signal,
+      });
+      if ((response.usage?.outputTokens ?? 0) > maxOutputTokens)
+        throw new AppError('AGY output exceeds application token limit', 422);
+      return response;
+    }
+    const key = provider === 'gemini' ? this.options.geminiApiKey : this.options.openaiApiKey;
+    if (!key) throw new AppError('Missing API key for AI_PROVIDER=' + provider, 422);
     const gemini = provider === 'gemini';
     const url = gemini
       ? 'https://generativelanguage.googleapis.com/v1beta/models/' +

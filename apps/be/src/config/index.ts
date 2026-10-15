@@ -58,6 +58,7 @@ export interface AppConfig {
     model?: string;
     geminiApiKey?: string;
     openaiApiKey?: string;
+    agyExecutable?: string;
   };
 }
 
@@ -78,10 +79,11 @@ export const config: AppConfig = {
   harvestingPolicy: getHarvestingPolicyFromEnv() || DEFAULT_HARVESTING_POLICY,
   get ai() {
     return {
-      provider: process.env.AI_PROVIDER || 'gemini',
+      provider: process.env.AI_PROVIDER || 'agy',
       model: process.env.AI_MODEL,
       geminiApiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GEMINI_API_KEY,
       openaiApiKey: process.env.OPENAI_API_KEY,
+      agyExecutable: process.env.AGY_EXECUTABLE || 'agy',
     };
   },
 };
