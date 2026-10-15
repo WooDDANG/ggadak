@@ -1,6 +1,6 @@
 # GGADDAK (까딱) - AI 기반 디스코드 의사결정 추적 및 거버넌스 플랫폼
 
-> 디스코드 채널의 흩어지는 대화를 LLM으로 실시간 분석하여 공식 의사결정(Decision Record)과 근거(Rationale)를 추출하고, 웹 대시보드와 OpenAPI로 체계화하는 전주기 거버넌스 모노레포 시스템입니다.
+> 디스코드 대화에서 AI가 의사결정 후보와 근거를 추출하고, 사람이 웹에서 검수·확정하여 Decision Record로 관리하는 모노레포 시스템입니다.
 
 ---
 
@@ -14,8 +14,10 @@ GGADDAK은 디스코드(Discord) 협업 채널에서 휘발되기 쉬운 중요�
 
 ## 2. 주요 기능
 
+현재 구현 범위와 운영 검증 상태는 [의사결정 기능과 AI 분석 흐름](docs/decision-features.md)에 Mermaid 다이어그램과 함께 정리되어 있습니다.
+
 - **디스코드 실시간 모니터링 및 트리거 감지**: 특정 이모지(📌) 반응이나 합의성 발언 패턴을 포착하여 비동기 대화 수집(Harvesting Window) 실행
-- **LLM 다중 의사결정 자동 추출**: Vercel AI SDK 기반으로 대화 맥락 속에서 결정 내용(Decision), 채택 이유(Rationale), 후속 과제(Action Items)를 구조화된 JSON으로 추출
+- **LLM 다중 의사결정 자동 추출**: agy CLI를 기본으로 후보·근거·Action Item 추출, 구조 검사·AI 의미 검증·필요 시 한 번 수정 및 재검증
 - **거버넌스 점수(Governance Score) 산출**: 합의 강도, 참여자 다양성, 근거 밀도를 평가하여 1.0 ~ 4.0 척도의 신뢰도 부여
 - **검토 대기열(Review Queue) 승인 파이프라인**: AI가 추출한 후보(Decision Candidate)를 팀 리더가 확인/수정/반려할 수 있는 안전 장치 제공
 - **의사결정 타임라인 및 피드백 대시보드**: 승인된 결정을 토픽/채널별로 시각화하고 외부 피드백과의 연계를 지원하는 React 웹 앱
@@ -29,13 +31,13 @@ GGADDAK은 디스코드(Discord) 협업 채널에서 휘발되기 쉬운 중요�
 - **Runtime & Framework**: Node.js v22, Express v5
 - **API Spec & Docs**: TSOA v7 (OpenAPI v3 Code-first), Swagger UI Express v5
 - **ORM & Database**: Prisma v5, SQLite
-- **AI Integration**: Vercel AI SDK v3, @ai-sdk/google, @ai-sdk/openai
+- **AI Integration**: agy CLI, 선택 가능한 Gemini/OpenAI HTTP Adapter, Zod 구조 검증
 - **Architecture**: TypeDI (Dependency Injection), Winston Logger, Zod
 
 ### Bot Daemon (`apps/bot`)
 - **Runtime**: Node.js v22, TypeScript v5
 - **Discord Client**: Discord.js v14
-- **Reliability**: SQLite 기반 Egress Queue (장애 복구 전송 큐)
+- **Reliability**: fsync 파일 journal 기반 Egress Queue (장애 복구 전송 큐)
 
 ### Frontend (`apps/fe`)
 - **Core**: React v18, Vite v5, TypeScript v5
@@ -52,7 +54,7 @@ GGADDAK은 디스코드(Discord) 협업 채널에서 휘발되기 쉬운 중요�
 - **Node.js**: v20.0.0 이상 권장 (v22 환경 테스트 완료)
 - **패키지 매니저**: npm (npm workspaces 모노레포)
 - **운영체제**: macOS / Linux / Windows
-- **필수 외부 서비스**: Discord Developer Portal (Bot Token 생성) 및 LLM API Key (OpenAI 또는 Google Gemini, Mock 모드 지원)
+- **외부 서비스**: Discord Bot 및 웹 로그인 설정, agy 로그인 또는 선택한 LLM API 자격증명 (Mock 지원). Why 검색은 별도 OpenAI 임베딩 설정 사용
 
 ---
 
@@ -135,7 +137,7 @@ GGADDAK/
 │   ├── bot/               # 디스코드 이벤트 수집 및 Egress 전송 데몬
 │   │   └── src/
 │   │       ├── handlers/  # 메시지 및 이모지 반응 핸들러
-│   │       └── queue/     # SQLite 기반 전송 보장 Egress Queue
+│   │       └── queue/     # 파일 journal 기반 장애 복구 Egress Queue
 │   └── fe/                # React 웹 대시보드
 │       └── src/
 │           ├── api/       # 백엔드 연동 클라이언트 (Codegen 연동 대상)
@@ -158,7 +160,7 @@ GGADDAK/
 - **TSOA Code-first 기반 OpenAPI 자동화**:
   - 수동 Swagger 작성의 불일치 문제를 해결하기 위해 백엔드 TypeScript Controller와 DTO를 기반으로 빌드 시 OpenAPI v3 명세(`swagger.json`)가 100% 자동 생성되도록 구성했습니다.
 - **비차단 비동기 봇 아키텍처**:
-  - 디스코드 3초 게이트웨이 타임아웃을 방지하기 위해 상호작용 처리를 즉시 지연(defer)하고 SQLite 기반 Egress Queue로 유실 없는 네트워크 전송을 보장했습니다.
+  - 디스코드 3초 게이트웨이 타임아웃을 방지하기 위해 상호작용 처리를 즉시 지연(defer)하고 fsync 파일 journal 기반 Egress Queue로 유실 없는 네트워크 전송을 보장했습니다.
 - **단일 책임 모노레포 구조**:
   - Bot, BE, FE가 도메인 계약(`packages/shared`)을 참조하도록 결합도를 낮추고 독립 배포가 가능하도록 설계했습니다.
 

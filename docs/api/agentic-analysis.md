@@ -2,6 +2,8 @@
 
 2026-10-14. 공통 인증·응답은 [FE 연동 문서](frontend-api.md)를 따른다. FE 화면 작업은 포함하지 않는다.
 
+전체 기능 현황과 Mermaid 흐름도는 [의사결정 기능과 AI 분석 흐름](../decision-features.md)을 참고한다.
+
 ## 분석과 상태
 
 기존 Bot `POST /api/discussions/analyze`는 서비스 인증으로 입력 대화를 전달한다. 추출 → 구조 검사 → AI 의미 검증 → 필요 시 한 번 수정 → 재검증 후 요청 전체를 공개한다. 응답은 기존 found/summary/decisions에 requestId/graphId/graphAvailable을 추가한다. found는 실제 반환 후보 존재이며 합의 존재가 아니다. 후보는 사람의 검수 전까지 Draft다.
@@ -14,6 +16,8 @@
 - error: null 또는 category/message/status/retryable. credential·stack·owner는 노출하지 않는다.
 
 수정은 세션당 한 번, 논리 호출 최대 4회, 호출당 45초, 누적 활성 실행 180초다. 통신 재시도 대기는 제외하고 재시작으로 예산을 초기화하지 않는다. 통신 장애는 503으로 저장 단계에서 재개하며 최종 검증/예산 실패는 422로 보존한다. 같은 terminal 요청 재전송으로 AI를 다시 실행하지 않는다.
+
+논리 호출 4회는 extract/verify/repair/reverify 기준이며 통신 재시도를 포함한 실제 CLI 시도 전체를 4회로 제한하지 않는다. 여러 세션과 재시도를 합친 요청 전체 누적 토큰·시간·실제 CLI 호출 예산은 아직 구현하지 않았다.
 
 ## 그래프 조회
 
