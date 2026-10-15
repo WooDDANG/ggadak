@@ -60,6 +60,7 @@ function geminiSchema(value: unknown): unknown {
 @Service({ factory: () => new AiAdapter() })
 export class AiAdapter implements IAiAdapter {
   readonly settings: AiSettings;
+  private readonly modelLimits = new Map<string, { input: number; output: number }>();
   constructor(
     private readonly options: AppConfig['ai'] = config.ai,
     private readonly environment = config.nodeEnv,
@@ -67,10 +68,15 @@ export class AiAdapter implements IAiAdapter {
   ) {
     this.settings = {
       provider: options.provider,
-      model: options.model || (options.provider === 'gemini' ? 'gemini-2.5-flash' : 'gpt-4o-mini'),
+      model: options.model || (options.provider === 'gemini' ? 'gemini-3.8-flash' : 'gpt-4o-mini'),
       promptVersion: GRAPH_PROMPT_VERSION,
       maxOutputTokens: Number(process.env.AI_MAX_OUTPUT_TOKENS || 8192),
-      maxInputChars: Number(process.env.AI_MAX_INPUT_CHARS || 100000),
+      maxInputChars: Number(
+        process.env.AI_MAX_INPUT_CHARS ?? (options.provider === 'gemini' ? 0 : 100000),
+      ),
+      ...(process.env.AI_MAX_INPUT_TOKENS
+        ? { maxInputTokens: Number(process.env.AI_MAX_INPUT_TOKENS) }
+        : {}),
     };
   }
   extractGraph(transcript: string, context: AiCallContext) {
@@ -114,7 +120,15 @@ export class AiAdapter implements IAiAdapter {
     const { provider, model, maxOutputTokens, maxInputChars, promptVersion } = context.settings;
     if (promptVersion !== GRAPH_PROMPT_VERSION)
       throw new AppError('Unsupported saved prompt version', 422);
-    if (![maxOutputTokens, maxInputChars].every(n => Number.isSafeInteger(n) && n > 0))
+    if (
+      !Number.isSafeInteger(maxOutputTokens) ||
+      maxOutputTokens <= 0 ||
+      !Number.isSafeInteger(maxInputChars) ||
+      maxInputChars < 0 ||
+      (context.settings.maxInputTokens !== undefined &&
+        (!Number.isSafeInteger(context.settings.maxInputTokens) ||
+          context.settings.maxInputTokens <= 0))
+    )
       throw new AppError('Invalid AI limits', 422);
     if (!['gemini', 'openai', 'mock'].includes(provider))
       throw new AppError('Unsupported AI_PROVIDER', 422);
@@ -136,7 +150,8 @@ export class AiAdapter implements IAiAdapter {
     const key = provider === 'gemini' ? this.options.geminiApiKey : this.options.openaiApiKey;
     if (!key) throw new AppError('Missing API key for AI_PROVIDER=' + provider, 422);
     const prompt = JSON.stringify(input);
-    if (prompt.length > maxInputChars) throw new AppError('AI input limit exceeded', 422);
+    if (maxInputChars > 0 && prompt.length > maxInputChars)
+      throw new AppError('AI input limit exceeded', 422);
     const schema = strictSchema(zodToJsonSchema(outputSchema, { $refStrategy: 'none' }));
     const gemini = provider === 'gemini';
     const url = gemini
@@ -145,6 +160,69 @@ export class AiAdapter implements IAiAdapter {
         ':generateContent'
       : 'https://api.openai.com/v1/chat/completions';
     try {
+      const generationConfig = gemini
+        ? {
+            responseMimeType: 'application/json',
+            responseJsonSchema: geminiSchema(schema),
+            maxOutputTokens,
+          }
+        : undefined;
+      const geminiRequest = {
+        system_instruction: { parts: [{ text: system }] },
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        generationConfig,
+      };
+      if (gemini) {
+        const modelUrl = url.slice(0, -':generateContent'.length);
+        let limits = this.modelLimits.get(model);
+        if (!limits) {
+          const metadata = await this.transport(modelUrl, {
+            method: 'GET',
+            signal: context.signal,
+            headers: { 'x-goog-api-key': key },
+          });
+          if (!metadata.ok)
+            throw new AppError(
+              'AI model metadata request failed',
+              [400, 401, 403, 404, 422].includes(metadata.status) ? 422 : 503,
+            );
+          const info = (await metadata.json()) as any;
+          if (
+            ![info.inputTokenLimit, info.outputTokenLimit].every(
+              n => Number.isSafeInteger(n) && n > 0,
+            )
+          )
+            throw new AppError('AI model token limits unavailable', 503);
+          limits = { input: info.inputTokenLimit, output: info.outputTokenLimit };
+          this.modelLimits.set(model, limits);
+        }
+        if (maxOutputTokens > limits.output)
+          throw new AppError('AI output token limit exceeds model capacity', 422);
+        const counted = await this.transport(modelUrl + ':countTokens', {
+          method: 'POST',
+          signal: context.signal,
+          headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
+          body: JSON.stringify({
+            generateContentRequest: {
+              model: 'models/' + model,
+              ...geminiRequest,
+            },
+          }),
+        });
+        if (!counted.ok)
+          throw new AppError(
+            'AI token count request failed',
+            [400, 401, 403, 404, 422].includes(counted.status) ? 422 : 503,
+          );
+        const count = (await counted.json()) as any;
+        if (!Number.isSafeInteger(count.totalTokens) || count.totalTokens < 0)
+          throw new AppError('AI token count unavailable', 503);
+        if (
+          count.totalTokens >
+          Math.min(limits.input, context.settings.maxInputTokens ?? limits.input)
+        )
+          throw new AppError('AI input token limit exceeded', 422);
+      }
       const response = await this.transport(url, {
         method: 'POST',
         signal: context.signal,
@@ -153,15 +231,7 @@ export class AiAdapter implements IAiAdapter {
           : { 'Content-Type': 'application/json', Authorization: 'Bearer ' + key },
         body: JSON.stringify(
           gemini
-            ? {
-                system_instruction: { parts: [{ text: system }] },
-                contents: [{ role: 'user', parts: [{ text: prompt }] }],
-                generationConfig: {
-                  responseMimeType: 'application/json',
-                  responseJsonSchema: geminiSchema(schema),
-                  maxOutputTokens,
-                },
-              }
+            ? geminiRequest
             : {
                 model,
                 messages: [

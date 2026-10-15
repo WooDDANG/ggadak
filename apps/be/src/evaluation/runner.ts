@@ -44,14 +44,19 @@ export function budgetTransport(budget: EvaluationBudget, underlying: typeof fet
   let calls = 0,
     tokens = 0;
   const transport: typeof fetch = async (url, options) => {
-    const reservation =
-      Buffer.byteLength(String(options?.body ?? ''), 'utf8') + budget.maxOutputTokens;
+    const endpoint = new URL(String(url));
+    const preflight =
+      endpoint.hostname === 'generativelanguage.googleapis.com' &&
+      (endpoint.pathname.endsWith(':countTokens') || options?.method === 'GET');
+    const reservation = preflight
+      ? 0
+      : Buffer.byteLength(String(options?.body ?? ''), 'utf8') + budget.maxOutputTokens;
     if (calls >= budget.maxCalls || tokens + reservation > budget.maxTokens)
       throw new Error('Evaluation budget exhausted before provider call');
     calls++;
     tokens += reservation;
     const response = await underlying(url, options);
-    if (response.ok) {
+    if (response.ok && !preflight) {
       const body = (await response.clone().json()) as any;
       const measured = body.usageMetadata?.totalTokenCount ?? body.usage?.total_tokens;
       if (typeof measured === 'number' && Number.isFinite(measured) && measured >= 0)
@@ -262,7 +267,12 @@ async function main() {
   );
   if (live) {
     adapter.settings.maxOutputTokens = budget.maxOutputTokens;
-    adapter.settings.maxInputChars = positive('--max-input-chars');
+    const inputChars = Number(args.get('--max-input-chars'));
+    if (!args.has('--max-input-chars') || !Number.isSafeInteger(inputChars) || inputChars < 0)
+      throw new Error(
+        'Explicit nonnegative limit required: --max-input-chars (0 disables character cap)',
+      );
+    adapter.settings.maxInputChars = inputChars;
   }
   if (!args.get('--output')) throw new Error('--output required');
   const output = resolve(args.get('--output')!);

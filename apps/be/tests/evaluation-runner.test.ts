@@ -33,6 +33,9 @@ test('provider nullable baseline completes with decision fallback and does not n
     { provider: 'gemini', geminiApiKey: 'fixture' },
     'production',
     async (_url, options) => {
+      if (options?.method === 'GET')
+        return Response.json({ inputTokenLimit: 1048576, outputTokenLimit: 65536 });
+      if (String(_url).endsWith(':countTokens')) return Response.json({ totalTokens: 10 });
       if (calls === 0) {
         const schema = JSON.parse(options!.body as string).generationConfig.responseJsonSchema;
         const decisions = schema.properties.decisions.anyOf.find(
@@ -167,7 +170,10 @@ test('baseline parsing failure preserves returned provider usage and workflow st
   const adapter = new AiAdapter(
     { provider: 'gemini', geminiApiKey: 'fixture' },
     'production',
-    async () => {
+    async (url, options) => {
+      if (options?.method === 'GET')
+        return Response.json({ inputTokenLimit: 1048576, outputTokenLimit: 65536 });
+      if (String(url).endsWith(':countTokens')) return Response.json({ totalTokens: 10 });
       const value = values[calls++];
       return Response.json({
         candidates: [
@@ -259,4 +265,20 @@ test('budget transport refuses the next paid call before exceeding call/token li
   await expect(bounded.transport('https://fixture', { body: '{}' })).rejects.toThrow(/budget/i);
   expect(calls).toBe(1);
   expect(bounded.usage()).toEqual({ calls: 1, tokens: 5 });
+});
+
+test('Gemini preflight requests consume HTTP call budget without inventing generated token usage', async () => {
+  const bounded = budgetTransport(
+    { maxCalls: 3, maxTokens: 100, maxOutputTokens: 20 },
+    async url => {
+      if (String(url).endsWith(':countTokens')) return Response.json({ totalTokens: 1048576 });
+      return Response.json({ usageMetadata: { totalTokenCount: 5 } });
+    },
+  );
+  const model = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash';
+  await bounded.transport(model, { method: 'GET' });
+  await bounded.transport(model + ':countTokens', { method: 'POST', body: '{}' });
+  await bounded.transport(model + ':generateContent', { method: 'POST', body: '{}' });
+  expect(bounded.usage()).toEqual({ calls: 3, tokens: 5 });
+  await expect(bounded.transport(model, { method: 'GET' })).rejects.toThrow(/budget/i);
 });

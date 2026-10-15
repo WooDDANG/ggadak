@@ -34,11 +34,13 @@ fixture는 meetingId별 baseline/extract/verify/repair 배열이다. 각 배열�
 fixture 없는 기본 실행은 중단한다. 유료 호출에는 --live, 실제 provider/model과 명시적인 모든 예산이 필요하다. 다음 수치는 예시이며 권장 최적값이 아니다.
 
 ```bash
-node apps/be/dist/evaluation/runner.js --live --smoke --provider gemini --model YOUR_MODEL --max-calls 2 --max-tokens 100000 --max-output-tokens 8192 --max-input-chars 100000 --output .data/evaluation/live-smoke.json
-node apps/be/dist/evaluation/runner.js --live --provider gemini --model YOUR_MODEL --max-calls 10 --max-tokens 200000 --max-output-tokens 8192 --max-input-chars 100000 --input .data/evaluation/ami/gold-dev.jsonl --limit 1 --output .data/evaluation/live-run.json
+node apps/be/dist/evaluation/runner.js --live --smoke --provider gemini --model YOUR_MODEL --max-calls 5 --max-tokens 100000 --max-output-tokens 8192 --max-input-chars 0 --output .data/evaluation/live-smoke.json
+node apps/be/dist/evaluation/runner.js --live --provider gemini --model YOUR_MODEL --max-calls 10 --max-tokens 200000 --max-output-tokens 8192 --max-input-chars 0 --input .data/evaluation/ami/gold-dev.jsonl --limit 1 --output .data/evaluation/live-run.json
 ```
 
 OpenAI는 provider=openai와 계정의 모델을 지정한다. credentials는 환경 설정을 사용하고 manifest에 저장하지 않는다. 공급자 HTTP transport로 시도·취소·예산을 제어해 SDK 숨은 retry를 피한다. 호출 전에 요청 bytes+출력 한도로 보수적으로 예약하고 실제 total usage로 정산한다. usage 누락·통신 실패는 예약 소비를 유지한다.
+
+Gemini는 models.get으로 실제 모델 한도를 확인하고 각 생성 전에 전체 요청을 countTokens로 검사한다. `--max-calls`는 조회를 포함한 모든 HTTP 요청의 한도다. 새 Adapter의 smoke는 메타데이터 1회/토큰 조회 2회/생성 2회로 최대 5회가 필요하다. 토큰 조회 응답은 예상 입력량이며 생성 사용량 합계에 더하지 않는다. `--max-input-chars 0`은 문자 제한만 끄며 모델 토큰 한도는 유지한다. 선택 환경 설정 `AI_MAX_INPUT_TOKENS`로 모델보다 작은 앱 입력 예산을 적용할 수 있다. 유료 프로젝트의 RPM/TPM/RPD는 AI Studio의 실제 값에 따라 공급자가 적용하며 임의의 무료 티어 수치를 서비스에 넣지 않는다.
 
 smoke는 실제 통신·graph/critic 형식을 확인하지만 품질 평가는 아니다. 모델·prompt/schema·baseline 버전·입력 checksum·예산·사용량을 manifest에 남긴다. 기존 단일 호출은 평가 baseline으로만 보존하고 production fallback은 없다.
 

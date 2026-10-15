@@ -8,12 +8,102 @@ const context = (adapter: AiAdapter) => ({
 });
 const graph = { summary: 'Context only', nodes: [], edges: [], discussionProblems: [] };
 
+test('Gemini accepts long text by counted tokens and counts the complete generation request', async () => {
+  let generated = false;
+  let counted: any;
+  const adapter = new AiAdapter(
+    { provider: 'gemini', model: 'gemini-3.8-flash', geminiApiKey: 'fixture' },
+    'production',
+    async (url, options) => {
+      if (options?.method === 'GET')
+        return Response.json({ inputTokenLimit: 1048576, outputTokenLimit: 65536 });
+      if (String(url).endsWith(':countTokens')) {
+        counted = JSON.parse(options!.body as string).generateContentRequest;
+        return Response.json({ totalTokens: 20000 });
+      }
+      generated = true;
+      expect(JSON.parse(options!.body as string)).toMatchObject({
+        contents: counted.contents,
+        system_instruction: counted.system_instruction,
+      });
+      return Response.json({
+        candidates: [
+          { finishReason: 'STOP', content: { parts: [{ text: JSON.stringify(graph) }] } },
+        ],
+      });
+    },
+  );
+  await adapter.extractGraph('가'.repeat(100001), {
+    ...context(adapter),
+    settings: { ...adapter.settings, maxInputChars: 0 },
+  });
+  expect(generated).toBe(true);
+  expect(counted.generationConfig.responseJsonSchema).toBeDefined();
+});
+
+test('Gemini rejects excess token input or output before generation and preserves retryable quota errors', async () => {
+  let generated = 0;
+  let modelReads = 0;
+  let inputTokens = 101;
+  const adapter = new AiAdapter(
+    { provider: 'gemini', geminiApiKey: 'fixture' },
+    'production',
+    async (url, options) => {
+      if (options?.method === 'GET') {
+        modelReads++;
+        return Response.json({ inputTokenLimit: 100, outputTokenLimit: 8192 });
+      }
+      if (String(url).endsWith(':countTokens')) return Response.json({ totalTokens: inputTokens });
+      generated++;
+      return Response.json({
+        candidates: [
+          { finishReason: 'STOP', content: { parts: [{ text: JSON.stringify(graph) }] } },
+        ],
+      });
+    },
+  );
+  await expect(adapter.extractGraph('input', context(adapter))).rejects.toMatchObject({
+    statusCode: 422,
+    message: 'AI input token limit exceeded',
+  });
+  await expect(
+    adapter.extractGraph('input', {
+      ...context(adapter),
+      settings: { ...adapter.settings, maxOutputTokens: 8193 },
+    }),
+  ).rejects.toMatchObject({ statusCode: 422 });
+  expect(generated).toBe(0);
+  inputTokens = 100;
+  await expect(adapter.extractGraph('input', context(adapter))).resolves.toMatchObject({
+    value: graph,
+  });
+  await expect(
+    adapter.extractGraph('input', {
+      ...context(adapter),
+      settings: { ...adapter.settings, maxInputTokens: 99 },
+    }),
+  ).rejects.toMatchObject({ statusCode: 422 });
+  expect(modelReads).toBe(1);
+  expect(generated).toBe(1);
+  const limited = new AiAdapter(
+    { provider: 'gemini', geminiApiKey: 'fixture' },
+    'production',
+    async () => new Response('', { status: 429 }),
+  );
+  await expect(limited.extractGraph('input', context(limited))).rejects.toMatchObject({
+    statusCode: 503,
+  });
+});
+
 test('Gemini extraction, repair and verification omit array bounds rejected by the provider', async () => {
   const schemas: unknown[] = [];
   const adapter = new AiAdapter(
     { provider: 'gemini', geminiApiKey: 'fixture' },
     'production',
     async (_url, options) => {
+      if (options?.method === 'GET')
+        return Response.json({ inputTokenLimit: 1048576, outputTokenLimit: 65536 });
+      if (String(_url).endsWith(':countTokens')) return Response.json({ totalTokens: 10 });
       const body = JSON.parse(options!.body as string);
       schemas.push(body.generationConfig.responseJsonSchema);
       return Response.json({
@@ -58,6 +148,9 @@ test('Gemini receives graph schema, output limit and only supplied input; usage 
     { provider: 'gemini', model: 'configured', geminiApiKey: 'fixture' },
     'production',
     async (url, options) => {
+      if (options?.method === 'GET')
+        return Response.json({ inputTokenLimit: 1048576, outputTokenLimit: 65536 });
+      if (String(url).endsWith(':countTokens')) return Response.json({ totalTokens: 10 });
       expect(String(url)).toContain('/configured:generateContent');
       const body = JSON.parse(options!.body as string);
       expect(body.generationConfig.responseJsonSchema.type).toBe('object');
@@ -130,7 +223,12 @@ test('provider rejection, refusal, truncation, malformed JSON and outages remain
     const adapter = new AiAdapter(
       { provider: 'gemini', geminiApiKey: 'fixture' },
       'production',
-      async () => response,
+      async (url, options) => {
+        if (options?.method === 'GET')
+          return Response.json({ inputTokenLimit: 1048576, outputTokenLimit: 65536 });
+        if (String(url).endsWith(':countTokens')) return Response.json({ totalTokens: 10 });
+        return response;
+      },
     );
     await expect(adapter.extractGraph('input', context(adapter))).rejects.toMatchObject({
       statusCode,

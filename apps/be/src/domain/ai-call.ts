@@ -4,6 +4,7 @@ export interface AiSettings {
   promptVersion: string;
   maxOutputTokens: number;
   maxInputChars: number;
+  maxInputTokens?: number;
 }
 export interface AiCallContext {
   signal: AbortSignal;
