@@ -11,4 +11,6 @@ export interface CandidateHistoryEntry {
   previousRequestIds: string[];
   relatedCandidateIds: string[];
   createdAt: string;
+  graphAvailable?: boolean;
+  candidateNodeIds?: string[];
 }

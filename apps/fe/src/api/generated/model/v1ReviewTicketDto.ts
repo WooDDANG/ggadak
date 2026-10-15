@@ -10,6 +10,8 @@ import type { RecordStringAny } from './recordStringAny';
 import type { V1ReviewTicketDtoAlternativesItem } from './v1ReviewTicketDtoAlternativesItem';
 import type { V1ReviewTicketDtoCategoryTag } from './v1ReviewTicketDtoCategoryTag';
 import type { V1ReviewTicketDtoDates } from './v1ReviewTicketDtoDates';
+import type { V1ReviewTicketDtoObservation } from './v1ReviewTicketDtoObservation';
+import type { V1ReviewTicketDtoRationaleStatus } from './v1ReviewTicketDtoRationaleStatus';
 import type { V1ReviewTicketDtoState } from './v1ReviewTicketDtoState';
 
 /**
@@ -24,6 +26,8 @@ export interface V1ReviewTicketDto {
   title?: string;
   decisionContent?: string;
   rationale: string;
+  rationaleStatus?: V1ReviewTicketDtoRationaleStatus;
+  observation?: V1ReviewTicketDtoObservation;
   rationaleSummary?: string;
   rationaleQuotes?: string[];
   categoryTag?: V1ReviewTicketDtoCategoryTag;

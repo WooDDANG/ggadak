@@ -7,6 +7,8 @@
 import type { ActionItemDto } from './actionItemDto';
 import type { AlternativeItemDto } from './alternativeItemDto';
 import type { DecisionItemDtoCategoryTag } from './decisionItemDtoCategoryTag';
+import type { DecisionItemDtoObservation } from './decisionItemDtoObservation';
+import type { DecisionItemDtoRationaleStatus } from './decisionItemDtoRationaleStatus';
 import type { DecisionItemDtoState } from './decisionItemDtoState';
 import type { RecordStringAny } from './recordStringAny';
 
@@ -20,6 +22,8 @@ export interface DecisionItemDto {
   title?: string;
   decisionContent?: string;
   rationale: string;
+  rationaleStatus?: DecisionItemDtoRationaleStatus;
+  observation?: DecisionItemDtoObservation;
   rationaleSummary?: string;
   rationaleQuotes?: string[];
   alternatives?: AlternativeItemDto[];

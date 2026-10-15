@@ -10,6 +10,8 @@ import type { RecordStringAny } from './recordStringAny';
 import type { V1DecisionDtoAlternativesItem } from './v1DecisionDtoAlternativesItem';
 import type { V1DecisionDtoCategoryTag } from './v1DecisionDtoCategoryTag';
 import type { V1DecisionDtoDates } from './v1DecisionDtoDates';
+import type { V1DecisionDtoObservation } from './v1DecisionDtoObservation';
+import type { V1DecisionDtoRationaleStatus } from './v1DecisionDtoRationaleStatus';
 import type { V1DecisionDtoState } from './v1DecisionDtoState';
 
 export interface V1DecisionDto {
@@ -21,6 +23,8 @@ export interface V1DecisionDto {
   title?: string;
   decisionContent?: string;
   rationale: string;
+  rationaleStatus?: V1DecisionDtoRationaleStatus;
+  observation?: V1DecisionDtoObservation;
   rationaleSummary?: string;
   rationaleQuotes?: string[];
   categoryTag?: V1DecisionDtoCategoryTag;

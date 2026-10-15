@@ -31,16 +31,18 @@ import type {
   ApiResponseAnalysisDeliveryQueueDto,
   ApiResponseAnalysisRetryCommandDto,
   ApiResponseAnalysisRetryCommandDtoArray,
-  ApiResponseAnyOrNull,
+  ApiResponseAnalysisStatus,
   ApiResponseAuthUserDto,
   ApiResponseCandidateHistoryEntryArray,
   ApiResponseChannelIdsStringArray,
   ApiResponseChannelSettings,
   ApiResponseDashboardDto,
   ApiResponseDecisionTimelineDto,
+  ApiResponseGraphSnapshot,
   ApiResponseGuildsDiscordGuildArray,
   ApiResponseNull,
   ApiResponseSearchResponse,
+  ApiResponseSyncJobClaimDtoOrNull,
   ApiResponseSyncJobView,
   ApiResponseUrlString,
   ApiResponseV1DecisionDto,
@@ -61,6 +63,7 @@ import type {
   GetParams,
   GetV1DecisionHistoryParams,
   GetV1DecisionParams,
+  GraphParams,
   HarvestingPolicyDto,
   ListAnalysisDeliveriesParams,
   ListDiscordChannelsParams,
@@ -76,8 +79,9 @@ import type {
   SaveDiscordChannelsBody,
   SaveDiscordChannelsParams,
   SearchDecisionsParams,
+  StatusParams,
+  SyncJobUpdate,
   SynchronizeBody,
-  UpdateBody,
   V1ReviewRequestDto
 } from './model';
 
@@ -1125,7 +1129,7 @@ export function useGet<TData = Awaited<ReturnType<typeof get>>, TError = unknown
 
 
 export type claimResponse200 = {
-  data: ApiResponseAnyOrNull
+  data: ApiResponseSyncJobClaimDtoOrNull
   status: 200
 }
 
@@ -1225,7 +1229,7 @@ export const getUpdateUrl = (jobId: string,) => {
 }
 
 export const update = async (jobId: string,
-    updateBody: UpdateBody, options?: Parameters<typeof authenticatedClient>[1]): Promise<updateResponse> => {
+    syncJobUpdate: SyncJobUpdate, options?: Parameters<typeof authenticatedClient>[1]): Promise<updateResponse> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -1246,7 +1250,7 @@ return authenticatedClient<updateResponse>(getUpdateUrl(jobId),
     ...options,
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-    body: JSON.stringify(updateBody)
+    body: JSON.stringify(syncJobUpdate)
   }
 );}
 
@@ -1284,9 +1288,9 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type UpdateMutationResult = NonNullable<Awaited<ReturnType<typeof update>>>
-    export type UpdateMutationBody = UpdateBody
+    export type UpdateMutationBody = SyncJobUpdate
     export type UpdateMutationError = unknown
-    export type UpdateMutationVariables = {jobId: string;data: UpdateBody}
+    export type UpdateMutationVariables = {jobId: string;data: SyncJobUpdate}
 
     export const useUpdate = <TError = unknown,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof update>>, TError,UpdateMutationVariables, TContext>, request?: SecondParameter<typeof authenticatedClient>}
@@ -3152,6 +3156,294 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       > => {
       return useMutation(getLogoutSessionMutationOptions(options), queryClient);
     }
+
+export type graphResponse200 = {
+  data: ApiResponseGraphSnapshot
+  status: 200
+}
+
+export type graphResponse401 = {
+  data: ApiResponseNull
+  status: 401
+}
+
+export type graphResponse403 = {
+  data: ApiResponseNull
+  status: 403
+}
+
+export type graphResponse404 = {
+  data: ApiResponseNull
+  status: 404
+}
+
+export type graphResponse409 = {
+  data: ApiResponseNull
+  status: 409
+}
+
+export type graphResponse422 = {
+  data: ApiResponseNull
+  status: 422
+}
+
+export type graphResponseSuccess = (graphResponse200) & {
+  headers: Headers;
+};
+export type graphResponseError = (graphResponse401 | graphResponse403 | graphResponse404 | graphResponse409 | graphResponse422) & {
+  headers: Headers;
+};
+
+export type graphResponse = (graphResponseSuccess | graphResponseError)
+
+export const getGraphUrl = (requestId: string,
+    params: GraphParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/analysis-requests/${requestId}/graph?${stringifiedParams}` : `/api/v1/analysis-requests/${requestId}/graph`
+}
+
+export const graph = async (requestId: string,
+    params: GraphParams, options?: Parameters<typeof authenticatedClient>[1]): Promise<graphResponse> => {
+
+  return authenticatedClient<graphResponse>(getGraphUrl(requestId,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGraphQueryKey = (requestId: string,
+    params?: GraphParams,) => {
+    return [
+    `/api/v1/analysis-requests/${requestId}/graph`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGraphQueryOptions = <TData = Awaited<ReturnType<typeof graph>>, TError = ApiResponseNull>(requestId: string,
+    params: GraphParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof graph>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGraphQueryKey(requestId,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof graph>>> = ({ signal }) => graph(requestId,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: requestId !== null && requestId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof graph>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GraphQueryResult = NonNullable<Awaited<ReturnType<typeof graph>>>
+export type GraphQueryError = ApiResponseNull
+
+
+export function useGraph<TData = Awaited<ReturnType<typeof graph>>, TError = ApiResponseNull>(
+ requestId: string,
+    params: GraphParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof graph>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof graph>>,
+          TError,
+          Awaited<ReturnType<typeof graph>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGraph<TData = Awaited<ReturnType<typeof graph>>, TError = ApiResponseNull>(
+ requestId: string,
+    params: GraphParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof graph>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof graph>>,
+          TError,
+          Awaited<ReturnType<typeof graph>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGraph<TData = Awaited<ReturnType<typeof graph>>, TError = ApiResponseNull>(
+ requestId: string,
+    params: GraphParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof graph>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+
+export function useGraph<TData = Awaited<ReturnType<typeof graph>>, TError = ApiResponseNull>(
+ requestId: string,
+    params: GraphParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof graph>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGraphQueryOptions(requestId,params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export type statusResponse200 = {
+  data: ApiResponseAnalysisStatus
+  status: 200
+}
+
+export type statusResponse401 = {
+  data: ApiResponseNull
+  status: 401
+}
+
+export type statusResponse403 = {
+  data: ApiResponseNull
+  status: 403
+}
+
+export type statusResponse404 = {
+  data: ApiResponseNull
+  status: 404
+}
+
+export type statusResponseSuccess = (statusResponse200) & {
+  headers: Headers;
+};
+export type statusResponseError = (statusResponse401 | statusResponse403 | statusResponse404) & {
+  headers: Headers;
+};
+
+export type statusResponse = (statusResponseSuccess | statusResponseError)
+
+export const getStatusUrl = (requestId: string,
+    params: StatusParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/analysis-requests/${requestId}?${stringifiedParams}` : `/api/v1/analysis-requests/${requestId}`
+}
+
+export const status = async (requestId: string,
+    params: StatusParams, options?: Parameters<typeof authenticatedClient>[1]): Promise<statusResponse> => {
+
+  return authenticatedClient<statusResponse>(getStatusUrl(requestId,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getStatusQueryKey = (requestId: string,
+    params?: StatusParams,) => {
+    return [
+    `/api/v1/analysis-requests/${requestId}`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getStatusQueryOptions = <TData = Awaited<ReturnType<typeof status>>, TError = ApiResponseNull>(requestId: string,
+    params: StatusParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof status>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getStatusQueryKey(requestId,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof status>>> = ({ signal }) => status(requestId,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: requestId !== null && requestId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof status>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type StatusQueryResult = NonNullable<Awaited<ReturnType<typeof status>>>
+export type StatusQueryError = ApiResponseNull
+
+
+export function useStatus<TData = Awaited<ReturnType<typeof status>>, TError = ApiResponseNull>(
+ requestId: string,
+    params: StatusParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof status>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof status>>,
+          TError,
+          Awaited<ReturnType<typeof status>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useStatus<TData = Awaited<ReturnType<typeof status>>, TError = ApiResponseNull>(
+ requestId: string,
+    params: StatusParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof status>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof status>>,
+          TError,
+          Awaited<ReturnType<typeof status>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useStatus<TData = Awaited<ReturnType<typeof status>>, TError = ApiResponseNull>(
+ requestId: string,
+    params: StatusParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof status>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+
+export function useStatus<TData = Awaited<ReturnType<typeof status>>, TError = ApiResponseNull>(
+ requestId: string,
+    params: StatusParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof status>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getStatusQueryOptions(requestId,params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export type listAnalysisDeliveriesResponse200 = {
   data: ApiResponseAnalysisDeliveryQueueDto

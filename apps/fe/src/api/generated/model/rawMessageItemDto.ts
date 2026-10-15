@@ -4,16 +4,6 @@
  * @ggaddak/be
  * OpenAPI spec version: 1.0.0
  */
-import type { RawMessageItemDtoReactionsItem } from './rawMessageItemDtoReactionsItem';
+import type { DiscussionMessage } from './discussionMessage';
 
-export interface RawMessageItemDto {
-  isBot?: boolean;
-  id: string;
-  author: string;
-  content: string;
-  createdAt?: string;
-  replyingTo?: string;
-  reactionCount?: number;
-  reactions?: RawMessageItemDtoReactionsItem[];
-  isTrigger?: boolean;
-}
+export type RawMessageItemDto = DiscussionMessage;

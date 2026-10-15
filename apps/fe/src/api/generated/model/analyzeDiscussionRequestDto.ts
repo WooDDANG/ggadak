@@ -4,11 +4,11 @@
  * @ggaddak/be
  * OpenAPI spec version: 1.0.0
  */
-import type { RawMessageItemDto } from './rawMessageItemDto';
+import type { DiscussionMessage } from './discussionMessage';
 
 export interface AnalyzeDiscussionRequestDto {
   requestId: string;
-  rawMessages: RawMessageItemDto[];
+  rawMessages: DiscussionMessage[];
   guildId?: string;
   channelId?: string;
   channelName?: string;

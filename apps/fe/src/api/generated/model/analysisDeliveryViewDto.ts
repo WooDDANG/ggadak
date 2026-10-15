@@ -18,5 +18,6 @@ export interface AnalysisDeliveryViewDto {
   errorCategory?: string;
   lastError?: string;
   scanRange?: AnalysisDeliveryViewDtoScanRange;
+  requiresNewAnalysis?: boolean;
   synchronizedAt: string;
 }

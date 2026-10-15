@@ -6,6 +6,8 @@
  */
 import type { ActionItemDto } from './actionItemDto';
 import type { PickDecisionItemDtoExcludeKeyofDecisionItemDtoAlternativesCategoryTag } from './pickDecisionItemDtoExcludeKeyofDecisionItemDtoAlternativesCategoryTag';
+import type { PickDecisionItemDtoExcludeKeyofDecisionItemDtoAlternativesObservation } from './pickDecisionItemDtoExcludeKeyofDecisionItemDtoAlternativesObservation';
+import type { PickDecisionItemDtoExcludeKeyofDecisionItemDtoAlternativesRationaleStatus } from './pickDecisionItemDtoExcludeKeyofDecisionItemDtoAlternativesRationaleStatus';
 import type { PickDecisionItemDtoExcludeKeyofDecisionItemDtoAlternativesState } from './pickDecisionItemDtoExcludeKeyofDecisionItemDtoAlternativesState';
 import type { RecordStringAny } from './recordStringAny';
 
@@ -21,6 +23,8 @@ export interface PickDecisionItemDtoExcludeKeyofDecisionItemDtoAlternatives {
   title?: string;
   decisionContent?: string;
   rationale: string;
+  rationaleStatus?: PickDecisionItemDtoExcludeKeyofDecisionItemDtoAlternativesRationaleStatus;
+  observation?: PickDecisionItemDtoExcludeKeyofDecisionItemDtoAlternativesObservation;
   rationaleSummary?: string;
   rationaleQuotes?: string[];
   categoryTag?: PickDecisionItemDtoExcludeKeyofDecisionItemDtoAlternativesCategoryTag;

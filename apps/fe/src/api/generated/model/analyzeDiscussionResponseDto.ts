@@ -7,6 +7,9 @@
 import type { DecisionItemDto } from './decisionItemDto';
 
 export interface AnalyzeDiscussionResponseDto {
+  requestId?: string;
+  graphAvailable?: boolean;
+  graphId?: string;
   found: boolean;
   summary: string;
   decisions: DecisionItemDto[];
