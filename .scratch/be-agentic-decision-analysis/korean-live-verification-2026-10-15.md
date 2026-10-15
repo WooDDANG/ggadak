@@ -20,3 +20,7 @@
 - 전체 3회 호출, 공급자 total usage 합계 6043토큰. 실행 한도: 최대 5회/100000토큰/output 8192/input 100000자.
 
 원본 입력/보고서는 ignored `.data/evaluation/korean-sample-2026-10-15.jsonl`, `.data/evaluation/korean-live-2026-10-15.json`에 있다. 합성 샘플 1건이며 사람이 검수한 서비스 gold나 정량 품질 평가로 간주하지 않는다. HTTP UI 및 실제 Discord 채널 검증은 포함하지 않았다.
+
+## Baseline 수정 후 재검증
+
+[09번](issues/09-baseline-nullable-response.md) 수정 후 같은 샘플의 baseline/workflow 모두 completed. Baseline은 PostgreSQL 합의 1건, workflow는 기존처럼 PostgreSQL 합의와 Redis 미합의 제안 2건을 반환했다. 총 3회 호출/6261토큰. baseline usage는 input=1792/output=214로 기록된다. 재실행 보고서는 `.data/evaluation/korean-live-baseline-fixed-2026-10-15.json`이다.

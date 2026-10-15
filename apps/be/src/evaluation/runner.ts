@@ -137,6 +137,8 @@ export async function evaluateRecords(
                 context,
                 ExtractionResultSchema,
               );
+          baselineInputTokens += response.usage?.inputTokens ?? 0;
+          baselineOutputTokens += response.usage?.outputTokens ?? 0;
           const extracted = ExtractionResultSchema.parse(response.value);
           if (extracted.found)
             for (const item of extracted.decisions)
@@ -144,8 +146,6 @@ export async function evaluateRecords(
                 id: 'baseline-' + baselineCandidates.length,
                 summary: item.decisionContent ?? item.decision,
               });
-          baselineInputTokens += response.usage?.inputTokens ?? 0;
-          baselineOutputTokens += response.usage?.outputTokens ?? 0;
         }
       } catch (error) {
         baselineOutcome = 'failed';
