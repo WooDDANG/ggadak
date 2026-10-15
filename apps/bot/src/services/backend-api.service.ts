@@ -437,6 +437,17 @@ export class BackendApiService {
         },
       );
       if (!response.ok) {
+        // Legacy analysis API keeps working after an HTTP client times out. A live owner
+        // returns this specific 503; checking it again must not exhaust delivery retries.
+        if (
+          response.status === 503 &&
+          result?.error === 'Analysis is already in progress; retry this request'
+        ) {
+          record.attempts--;
+          record.stopped = false;
+          record.errorCategory = 'analysis-in-progress';
+          throw new Error('Backend analysis is still processing; waiting for completion');
+        }
         permanent =
           response.status >= 400 && response.status < 500 && ![408, 429].includes(response.status);
         record.errorCategory =
@@ -562,7 +573,14 @@ export class BackendApiService {
       return await Promise.race([
         (async () => {
           const response = await this.transport(url, init);
-          return { response, result: response.ok ? await response.json() : undefined };
+          return {
+            response,
+            result: response.ok
+              ? await response.json()
+              : response.status === 503
+                ? await response.json().catch(() => undefined)
+                : undefined,
+          };
         })(),
         new Promise<{ response: Response; result: any }>((_, reject) => {
           timer = setTimeout(

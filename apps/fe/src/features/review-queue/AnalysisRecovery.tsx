@@ -8,6 +8,7 @@ type Command = {
   error?: string;
 };
 const categories: Record<string, string> = {
+  'analysis-in-progress': '서버에서 분석 진행 중',
   'backend-unavailable': '분석 서버 연결 오류',
   'configuration-or-payload': '분석 설정 확인 필요',
   'invalid-result': '분석 결과 확인 필요',

@@ -142,3 +142,42 @@ test('a worker that loses its lease stops before scanning the next channel', asy
     await db.cleanup();
   }
 });
+
+test('a sync with analysis still pending remains PROCESSING and resumes after lease recovery', async () => {
+  const { ScanIncompleteError } = await import('../../apps/bot/src/services/harvester.service.js');
+  const db = await isolatedRepository();
+  try {
+    await db.client.guild.create({ data: { id: 'pending-sync', name: 'Pending' } });
+    await db.client.monitoredChannel.create({
+      data: { id: 'pending-channel', guildId: 'pending-sync', name: 'Pending' },
+    });
+    const jobs = new SyncJobService(db.repo);
+    const job = await jobs.create('pending-sync', true);
+    let ready = false;
+    const worker = new SyncJobWorker(
+      { claimSyncJob: () => jobs.claim(), updateSyncJob: (id, update) => jobs.update(id, update) },
+      async () => {
+        if (!ready) throw new ScanIncompleteError(1, 1, 0, 'Analysis still running');
+        return { scannedCount: 150, decisionsCount: 2 };
+      },
+    );
+    await expect(worker.runOnce()).rejects.toBeInstanceOf(ScanIncompleteError);
+    expect(await jobs.get(job.jobId, 'pending-sync')).toMatchObject({
+      status: 'PROCESSING',
+      failedChannels: 0,
+      completedChannels: 0,
+    });
+    await db.client.syncJob.update({ where: { id: job.jobId }, data: { leaseUntil: new Date(0) } });
+    ready = true;
+    await worker.runOnce();
+    expect(await jobs.get(job.jobId, 'pending-sync')).toMatchObject({
+      status: 'COMPLETED',
+      completedChannels: 1,
+      failedChannels: 0,
+      messagesScanned: 150,
+      decisionsFound: 2,
+    });
+  } finally {
+    await db.cleanup();
+  }
+});

@@ -15,3 +15,11 @@
 ## Comments
 
 2026-10-15: npm test 전체 통과(BE 111, Bot 35, FE 10, Shared 15, E2E 6). 기존 테스트에서 미완료 채널 재개, lease 갱신·상실, 중복 Sync Job 거절, 동일 요청 멱등성, 실패 구간 checkpoint 보존을 확인했다. 실제 전체 스캔·FE 상태 대조는 01번과 대상 채널 선택에 의존하므로 완료가 아니다.
+
+실제 스캔에서 발견한 두 오류를 보완했다.
+
+- HTTP 대기 시간이 끝나도 BE는 여러 세션의 분석을 계속한다. BE의 명시적인 ‘already in progress’ 503 응답은 실패 재시도 예산을 소모하지 않고, backoff 후 같은 요청의 완료를 회수한다. 일반 503·통신 장애·최종 실패 제한은 유지한다.
+- ScanIncompleteError에 pending 구간이 있으면 Sync Job 채널을 FAILED로 확정하지 않고 PROCESSING을 유지한다. lease 만료 후 기존 manifest·요청 ID를 이용해 재개한다. 실제로 실패한 구간만 남으면 기존 FAILED 경로를 따른다.
+- 공개 Bot 전달/재시작 경계와 실제 임시 DB의 Sync Job 복구 경계에서 회귀 테스트를 먼저 실패시킨 뒤 통과시켰다. 진행 중인 BE를 재시작하지 않고 전체 워크스페이스·E2E 테스트를 실행했다.
+
+처음 생성한 작업은 접근 가능했던 2개 채널의 snapshot을 가진다. 권한 수정 후 모니터링 대상은 3개다. 첫 작업 종료 후 incremental Sync Job으로 완료한 두 채널을 반복 분석하지 않고 checkpoint가 없는 newbie_channel의 과거 기록을 검증할 예정이다. 실제 전체 종료는 아직 미완료다.

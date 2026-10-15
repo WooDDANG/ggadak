@@ -1,4 +1,5 @@
 import type { SyncJobClaim, SyncJobUpdate as SyncWorkerUpdate } from '@ggaddak/shared';
+import { ScanIncompleteError } from './harvester.service.js';
 export type { SyncJobClaim, SyncJobUpdate as SyncWorkerUpdate } from '@ggaddak/shared';
 
 interface SyncWorkerBackend {
@@ -61,6 +62,9 @@ export class SyncJobWorker {
               decisionsFound: result.decisionsCount,
             };
           } catch (error) {
+            // A timed-out delivery can still be running in BE. Keep the job recoverable
+            // rather than publishing a failed channel while retained requests are pending.
+            if (error instanceof ScanIncompleteError && error.pending > 0) throw error;
             channelResult = {
               channelId,
               status: 'FAILED',

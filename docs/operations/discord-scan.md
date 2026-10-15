@@ -41,3 +41,11 @@ Bot의 Egress Queue 재시도는 같은 Analysis Request ID를 유지한다. 사
 - 현재 모니터링 채널은 0개이며, 실제 검증 대상의 사용자 선택을 기다리고 있다. 실제 Discord → AI → 운영 DB → FE 검증과 서버 전체 스캔 완료를 주장하지 않는다.
 
 [진행 티켓](../../.scratch/discord-scan-readiness/issues/), [전체 기능 현황](../decision-features.md).
+
+## 장시간 분석의 대기·복구
+
+한 Analysis Request에 여러 세션이 있으면 총 실행 시간이 Bot의 HTTP 대기 시간(기본 190초)을 넘을 수 있다. 연결 대기 시간 종료와 BE 분석 중단은 같지 않다. 같은 요청을 전달했을 때 내부 legacy 분석 API가 503과 정확한 `Analysis is already in progress; retry this request` 오류를 반환하면, Bot은 이를 작업 진행 중 상태로 보존하고 backoff 후 다시 확인한다. 이 확인은 실패 재시도 예산을 소모하지 않는다. 임의의 503을 진행 중으로 취급하지 않으며, 실제 통신·provider 실패의 제한은 유지한다.
+
+대기 중 Scan Range가 있는 Sync Job은 채널을 실패로 확정하지 않는다. PROCESSING 상태와 저장한 요청을 유지하고, worker lease 만료 후 같은 scan manifest로 재개한다. 완료한 구간은 결과를 회수하고 checkpoint를 복구하며, pending이 사라진 뒤 남은 실제 실패만 최종 집계한다. Review Queue의 복구 화면은 이 경우 ‘서버에서 분석 진행 중’으로 표시한다.
+
+실제 점검 중 사용자가 세 채널을 모두 지정했고, 권한 수정 뒤 3개 채널의 모니터링 등록을 완료했다. 한 요청에서 새 후보 7건과 graph 저장을 확인했다. 이 기록은 부분 성공이며 전체 작업 완료나 사람의 확정을 뜻하지 않는다.

@@ -9,7 +9,7 @@ import {
   DEFAULT_HARVESTING_POLICY,
 } from '@ggaddak/shared';
 import { BackendApiService } from '../services/backend-api.service.js';
-import { DiscussionHarvester } from '../services/harvester.service.js';
+import { DiscussionHarvester, ScanIncompleteError } from '../services/harvester.service.js';
 import { DecisionHarvestingEngine } from '../services/decision-harvesting-engine.js';
 import { MessageHandler, CONSENSUS_REGEX } from '../handlers/message.handler.js';
 import { ReactionHandler } from '../handlers/reaction.handler.js';
@@ -97,6 +97,12 @@ export class DecisionTrackerBot {
       });
       const processSyncJob = () =>
         syncWorker.runOnce().catch((error: unknown) => {
+          if (error instanceof ScanIncompleteError && error.pending > 0) {
+            logger.info(
+              'Sync Job analysis is pending; the saved scan will resume after lease recovery',
+            );
+            return;
+          }
           logger.warn(
             `Sync Job worker unavailable: ${error instanceof Error ? error.message : String(error)}`,
           );
