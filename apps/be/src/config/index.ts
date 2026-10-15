@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { AppError } from '../errors/AppError.js';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'node:url';
+import type { AiStage } from '../domain/ai-call.js';
 import {
   DEFAULT_HARVESTING_POLICY,
   HarvestingPolicyConfig,
@@ -56,6 +57,7 @@ export interface AppConfig {
   ai: {
     provider: string;
     model?: string;
+    stageModels?: Partial<Record<AiStage, string>>;
     geminiApiKey?: string;
     openaiApiKey?: string;
     agyExecutable?: string;
@@ -81,6 +83,11 @@ export const config: AppConfig = {
     return {
       provider: process.env.AI_PROVIDER || 'agy',
       model: process.env.AI_MODEL,
+      stageModels: Object.fromEntries(
+        (['extract', 'verify', 'repair'] as const)
+          .map(stage => [stage, process.env['AI_MODEL_' + stage.toUpperCase()]?.trim()] as const)
+          .filter(([, model]) => model),
+      ),
       geminiApiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GEMINI_API_KEY,
       openaiApiKey: process.env.OPENAI_API_KEY,
       agyExecutable: process.env.AGY_EXECUTABLE || 'agy',

@@ -6,6 +6,8 @@ export type AnalysisPhase =
   'extract' | 'check' | 'verify' | 'repair' | 'recheck' | 'reverify' | 'done';
 export interface StageAttempt {
   phase: AnalysisPhase;
+  provider?: string;
+  model?: string;
   owner?: string;
   deadline?: number;
   verification?: unknown;

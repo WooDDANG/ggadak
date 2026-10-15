@@ -46,3 +46,13 @@ Each attempt spawns a fresh stream-json process in a temporary directory with th
 `AI_MAX_INPUT_CHARS=0` disables the optional character safeguard. AGY has no exposed exact countTokens preflight; configuring `AI_MAX_INPUT_TOKENS` for CLI mode fails explicitly. `AI_MAX_OUTPUT_TOKENS` is checked against returned output usage after generation, so it is not a pre-generation billing cap. Antigravity account/model limits still apply. The HTTP evaluation runner supports gemini/openai and does not pretend its HTTP budgets govern a CLI harness.
 
 Real cached-login analysis on the four-turn Korean PostgreSQL/Redis sample completed with two CLI attempts and no repair, about 27.9 seconds: PostgreSQL agreed, Redis proposed, DB connection assignee 민수, dueDate null. Both candidates were persisted and queried in temporary SQLite. Aggregate reported input=25021/output=598 tokens; this includes CLI system context and must not be compared as if identical to direct-API prompts. Report: ignored `.data/evaluation/agy-live-2026-10-15.json`. Operating database and real Discord channels were not touched.
+
+## Model selection by analysis stage
+
+`AI_MODEL` is the default. Optional `AI_MODEL_EXTRACT`, `AI_MODEL_VERIFY`, and `AI_MODEL_REPAIR` select models within the configured provider. Reverification uses the verify selection. For agy use exact slugs from `agy models`; neither an unavailable model nor a CLI failure triggers an automatic substitute.
+
+Example: keep `AI_MODEL=gemini-3.8-flash-low` and set `AI_MODEL_VERIFY=gemini-3.8-flash-medium`. Unset stages keep Low. This is explicit stage routing, not automatic conversation-complexity detection. No higher-cost production override was enabled by implementing this feature.
+
+Rules are copied into durable workflow settings at analysis start; server restart or environment changes apply to new analyses. Each persisted attempt records its selected provider/model. Old workflows without stage rules keep their original single model. The HTTP evaluation runner deliberately ignores service stage overrides and uses its explicit --model for fair baseline/workflow comparison.
+
+Live two-model verification succeeded with extraction Low and critic Medium: completed, two attempts/no repair, about 36.2 seconds, input=24655/output=1420. Report: ignored `.data/evaluation/stage-model-live-2026-10-15.json`. Regression tests also verify old model selection after a failed verify, database restart, changed defaults, and midflight settings mutation.

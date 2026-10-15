@@ -37,6 +37,33 @@ test('AGY adapter routes all workflow stages without API credentials or HTTP fal
   expect(JSON.stringify(requests[0].schema)).not.toContain('maxItems');
 });
 
+test('stage models can differ while omitted stages and legacy settings keep the base model', async () => {
+  const models: string[] = [];
+  const adapter = new AiAdapter(
+    { provider: 'agy', model: 'default', stageModels: { extract: 'fast', verify: 'critic' } },
+    'production',
+    undefined,
+    async request => {
+      models.push(request.model);
+      return { value: {}, usage: { inputTokens: 1, outputTokens: 1 } };
+    },
+  );
+  const context = { settings: adapter.settings, signal: new AbortController().signal };
+  await adapter.extractGraph('input', context);
+  await adapter.verifyGraph('input', {}, context);
+  await adapter.repairGraph('input', {}, [], context);
+  await adapter.generateStructured(
+    'baseline',
+    'system',
+    { transcript: 'input' },
+    context,
+    (await import('../../src/domain/decision-graph.js')).GraphSchema,
+  );
+  const { stageModels: _models, ...legacy } = adapter.settings;
+  await adapter.verifyGraph('input', {}, { ...context, settings: legacy });
+  expect(models).toEqual(['fast', 'critic', 'default', 'default', 'default']);
+});
+
 async function fakeCli(body: string) {
   const directory = await mkdtemp(join(tmpdir(), 'ggaddak-fake-agy-'));
   const executable = join(directory, 'agy');

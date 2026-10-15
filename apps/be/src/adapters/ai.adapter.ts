@@ -11,6 +11,7 @@ import {
 } from '../extractor/graph-prompt.js';
 
 import type { AiSettings, AiCallContext, AiResult } from '../domain/ai-call.js';
+import { modelForStage, type AiStage } from '../domain/ai-call.js';
 import { runAgyCli, type AgyTransport } from './agy-cli.js';
 export type { AiSettings, AiCallContext, AiResult } from '../domain/ai-call.js';
 export interface IAiAdapter {
@@ -86,6 +87,7 @@ export class AiAdapter implements IAiAdapter {
       ...(process.env.AI_MAX_INPUT_TOKENS
         ? { maxInputTokens: Number(process.env.AI_MAX_INPUT_TOKENS) }
         : {}),
+      ...(options.stageModels ? { stageModels: { ...options.stageModels } } : {}),
     };
   }
   extractGraph(transcript: string, context: AiCallContext) {
@@ -104,7 +106,7 @@ export class AiAdapter implements IAiAdapter {
   }
 
   private call(
-    stage: string,
+    stage: AiStage,
     system: string,
     input: { transcript: string; graph?: unknown; issues?: string[] },
     context: AiCallContext,
@@ -120,13 +122,16 @@ export class AiAdapter implements IAiAdapter {
 
   /** Shared provider transport; evaluation baseline supplies its frozen schema and prompt. */
   async generateStructured(
-    stage: string,
+    stage: AiStage | 'baseline',
     system: string,
     input: { transcript: string; graph?: unknown; issues?: string[] },
     context: AiCallContext,
     outputSchema: ZodTypeAny,
   ): Promise<AiResult> {
-    const { provider, model, maxOutputTokens, maxInputChars, promptVersion } = context.settings;
+    const { provider, maxOutputTokens, maxInputChars, promptVersion } = context.settings;
+    const model = modelForStage(context.settings, stage);
+    if (typeof model !== 'string' || !model.trim())
+      throw new AppError('Invalid AI model selection', 422);
     if (promptVersion !== GRAPH_PROMPT_VERSION)
       throw new AppError('Unsupported saved prompt version', 422);
     if (

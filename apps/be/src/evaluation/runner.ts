@@ -261,6 +261,8 @@ async function main() {
       ...config.ai,
       provider: args.get('--provider') ?? 'mock',
       model: args.get('--model') ?? 'fixture',
+      // Baseline comparison pins the CLI-selected model for every stage.
+      stageModels: undefined,
     },
     live ? 'production' : 'test',
     bounded.transport,

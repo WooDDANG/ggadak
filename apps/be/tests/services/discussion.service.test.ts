@@ -5,7 +5,8 @@ import { test, expect, vi } from 'vitest';
 import { isolatedRepository } from '../../src/repositories/test-database.js';
 import { DiscussionService } from '../../src/services/discussion.service.js';
 import { DecisionExtractorCore } from '../../src/engine/extractor-core.js';
-import { IAiAdapter } from '../../src/adapters/ai.adapter.js';
+import { IAiAdapter, AiAdapter } from '../../src/adapters/ai.adapter.js';
+import { AppError } from '../../src/errors/AppError.js';
 import { ExtractionResultSchema } from '../../src/evaluation/baseline/schemas.js';
 import { DecisionRepository } from '../../src/repositories/decision.repository.js';
 import { PrismaClient } from '@prisma/client';
@@ -21,6 +22,61 @@ const input = {
     { id: '100', author: 'Lee', content: 'SQLite를 채택합시다', createdAt: '2026-01-01T00:00:00Z' },
   ],
 };
+
+test('stage model selection is frozen at analysis start and survives restart with changed defaults', async () => {
+  const db = await isolatedRepository();
+  const models: string[] = [];
+  const graph = { summary: 'Context', nodes: [], edges: [], discussionProblems: [] };
+  let restarted: PrismaClient | undefined;
+  const old = new AiAdapter(
+    {
+      provider: 'agy',
+      model: 'old-base',
+      stageModels: { extract: 'old-fast', verify: 'old-critic' },
+    },
+    'production',
+    undefined,
+    async request => {
+      models.push(request.model);
+      if (models.length === 1) {
+        old.settings.stageModels!.verify = 'changed-midflight';
+        return { value: graph };
+      }
+      throw new AppError('temporary', 503);
+    },
+  );
+  try {
+    await expect(
+      new DiscussionService(db.repo, old, new DecisionExtractorCore()).analyzeDiscussion(input),
+    ).rejects.toMatchObject({ statusCode: 503 });
+    await db.client.$disconnect();
+    restarted = new PrismaClient({ datasources: { db: { url: db.url } } });
+    const replacement = new AiAdapter(
+      {
+        provider: 'agy',
+        model: 'new-base',
+        stageModels: { extract: 'new-fast', verify: 'new-critic' },
+      },
+      'production',
+      undefined,
+      async request => {
+        models.push(request.model);
+        return { value: { valid: true, issues: [] } };
+      },
+    );
+    const service = new DiscussionService(
+      new DecisionRepository(restarted),
+      replacement,
+      new DecisionExtractorCore(),
+    );
+    await service.analyzeDiscussion(input);
+    expect((await service.getStatus(input.requestId, input.guildId)).state).toBe('completed');
+    expect(models).toEqual(['old-fast', 'old-critic', 'old-critic']);
+  } finally {
+    await restarted?.$disconnect();
+    await db.cleanup();
+  }
+});
 
 test('lost-response retry survives restart and does not repeat paid extraction, including no-decision', async () => {
   const db = await isolatedRepository();

@@ -28,7 +28,7 @@ export function prepareAnalysis(
     .filter(chunk => chunk.length);
   return {
     version: 1,
-    settings: settings,
+    settings: structuredClone(settings),
     skipped: chunks.length === 0,
     sessions: chunks.map((chunk, index) => {
       const originalIds = new Set(

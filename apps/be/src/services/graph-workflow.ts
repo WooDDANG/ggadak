@@ -12,6 +12,7 @@ import {
   type DecisionGraph,
 } from '../domain/decision-graph.js';
 import { AppError } from '../errors/AppError.js';
+import { modelForStage } from '../domain/ai-call.js';
 
 /** Bounded session algorithm; checkpoint callback owns persistence and owner fencing. */
 export class GraphWorkflow {
@@ -71,6 +72,11 @@ export class GraphWorkflow {
       const startedAt = Date.now();
       const attempt: StageAttempt = {
         phase,
+        provider: workflow.settings.provider,
+        model: modelForStage(
+          workflow.settings,
+          phase === 'extract' ? 'extract' : phase === 'repair' ? 'repair' : 'verify',
+        ),
         owner,
         startedAt,
         timeoutMs,

@@ -75,6 +75,8 @@ BE와 Bot은 실행 디렉터리와 관계없이 이 루트 `.env`를 읽습니�
 
 의사결정 분석은 기본적으로 Antigravity CLI(`agy`)를 사용합니다. BE를 실행하는 OS 사용자로 `agy`에 로그인한 뒤 `agy models`에서 사용 가능한 모델을 확인하세요. 루트 설정은 `AI_PROVIDER=agy`, `AI_MODEL=gemini-3.8-flash-low`이며 `AGY_EXECUTABLE`에 실행 파일 경로를 지정할 수 있습니다. 이 경로는 새 CLI 세션의 구조화 응답을 기존 검증·수정·저장 흐름에 전달하며 API 키를 CLI에 전달하지 않습니다. [CLI 사용·제약](docs/research/agy-cli-integration.md).
 
+단계별 모델은 `AI_MODEL_EXTRACT`, `AI_MODEL_VERIFY`, `AI_MODEL_REPAIR`로 선택할 수 있습니다. 예를 들어 기본 모델을 유지하면서 `AI_MODEL_VERIFY=gemini-3.8-flash-medium`만 설정하면 검증·재검증에 다른 모델을 사용합니다. 빈 설정은 `AI_MODEL`로 돌아갑니다. 변경 후 BE를 재시작하면 새 분석부터 적용하며, 진행 중인 분석은 시작 시 저장한 모델 선택을 유지합니다. 복잡도 기반 자동 선택은 적용하지 않습니다.
+
 주요 환경 변수:
 ```env
 DISCORD_BOT_TOKEN=your_discord_bot_token_here

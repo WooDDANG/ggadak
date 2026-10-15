@@ -1,3 +1,5 @@
+export type AiStage = 'extract' | 'verify' | 'repair';
+
 export interface AiSettings {
   provider: string;
   model: string;
@@ -5,6 +7,11 @@ export interface AiSettings {
   maxOutputTokens: number;
   maxInputChars: number;
   maxInputTokens?: number;
+  stageModels?: Partial<Record<AiStage, string>>;
+}
+
+export function modelForStage(settings: AiSettings, stage: AiStage | 'baseline'): string {
+  return stage === 'baseline' ? settings.model : (settings.stageModels?.[stage] ?? settings.model);
 }
 export interface AiCallContext {
   signal: AbortSignal;
