@@ -169,3 +169,5 @@ AI graph는 분석 당시 snapshot이다. 카드 편집은 현재 카드와 변�
 ## 운영 준비 후속 기록 — 2026-10-15
 
 위 운영 점검 이후 루트 BOT_SERVICE_TOKEN을 설정하고 실제 서버의 내부 API 인증 200을 확인했다. 활성·legacy DB를 백업한 뒤 미적용 agentic migration을 적용했고, 기존 Decision 305건의 내용 보존과 DB 무결성을 검증했다. 모니터링 채널 선택과 실제 Discord 스캔 검증은 아직 남아 있다. 상세 절차와 시점별 결과는 [Discord 스캔 운영 기록](operations/discord-scan.md)을 따른다.
+
+2026-10-16 후속 검증에서는 세 채널의 실제 메시지 186개·요청 4개 처리를 완료하고 후보 21건과 graph 4개를 저장했다. 후속 Sync Job은 3/3 완료·실패 0이며 기존 Decision 305건은 보존했다. 새 후보 모두 Review Queue의 조회 대상이다. 실제 사용자 브라우저 표시 확인과 사람의 최종 확정은 구분하며, 상세한 초기 실패 복구·집계 차이는 [운영 기록](operations/discord-scan.md)에 남겼다.

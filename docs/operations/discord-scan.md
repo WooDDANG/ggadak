@@ -49,3 +49,20 @@ Bot의 Egress Queue 재시도는 같은 Analysis Request ID를 유지한다. 사
 대기 중 Scan Range가 있는 Sync Job은 채널을 실패로 확정하지 않는다. PROCESSING 상태와 저장한 요청을 유지하고, worker lease 만료 후 같은 scan manifest로 재개한다. 완료한 구간은 결과를 회수하고 checkpoint를 복구하며, pending이 사라진 뒤 남은 실제 실패만 최종 집계한다. Review Queue의 복구 화면은 이 경우 ‘서버에서 분석 진행 중’으로 표시한다.
 
 실제 점검 중 사용자가 세 채널을 모두 지정했고, 권한 수정 뒤 3개 채널의 모니터링 등록을 완료했다. 한 요청에서 새 후보 7건과 graph 저장을 확인했다. 이 기록은 부분 성공이며 전체 작업 완료나 사람의 확정을 뜻하지 않는다.
+
+## 2026-10-16 실제 검증 완료
+
+| 채널 | 검사 메시지 | Analysis Request | 최종 상태 |
+| --- | ---: | ---: | --- |
+| 일반 | 176 | 2 | 모두 completed |
+| ㄱㅗㅇㅈㅣ | 9 | 1 | completed |
+| newbie_channel | 1 | 1 | completed |
+| 합계 | 186 | 4 | 실패 요청 없음 |
+
+실제 agy 분석 결과로 새 후보 21건과 graph snapshot 4개를 저장했다. 기존 Decision 305건의 전체 행 내용은 백업과 동일하며, 현재 전체 Decision은 326건이다. 세 채널의 Channel Checkpoint가 각 분석 범위를 포함하고 SQLite 무결성 검사는 `ok`다. FE Review Queue가 사용하는 서버별 IN_REVIEW 조회 경로에서 새 후보 21건 모두 조회 대상임을 확인했다. 실제 사용자 브라우저의 인증된 화면 표시를 수동 확인한 것은 아니며, 사람의 확정은 하지 않았다.
+
+초기 2채널 Sync Job에는 수정 전 잘못 집계한 FAILED 이력이 남아 있다. 이를 직접 덮어쓰지 않고 보관된 요청의 정식 재시도 경로로 완료 결과를 회수했다. 후속 3채널 incremental Sync Job은 COMPLETED, completedChannels=3, failedChannels=0으로 종료됐다. 완료한 기존 두 채널은 처리 구간을 재사용했으므로 후속 작업 자체의 messagesScanned/decisionsFound는 새 채널의 1/1이다. 위 표는 초기 요청과 후속 요청을 합친 실제 검사 범위이며, 최초 FAILED 상태가 현재 분석 데이터의 미완료를 뜻하지 않는다.
+
+작업 중 공통 IP 제한(분당 120회)이 FE 조회와 Bot의 주기적 내부 요청을 함께 집계해 정상 worker까지 429로 차단했다. 올바른 BOT_SERVICE_TOKEN을 검증한 요청은 브라우저 공통 제한에서 제외한다. 잘못된 토큰·미인증 요청은 기존 제한과 경로별 인증을 유지한다. 사용자 JWT는 서비스 토큰을 대신하지 않는다. 실제 BE에서 서비스 토큰을 넣은 읽기 전용 정책 요청 125회가 모두 200으로 성공했으며, 회귀 테스트는 잘못된 서비스 토큰의 401과 한도 초과 429도 확인한다.
+
+최종 검증은 BE 112개, Bot 36개, FE 10개, Shared 15개, E2E 7개와 타입 검사·lint(기존 경고 1개 포함)를 통과했다. 원문 대화·자격증명·백업 DB·로컬 상세 보고서는 Git에 추가하지 않았다.
