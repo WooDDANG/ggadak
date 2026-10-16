@@ -285,6 +285,7 @@ export class AiAdapter implements IAiAdapter {
         throw new AppError(
           'AI provider request failed',
           [400, 401, 403, 404, 422].includes(response.status) ? 422 : 503,
+          { retryAfterMs: retryAfterMs(response.headers.get('retry-after')) },
         );
       const body = (await response.json()) as any;
       const candidate = gemini ? body.candidates?.[0] : body.choices?.[0];
@@ -317,4 +318,10 @@ export class AiAdapter implements IAiAdapter {
       throw new AppError('AI provider temporarily unavailable', 503);
     }
   }
+}
+
+function retryAfterMs(value: string | null): number | undefined {
+  if (!value) return undefined;
+  const ms = /^\d+(\.\d+)?$/.test(value) ? Number(value) * 1000 : Date.parse(value) - Date.now();
+  return Number.isFinite(ms) && ms > 0 ? Math.min(ms, 86400000) : undefined;
 }

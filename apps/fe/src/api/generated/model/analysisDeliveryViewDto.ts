@@ -4,6 +4,7 @@
  * @ggaddak/be
  * OpenAPI spec version: 1.0.0
  */
+import type { AnalysisDeliveryViewDtoManagedBy } from './analysisDeliveryViewDtoManagedBy';
 import type { AnalysisDeliveryViewDtoScanRange } from './analysisDeliveryViewDtoScanRange';
 import type { AnalysisDeliveryViewDtoStatus } from './analysisDeliveryViewDtoStatus';
 
@@ -18,6 +19,14 @@ export interface AnalysisDeliveryViewDto {
   errorCategory?: string;
   lastError?: string;
   scanRange?: AnalysisDeliveryViewDtoScanRange;
+  managedBy?: AnalysisDeliveryViewDtoManagedBy;
+  phase?: string;
+  inputRetained?: boolean;
+  receivedAt?: string;
+  /** @nullable */
+  startedAt?: string | null;
+  /** @nullable */
+  completedAt?: string | null;
   requiresNewAnalysis?: boolean;
   synchronizedAt: string;
 }

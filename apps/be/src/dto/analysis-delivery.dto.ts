@@ -17,6 +17,12 @@ export interface AnalysisDeliveryStatusDto {
 }
 
 export interface AnalysisDeliveryViewDto extends AnalysisDeliveryStatusDto {
+  managedBy?: 'bot' | 'backend';
+  phase?: string;
+  inputRetained?: boolean;
+  receivedAt?: string;
+  startedAt?: string | null;
+  completedAt?: string | null;
   requiresNewAnalysis?: boolean;
   synchronizedAt: string;
 }

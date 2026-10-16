@@ -23,6 +23,7 @@ import {
 } from '../repositories/analysis-request.repository.js';
 import { GraphWorkflow } from './graph-workflow.js';
 import { prepareAnalysis } from './discussion-preprocessing.js';
+import { AnalysisExecution } from './analysis-execution.js';
 
 @Service()
 export class DiscussionService {
@@ -40,16 +41,30 @@ export class DiscussionService {
     const requests = new AnalysisRequestRepository(this.repo);
     const claim = await requests.claim(params);
     if (claim.result) return claim.result;
+    const execution = new AnalysisExecution(this.repo.prisma);
+    let slot: { slot: string; owner: string };
+    try {
+      slot = await execution.acquire(params.requestId, params.channelId ?? 'channel');
+    } catch (error) {
+      await requests.release(params.requestId, claim.owner);
+      throw error;
+    }
     const stored = await requests.get(params.requestId);
     const workflow: AnalysisWorkflow = stored?.workflowJson
       ? JSON.parse(stored.workflowJson)
       : this.prepare(params);
     const controller = new AbortController();
     const heartbeat = setInterval(() => {
-      void requests.renew(params.requestId, claim.owner).catch(error => controller.abort(error));
+      void Promise.all([
+        requests.renew(params.requestId, claim.owner),
+        execution.renew(slot),
+      ]).catch(error => controller.abort(error));
     }, 20000);
     heartbeat.unref();
-    const save = () => requests.checkpoint(params.requestId, claim.owner, workflow, params);
+    const save = async () => {
+      await execution.renew(slot);
+      await requests.checkpoint(params.requestId, claim.owner, workflow, params);
+    };
     try {
       await save();
       const algorithm = new GraphWorkflow(this.extractor);
@@ -90,7 +105,7 @@ export class DiscussionService {
         error instanceof AppError
           ? error.statusCode
           : ((error as { status?: number }).status ?? 500);
-      const retryable = status >= 500;
+      const retryable = status >= 500 || status === 429 || status === 408;
       await requests.fail(params.requestId, claim.owner, {
         category: status === 422 ? 'validation-or-budget' : 'provider-or-storage',
         message:
@@ -103,6 +118,7 @@ export class DiscussionService {
       throw error;
     } finally {
       clearInterval(heartbeat);
+      await execution.release(slot);
     }
   }
 

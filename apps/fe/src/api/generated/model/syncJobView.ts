@@ -4,6 +4,7 @@
  * @ggaddak/be
  * OpenAPI spec version: 1.0.0
  */
+import type { SyncJobViewChannelsItem } from './syncJobViewChannelsItem';
 
 export interface SyncJobView {
   /** @nullable */
@@ -13,6 +14,9 @@ export interface SyncJobView {
   createdAt: string;
   /** @nullable */
   errorMessage: string | null;
+  channels?: SyncJobViewChannelsItem[];
+  analysisPendingChannels?: number;
+  receivedChannels?: number;
   messagesScanned: number;
   decisionsFound: number;
   failedChannels: number;

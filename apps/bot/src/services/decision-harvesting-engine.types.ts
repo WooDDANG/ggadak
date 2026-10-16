@@ -9,12 +9,14 @@ export type HarvestTrigger =
 export interface HarvestResult {
   success: boolean;
   outcome?:
+    | 'accepted'
     | 'completed-with-candidates'
     | 'completed-no-decision'
     | 'retry-pending'
     | 'retained-failure'
     | 'merged'
     | 'canceled';
+  pendingAnalysis?: boolean;
   decisions: Decision[];
   decisionsCount: number;
   messageCount: number;

@@ -8,6 +8,7 @@ import type { SyncChannelResult } from './syncChannelResult';
 import type { SyncJobUpdateStatus } from './syncJobUpdateStatus';
 
 export interface SyncJobUpdate {
+  release?: boolean;
   owner: string;
   channelResult?: SyncChannelResult;
   status?: SyncJobUpdateStatus;

@@ -1,7 +1,18 @@
 import type { SyncJobClaim, SyncWorkerUpdate } from './sync-job-worker.js';
 import { analysisScheduler } from './channel-scheduler.js';
 import { createHash, randomUUID } from 'node:crypto';
-import { mkdir, readFile, readdir, link, open, unlink, rename } from 'node:fs/promises';
+import {
+  mkdir,
+  readFile,
+  readdir,
+  link,
+  open,
+  unlink,
+  rename,
+  statfs,
+  stat,
+} from 'node:fs/promises';
+import { JournalBudget } from './journal-budget.js';
 import { resolve, join, dirname } from 'node:path';
 import {
   HarvestingPolicyConfig,
@@ -43,6 +54,11 @@ export class AnalysisDeliveryError extends Error {
     super(message);
   }
 }
+export class BackendRequestError extends Error {
+  constructor(readonly statusCode: number) {
+    super(`Backend request failed (${statusCode})`);
+  }
+}
 export interface ScanRange {
   afterMessageId: string;
   startMessageId: string;
@@ -57,6 +73,21 @@ export interface SyncScanManifest {
 }
 
 export interface DeliveryRecord {
+  receipt?: boolean;
+  scanId?: string;
+  rangeIndex?: number;
+  feedbackApplied?: boolean;
+  serverAcknowledged?: boolean;
+  compacted?: boolean;
+  enqueuedAt?: number;
+  receivedAt?: number;
+  feedbackAppliedAt?: number;
+  feedbackNextAttemptAt?: number;
+  feedbackAttempts?: number;
+  failureFeedbackApplied?: boolean;
+  checkpointAcknowledged?: boolean;
+  fingerprint?: string;
+  reactionRecovered?: boolean;
   scanRange?: ScanRange;
   payload: any;
   attempts: number;
@@ -70,10 +101,14 @@ export interface DeliveryRecord {
 }
 
 export class BackendApiService {
+  private journal: JournalBudget;
   private backendUrl: string;
   private lastPolicy: HarvestingPolicyConfig = DEFAULT_HARVESTING_POLICY;
   private retryCommandsInFlight = new Set<string>();
   private deliveryObserver?: (payload: any, result?: any, error?: unknown) => Promise<void>;
+  private reconciling = false;
+  private recoveringCheckpoints = false;
+  private checkpointRevision = '';
 
   constructor(
     backendUrl: string,
@@ -91,7 +126,10 @@ export class BackendApiService {
       jitter: Number(process.env.ANALYSIS_RETRY_JITTER || 0.2),
     },
     private readonly random: () => number = Math.random,
+    readonly asyncDelivery = process.env.ANALYSIS_ASYNC_DELIVERY !== 'false' &&
+      process.env.NODE_ENV !== 'test',
   ) {
+    this.journal = new JournalBudget(pendingDirectory);
     const o = deliveryOptions;
     if (
       !Number.isInteger(o.maxAttempts) ||
@@ -116,19 +154,197 @@ export class BackendApiService {
   }
 
   async reconcileDeliveryReactions(): Promise<void> {
-    for (const { record } of await this.deliveryRecords()) {
-      if (record.result) continue;
-      await analysisScheduler.run(
-        `${this.pendingDirectory}:${record.payload.channelId || 'unknown'}`,
-        async () => {
-          await this.deliveryObserver?.(record.payload);
-        },
+    if (this.reconciling) return;
+    this.reconciling = true;
+    try {
+      for (const { record } of await this.deliveryRecords()) {
+        if (record.result || record.receipt || record.reactionRecovered || record.scanId) continue;
+        await analysisScheduler.run(
+          `${this.pendingDirectory}:${record.payload.channelId || 'unknown'}`,
+          async () => {
+            await this.deliveryObserver?.(record.payload);
+            record.reactionRecovered = true;
+            await this.persistJson(record, this.deliveryFilename(record.payload.requestId));
+          },
+        );
+      }
+    } finally {
+      this.reconciling = false;
+    }
+  }
+  private deliveryFilename(requestId: string) {
+    return join(
+      this.pendingDirectory,
+      `${createHash('sha256').update(requestId).digest('hex')}.json`,
+    );
+  }
+  async deliverScanSegment(payload: any, scanId: string, rangeIndex: number, range: ScanRange) {
+    return this.enqueueAnalysis(payload, undefined, range, undefined, { scanId, rangeIndex });
+  }
+  async queueRequest(path: string, method: string, body?: unknown) {
+    return this.syncJobRequest(`/api/v1/internal/analysis-queue${path}`, method, body);
+  }
+  transferDirectory(id: string) {
+    return join(this.pendingDirectory, 'transfers', createHash('sha256').update(id).digest('hex'));
+  }
+  async writeTransfer(id: string, name: string, value: unknown) {
+    const directory = this.transferDirectory(id);
+    await mkdir(directory, { recursive: true, mode: 0o700 });
+    await this.persistJson(value, join(directory, name));
+  }
+  async readTransfer(id: string, name: string): Promise<any | null> {
+    try {
+      return JSON.parse(await readFile(join(this.transferDirectory(id), name), 'utf8'));
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+      throw error;
+    }
+  }
+  async reconcileResults(): Promise<void> {
+    if (this.reconciling) return;
+    this.reconciling = true;
+    try {
+      const records = (await this.deliveryRecords()).filter(
+        e =>
+          e.record.receipt &&
+          !e.record.serverAcknowledged &&
+          (e.record.feedbackNextAttemptAt ?? 0) <= this.now(),
       );
+      for (let offset = 0; offset < records.length; offset += 100) {
+        const batch = records.slice(offset, offset + 100);
+        const results = await this.queueRequest(
+          `/results?ids=${encodeURIComponent(batch.map(e => e.record.payload.requestId).join(','))}`,
+          'GET',
+        );
+        for (const result of results ?? []) {
+          const entry = batch.find(e => e.record.payload.requestId === result.requestId);
+          if (!entry) continue;
+          try {
+            if (result.state === 'failed') {
+              if (!entry.record.failureFeedbackApplied && !entry.record.scanId)
+                await this.deliveryObserver?.(
+                  entry.record.payload,
+                  undefined,
+                  new Error('Analysis failure retained; retry from web'),
+                );
+              entry.record.failureFeedbackApplied = true;
+              entry.record.errorCategory = result.errorCategory;
+              entry.record.feedbackNextAttemptAt = this.now() + 30000;
+              await this.persistJson(entry.record, entry.filename);
+              continue;
+            }
+            if (result.state !== 'completed' || !result.result) continue;
+            entry.record.result = result.result;
+            entry.record.completedAt = this.now();
+            await this.persistJson(entry.record, entry.filename);
+            if (!entry.record.feedbackApplied && !entry.record.scanId)
+              await this.deliveryObserver?.(entry.record.payload, result.result);
+            entry.record.feedbackApplied = true;
+            entry.record.feedbackAppliedAt = this.now();
+            await this.persistJson(entry.record, entry.filename);
+            await this.queueRequest('/ack', 'POST', { ids: [result.requestId] });
+            entry.record.serverAcknowledged = true;
+            await this.persistJson(entry.record, entry.filename);
+            const archive = join(this.pendingDirectory, 'completed');
+            await mkdir(archive, { recursive: true });
+            await rename(entry.filename, join(archive, entry.filename.split('/').at(-1)!));
+          } catch (error) {
+            entry.record.feedbackAttempts = (entry.record.feedbackAttempts ?? 0) + 1;
+            entry.record.feedbackNextAttemptAt =
+              this.now() +
+              Math.min(300000, 5000 * 2 ** Math.min(entry.record.feedbackAttempts - 1, 6));
+            await this.persistJson(entry.record, entry.filename);
+            logger.warn(
+              `Result feedback retained for ${result.requestId}: ${error instanceof Error ? error.message : 'unavailable'}`,
+            );
+          }
+        }
+      }
+    } finally {
+      this.reconciling = false;
     }
   }
 
   get baseUrl(): string {
     return this.backendUrl;
+  }
+  async cleanupCompleted(
+    retentionMs = Number(process.env.ANALYSIS_COMPLETED_RETENTION_MS ?? 7 * 86400000),
+  ) {
+    if (!Number.isFinite(retentionMs) || retentionMs < 0)
+      throw new Error('Invalid completed retention');
+    const archive = join(this.pendingDirectory, 'completed');
+    let files: string[] = [];
+    try {
+      files = await readdir(archive);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    }
+    let compacted = 0;
+    for (const name of files.filter(n => n.endsWith('.json'))) {
+      if (compacted >= 50) break;
+      const filename = join(archive, name),
+        record = this.parseDelivery(await readFile(filename, 'utf8'));
+      if (
+        record.compacted ||
+        !record.serverAcknowledged ||
+        !record.feedbackApplied ||
+        !record.completedAt ||
+        record.completedAt > this.now() - retentionMs
+      )
+        continue;
+      record.fingerprint ??= createHash('sha256')
+        .update(deliveryIdentity(record.payload))
+        .digest('hex');
+      record.payload = {
+        requestId: record.payload.requestId,
+        guildId: record.payload.guildId,
+        channelId: record.payload.channelId,
+      };
+      delete record.result;
+      record.compacted = true;
+      await this.persistJson(record, filename);
+      compacted++;
+    }
+    const transfers = join(this.pendingDirectory, 'transfers');
+    let scans: string[] = [];
+    try {
+      scans = await readdir(transfers);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    }
+    for (const name of scans.slice(0, 50)) {
+      const filename = join(transfers, name, 'manifest.json');
+      let manifest: any;
+      try {
+        manifest = JSON.parse(await readFile(filename, 'utf8'));
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') continue;
+        throw error;
+      }
+      if (
+        manifest.compacted ||
+        !manifest.uploaded ||
+        !manifest.uploadedAt ||
+        manifest.uploadedAt > this.now() - retentionMs
+      )
+        continue;
+      const remote = await this.queueRequest(`/scans/${encodeURIComponent(manifest.id)}`, 'GET');
+      if (remote?.completed !== manifest.ranges || remote?.failed) continue;
+      for (let page = 0; page < manifest.pages; page++) {
+        const pageFile = join(transfers, name, `page-${page}.json`);
+        try {
+          const bytes = (await stat(pageFile)).size;
+          await unlink(pageFile);
+          await this.journal.reserve(-bytes, false);
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+        }
+      }
+      manifest.compacted = true;
+      await this.persistJson(manifest, filename);
+    }
+    return { compacted, ...(await this.journal.usage()) };
   }
 
   private async syncJobRequest(path: string, method: string, body?: unknown): Promise<any> {
@@ -139,7 +355,7 @@ export class BackendApiService {
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
       signal: AbortSignal.timeout(15_000),
     });
-    if (!response.ok) throw new Error(`Sync Job API failed (${response.status})`);
+    if (!response.ok) throw new BackendRequestError(response.status);
     const envelope = (await response.json()) as { data?: unknown };
     return envelope.data;
   }
@@ -259,6 +475,7 @@ export class BackendApiService {
     onExecuting?: () => Promise<void>,
     scanRange?: ScanRange,
     onSettled?: (result?: any, error?: unknown) => Promise<void>,
+    scan?: { scanId: string; rangeIndex: number },
   ): Promise<any> {
     if (
       scanRange &&
@@ -285,14 +502,39 @@ export class BackendApiService {
       record = this.parseDelivery(await readFile(filename, 'utf8'));
     } catch (error: any) {
       if (error.code !== 'ENOENT') throw error;
+      try {
+        const archived = this.parseDelivery(
+          await readFile(
+            join(this.pendingDirectory, 'completed', filename.split('/').at(-1)!),
+            'utf8',
+          ),
+        );
+        const fingerprint = createHash('sha256').update(deliveryIdentity(payload)).digest('hex');
+        if (
+          (archived.fingerprint ??
+            createHash('sha256').update(deliveryIdentity(archived.payload)).digest('hex')) !==
+          fingerprint
+        )
+          throw new Error('Analysis Request ID already has a different payload');
+        return { accepted: true, requestId, found: false, decisions: [] };
+      } catch (archiveError) {
+        if ((archiveError as NodeJS.ErrnoException).code !== 'ENOENT') throw archiveError;
+      }
       record = {
         payload: { ...payload, requestId },
         scanRange,
         attempts: 0,
         nextAttemptAt: 0,
         stopped: false,
+        fingerprint: createHash('sha256').update(deliveryIdentity(payload)).digest('hex'),
+        enqueuedAt: this.now(),
+        ...scan,
       };
       const temporary = `${filename}.${randomUUID()}.tmp`;
+      await this.journal.reserve(Buffer.byteLength(JSON.stringify(record)), true);
+      const disk = await statfs(this.pendingDirectory);
+      if (disk.bavail * disk.bsize < Buffer.byteLength(JSON.stringify(record)) + 64 * 1024 * 1024)
+        throw new Error('Bot receive disk capacity unavailable');
       const file = await open(temporary, 'wx', 0o600);
       try {
         await file.writeFile(JSON.stringify(record));
@@ -317,6 +559,13 @@ export class BackendApiService {
     }
     if (deliveryIdentity(record.payload) !== deliveryIdentity(payload))
       throw new Error('Analysis Request ID already has a different payload');
+    if (scan && record.stopped && record.errorCategory === 'receive-capacity') {
+      record.stopped = false;
+      record.attempts = 0;
+      record.nextAttemptAt = 0;
+      delete record.lastError;
+      await this.persistJson(record, filename);
+    }
     return analysisScheduler.run(
       `${this.pendingDirectory}:${payload.channelId || 'unknown'}`,
       async () => {
@@ -339,6 +588,16 @@ export class BackendApiService {
   }
 
   private async persistJson(record: unknown, filename: string, immutable = false): Promise<void> {
+    const bytes = Buffer.byteLength(JSON.stringify(record));
+    let previous = 0,
+      exists = false;
+    try {
+      previous = (await stat(filename)).size;
+      exists = true;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    }
+    await this.journal.reserve(bytes - previous, !exists);
     const temporary = `${filename}.${randomUUID()}.tmp`;
     const file = await open(temporary, 'wx', 0o600);
     try {
@@ -382,8 +641,10 @@ export class BackendApiService {
       throw error;
     } finally {
       try {
-        await onSettled?.(result, failure);
-        await this.deliveryObserver?.(record.payload, result, failure);
+        if (!result?.accepted) {
+          await onSettled?.(result, failure);
+          await this.deliveryObserver?.(record.payload, result, failure);
+        }
       } catch (error: any) {
         logger.warn(
           `Analysis completed but Discord feedback could not be updated: ${error.message}`,
@@ -398,6 +659,8 @@ export class BackendApiService {
     onExecuting?: () => Promise<void>,
   ): Promise<any> {
     if (record.result) return record.result;
+    if (record.receipt)
+      return { accepted: true, requestId: record.payload.requestId, found: false, decisions: [] };
     if (record.stopped || record.attempts >= this.deliveryOptions.maxAttempts)
       throw new AnalysisDeliveryError(
         'Analysis delivery requires explicit manual retry',
@@ -428,11 +691,24 @@ export class BackendApiService {
       if (this.serviceToken) headers.Authorization = `Bearer ${this.serviceToken}`;
       if (payload.traceId) headers['X-Trace-Id'] = payload.traceId;
       const { response, result } = await this.boundedTransport(
-        `${this.backendUrl}/api/discussions/analyze`,
+        `${this.backendUrl}${this.asyncDelivery ? '/api/v1/internal/analysis-queue/receipts' : '/api/discussions/analyze'}`,
         {
           method: 'POST',
           headers,
-          body: JSON.stringify(payload),
+          body: JSON.stringify(
+            this.asyncDelivery
+              ? {
+                  input: payload,
+                  ...(record.scanId
+                    ? {
+                        scanId: record.scanId,
+                        rangeIndex: record.rangeIndex,
+                        range: record.scanRange,
+                      }
+                    : {}),
+                }
+              : payload,
+          ),
           signal: AbortSignal.timeout(this.deliveryOptions.timeoutMs),
         },
       );
@@ -451,12 +727,34 @@ export class BackendApiService {
         permanent =
           response.status >= 400 && response.status < 500 && ![408, 429].includes(response.status);
         record.errorCategory =
-          response.status === 422
-            ? 'analysis-terminal'
-            : permanent
-              ? 'configuration-or-payload'
-              : 'backend-unavailable';
+          response.status === 413
+            ? 'receive-capacity'
+            : response.status === 422
+              ? 'analysis-terminal'
+              : permanent
+                ? 'configuration-or-payload'
+                : 'backend-unavailable';
+        const retryAfter = response.headers.get('retry-after');
+        if (retryAfter) {
+          const ms = /^\d+(\.\d+)?$/.test(retryAfter)
+            ? Number(retryAfter) * 1000
+            : Date.parse(retryAfter) - this.now();
+          if (Number.isFinite(ms) && ms > 0)
+            record.nextAttemptAt = Math.max(
+              record.nextAttemptAt,
+              this.now() + Math.min(ms, 86400000),
+            );
+        }
         throw new Error(`Backend AI returned status ${response.status}`);
+      }
+      if (this.asyncDelivery && result?.data?.requestId === payload.requestId) {
+        record.receipt = true;
+        record.receivedAt = this.now();
+        record.stopped = false;
+        delete record.lastError;
+        delete record.errorCategory;
+        await this.persistJson(record, filename);
+        return { accepted: true, requestId: payload.requestId, found: false, decisions: [] };
       }
       if (typeof result.found !== 'boolean' || !Array.isArray(result.decisions)) {
         permanent = true;
@@ -501,6 +799,7 @@ export class BackendApiService {
         const record = this.parseDelivery(await readFile(filename, 'utf8'));
         if (
           !record.result &&
+          !record.receipt &&
           !record.stopped &&
           record.attempts < this.deliveryOptions.maxAttempts &&
           record.nextAttemptAt <= this.now()
@@ -638,51 +937,70 @@ export class BackendApiService {
   }
 
   async recoverScanCheckpoints(): Promise<void> {
-    const entries = await this.deliveryRecords();
-    const channels = new Set(
-      entries
-        .filter(({ record }) => record.scanRange)
-        .map(({ record }) => record.payload.channelId as string),
-    );
-    for (const channelId of channels) {
-      const records = entries
-        .filter(({ record }) => record.payload.channelId === channelId && record.scanRange)
-        .map(({ record }) => record);
-      const remote = await this.getCheckpoint(channelId);
-      let boundary = remote
-        ? BigInt(remote)
-        : records.reduce(
-            (min, r) =>
-              BigInt(r.scanRange!.afterMessageId) < min ? BigInt(r.scanRange!.afterMessageId) : min,
-            BigInt(records[0].scanRange!.afterMessageId),
-          );
-      let changed = true;
-      while (changed) {
-        changed = false;
-        for (const record of records) {
-          const range = record.scanRange!;
-          if (
-            record.result &&
-            BigInt(range.afterMessageId) <= boundary &&
-            BigInt(range.endMessageId) > boundary
-          ) {
-            boundary = BigInt(range.endMessageId);
-            changed = true;
+    if (this.recoveringCheckpoints) return;
+    this.recoveringCheckpoints = true;
+    try {
+      const entries = await this.deliveryRecords();
+      const revision = createHash('sha256')
+        .update(
+          stablePayload(
+            entries
+              .filter(e => e.record.scanRange && !e.record.scanId)
+              .map(e => [e.record.payload.requestId, e.record.scanRange, Boolean(e.record.result)]),
+          ),
+        )
+        .digest('hex');
+      if (revision === this.checkpointRevision) return;
+      const channels = new Set(
+        entries
+          .filter(({ record }) => record.scanRange && !record.scanId)
+          .map(({ record }) => record.payload.channelId as string),
+      );
+      for (const channelId of channels) {
+        const records = entries
+          .filter(({ record }) => record.payload.channelId === channelId && record.scanRange)
+          .map(({ record }) => record);
+        const remote = await this.getCheckpoint(channelId);
+        let boundary = remote
+          ? BigInt(remote)
+          : records.reduce(
+              (min, r) =>
+                BigInt(r.scanRange!.afterMessageId) < min
+                  ? BigInt(r.scanRange!.afterMessageId)
+                  : min,
+              BigInt(records[0].scanRange!.afterMessageId),
+            );
+        let changed = true;
+        while (changed) {
+          changed = false;
+          for (const record of records) {
+            const range = record.scanRange!;
+            if (
+              record.result &&
+              BigInt(range.afterMessageId) <= boundary &&
+              BigInt(range.endMessageId) > boundary
+            ) {
+              boundary = BigInt(range.endMessageId);
+              changed = true;
+            }
           }
         }
+        if (
+          records.some(r => r.result && BigInt(r.scanRange!.endMessageId) <= boundary) &&
+          (!remote || boundary > BigInt(remote))
+        )
+          await this.saveCheckpoint(channelId, boundary.toString());
       }
-      if (
-        records.some(r => r.result && BigInt(r.scanRange!.endMessageId) <= boundary) &&
-        (!remote || boundary > BigInt(remote))
-      )
-        await this.saveCheckpoint(channelId, boundary.toString());
+      this.checkpointRevision = revision;
+    } finally {
+      this.recoveringCheckpoints = false;
     }
   }
 
   async synchronizeDeliveryStatus(): Promise<void> {
     const records = await this.deliveryRecords();
     const requests = records
-      .filter(({ record }) => record.payload.guildId)
+      .filter(({ record }) => record.payload.guildId && !record.receipt)
       .map(({ record }) => ({
         requestId: record.payload.requestId,
         guildId: record.payload.guildId,
@@ -704,11 +1022,30 @@ export class BackendApiService {
         lastError: record.lastError,
         scanRange: record.scanRange,
       }));
-    const commands = await this.syncJobRequest(
-      '/api/v1/internal/analysis-deliveries/sync',
-      'POST',
-      { requests },
+    const control = join(this.pendingDirectory, '.control');
+    await mkdir(control, { recursive: true });
+    const ackFile = join(control, 'status-acks.json');
+    let acks: Record<string, string> = {};
+    try {
+      acks = JSON.parse(await readFile(ackFile, 'utf8'));
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    }
+    const changes = requests.filter(
+      r => acks[r.requestId] !== createHash('sha256').update(stablePayload(r)).digest('hex'),
     );
+    const commands: any[] = [];
+    for (let offset = 0; offset < Math.max(1, changes.length); offset += 100) {
+      const batch = changes.slice(offset, offset + 100);
+      commands.push(
+        ...((await this.syncJobRequest('/api/v1/internal/analysis-deliveries/sync', 'POST', {
+          requests: batch,
+        })) ?? []),
+      );
+      for (const r of batch)
+        acks[r.requestId] = createHash('sha256').update(stablePayload(r)).digest('hex');
+      await this.persistJson(acks, ackFile);
+    }
     for (const command of commands || []) {
       if (this.retryCommandsInFlight.has(command.id)) continue;
       this.retryCommandsInFlight.add(command.id);

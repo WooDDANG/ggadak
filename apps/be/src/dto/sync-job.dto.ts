@@ -10,6 +10,9 @@ export type SyncJobView = {
   failedChannels: number;
   decisionsFound: number;
   messagesScanned: number;
+  receivedChannels?: number;
+  analysisPendingChannels?: number;
+  channels?:Array<{id:string;status:string}>;
   errorMessage: string | null;
   createdAt: string;
   startedAt: string | null;

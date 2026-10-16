@@ -8,6 +8,9 @@ type Command = {
   error?: string;
 };
 const categories: Record<string, string> = {
+  'analysis-capacity': '분석 실행 순서 대기',
+  'provider-or-storage': 'AI 또는 저장소 일시 장애',
+  'analysis-terminal': '새 수동 분석이 필요한 오류',
   'analysis-in-progress': '서버에서 분석 진행 중',
   'backend-unavailable': '분석 서버 연결 오류',
   'configuration-or-payload': '분석 설정 확인 필요',
@@ -109,6 +112,23 @@ export function AnalysisRecovery({ guildId }: { guildId: string }) {
                 : '분석 대기 · 자동 재시도 예정'}{' '}
               · 시도 {request.attempts}회
             </p>
+            {request.managedBy === 'backend' && (
+              <p className="text-slate-400">
+                데이터는 서버에 저장됐습니다.{' '}
+                {request.phase === 'receiving'
+                  ? '채널 전체 수신 대기'
+                  : request.phase === 'processing'
+                    ? 'AI 분석 중'
+                    : request.phase === 'failed'
+                      ? '분석 실패 보관'
+                      : request.phase === 'retry'
+                        ? 'BE에서 분석 재시도 대기'
+                        : 'BE 분석 큐 대기'}
+              </p>
+            )}
+            {request.inputRetained === false && (
+              <p>전달용 입력은 정리됐습니다. 완료 기록은 유지됩니다.</p>
+            )}
             {request.errorCategory && (
               <p className="text-slate-400">
                 {categories[request.errorCategory] || '분석을 완료하지 못했습니다.'}
@@ -126,17 +146,18 @@ export function AnalysisRecovery({ guildId }: { guildId: string }) {
                   : command.phase === 'pending'
                     ? '재시도 접수됨 · 봇의 확인 대기 중'
                     : command.phase === 'acknowledged'
-                      ? '봇이 재시도를 확인했습니다. 분석 결과를 기다리세요.'
+                      ? '재시도를 확인했습니다. 분석 결과를 기다리세요.'
                       : command.error}
               </p>
             )}
             <button
               className="bg-indigo-600 px-3 py-2 rounded disabled:opacity-40"
               disabled={
-                !queue.data?.available ||
+                (request.managedBy !== 'backend' && !queue.data?.available) ||
                 !!queue.error ||
                 !!pendingCommand ||
-                request.status !== 'retained-failure'
+                request.status !== 'retained-failure' ||
+                request.requiresNewAnalysis === true
               }
               onClick={() => void retry(request.requestId)}
             >

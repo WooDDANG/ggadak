@@ -151,6 +151,17 @@ export class DecisionHarvestingEngine implements IDecisionHarvestingEngine {
           traceId,
           triggers,
         );
+        if (decisions && 'accepted' in decisions)
+          return {
+            success: true,
+            outcome: 'accepted',
+            pendingAnalysis: true,
+            decisions: [],
+            decisionsCount: 0,
+            messageCount: 0,
+            summary: '데이터 전달 완료 · BE 분석 대기',
+            traceId,
+          };
         if (!decisions || decisions.length === 0) {
           return {
             success: true,
@@ -233,6 +244,7 @@ export class DecisionHarvestingEngine implements IDecisionHarvestingEngine {
         decisionsCount: res.decisionsCount,
         messageCount: res.scannedCount,
         channelCount: res.channelCount,
+        pendingAnalysis: res.pendingAnalysis,
         traceId,
       };
     } else {
@@ -243,6 +255,7 @@ export class DecisionHarvestingEngine implements IDecisionHarvestingEngine {
         decisionsCount: res.decisionsCount,
         messageCount: res.scannedCount,
         channelCount: 1,
+        pendingAnalysis: res.pendingAnalysis,
         traceId,
       };
     }

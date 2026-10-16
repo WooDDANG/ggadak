@@ -24,5 +24,30 @@ export async function createServer(
   embeddingProvider?: EmbeddingProvider,
 ): Promise<http.Server> {
   const app = await createApp(repo, aiAdapter, authOptions, embeddingProvider);
-  return http.createServer(app);
+  const server = http.createServer(app);
+  let timer: NodeJS.Timeout | undefined;
+  let maintenance: NodeJS.Timeout | undefined;
+  server.on('listening', () => {
+    if (process.env.NODE_ENV === 'test') return;
+    const tick = () =>
+      void app.locals.analysisQueue
+        .runOnce()
+        .catch((error: Error) => (app.locals.queueError = error.message));
+    timer = setInterval(tick, 500);
+    timer.unref();
+    tick();
+    maintenance = setInterval(
+      () =>
+        void app.locals.analysisQueue
+          .cleanup()
+          .catch((error: Error) => (app.locals.queueError = error.message)),
+      60000,
+    );
+    maintenance.unref();
+  });
+  server.on('close', () => {
+    if (timer) clearInterval(timer);
+    if (maintenance) clearInterval(maintenance);
+  });
+  return server;
 }

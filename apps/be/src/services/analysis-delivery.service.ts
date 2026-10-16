@@ -26,6 +26,7 @@ export class AnalysisDeliveryService {
   constructor(private repo: DecisionRepository) {}
 
   async synchronize(requests: AnalysisDeliveryStatus[]): Promise<AnalysisRetryCommandDto[]> {
+    if (requests.length > 100) throw new BadRequestError('At most 100 status changes per request');
     const now = new Date();
     await this.repo.withTransaction(async tx => {
       await tx.analysisDeliveryHeartbeat.upsert({
@@ -68,6 +69,13 @@ export class AnalysisDeliveryService {
           errorCategory: request.errorCategory ?? null,
           synchronizedAt: now,
         };
+        if (
+          previous &&
+          Object.entries(data)
+            .filter(([key]) => key !== 'synchronizedAt')
+            .every(([key, value]) => previous[key as keyof typeof previous] === value)
+        )
+          continue;
         await tx.analysisDelivery.upsert({
           where: { requestId: request.requestId },
           create: data,
@@ -91,21 +99,52 @@ export class AnalysisDeliveryService {
     const heartbeat = await this.repo.prisma.analysisDeliveryHeartbeat.findUnique({
       where: { id: 'bot' },
     });
+    const receipts = await this.repo.prisma.analysisReceipt.findMany({
+      where: { guildId },
+      orderBy: { createdAt: 'desc' },
+      take: 500,
+    });
+    const owned = new Set(receipts.map(r => r.id));
     return {
-      requests: requests.map(r => ({
-        ...r,
-        requiresNewAnalysis: r.errorCategory === 'analysis-terminal',
-        channelName: r.channelName ?? undefined,
-        scanRange: r.scanRangeJson ? JSON.parse(r.scanRangeJson) : undefined,
-        status: r.status as AnalysisDeliveryStatus['status'],
-        errorCategory: r.errorCategory ?? undefined,
-        lastError: r.lastError ?? undefined,
-        synchronizedAt: r.synchronizedAt.toISOString(),
-      })),
-      available:
-        !!heartbeat &&
-        Date.now() - heartbeat.synchronizedAt.getTime() < 15000 &&
-        requests.every(r => Date.now() - r.synchronizedAt.getTime() < 15000),
+      requests: [
+        ...requests
+          .filter(r => !owned.has(r.requestId))
+          .map(r => ({
+            ...r,
+            requiresNewAnalysis: r.errorCategory === 'analysis-terminal',
+            channelName: r.channelName ?? undefined,
+            scanRange: r.scanRangeJson ? JSON.parse(r.scanRangeJson) : undefined,
+            status: r.status as AnalysisDeliveryStatus['status'],
+            errorCategory: r.errorCategory ?? undefined,
+            lastError: r.lastError ?? undefined,
+            synchronizedAt: r.synchronizedAt.toISOString(),
+          })),
+        ...receipts.map(r => ({
+          requestId: r.id,
+          guildId: r.guildId,
+          channelId: r.channelId,
+          status: (r.state === 'failed'
+            ? 'retained-failure'
+            : r.state === 'retry'
+              ? 'retry-pending'
+              : r.state === 'completed'
+                ? 'completed-no-decision'
+                : 'pending') as AnalysisDeliveryStatus['status'],
+          phase: r.state,
+          managedBy: 'backend' as const,
+          inputRetained: r.inputJson !== null,
+          attempts: r.attempts,
+          nextAttemptAt: r.nextAttemptAt.getTime(),
+          errorCategory: r.errorCategory ?? undefined,
+          requiresNewAnalysis: r.errorCategory === 'analysis-terminal',
+          scanRange: r.rangeJson ? JSON.parse(r.rangeJson) : undefined,
+          synchronizedAt: r.createdAt.toISOString(),
+          receivedAt: r.createdAt.toISOString(),
+          startedAt: r.startedAt?.toISOString() ?? null,
+          completedAt: r.completedAt?.toISOString() ?? null,
+        })),
+      ],
+      available: !!heartbeat && Date.now() - heartbeat.synchronizedAt.getTime() < 15000,
       lastSynchronizedAt: heartbeat?.synchronizedAt.toISOString() ?? null,
     };
   }
@@ -127,9 +166,22 @@ export class AnalysisDeliveryService {
           throw new ConflictError('Retry command ID already used');
         return existing;
       }
+      const receipt = await tx.analysisReceipt.findUnique({ where: { id: requestId } });
+      if (receipt?.guildId === guildId) {
+        if (receipt.state !== 'failed' || !receipt.inputJson)
+          throw new ConflictError('Only retained analysis failures can be retried');
+        await tx.analysisReceipt.update({
+          where: { id: requestId },
+          data: { state: 'pending', attempts: 0, nextAttemptAt: new Date(), errorCategory: null },
+        });
+        return tx.analysisRetryCommand.create({
+          data: { id: commandId, guildId, requestId, acknowledgedAt: new Date() },
+        });
+      }
       const request = await tx.analysisDelivery.findFirst({ where: { guildId, requestId } });
       if (!request) throw new NotFoundError('Analysis Request not found');
-      if (Date.now() - request.synchronizedAt.getTime() >= 15000)
+      const heartbeat = await tx.analysisDeliveryHeartbeat.findUnique({ where: { id: 'bot' } });
+      if (!heartbeat || Date.now() - heartbeat.synchronizedAt.getTime() >= 15000)
         throw new ConflictError('Bot queue status is unavailable; wait for reconnection');
       if (request.status !== 'retained-failure')
         throw new ConflictError('Only retained failures can be retried');

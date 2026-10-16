@@ -63,18 +63,20 @@ export class DecisionTrackerBot {
       silent: false,
     });
 
-    this.backendApi.observeDeliveries(async (payload, result) => {
+    this.backendApi.observeDeliveries(async (payload, result, error) => {
       if (!payload.channelId || !payload.triggerMessageId) return;
       try {
         const channel = await this.client.channels.fetch(payload.channelId);
         if (!channel || !channel.isTextBased() || !('messages' in channel)) return;
         const message = await channel.messages.fetch(payload.triggerMessageId);
-        await this.analysisService.removeReactionSafely(message, '👀');
-        await this.analysisService.removeReactionSafely(message, '⚠️');
+        await this.analysisService.removeReactionSafely(message, '👀', true);
+        await this.analysisService.removeReactionSafely(message, '⚠️', true);
         if (result?.found && result.decisions.length)
-          await this.analysisService.addReactionSafely(message, '📝');
+          await this.analysisService.addReactionSafely(message, '📝', true);
+        if (error) await this.analysisService.addReactionSafely(message, '⚠️', true);
       } catch (error: any) {
         logger.warn(`Could not reconcile Discord processing reaction: ${error.message}`);
+        throw error;
       }
     });
 
@@ -93,6 +95,8 @@ export class DecisionTrackerBot {
           full: job.forceFullSync,
           forceFullSync: job.forceFullSync,
           requestId: `sync-${job.jobId}-${channelId}`,
+          jobId: job.jobId,
+          jobOwner: job.owner,
         });
       });
       const processSyncJob = () =>
@@ -130,6 +134,18 @@ export class DecisionTrackerBot {
         void synchronize();
       }, 5000);
       statusTimer.unref();
+      let cleaning = false;
+      const cleanupTimer = setInterval(() => {
+        if (cleaning) return;
+        cleaning = true;
+        void this.backendApi
+          .cleanupCompleted()
+          .catch(error => logger.warn(`Delivery cleanup retained: ${error.message}`))
+          .finally(() => {
+            cleaning = false;
+          });
+      }, 60000);
+      cleanupTimer.unref();
 
       let recovering = false;
       const recover = async () => {
@@ -155,10 +171,11 @@ export class DecisionTrackerBot {
         .catch(error => logger.warn(`Processing reaction recovery failed: ${error.message}`));
       const retryTimer = setInterval(() => {
         void this.backendApi
-          .reconcileDeliveryReactions()
+          .reconcileResults()
+          .then(() => this.backendApi.reconcileDeliveryReactions())
           .then(recover)
           .catch(error => logger.warn(`Processing reaction recovery failed: ${error.message}`));
-      }, 1_000);
+      }, 5_000);
       retryTimer.unref();
     });
 

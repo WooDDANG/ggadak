@@ -54,6 +54,11 @@ export class SyncJobsController extends Controller {
     await this.auth.requireGuild(requirePrincipal(request), guildId);
     return apiSuccess(await this.jobs.get(jobId, guildId));
   }
+  @Post('{jobId}/channels/{channelId}/resume')
+  public async resumeChannel(@Request() request:ExpressRequest,@Path() jobId:string,@Path() channelId:string,@Query() guildId:string):Promise<ApiResponse<SyncJobView>>{
+    await this.auth.requireGuild(requirePrincipal(request),guildId,true);
+    return apiSuccess(await this.jobs.resume(jobId,guildId,channelId));
+  }
 }
 
 @Tags('Internal Sync Jobs')

@@ -32,6 +32,8 @@ import { AuthController } from './../../controllers/auth.controller.js';
 // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
 import { AnalysisRequestController } from './../../controllers/analysis-request.controller.js';
 // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+import { AnalysisQueueController } from './../../controllers/analysis-queue.controller.js';
+// WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
 import { AnalysisDeliveriesController } from './../../controllers/analysis-deliveries.controller.js';
 // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
 import { InternalAnalysisDeliveriesController } from './../../controllers/analysis-deliveries.controller.js';
@@ -357,7 +359,7 @@ const models: TsoaRoute.Models = {
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "SyncJobView": {
         "dataType": "refAlias",
-        "type": {"dataType":"nestedObjectLiteral","nestedProperties":{"completedAt":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},"startedAt":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},"createdAt":{"dataType":"string","required":true},"errorMessage":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},"messagesScanned":{"dataType":"double","required":true},"decisionsFound":{"dataType":"double","required":true},"failedChannels":{"dataType":"double","required":true},"completedChannels":{"dataType":"double","required":true},"totalChannels":{"dataType":"double","required":true},"status":{"dataType":"string","required":true},"forceFullSync":{"dataType":"boolean","required":true},"guildId":{"dataType":"string","required":true},"jobId":{"dataType":"string","required":true}},"validators":{}},
+        "type": {"dataType":"nestedObjectLiteral","nestedProperties":{"completedAt":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},"startedAt":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},"createdAt":{"dataType":"string","required":true},"errorMessage":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},"channels":{"dataType":"array","array":{"dataType":"nestedObjectLiteral","nestedProperties":{"status":{"dataType":"string","required":true},"id":{"dataType":"string","required":true}}}},"analysisPendingChannels":{"dataType":"double"},"receivedChannels":{"dataType":"double"},"messagesScanned":{"dataType":"double","required":true},"decisionsFound":{"dataType":"double","required":true},"failedChannels":{"dataType":"double","required":true},"completedChannels":{"dataType":"double","required":true},"totalChannels":{"dataType":"double","required":true},"status":{"dataType":"string","required":true},"forceFullSync":{"dataType":"boolean","required":true},"guildId":{"dataType":"string","required":true},"jobId":{"dataType":"string","required":true}},"validators":{}},
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "ApiResponse_SyncJobView_": {
@@ -378,6 +380,9 @@ const models: TsoaRoute.Models = {
             "startedAt": {"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},
             "createdAt": {"dataType":"string","required":true},
             "errorMessage": {"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},
+            "channels": {"dataType":"array","array":{"dataType":"nestedObjectLiteral","nestedProperties":{"status":{"dataType":"string","required":true},"id":{"dataType":"string","required":true}}}},
+            "analysisPendingChannels": {"dataType":"double"},
+            "receivedChannels": {"dataType":"double"},
             "messagesScanned": {"dataType":"double","required":true},
             "decisionsFound": {"dataType":"double","required":true},
             "failedChannels": {"dataType":"double","required":true},
@@ -387,6 +392,7 @@ const models: TsoaRoute.Models = {
             "forceFullSync": {"dataType":"boolean","required":true},
             "guildId": {"dataType":"string","required":true},
             "jobId": {"dataType":"string","required":true},
+            "deliveryOnly": {"dataType":"boolean"},
             "owner": {"dataType":"string","required":true},
             "channelIds": {"dataType":"array","array":{"dataType":"string"},"required":true},
         },
@@ -419,7 +425,7 @@ const models: TsoaRoute.Models = {
         "dataType": "refObject",
         "properties": {
             "channelId": {"dataType":"string","required":true},
-            "status": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["COMPLETED"]},{"dataType":"enum","enums":["FAILED"]}],"required":true},
+            "status": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["COMPLETED"]},{"dataType":"enum","enums":["FAILED"]},{"dataType":"enum","enums":["RECEIVED"]}],"required":true},
             "messagesScanned": {"dataType":"double","required":true},
             "decisionsFound": {"dataType":"double","required":true},
             "errorMessage": {"dataType":"string"},
@@ -430,6 +436,7 @@ const models: TsoaRoute.Models = {
     "SyncJobUpdate": {
         "dataType": "refObject",
         "properties": {
+            "release": {"dataType":"boolean"},
             "owner": {"dataType":"string","required":true},
             "channelResult": {"ref":"SyncChannelResult"},
             "status": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["PROCESSING"]},{"dataType":"enum","enums":["COMPLETED"]},{"dataType":"enum","enums":["FAILED"]}]},
@@ -861,6 +868,124 @@ const models: TsoaRoute.Models = {
         "additionalProperties": false,
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "ReceiptView": {
+        "dataType": "refObject",
+        "properties": {
+            "requestId": {"dataType":"string","required":true},
+            "state": {"dataType":"string","required":true},
+            "attempts": {"dataType":"double","required":true},
+            "nextAttemptAt": {"dataType":"string","required":true},
+            "errorCategory": {"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},
+            "inputRetained": {"dataType":"boolean","required":true},
+            "result": {"ref":"AnalyzeDiscussionResponseDto"},
+            "receivedAt": {"dataType":"string","required":true},
+            "startedAt": {"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},
+            "completedAt": {"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "ApiResponse_ReceiptView_": {
+        "dataType": "refObject",
+        "properties": {
+            "success": {"dataType":"boolean","required":true},
+            "code": {"dataType":"string","required":true},
+            "message": {"dataType":"string","required":true},
+            "data": {"ref":"ReceiptView","required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "ScanRangeDto": {
+        "dataType": "refObject",
+        "properties": {
+            "afterMessageId": {"dataType":"string","required":true},
+            "startMessageId": {"dataType":"string","required":true},
+            "endMessageId": {"dataType":"string","required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "ReceiptBody": {
+        "dataType": "refObject",
+        "properties": {
+            "input": {"ref":"AnalyzeDiscussionRequestDto","required":true},
+            "scanId": {"dataType":"string"},
+            "rangeIndex": {"dataType":"double"},
+            "range": {"ref":"ScanRangeDto"},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "ApiResponse_ReceiptView-Array_": {
+        "dataType": "refObject",
+        "properties": {
+            "success": {"dataType":"boolean","required":true},
+            "code": {"dataType":"string","required":true},
+            "message": {"dataType":"string","required":true},
+            "data": {"dataType":"array","array":{"dataType":"refObject","ref":"ReceiptView"},"required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "ApiResponse__acceptingScans-boolean--pending-number--retainedBytes-number--oldestWaitingMs-number--pauseUntil-string-or-null--maxBytes-number--maxChannelBytes-number--maxPending-number--states-Array__state-string--count-number--bytes-number____": {
+        "dataType": "refObject",
+        "properties": {
+            "success": {"dataType":"boolean","required":true},
+            "code": {"dataType":"string","required":true},
+            "message": {"dataType":"string","required":true},
+            "data": {"dataType":"nestedObjectLiteral","nestedProperties":{"states":{"dataType":"array","array":{"dataType":"nestedObjectLiteral","nestedProperties":{"bytes":{"dataType":"double","required":true},"count":{"dataType":"double","required":true},"state":{"dataType":"string","required":true}}},"required":true},"maxPending":{"dataType":"double","required":true},"maxChannelBytes":{"dataType":"double","required":true},"maxBytes":{"dataType":"double","required":true},"pauseUntil":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},"oldestWaitingMs":{"dataType":"double","required":true},"retainedBytes":{"dataType":"double","required":true},"pending":{"dataType":"double","required":true},"acceptingScans":{"dataType":"boolean","required":true}},"required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "ApiResponse__id-string--state-string__": {
+        "dataType": "refObject",
+        "properties": {
+            "success": {"dataType":"boolean","required":true},
+            "code": {"dataType":"string","required":true},
+            "message": {"dataType":"string","required":true},
+            "data": {"dataType":"nestedObjectLiteral","nestedProperties":{"state":{"dataType":"string","required":true},"id":{"dataType":"string","required":true}},"required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "ScanBody": {
+        "dataType": "refObject",
+        "properties": {
+            "id": {"dataType":"string","required":true},
+            "guildId": {"dataType":"string","required":true},
+            "channelId": {"dataType":"string","required":true},
+            "upperMessageId": {"dataType":"string","required":true},
+            "afterMessageId": {"dataType":"string","required":true},
+            "jobId": {"dataType":"string"},
+            "jobOwner": {"dataType":"string"},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "ApiResponse__sealed-boolean--missing-number-Array__": {
+        "dataType": "refObject",
+        "properties": {
+            "success": {"dataType":"boolean","required":true},
+            "code": {"dataType":"string","required":true},
+            "message": {"dataType":"string","required":true},
+            "data": {"dataType":"nestedObjectLiteral","nestedProperties":{"missing":{"dataType":"array","array":{"dataType":"double"},"required":true},"sealed":{"dataType":"boolean","required":true}},"required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "ApiResponse__id-string--state-string--expectedRanges-number-or-null--receivedRanges-number--completed-number--failed-number--bytes-number--missing-number-Array__": {
+        "dataType": "refObject",
+        "properties": {
+            "success": {"dataType":"boolean","required":true},
+            "code": {"dataType":"string","required":true},
+            "message": {"dataType":"string","required":true},
+            "data": {"dataType":"nestedObjectLiteral","nestedProperties":{"missing":{"dataType":"array","array":{"dataType":"double"},"required":true},"bytes":{"dataType":"double","required":true},"failed":{"dataType":"double","required":true},"completed":{"dataType":"double","required":true},"receivedRanges":{"dataType":"double","required":true},"expectedRanges":{"dataType":"union","subSchemas":[{"dataType":"double"},{"dataType":"enum","enums":[null]}],"required":true},"state":{"dataType":"string","required":true},"id":{"dataType":"string","required":true}},"required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "AnalysisDeliveryViewDto": {
         "dataType": "refObject",
         "properties": {
@@ -874,6 +999,12 @@ const models: TsoaRoute.Models = {
             "errorCategory": {"dataType":"string"},
             "lastError": {"dataType":"string"},
             "scanRange": {"dataType":"nestedObjectLiteral","nestedProperties":{"endMessageId":{"dataType":"string","required":true},"startMessageId":{"dataType":"string","required":true},"afterMessageId":{"dataType":"string","required":true}}},
+            "managedBy": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["bot"]},{"dataType":"enum","enums":["backend"]}]},
+            "phase": {"dataType":"string"},
+            "inputRetained": {"dataType":"boolean"},
+            "receivedAt": {"dataType":"string"},
+            "startedAt": {"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}]},
+            "completedAt": {"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}]},
             "requiresNewAnalysis": {"dataType":"boolean"},
             "synchronizedAt": {"dataType":"string","required":true},
         },
@@ -1318,6 +1449,45 @@ export function RegisterRoutes(app: Router) {
 
               await templateService.apiHandler({
                 methodName: 'get',
+                controller,
+                response,
+                next,
+                validatedArgs,
+                successStatus: undefined,
+              });
+            } catch (err) {
+                return next(err);
+            }
+        });
+        // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+        const argsSyncJobsController_resumeChannel: Record<string, TsoaRoute.ParameterSchema> = {
+                request: {"in":"request","name":"request","required":true,"dataType":"object"},
+                jobId: {"in":"path","name":"jobId","required":true,"dataType":"string"},
+                channelId: {"in":"path","name":"channelId","required":true,"dataType":"string"},
+                guildId: {"in":"query","name":"guildId","required":true,"dataType":"string"},
+        };
+        app.post('/api/v1/sync-jobs/:jobId/channels/:channelId/resume',
+            authenticateMiddleware([{"jwt":[]}]),
+            ...(fetchMiddlewares<RequestHandler>(SyncJobsController)),
+            ...(fetchMiddlewares<RequestHandler>(SyncJobsController.prototype.resumeChannel)),
+
+            async function SyncJobsController_resumeChannel(request: ExRequest, response: ExResponse, next: any) {
+
+            // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+
+            let validatedArgs: any[] = [];
+            try {
+                validatedArgs = templateService.getValidatedArgs({ args: argsSyncJobsController_resumeChannel, request, response });
+
+                const container: IocContainer = typeof iocContainer === 'function' ? (iocContainer as IocContainerFactory)(request) : iocContainer;
+
+                const controller: any = await container.get<SyncJobsController>(SyncJobsController);
+                if (typeof controller['setStatus'] === 'function') {
+                controller.setStatus(undefined);
+                }
+
+              await templateService.apiHandler({
+                methodName: 'resumeChannel',
                 controller,
                 response,
                 next,
@@ -2152,6 +2322,258 @@ export function RegisterRoutes(app: Router) {
 
               await templateService.apiHandler({
                 methodName: 'status',
+                controller,
+                response,
+                next,
+                validatedArgs,
+                successStatus: undefined,
+              });
+            } catch (err) {
+                return next(err);
+            }
+        });
+        // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+        const argsAnalysisQueueController_receive: Record<string, TsoaRoute.ParameterSchema> = {
+                body: {"in":"body","name":"body","required":true,"ref":"ReceiptBody"},
+        };
+        app.post('/api/v1/internal/analysis-queue/receipts',
+            authenticateMiddleware([{"service":[]}]),
+            ...(fetchMiddlewares<RequestHandler>(AnalysisQueueController)),
+            ...(fetchMiddlewares<RequestHandler>(AnalysisQueueController.prototype.receive)),
+
+            async function AnalysisQueueController_receive(request: ExRequest, response: ExResponse, next: any) {
+
+            // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+
+            let validatedArgs: any[] = [];
+            try {
+                validatedArgs = templateService.getValidatedArgs({ args: argsAnalysisQueueController_receive, request, response });
+
+                const container: IocContainer = typeof iocContainer === 'function' ? (iocContainer as IocContainerFactory)(request) : iocContainer;
+
+                const controller: any = await container.get<AnalysisQueueController>(AnalysisQueueController);
+                if (typeof controller['setStatus'] === 'function') {
+                controller.setStatus(undefined);
+                }
+
+              await templateService.apiHandler({
+                methodName: 'receive',
+                controller,
+                response,
+                next,
+                validatedArgs,
+                successStatus: 202,
+              });
+            } catch (err) {
+                return next(err);
+            }
+        });
+        // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+        const argsAnalysisQueueController_results: Record<string, TsoaRoute.ParameterSchema> = {
+                ids: {"in":"query","name":"ids","required":true,"dataType":"string"},
+        };
+        app.get('/api/v1/internal/analysis-queue/results',
+            authenticateMiddleware([{"service":[]}]),
+            ...(fetchMiddlewares<RequestHandler>(AnalysisQueueController)),
+            ...(fetchMiddlewares<RequestHandler>(AnalysisQueueController.prototype.results)),
+
+            async function AnalysisQueueController_results(request: ExRequest, response: ExResponse, next: any) {
+
+            // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+
+            let validatedArgs: any[] = [];
+            try {
+                validatedArgs = templateService.getValidatedArgs({ args: argsAnalysisQueueController_results, request, response });
+
+                const container: IocContainer = typeof iocContainer === 'function' ? (iocContainer as IocContainerFactory)(request) : iocContainer;
+
+                const controller: any = await container.get<AnalysisQueueController>(AnalysisQueueController);
+                if (typeof controller['setStatus'] === 'function') {
+                controller.setStatus(undefined);
+                }
+
+              await templateService.apiHandler({
+                methodName: 'results',
+                controller,
+                response,
+                next,
+                validatedArgs,
+                successStatus: undefined,
+              });
+            } catch (err) {
+                return next(err);
+            }
+        });
+        // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+        const argsAnalysisQueueController_acknowledge: Record<string, TsoaRoute.ParameterSchema> = {
+                body: {"in":"body","name":"body","required":true,"dataType":"nestedObjectLiteral","nestedProperties":{"ids":{"dataType":"array","array":{"dataType":"string"},"required":true}}},
+        };
+        app.post('/api/v1/internal/analysis-queue/ack',
+            authenticateMiddleware([{"service":[]}]),
+            ...(fetchMiddlewares<RequestHandler>(AnalysisQueueController)),
+            ...(fetchMiddlewares<RequestHandler>(AnalysisQueueController.prototype.acknowledge)),
+
+            async function AnalysisQueueController_acknowledge(request: ExRequest, response: ExResponse, next: any) {
+
+            // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+
+            let validatedArgs: any[] = [];
+            try {
+                validatedArgs = templateService.getValidatedArgs({ args: argsAnalysisQueueController_acknowledge, request, response });
+
+                const container: IocContainer = typeof iocContainer === 'function' ? (iocContainer as IocContainerFactory)(request) : iocContainer;
+
+                const controller: any = await container.get<AnalysisQueueController>(AnalysisQueueController);
+                if (typeof controller['setStatus'] === 'function') {
+                controller.setStatus(undefined);
+                }
+
+              await templateService.apiHandler({
+                methodName: 'acknowledge',
+                controller,
+                response,
+                next,
+                validatedArgs,
+                successStatus: undefined,
+              });
+            } catch (err) {
+                return next(err);
+            }
+        });
+        // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+        const argsAnalysisQueueController_capacity: Record<string, TsoaRoute.ParameterSchema> = {
+        };
+        app.get('/api/v1/internal/analysis-queue/capacity',
+            authenticateMiddleware([{"service":[]}]),
+            ...(fetchMiddlewares<RequestHandler>(AnalysisQueueController)),
+            ...(fetchMiddlewares<RequestHandler>(AnalysisQueueController.prototype.capacity)),
+
+            async function AnalysisQueueController_capacity(request: ExRequest, response: ExResponse, next: any) {
+
+            // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+
+            let validatedArgs: any[] = [];
+            try {
+                validatedArgs = templateService.getValidatedArgs({ args: argsAnalysisQueueController_capacity, request, response });
+
+                const container: IocContainer = typeof iocContainer === 'function' ? (iocContainer as IocContainerFactory)(request) : iocContainer;
+
+                const controller: any = await container.get<AnalysisQueueController>(AnalysisQueueController);
+                if (typeof controller['setStatus'] === 'function') {
+                controller.setStatus(undefined);
+                }
+
+              await templateService.apiHandler({
+                methodName: 'capacity',
+                controller,
+                response,
+                next,
+                validatedArgs,
+                successStatus: undefined,
+              });
+            } catch (err) {
+                return next(err);
+            }
+        });
+        // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+        const argsAnalysisQueueController_startScan: Record<string, TsoaRoute.ParameterSchema> = {
+                body: {"in":"body","name":"body","required":true,"ref":"ScanBody"},
+        };
+        app.post('/api/v1/internal/analysis-queue/scans',
+            authenticateMiddleware([{"service":[]}]),
+            ...(fetchMiddlewares<RequestHandler>(AnalysisQueueController)),
+            ...(fetchMiddlewares<RequestHandler>(AnalysisQueueController.prototype.startScan)),
+
+            async function AnalysisQueueController_startScan(request: ExRequest, response: ExResponse, next: any) {
+
+            // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+
+            let validatedArgs: any[] = [];
+            try {
+                validatedArgs = templateService.getValidatedArgs({ args: argsAnalysisQueueController_startScan, request, response });
+
+                const container: IocContainer = typeof iocContainer === 'function' ? (iocContainer as IocContainerFactory)(request) : iocContainer;
+
+                const controller: any = await container.get<AnalysisQueueController>(AnalysisQueueController);
+                if (typeof controller['setStatus'] === 'function') {
+                controller.setStatus(undefined);
+                }
+
+              await templateService.apiHandler({
+                methodName: 'startScan',
+                controller,
+                response,
+                next,
+                validatedArgs,
+                successStatus: undefined,
+              });
+            } catch (err) {
+                return next(err);
+            }
+        });
+        // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+        const argsAnalysisQueueController_seal: Record<string, TsoaRoute.ParameterSchema> = {
+                id: {"in":"path","name":"id","required":true,"dataType":"string"},
+                body: {"in":"body","name":"body","required":true,"dataType":"nestedObjectLiteral","nestedProperties":{"expectedRanges":{"dataType":"double","required":true}}},
+        };
+        app.post('/api/v1/internal/analysis-queue/scans/:id/seal',
+            authenticateMiddleware([{"service":[]}]),
+            ...(fetchMiddlewares<RequestHandler>(AnalysisQueueController)),
+            ...(fetchMiddlewares<RequestHandler>(AnalysisQueueController.prototype.seal)),
+
+            async function AnalysisQueueController_seal(request: ExRequest, response: ExResponse, next: any) {
+
+            // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+
+            let validatedArgs: any[] = [];
+            try {
+                validatedArgs = templateService.getValidatedArgs({ args: argsAnalysisQueueController_seal, request, response });
+
+                const container: IocContainer = typeof iocContainer === 'function' ? (iocContainer as IocContainerFactory)(request) : iocContainer;
+
+                const controller: any = await container.get<AnalysisQueueController>(AnalysisQueueController);
+                if (typeof controller['setStatus'] === 'function') {
+                controller.setStatus(undefined);
+                }
+
+              await templateService.apiHandler({
+                methodName: 'seal',
+                controller,
+                response,
+                next,
+                validatedArgs,
+                successStatus: undefined,
+              });
+            } catch (err) {
+                return next(err);
+            }
+        });
+        // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+        const argsAnalysisQueueController_scan: Record<string, TsoaRoute.ParameterSchema> = {
+                id: {"in":"path","name":"id","required":true,"dataType":"string"},
+        };
+        app.get('/api/v1/internal/analysis-queue/scans/:id',
+            authenticateMiddleware([{"service":[]}]),
+            ...(fetchMiddlewares<RequestHandler>(AnalysisQueueController)),
+            ...(fetchMiddlewares<RequestHandler>(AnalysisQueueController.prototype.scan)),
+
+            async function AnalysisQueueController_scan(request: ExRequest, response: ExResponse, next: any) {
+
+            // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+
+            let validatedArgs: any[] = [];
+            try {
+                validatedArgs = templateService.getValidatedArgs({ args: argsAnalysisQueueController_scan, request, response });
+
+                const container: IocContainer = typeof iocContainer === 'function' ? (iocContainer as IocContainerFactory)(request) : iocContainer;
+
+                const controller: any = await container.get<AnalysisQueueController>(AnalysisQueueController);
+                if (typeof controller['setStatus'] === 'function') {
+                controller.setStatus(undefined);
+                }
+
+              await templateService.apiHandler({
+                methodName: 'scan',
                 controller,
                 response,
                 next,

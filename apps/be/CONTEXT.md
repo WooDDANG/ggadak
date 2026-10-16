@@ -4,6 +4,12 @@ The backend REST API server managing persistent decision storage, Review Queue l
 
 ## Language
 
+**Analysis Queue**:
+The durable collection of received Discussion Contexts awaiting analysis, execution, or bounded retry. A received Scan Range becomes eligible only after the channel's declared scan coverage is fully received; receipt itself is distinct from completed analysis.
+
+**Durable Receipt**:
+The backend's confirmation that both an input and its processing intent have been persisted. It transfers analysis responsibility from the Bot to the BE without claiming that analysis succeeded.
+
 **Review Queue**:
 The staging pipeline and query interface where Decision Candidates are held in Draft state until human leads confirm, edit, or reject them.
 _Avoid_: Inbox, Approval List, Staging Area, Pending Tasks

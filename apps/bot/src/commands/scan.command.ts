@@ -104,7 +104,9 @@ export class ScanCommand {
         );
 
         await reply(
-          `✅ **[서버 전체 스캔 완료]**\n- 📂 대상 채널: **${res.channelCount || 0}개**\n- 💬 검사한 메시지: **${res.messageCount}개**\n- 📌 추출된 의사결정: **${res.decisionsCount}건**`,
+          res.pendingAnalysis
+            ? `📥 **[서버 데이터 전달 완료 · 분석 진행 중]**\n- 대상 채널: ${res.channelCount || 0}개\n- 전달한 메시지: ${res.messageCount}개\n분석 완료·실패 결과는 웹에서 확인해 주세요.`
+            : `✅ **[서버 전체 스캔 완료]**\n- 📂 대상 채널: **${res.channelCount || 0}개**\n- 💬 검사한 메시지: **${res.messageCount}개**\n- 📌 추출된 의사결정: **${res.decisionsCount}건**`,
         );
       } else {
         const channel = interaction.channel;
@@ -123,7 +125,9 @@ export class ScanCommand {
         );
 
         await reply(
-          `✅ **[채널 스캔 완료]**\n- 📂 채널: **#${'name' in channel ? channel.name : 'channel'}**\n- 💬 검사한 메시지: **${res.messageCount}개**\n- 📌 추출된 의사결정: **${res.decisionsCount}건**`,
+          res.pendingAnalysis
+            ? `📥 **[채널 데이터 전달 완료 · 분석 진행 중]**\n- 전달한 메시지: ${res.messageCount}개\n분석 완료·실패 결과는 웹에서 확인해 주세요.`
+            : `✅ **[채널 스캔 완료]**\n- 📂 채널: **#${'name' in channel ? channel.name : 'channel'}**\n- 💬 검사한 메시지: **${res.messageCount}개**\n- 📌 추출된 의사결정: **${res.decisionsCount}건**`,
         );
       }
     } catch (err: any) {

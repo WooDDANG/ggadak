@@ -43,8 +43,25 @@ test('queue snapshots and retry acknowledgements persist; duplicate Web commands
       where: { requestId: 'request' },
       data: { synchronizedAt: new Date(0) },
     });
+    await db.client.analysisDeliveryHeartbeat.update({
+      where: { id: 'bot' },
+      data: { synchronizedAt: new Date(0) },
+    });
     expect((await service.list('guild')).available).toBe(false);
     await expect(service.retry('guild', 'request', 'new-command')).rejects.toThrow(/unavailable/);
+  } finally {
+    await db.cleanup();
+  }
+});
+
+test('unchanged delivery status only refreshes heartbeat, not completed rows', async () => {
+  const db = await isolatedRepository();
+  try {
+    const service = new AnalysisDeliveryService(db.repo);
+    await service.synchronize([{ ...request, status: 'completed-no-decision' }]);
+    const first = (await service.list('guild')).requests[0].synchronizedAt;
+    await service.synchronize([{ ...request, status: 'completed-no-decision' }]);
+    expect((await service.list('guild')).requests[0].synchronizedAt).toBe(first);
   } finally {
     await db.cleanup();
   }

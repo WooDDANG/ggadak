@@ -11,4 +11,5 @@ export type SyncChannelResultStatus = typeof SyncChannelResultStatus[keyof typeo
 export const SyncChannelResultStatus = {
   COMPLETED: 'COMPLETED',
   FAILED: 'FAILED',
+  RECEIVED: 'RECEIVED',
 } as const;

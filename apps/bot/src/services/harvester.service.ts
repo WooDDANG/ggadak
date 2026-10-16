@@ -11,6 +11,7 @@ import {
   type SyncScanManifest,
 } from './backend-api.service.js';
 import { CONSENSUS_REGEX } from '../handlers/message.handler.js';
+import { ChannelTransfer } from './channel-transfer.js';
 
 const logger = createLogger('DISCUSSION-HARVESTER');
 
@@ -28,6 +29,9 @@ export interface RawMessageData {
 }
 
 export interface ScanOptions {
+  jobId?: string;
+  jobOwner?: string;
+  lookbackDays?: number;
   full?: boolean;
   hours?: number;
   limit?: number;
@@ -186,7 +190,7 @@ export class DiscussionHarvester {
     isManualOverride: boolean = false,
     traceId?: string,
     triggers: Message[] = [message],
-  ): Promise<Decision[] | null> {
+  ): Promise<Decision[] | null | { accepted: true; requestId: string }> {
     const channel = message.channel;
     if (!channel || !channel.isTextBased()) return null;
     if (!(await this.backendApi.isMonitoredChannel(message.guildId, channel.id))) return null;
@@ -274,6 +278,7 @@ export class DiscussionHarvester {
         },
       );
       const beDuration = Date.now() - beStart;
+      if (result.accepted) return { accepted: true, requestId: result.requestId };
 
       if (!result.found || !result.decisions || result.decisions.length === 0) {
         logger.info(
@@ -316,9 +321,15 @@ export class DiscussionHarvester {
     channel: TextChannel,
     policy: HarvestingPolicyConfig,
     options: ScanOptions = {},
-  ): Promise<{ scannedCount: number; decisionsCount: number }> {
+  ): Promise<{ scannedCount: number; decisionsCount: number; pendingAnalysis?: boolean }> {
     if (!(await this.backendApi.requireMonitoredChannel(channel.guild.id, channel.id)))
       return { scannedCount: 0, decisionsCount: 0 };
+    if (this.backendApi.asyncDelivery)
+      return new ChannelTransfer(this.backendApi).run(channel, {
+        ...options,
+        lookbackDays: policy.lookbackDays,
+        limit: options.limit ?? (options.initialOnly ? policy.initialScanLimit : undefined),
+      });
     const scanId = options.requestId
       ? `${options.requestId}:${channel.guild.id}:${channel.id}`
       : undefined;
@@ -464,10 +475,16 @@ export class DiscussionHarvester {
     guild: { channels: { cache: Map<string, any> }; name: string },
     policy: HarvestingPolicyConfig,
     options: ScanOptions = {},
-  ): Promise<{ channelCount: number; scannedCount: number; decisionsCount: number }> {
+  ): Promise<{
+    channelCount: number;
+    scannedCount: number;
+    decisionsCount: number;
+    pendingAnalysis?: boolean;
+  }> {
     let totalMessages = 0;
     let totalDecisions = 0;
     let channelCount = 0;
+    let pendingAnalysis = false;
     const failures: string[] = [];
     let completedRanges = 0;
     let pendingRanges = 0;
@@ -485,6 +502,7 @@ export class DiscussionHarvester {
         const res = await this.scanChannel(textChannel, policy, options);
         totalMessages += res.scannedCount;
         totalDecisions += res.decisionsCount;
+        pendingAnalysis ||= res.pendingAnalysis === true;
         channelCount++;
         completedRanges += Math.ceil(res.scannedCount / 100);
       } catch (err: any) {
@@ -505,7 +523,12 @@ export class DiscussionHarvester {
         failedRanges,
         failures.join('; '),
       );
-    return { channelCount, scannedCount: totalMessages, decisionsCount: totalDecisions };
+    return {
+      channelCount,
+      scannedCount: totalMessages,
+      decisionsCount: totalDecisions,
+      pendingAnalysis,
+    };
   }
 
   /** @internal Adapter operation; event and manual scan callers use engine.harvest(). */
@@ -535,22 +558,24 @@ export class DiscussionHarvester {
   }
 
   /** @internal Adapter operation; event and manual scan callers use engine.harvest(). */
-  async addReactionSafely(message: Message, emoji: string): Promise<void> {
+  async addReactionSafely(message: Message, emoji: string, strict = false): Promise<void> {
     try {
       if (message.react) await message.react(emoji);
     } catch (err: any) {
       logger.warn(`[Reaction] Failed to add '${emoji}' reaction: ${err.message}`);
+      if (strict) throw err;
     }
   }
 
   /** @internal Adapter operation; event and manual scan callers use engine.harvest(). */
-  async removeReactionSafely(message: Message, emoji: string): Promise<void> {
+  async removeReactionSafely(message: Message, emoji: string, strict = false): Promise<void> {
     try {
       const existing = message.reactions?.cache?.find((r: any) => r.emoji.name === emoji);
       const botId = message.client?.user?.id;
       if (existing && botId && existing.users?.remove) await existing.users.remove(botId);
     } catch (err: any) {
       logger.warn(`[Reaction] Failed to remove '${emoji}' reaction: ${err.message}`);
+      if (strict) throw err;
     }
   }
 }

@@ -1,4 +1,6 @@
 import { DashboardService } from '../services/dashboard.service.js';
+import { AnalysisQueueService } from '../services/analysis-queue.service.js';
+import { AnalysisQueueController } from '../api/controllers/analysis-queue.controller.js';
 import { AnalysisRequestController } from '../api/controllers/analysis-request.controller.js';
 import { DashboardController } from '../api/controllers/dashboard.controller.js';
 import { SearchService, EmbeddingProvider } from '../services/search.service.js';
@@ -100,6 +102,9 @@ export async function initLoaders({
   const feedbackService = new FeedbackService(repo);
   const decisionService = new DecisionService(repo);
   const discussionService = new DiscussionService(repo, aiAdapter as AiAdapter, core);
+  const analysisQueue = new AnalysisQueueService(repo, discussionService);
+  expressApp.locals.analysisQueue = analysisQueue;
+  container.set(AnalysisQueueController, new AnalysisQueueController(analysisQueue));
 
   container.set(DecisionExtractorCore, core);
   container.set(PolicyService, policyService);
@@ -107,7 +112,10 @@ export async function initLoaders({
   container.set(FeedbackService, feedbackService);
   container.set(DecisionService, decisionService);
   container.set(DiscussionService, discussionService);
-  container.set(AnalysisRequestController, new AnalysisRequestController(discussionService, authService));
+  container.set(
+    AnalysisRequestController,
+    new AnalysisRequestController(discussionService, authService),
+  );
 
   // 5. Controller Layer Binding for TSOA IoC Container
   container.set(PolicyController, new PolicyController(policyService));

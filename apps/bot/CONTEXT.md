@@ -21,7 +21,7 @@ An apparent contradiction or replacement relationship between a Decision Candida
 _Avoid_: Collision, Override, Overwrite, Duplicate
 
 **Egress Queue**:
-The durable collection of pending Discussion Context analysis requests retained until analysis completes, including requests awaiting retry after a failure.
+The durable collection of Discussion Context deliveries awaiting backend durable receipt. Once receipt is confirmed, backend analysis and its retries are owned by the BE Analysis Queue; result feedback is tracked separately. Legacy synchronous deliveries retain their original completion contract during transition.
 _Avoid_: Outbox, Message Queue, Task Buffer
 
 **Analysis Request**:

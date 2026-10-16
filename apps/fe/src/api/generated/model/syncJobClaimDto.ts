@@ -4,6 +4,7 @@
  * @ggaddak/be
  * OpenAPI spec version: 1.0.0
  */
+import type { SyncJobClaimDtoChannelsItem } from './syncJobClaimDtoChannelsItem';
 
 export interface SyncJobClaimDto {
   /** @nullable */
@@ -13,6 +14,9 @@ export interface SyncJobClaimDto {
   createdAt: string;
   /** @nullable */
   errorMessage: string | null;
+  channels?: SyncJobClaimDtoChannelsItem[];
+  analysisPendingChannels?: number;
+  receivedChannels?: number;
   messagesScanned: number;
   decisionsFound: number;
   failedChannels: number;
@@ -22,6 +26,7 @@ export interface SyncJobClaimDto {
   forceFullSync: boolean;
   guildId: string;
   jobId: string;
+  deliveryOnly?: boolean;
   owner: string;
   channelIds: string[];
 }

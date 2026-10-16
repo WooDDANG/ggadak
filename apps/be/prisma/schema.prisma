@@ -91,6 +91,60 @@ model AnalysisRequest {
   completedAt DateTime?
 }
 
+model AnalysisReceipt {
+  id String @id
+  fingerprint String
+  guildId String
+  channelId String
+  scanId String?
+  rangeIndex Int?
+  rangeJson String?
+  inputJson String?
+  inputBytes Int
+  state String @default("pending")
+  attempts Int @default(0)
+  nextAttemptAt DateTime @default(now())
+  owner String?
+  leaseUntil DateTime?
+  errorCategory String?
+  createdAt DateTime @default(now())
+  startedAt DateTime?
+  completedAt DateTime?
+  acknowledgedAt DateTime?
+  @@unique([scanId, rangeIndex])
+  @@index([state, nextAttemptAt])
+  @@index([guildId, createdAt])
+}
+
+model AnalysisScan {
+  id String @id
+  guildId String
+  channelId String
+  upperMessageId String
+  afterMessageId String
+  expectedRanges Int?
+  state String @default("receiving")
+  jobId String?
+  jobOwner String?
+  createdAt DateTime @default(now())
+  @@index([jobId])
+}
+
+model AnalysisQueueControl {
+  id String @id
+  revision Int @default(0)
+  foregroundCount Int @default(0)
+  pauseUntil DateTime?
+}
+
+model AnalysisExecution {
+  id String @id
+  owner String?
+  requestId String?
+  channelId String?
+  leaseUntil DateTime?
+}
+
 model CandidateIdentity {
   key String @id
   decisionId String

@@ -1384,6 +1384,32 @@
 						"type": "string",
 						"nullable": true
 					},
+					"channels": {
+						"items": {
+							"properties": {
+								"status": {
+									"type": "string"
+								},
+								"id": {
+									"type": "string"
+								}
+							},
+							"required": [
+								"status",
+								"id"
+							],
+							"type": "object"
+						},
+						"type": "array"
+					},
+					"analysisPendingChannels": {
+						"type": "number",
+						"format": "double"
+					},
+					"receivedChannels": {
+						"type": "number",
+						"format": "double"
+					},
 					"messagesScanned": {
 						"type": "number",
 						"format": "double"
@@ -1476,6 +1502,32 @@
 						"type": "string",
 						"nullable": true
 					},
+					"channels": {
+						"items": {
+							"properties": {
+								"status": {
+									"type": "string"
+								},
+								"id": {
+									"type": "string"
+								}
+							},
+							"required": [
+								"status",
+								"id"
+							],
+							"type": "object"
+						},
+						"type": "array"
+					},
+					"analysisPendingChannels": {
+						"type": "number",
+						"format": "double"
+					},
+					"receivedChannels": {
+						"type": "number",
+						"format": "double"
+					},
 					"messagesScanned": {
 						"type": "number",
 						"format": "double"
@@ -1507,6 +1559,9 @@
 					},
 					"jobId": {
 						"type": "string"
+					},
+					"deliveryOnly": {
+						"type": "boolean"
 					},
 					"owner": {
 						"type": "string"
@@ -1606,7 +1661,8 @@
 						"type": "string",
 						"enum": [
 							"COMPLETED",
-							"FAILED"
+							"FAILED",
+							"RECEIVED"
 						]
 					},
 					"messagesScanned": {
@@ -1632,6 +1688,9 @@
 			},
 			"SyncJobUpdate": {
 				"properties": {
+					"release": {
+						"type": "boolean"
+					},
 					"owner": {
 						"type": "string"
 					},
@@ -3000,6 +3059,428 @@
 				"type": "object",
 				"additionalProperties": false
 			},
+			"ReceiptView": {
+				"properties": {
+					"requestId": {
+						"type": "string"
+					},
+					"state": {
+						"type": "string"
+					},
+					"attempts": {
+						"type": "number",
+						"format": "double"
+					},
+					"nextAttemptAt": {
+						"type": "string"
+					},
+					"errorCategory": {
+						"type": "string",
+						"nullable": true
+					},
+					"inputRetained": {
+						"type": "boolean"
+					},
+					"result": {
+						"$ref": "#/components/schemas/AnalyzeDiscussionResponseDto"
+					},
+					"receivedAt": {
+						"type": "string"
+					},
+					"startedAt": {
+						"type": "string",
+						"nullable": true
+					},
+					"completedAt": {
+						"type": "string",
+						"nullable": true
+					}
+				},
+				"required": [
+					"requestId",
+					"state",
+					"attempts",
+					"nextAttemptAt",
+					"errorCategory",
+					"inputRetained",
+					"receivedAt",
+					"startedAt",
+					"completedAt"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"ApiResponse_ReceiptView_": {
+				"description": "Shared v1 response contract. Domain payloads remain typed by each endpoint.",
+				"properties": {
+					"success": {
+						"type": "boolean"
+					},
+					"code": {
+						"type": "string"
+					},
+					"message": {
+						"type": "string"
+					},
+					"data": {
+						"$ref": "#/components/schemas/ReceiptView"
+					}
+				},
+				"required": [
+					"success",
+					"code",
+					"message",
+					"data"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"ScanRangeDto": {
+				"properties": {
+					"afterMessageId": {
+						"type": "string"
+					},
+					"startMessageId": {
+						"type": "string"
+					},
+					"endMessageId": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"afterMessageId",
+					"startMessageId",
+					"endMessageId"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"ReceiptBody": {
+				"properties": {
+					"input": {
+						"$ref": "#/components/schemas/AnalyzeDiscussionRequestDto"
+					},
+					"scanId": {
+						"type": "string"
+					},
+					"rangeIndex": {
+						"type": "number",
+						"format": "double"
+					},
+					"range": {
+						"$ref": "#/components/schemas/ScanRangeDto"
+					}
+				},
+				"required": [
+					"input"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"ApiResponse_ReceiptView-Array_": {
+				"description": "Shared v1 response contract. Domain payloads remain typed by each endpoint.",
+				"properties": {
+					"success": {
+						"type": "boolean"
+					},
+					"code": {
+						"type": "string"
+					},
+					"message": {
+						"type": "string"
+					},
+					"data": {
+						"items": {
+							"$ref": "#/components/schemas/ReceiptView"
+						},
+						"type": "array"
+					}
+				},
+				"required": [
+					"success",
+					"code",
+					"message",
+					"data"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"ApiResponse__acceptingScans-boolean--pending-number--retainedBytes-number--oldestWaitingMs-number--pauseUntil-string-or-null--maxBytes-number--maxChannelBytes-number--maxPending-number--states-Array__state-string--count-number--bytes-number____": {
+				"description": "Shared v1 response contract. Domain payloads remain typed by each endpoint.",
+				"properties": {
+					"success": {
+						"type": "boolean"
+					},
+					"code": {
+						"type": "string"
+					},
+					"message": {
+						"type": "string"
+					},
+					"data": {
+						"properties": {
+							"states": {
+								"items": {
+									"properties": {
+										"bytes": {
+											"type": "number",
+											"format": "double"
+										},
+										"count": {
+											"type": "number",
+											"format": "double"
+										},
+										"state": {
+											"type": "string"
+										}
+									},
+									"required": [
+										"bytes",
+										"count",
+										"state"
+									],
+									"type": "object"
+								},
+								"type": "array"
+							},
+							"maxPending": {
+								"type": "number",
+								"format": "double"
+							},
+							"maxChannelBytes": {
+								"type": "number",
+								"format": "double"
+							},
+							"maxBytes": {
+								"type": "number",
+								"format": "double"
+							},
+							"pauseUntil": {
+								"type": "string",
+								"nullable": true
+							},
+							"oldestWaitingMs": {
+								"type": "number",
+								"format": "double"
+							},
+							"retainedBytes": {
+								"type": "number",
+								"format": "double"
+							},
+							"pending": {
+								"type": "number",
+								"format": "double"
+							},
+							"acceptingScans": {
+								"type": "boolean"
+							}
+						},
+						"required": [
+							"states",
+							"maxPending",
+							"maxChannelBytes",
+							"maxBytes",
+							"pauseUntil",
+							"oldestWaitingMs",
+							"retainedBytes",
+							"pending",
+							"acceptingScans"
+						],
+						"type": "object"
+					}
+				},
+				"required": [
+					"success",
+					"code",
+					"message",
+					"data"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"ApiResponse__id-string--state-string__": {
+				"description": "Shared v1 response contract. Domain payloads remain typed by each endpoint.",
+				"properties": {
+					"success": {
+						"type": "boolean"
+					},
+					"code": {
+						"type": "string"
+					},
+					"message": {
+						"type": "string"
+					},
+					"data": {
+						"properties": {
+							"state": {
+								"type": "string"
+							},
+							"id": {
+								"type": "string"
+							}
+						},
+						"required": [
+							"state",
+							"id"
+						],
+						"type": "object"
+					}
+				},
+				"required": [
+					"success",
+					"code",
+					"message",
+					"data"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"ScanBody": {
+				"properties": {
+					"id": {
+						"type": "string"
+					},
+					"guildId": {
+						"type": "string"
+					},
+					"channelId": {
+						"type": "string"
+					},
+					"upperMessageId": {
+						"type": "string"
+					},
+					"afterMessageId": {
+						"type": "string"
+					},
+					"jobId": {
+						"type": "string"
+					},
+					"jobOwner": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"id",
+					"guildId",
+					"channelId",
+					"upperMessageId",
+					"afterMessageId"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"ApiResponse__sealed-boolean--missing-number-Array__": {
+				"description": "Shared v1 response contract. Domain payloads remain typed by each endpoint.",
+				"properties": {
+					"success": {
+						"type": "boolean"
+					},
+					"code": {
+						"type": "string"
+					},
+					"message": {
+						"type": "string"
+					},
+					"data": {
+						"properties": {
+							"missing": {
+								"items": {
+									"type": "number",
+									"format": "double"
+								},
+								"type": "array"
+							},
+							"sealed": {
+								"type": "boolean"
+							}
+						},
+						"required": [
+							"missing",
+							"sealed"
+						],
+						"type": "object"
+					}
+				},
+				"required": [
+					"success",
+					"code",
+					"message",
+					"data"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"ApiResponse__id-string--state-string--expectedRanges-number-or-null--receivedRanges-number--completed-number--failed-number--bytes-number--missing-number-Array__": {
+				"description": "Shared v1 response contract. Domain payloads remain typed by each endpoint.",
+				"properties": {
+					"success": {
+						"type": "boolean"
+					},
+					"code": {
+						"type": "string"
+					},
+					"message": {
+						"type": "string"
+					},
+					"data": {
+						"properties": {
+							"missing": {
+								"items": {
+									"type": "number",
+									"format": "double"
+								},
+								"type": "array"
+							},
+							"bytes": {
+								"type": "number",
+								"format": "double"
+							},
+							"failed": {
+								"type": "number",
+								"format": "double"
+							},
+							"completed": {
+								"type": "number",
+								"format": "double"
+							},
+							"receivedRanges": {
+								"type": "number",
+								"format": "double"
+							},
+							"expectedRanges": {
+								"type": "number",
+								"format": "double",
+								"nullable": true
+							},
+							"state": {
+								"type": "string"
+							},
+							"id": {
+								"type": "string"
+							}
+						},
+						"required": [
+							"missing",
+							"bytes",
+							"failed",
+							"completed",
+							"receivedRanges",
+							"expectedRanges",
+							"state",
+							"id"
+						],
+						"type": "object"
+					}
+				},
+				"required": [
+					"success",
+					"code",
+					"message",
+					"data"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
 			"AnalysisDeliveryViewDto": {
 				"properties": {
 					"requestId": {
@@ -3056,6 +3537,30 @@
 							"afterMessageId"
 						],
 						"type": "object"
+					},
+					"managedBy": {
+						"type": "string",
+						"enum": [
+							"bot",
+							"backend"
+						]
+					},
+					"phase": {
+						"type": "string"
+					},
+					"inputRetained": {
+						"type": "boolean"
+					},
+					"receivedAt": {
+						"type": "string"
+					},
+					"startedAt": {
+						"type": "string",
+						"nullable": true
+					},
+					"completedAt": {
+						"type": "string",
+						"nullable": true
 					},
 					"requiresNewAnalysis": {
 						"type": "boolean"
@@ -3793,6 +4298,57 @@
 					{
 						"in": "path",
 						"name": "jobId",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"in": "query",
+						"name": "guildId",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				]
+			}
+		},
+		"/api/v1/sync-jobs/{jobId}/channels/{channelId}/resume": {
+			"post": {
+				"operationId": "ResumeChannel",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiResponse_SyncJobView_"
+								}
+							}
+						}
+					}
+				},
+				"tags": [
+					"v1 Sync Jobs"
+				],
+				"security": [
+					{
+						"jwt": []
+					}
+				],
+				"parameters": [
+					{
+						"in": "path",
+						"name": "jobId",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"in": "path",
+						"name": "channelId",
 						"required": true,
 						"schema": {
 							"type": "string"
@@ -4720,6 +5276,254 @@
 					{
 						"in": "query",
 						"name": "guildId",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				]
+			}
+		},
+		"/api/v1/internal/analysis-queue/receipts": {
+			"post": {
+				"operationId": "Receive",
+				"responses": {
+					"202": {
+						"description": "Durably received",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiResponse_ReceiptView_"
+								}
+							}
+						}
+					}
+				},
+				"security": [
+					{
+						"service": []
+					}
+				],
+				"parameters": [],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/ReceiptBody"
+							}
+						}
+					}
+				}
+			}
+		},
+		"/api/v1/internal/analysis-queue/results": {
+			"get": {
+				"operationId": "Results",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiResponse_ReceiptView-Array_"
+								}
+							}
+						}
+					}
+				},
+				"security": [
+					{
+						"service": []
+					}
+				],
+				"parameters": [
+					{
+						"in": "query",
+						"name": "ids",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				]
+			}
+		},
+		"/api/v1/internal/analysis-queue/ack": {
+			"post": {
+				"operationId": "Acknowledge",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiResponse_null_"
+								}
+							}
+						}
+					}
+				},
+				"security": [
+					{
+						"service": []
+					}
+				],
+				"parameters": [],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"properties": {
+									"ids": {
+										"items": {
+											"type": "string"
+										},
+										"type": "array"
+									}
+								},
+								"required": [
+									"ids"
+								],
+								"type": "object"
+							}
+						}
+					}
+				}
+			}
+		},
+		"/api/v1/internal/analysis-queue/capacity": {
+			"get": {
+				"operationId": "Capacity",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiResponse__acceptingScans-boolean--pending-number--retainedBytes-number--oldestWaitingMs-number--pauseUntil-string-or-null--maxBytes-number--maxChannelBytes-number--maxPending-number--states-Array__state-string--count-number--bytes-number____"
+								}
+							}
+						}
+					}
+				},
+				"security": [
+					{
+						"service": []
+					}
+				],
+				"parameters": []
+			}
+		},
+		"/api/v1/internal/analysis-queue/scans": {
+			"post": {
+				"operationId": "StartScan",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiResponse__id-string--state-string__"
+								}
+							}
+						}
+					}
+				},
+				"security": [
+					{
+						"service": []
+					}
+				],
+				"parameters": [],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/ScanBody"
+							}
+						}
+					}
+				}
+			}
+		},
+		"/api/v1/internal/analysis-queue/scans/{id}/seal": {
+			"post": {
+				"operationId": "Seal",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiResponse__sealed-boolean--missing-number-Array__"
+								}
+							}
+						}
+					}
+				},
+				"security": [
+					{
+						"service": []
+					}
+				],
+				"parameters": [
+					{
+						"in": "path",
+						"name": "id",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"properties": {
+									"expectedRanges": {
+										"type": "number",
+										"format": "double"
+									}
+								},
+								"required": [
+									"expectedRanges"
+								],
+								"type": "object"
+							}
+						}
+					}
+				}
+			}
+		},
+		"/api/v1/internal/analysis-queue/scans/{id}": {
+			"get": {
+				"operationId": "Scan",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiResponse__id-string--state-string--expectedRanges-number-or-null--receivedRanges-number--completed-number--failed-number--bytes-number--missing-number-Array__"
+								}
+							}
+						}
+					}
+				},
+				"security": [
+					{
+						"service": []
+					}
+				],
+				"parameters": [
+					{
+						"in": "path",
+						"name": "id",
 						"required": true,
 						"schema": {
 							"type": "string"

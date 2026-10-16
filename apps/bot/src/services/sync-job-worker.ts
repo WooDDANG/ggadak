@@ -1,5 +1,6 @@
 import type { SyncJobClaim, SyncJobUpdate as SyncWorkerUpdate } from '@ggaddak/shared';
 import { ScanIncompleteError } from './harvester.service.js';
+import { AnalysisDeliveryError, BackendRequestError } from './backend-api.service.js';
 export type { SyncJobClaim, SyncJobUpdate as SyncWorkerUpdate } from '@ggaddak/shared';
 
 interface SyncWorkerBackend {
@@ -19,6 +20,7 @@ export class SyncJobWorker {
     ) => Promise<{
       scannedCount: number;
       decisionsCount: number;
+      pendingAnalysis?: boolean;
     }>,
   ) {}
 
@@ -57,11 +59,20 @@ export class SyncJobWorker {
             const result = await this.scan(job, channelId);
             channelResult = {
               channelId,
-              status: 'COMPLETED',
+              status: job.deliveryOnly ? 'RECEIVED' : 'COMPLETED',
               messagesScanned: result.scannedCount,
               decisionsFound: result.decisionsCount,
             };
           } catch (error) {
+            if (
+              job.deliveryOnly &&
+              ((error instanceof AnalysisDeliveryError && error.outcome === 'retry-pending') ||
+                (error instanceof BackendRequestError &&
+                  [429, 503, 507].includes(error.statusCode)))
+            ) {
+              await this.backend.updateSyncJob(job.jobId, { owner: job.owner, release: true });
+              return;
+            }
             // A timed-out delivery can still be running in BE. Keep the job recoverable
             // rather than publishing a failed channel while retained requests are pending.
             if (error instanceof ScanIncompleteError && error.pending > 0) throw error;
@@ -79,7 +90,12 @@ export class SyncJobWorker {
         clearInterval(timer);
         await checkLease();
         // BE derives COMPLETED/FAILED from persisted channel results.
-        await this.backend.updateSyncJob(job.jobId, { owner: job.owner, status: 'COMPLETED' });
+        await this.backend.updateSyncJob(
+          job.jobId,
+          job.deliveryOnly
+            ? { owner: job.owner, release: true }
+            : { owner: job.owner, status: 'COMPLETED' },
+        );
       } finally {
         clearInterval(timer);
         await heartbeat;

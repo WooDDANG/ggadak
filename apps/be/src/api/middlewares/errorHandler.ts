@@ -9,6 +9,12 @@ const logger = createLogger('ERROR-HANDLER');
 
 export function errorHandler(err: any, req: Request, res: Response, _next: NextFunction): void {
   if (isV1Request(req.path)) {
+    if (
+      err instanceof AppError &&
+      Number.isFinite(err.details?.retryAfterMs) &&
+      err.details.retryAfterMs > 0
+    )
+      res.setHeader('Retry-After', String(Math.ceil(err.details.retryAfterMs / 1000)));
     const status =
       err instanceof AppError ? err.statusCode : typeof err.status === 'number' ? err.status : 500;
     const validation = err instanceof ValidateError || err.type === 'entity.parse.failed';
