@@ -1,3 +1,5 @@
+import { AnalysisQueueRepository } from '../repositories/analysis-queue.repository.js';
+import { AnalysisReceiptState } from '@ggaddak/shared';
 import { Service } from 'typedi';
 import { AnalysisRequestRepository } from '../repositories/analysis-request.repository.js';
 import { DecisionRepository } from '../repositories/decision.repository.js';
@@ -23,7 +25,10 @@ const commandView = (command: {
 
 @Service()
 export class AnalysisDeliveryService {
-  constructor(private repo: DecisionRepository) {}
+  private queue: AnalysisQueueRepository;
+  constructor(private repo: DecisionRepository) {
+    this.queue = new AnalysisQueueRepository(repo.prisma);
+  }
 
   async synchronize(requests: AnalysisDeliveryStatus[]): Promise<AnalysisRetryCommandDto[]> {
     if (requests.length > 100) throw new BadRequestError('At most 100 status changes per request');
@@ -99,11 +104,7 @@ export class AnalysisDeliveryService {
     const heartbeat = await this.repo.prisma.analysisDeliveryHeartbeat.findUnique({
       where: { id: 'bot' },
     });
-    const receipts = await this.repo.prisma.analysisReceipt.findMany({
-      where: { guildId },
-      orderBy: { createdAt: 'desc' },
-      take: 500,
-    });
+    const receipts = await this.queue.listForGuild(guildId);
     const owned = new Set(receipts.map(r => r.id));
     return {
       requests: [
@@ -123,11 +124,11 @@ export class AnalysisDeliveryService {
           requestId: r.id,
           guildId: r.guildId,
           channelId: r.channelId,
-          status: (r.state === 'failed'
+          status: (r.state === AnalysisReceiptState.Failed
             ? 'retained-failure'
-            : r.state === 'retry'
+            : r.state === AnalysisReceiptState.Retry
               ? 'retry-pending'
-              : r.state === 'completed'
+              : r.state === AnalysisReceiptState.Completed
                 ? 'completed-no-decision'
                 : 'pending') as AnalysisDeliveryStatus['status'],
           phase: r.state,
@@ -166,17 +167,12 @@ export class AnalysisDeliveryService {
           throw new ConflictError('Retry command ID already used');
         return existing;
       }
-      const receipt = await tx.analysisReceipt.findUnique({ where: { id: requestId } });
+      const receipt = await this.queue.receipt(requestId, tx);
       if (receipt?.guildId === guildId) {
-        if (receipt.state !== 'failed' || !receipt.inputJson)
+        if (receipt.state !== AnalysisReceiptState.Failed || !receipt.inputJson)
           throw new ConflictError('Only retained analysis failures can be retried');
-        await tx.analysisReceipt.update({
-          where: { id: requestId },
-          data: { state: 'pending', attempts: 0, nextAttemptAt: new Date(), errorCategory: null },
-        });
-        return tx.analysisRetryCommand.create({
-          data: { id: commandId, guildId, requestId, acknowledgedAt: new Date() },
-        });
+        await this.queue.resetFailed(requestId, tx);
+        return this.queue.acknowledgeRetry(commandId, guildId, requestId, new Date(), tx);
       }
       const request = await tx.analysisDelivery.findFirst({ where: { guildId, requestId } });
       if (!request) throw new NotFoundError('Analysis Request not found');

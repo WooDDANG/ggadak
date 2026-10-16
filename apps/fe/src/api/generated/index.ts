@@ -24,10 +24,8 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
-  AcknowledgeBody,
   AnalyzeDiscussionRequestDto,
   AnalyzeDiscussionResponseDto,
-  ApiResponseAcceptingScansBooleanPendingNumberRetainedBytesNumberOldestWaitingMsNumberPauseUntilStringOrNullMaxBytesNumberMaxChannelBytesNumberMaxPendingNumberStatesArrayStateStringCountNumberBytesNumber,
   ApiResponseAccessTokenStringTokenTypeStringExpiresAtString,
   ApiResponseAccessTokenStringTokenTypeStringExpiresAtStringUserAuthUserDto,
   ApiResponseAccessTokenStringTokenTypeStringExpiresAtStringUserAuthUserDtoGuildsDiscordGuildArray,
@@ -43,12 +41,13 @@ import type {
   ApiResponseDecisionTimelineDto,
   ApiResponseGraphSnapshot,
   ApiResponseGuildsDiscordGuildArray,
-  ApiResponseIdStringStateString,
-  ApiResponseIdStringStateStringExpectedRangesNumberOrNullReceivedRangesNumberCompletedNumberFailedNumberBytesNumberMissingNumberArray,
   ApiResponseNull,
+  ApiResponseQueueCapacityDto,
   ApiResponseReceiptView,
   ApiResponseReceiptViewArray,
-  ApiResponseSealedBooleanMissingNumberArray,
+  ApiResponseScanReceiptDto,
+  ApiResponseScanSealDto,
+  ApiResponseScanStatusDto,
   ApiResponseSearchResponse,
   ApiResponseSyncJobClaimDtoOrNull,
   ApiResponseSyncJobView,
@@ -80,6 +79,7 @@ import type {
   ListV1ReviewQueueParams,
   LoginDiscordBody,
   ReceiptBody,
+  ResultAckBody,
   ResultsParams,
   ResumeChannelParams,
   RetryAnalysisRequestBody,
@@ -90,7 +90,7 @@ import type {
   SaveDiscordChannelsBody,
   SaveDiscordChannelsParams,
   ScanBody,
-  SealBody,
+  ScanSealBody,
   SearchDecisionsParams,
   StatusParams,
   SyncJobUpdate,
@@ -3857,7 +3857,7 @@ export const getAcknowledgeUrl = () => {
   return `/api/v1/internal/analysis-queue/ack`
 }
 
-export const acknowledge = async (acknowledgeBody: AcknowledgeBody, options?: Parameters<typeof authenticatedClient>[1]): Promise<acknowledgeResponse> => {
+export const acknowledge = async (resultAckBody: ResultAckBody, options?: Parameters<typeof authenticatedClient>[1]): Promise<acknowledgeResponse> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -3878,7 +3878,7 @@ return authenticatedClient<acknowledgeResponse>(getAcknowledgeUrl(),
     ...options,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-    body: JSON.stringify(acknowledgeBody)
+    body: JSON.stringify(resultAckBody)
   }
 );}
 
@@ -3916,9 +3916,9 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type AcknowledgeMutationResult = NonNullable<Awaited<ReturnType<typeof acknowledge>>>
-    export type AcknowledgeMutationBody = AcknowledgeBody
+    export type AcknowledgeMutationBody = ResultAckBody
     export type AcknowledgeMutationError = unknown
-    export type AcknowledgeMutationVariables = {data: AcknowledgeBody}
+    export type AcknowledgeMutationVariables = {data: ResultAckBody}
 
     export const useAcknowledge = <TError = unknown,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof acknowledge>>, TError,AcknowledgeMutationVariables, TContext>, request?: SecondParameter<typeof authenticatedClient>}
@@ -3932,7 +3932,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     }
 
 export type capacityResponse200 = {
-  data: ApiResponseAcceptingScansBooleanPendingNumberRetainedBytesNumberOldestWaitingMsNumberPauseUntilStringOrNullMaxBytesNumberMaxChannelBytesNumberMaxPendingNumberStatesArrayStateStringCountNumberBytesNumber
+  data: ApiResponseQueueCapacityDto
   status: 200
 }
 
@@ -4039,7 +4039,7 @@ export function useCapacity<TData = Awaited<ReturnType<typeof capacity>>, TError
 
 
 export type startScanResponse200 = {
-  data: ApiResponseIdStringStateString
+  data: ApiResponseScanReceiptDto
   status: 200
 }
 
@@ -4133,7 +4133,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     }
 
 export type sealResponse200 = {
-  data: ApiResponseSealedBooleanMissingNumberArray
+  data: ApiResponseScanSealDto
   status: 200
 }
 
@@ -4153,7 +4153,7 @@ export const getSealUrl = (id: string,) => {
 }
 
 export const seal = async (id: string,
-    sealBody: SealBody, options?: Parameters<typeof authenticatedClient>[1]): Promise<sealResponse> => {
+    scanSealBody: ScanSealBody, options?: Parameters<typeof authenticatedClient>[1]): Promise<sealResponse> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -4174,7 +4174,7 @@ return authenticatedClient<sealResponse>(getSealUrl(id),
     ...options,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-    body: JSON.stringify(sealBody)
+    body: JSON.stringify(scanSealBody)
   }
 );}
 
@@ -4212,9 +4212,9 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type SealMutationResult = NonNullable<Awaited<ReturnType<typeof seal>>>
-    export type SealMutationBody = SealBody
+    export type SealMutationBody = ScanSealBody
     export type SealMutationError = unknown
-    export type SealMutationVariables = {id: string;data: SealBody}
+    export type SealMutationVariables = {id: string;data: ScanSealBody}
 
     export const useSeal = <TError = unknown,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof seal>>, TError,SealMutationVariables, TContext>, request?: SecondParameter<typeof authenticatedClient>}
@@ -4228,7 +4228,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     }
 
 export type scanResponse200 = {
-  data: ApiResponseIdStringStateStringExpectedRangesNumberOrNullReceivedRangesNumberCompletedNumberFailedNumberBytesNumberMissingNumberArray
+  data: ApiResponseScanStatusDto
   status: 200
 }
 

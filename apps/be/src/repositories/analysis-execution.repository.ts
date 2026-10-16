@@ -1,10 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import type { PrismaClient } from '@prisma/client';
 import { AppError } from '../errors/AppError.js';
-import { AnalysisRequestError } from '../repositories/analysis-request.repository.js';
+import { AnalysisRequestError } from './analysis-request.repository.js';
 
 /** Shared by synchronous compatibility callers and durable workers, across BE processes. */
-export class AnalysisExecution {
+export class AnalysisExecutionRepository {
   constructor(private prisma: PrismaClient) {}
   async acquire(requestId: string, channelId: string) {
     const max = Number(process.env.ANALYSIS_CONCURRENCY ?? 1);

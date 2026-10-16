@@ -23,7 +23,7 @@ import {
 } from '../repositories/analysis-request.repository.js';
 import { GraphWorkflow } from './graph-workflow.js';
 import { prepareAnalysis } from './discussion-preprocessing.js';
-import { AnalysisExecution } from './analysis-execution.js';
+import { AnalysisExecutionRepository } from '../repositories/analysis-execution.repository.js';
 
 @Service()
 export class DiscussionService {
@@ -41,7 +41,7 @@ export class DiscussionService {
     const requests = new AnalysisRequestRepository(this.repo);
     const claim = await requests.claim(params);
     if (claim.result) return claim.result;
-    const execution = new AnalysisExecution(this.repo.prisma);
+    const execution = new AnalysisExecutionRepository(this.repo.prisma);
     let slot: { slot: string; owner: string };
     try {
       slot = await execution.acquire(params.requestId, params.channelId ?? 'channel');

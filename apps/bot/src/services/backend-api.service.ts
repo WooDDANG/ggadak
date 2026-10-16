@@ -1,3 +1,4 @@
+import { AnalysisReceiptState } from '@ggaddak/shared';
 import type { SyncJobClaim, SyncWorkerUpdate } from './sync-job-worker.js';
 import { analysisScheduler } from './channel-scheduler.js';
 import { createHash, randomUUID } from 'node:crypto';
@@ -200,11 +201,29 @@ export class BackendApiService {
       throw error;
     }
   }
+  private async archiveConfirmed(filename: string): Promise<void> {
+    const archive = join(this.pendingDirectory, 'completed');
+    await mkdir(archive, { recursive: true });
+    await rename(filename, join(archive, filename.split('/').at(-1)!));
+    for (const directory of [archive, this.pendingDirectory]) {
+      const handle = await open(directory, 'r');
+      try {
+        await handle.sync();
+      } finally {
+        await handle.close();
+      }
+    }
+  }
   async reconcileResults(): Promise<void> {
     if (this.reconciling) return;
     this.reconciling = true;
     try {
-      const records = (await this.deliveryRecords()).filter(
+      const existing = await this.deliveryRecords();
+      for (const entry of existing) {
+        if (entry.record.serverAcknowledged && entry.record.feedbackApplied)
+          await this.archiveConfirmed(entry.filename);
+      }
+      const records = existing.filter(
         e =>
           e.record.receipt &&
           !e.record.serverAcknowledged &&
@@ -220,7 +239,7 @@ export class BackendApiService {
           const entry = batch.find(e => e.record.payload.requestId === result.requestId);
           if (!entry) continue;
           try {
-            if (result.state === 'failed') {
+            if (result.state === AnalysisReceiptState.Failed) {
               if (!entry.record.failureFeedbackApplied && !entry.record.scanId)
                 await this.deliveryObserver?.(
                   entry.record.payload,
@@ -233,7 +252,7 @@ export class BackendApiService {
               await this.persistJson(entry.record, entry.filename);
               continue;
             }
-            if (result.state !== 'completed' || !result.result) continue;
+            if (result.state !== AnalysisReceiptState.Completed || !result.result) continue;
             entry.record.result = result.result;
             entry.record.completedAt = this.now();
             await this.persistJson(entry.record, entry.filename);
@@ -245,9 +264,7 @@ export class BackendApiService {
             await this.queueRequest('/ack', 'POST', { ids: [result.requestId] });
             entry.record.serverAcknowledged = true;
             await this.persistJson(entry.record, entry.filename);
-            const archive = join(this.pendingDirectory, 'completed');
-            await mkdir(archive, { recursive: true });
-            await rename(entry.filename, join(archive, entry.filename.split('/').at(-1)!));
+            await this.archiveConfirmed(entry.filename);
           } catch (error) {
             entry.record.feedbackAttempts = (entry.record.feedbackAttempts ?? 0) + 1;
             entry.record.feedbackNextAttemptAt =
@@ -313,7 +330,21 @@ export class BackendApiService {
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
     }
-    for (const name of scans.slice(0, 50)) {
+    scans.sort();
+    const cursorFile = join(this.pendingDirectory, '.control', 'cleanup-cursor.json');
+    await mkdir(dirname(cursorFile), { recursive: true, mode: 0o700 });
+    let cursor = '';
+    try {
+      cursor = JSON.parse(await readFile(cursorFile, 'utf8')).scan ?? '';
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    }
+    const ordered = [
+      ...scans.filter(name => name > cursor),
+      ...scans.filter(name => name <= cursor),
+    ];
+    for (const name of ordered.slice(0, 50)) {
+      await this.persistJson({ scan: name }, cursorFile);
       const filename = join(transfers, name, 'manifest.json');
       let manifest: any;
       try {

@@ -3059,13 +3059,25 @@
 				"type": "object",
 				"additionalProperties": false
 			},
+			"AnalysisReceiptState": {
+				"description": "Durable input receipt lifecycle shared by the backend and bot.",
+				"enum": [
+					"receiving",
+					"pending",
+					"processing",
+					"retry",
+					"completed",
+					"failed"
+				],
+				"type": "string"
+			},
 			"ReceiptView": {
 				"properties": {
 					"requestId": {
 						"type": "string"
 					},
 					"state": {
-						"type": "string"
+						"$ref": "#/components/schemas/AnalysisReceiptState"
 					},
 					"attempts": {
 						"type": "number",
@@ -3205,7 +3217,94 @@
 				"type": "object",
 				"additionalProperties": false
 			},
-			"ApiResponse__acceptingScans-boolean--pending-number--retainedBytes-number--oldestWaitingMs-number--pauseUntil-string-or-null--maxBytes-number--maxChannelBytes-number--maxPending-number--states-Array__state-string--count-number--bytes-number____": {
+			"ResultAckBody": {
+				"properties": {
+					"ids": {
+						"items": {
+							"type": "string"
+						},
+						"type": "array"
+					}
+				},
+				"required": [
+					"ids"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"QueueCapacityDto": {
+				"properties": {
+					"acceptingScans": {
+						"type": "boolean"
+					},
+					"pending": {
+						"type": "number",
+						"format": "double"
+					},
+					"retainedBytes": {
+						"type": "number",
+						"format": "double"
+					},
+					"oldestWaitingMs": {
+						"type": "number",
+						"format": "double"
+					},
+					"pauseUntil": {
+						"type": "string",
+						"nullable": true
+					},
+					"maxBytes": {
+						"type": "number",
+						"format": "double"
+					},
+					"maxChannelBytes": {
+						"type": "number",
+						"format": "double"
+					},
+					"maxPending": {
+						"type": "number",
+						"format": "double"
+					},
+					"states": {
+						"items": {
+							"properties": {
+								"bytes": {
+									"type": "number",
+									"format": "double"
+								},
+								"count": {
+									"type": "number",
+									"format": "double"
+								},
+								"state": {
+									"$ref": "#/components/schemas/AnalysisReceiptState"
+								}
+							},
+							"required": [
+								"bytes",
+								"count",
+								"state"
+							],
+							"type": "object"
+						},
+						"type": "array"
+					}
+				},
+				"required": [
+					"acceptingScans",
+					"pending",
+					"retainedBytes",
+					"oldestWaitingMs",
+					"pauseUntil",
+					"maxBytes",
+					"maxChannelBytes",
+					"maxPending",
+					"states"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"ApiResponse_QueueCapacityDto_": {
 				"description": "Shared v1 response contract. Domain payloads remain typed by each endpoint.",
 				"properties": {
 					"success": {
@@ -3218,75 +3317,7 @@
 						"type": "string"
 					},
 					"data": {
-						"properties": {
-							"states": {
-								"items": {
-									"properties": {
-										"bytes": {
-											"type": "number",
-											"format": "double"
-										},
-										"count": {
-											"type": "number",
-											"format": "double"
-										},
-										"state": {
-											"type": "string"
-										}
-									},
-									"required": [
-										"bytes",
-										"count",
-										"state"
-									],
-									"type": "object"
-								},
-								"type": "array"
-							},
-							"maxPending": {
-								"type": "number",
-								"format": "double"
-							},
-							"maxChannelBytes": {
-								"type": "number",
-								"format": "double"
-							},
-							"maxBytes": {
-								"type": "number",
-								"format": "double"
-							},
-							"pauseUntil": {
-								"type": "string",
-								"nullable": true
-							},
-							"oldestWaitingMs": {
-								"type": "number",
-								"format": "double"
-							},
-							"retainedBytes": {
-								"type": "number",
-								"format": "double"
-							},
-							"pending": {
-								"type": "number",
-								"format": "double"
-							},
-							"acceptingScans": {
-								"type": "boolean"
-							}
-						},
-						"required": [
-							"states",
-							"maxPending",
-							"maxChannelBytes",
-							"maxBytes",
-							"pauseUntil",
-							"oldestWaitingMs",
-							"retainedBytes",
-							"pending",
-							"acceptingScans"
-						],
-						"type": "object"
+						"$ref": "#/components/schemas/QueueCapacityDto"
 					}
 				},
 				"required": [
@@ -3298,7 +3329,32 @@
 				"type": "object",
 				"additionalProperties": false
 			},
-			"ApiResponse__id-string--state-string__": {
+			"AnalysisScanState": {
+				"description": "A scan becomes eligible for analysis only after its manifest is sealed.",
+				"enum": [
+					"receiving",
+					"capacity-exceeded",
+					"sealed"
+				],
+				"type": "string"
+			},
+			"ScanReceiptDto": {
+				"properties": {
+					"id": {
+						"type": "string"
+					},
+					"state": {
+						"$ref": "#/components/schemas/AnalysisScanState"
+					}
+				},
+				"required": [
+					"id",
+					"state"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"ApiResponse_ScanReceiptDto_": {
 				"description": "Shared v1 response contract. Domain payloads remain typed by each endpoint.",
 				"properties": {
 					"success": {
@@ -3311,19 +3367,7 @@
 						"type": "string"
 					},
 					"data": {
-						"properties": {
-							"state": {
-								"type": "string"
-							},
-							"id": {
-								"type": "string"
-							}
-						},
-						"required": [
-							"state",
-							"id"
-						],
-						"type": "object"
+						"$ref": "#/components/schemas/ScanReceiptDto"
 					}
 				},
 				"required": [
@@ -3369,7 +3413,27 @@
 				"type": "object",
 				"additionalProperties": false
 			},
-			"ApiResponse__sealed-boolean--missing-number-Array__": {
+			"ScanSealDto": {
+				"properties": {
+					"sealed": {
+						"type": "boolean"
+					},
+					"missing": {
+						"items": {
+							"type": "number",
+							"format": "double"
+						},
+						"type": "array"
+					}
+				},
+				"required": [
+					"sealed",
+					"missing"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"ApiResponse_ScanSealDto_": {
 				"description": "Shared v1 response contract. Domain payloads remain typed by each endpoint.",
 				"properties": {
 					"success": {
@@ -3382,23 +3446,7 @@
 						"type": "string"
 					},
 					"data": {
-						"properties": {
-							"missing": {
-								"items": {
-									"type": "number",
-									"format": "double"
-								},
-								"type": "array"
-							},
-							"sealed": {
-								"type": "boolean"
-							}
-						},
-						"required": [
-							"missing",
-							"sealed"
-						],
-						"type": "object"
+						"$ref": "#/components/schemas/ScanSealDto"
 					}
 				},
 				"required": [
@@ -3410,7 +3458,70 @@
 				"type": "object",
 				"additionalProperties": false
 			},
-			"ApiResponse__id-string--state-string--expectedRanges-number-or-null--receivedRanges-number--completed-number--failed-number--bytes-number--missing-number-Array__": {
+			"ScanSealBody": {
+				"properties": {
+					"expectedRanges": {
+						"type": "number",
+						"format": "double"
+					}
+				},
+				"required": [
+					"expectedRanges"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"ScanStatusDto": {
+				"properties": {
+					"id": {
+						"type": "string"
+					},
+					"state": {
+						"$ref": "#/components/schemas/AnalysisScanState"
+					},
+					"expectedRanges": {
+						"type": "number",
+						"format": "double",
+						"nullable": true
+					},
+					"receivedRanges": {
+						"type": "number",
+						"format": "double"
+					},
+					"completed": {
+						"type": "number",
+						"format": "double"
+					},
+					"failed": {
+						"type": "number",
+						"format": "double"
+					},
+					"bytes": {
+						"type": "number",
+						"format": "double"
+					},
+					"missing": {
+						"items": {
+							"type": "number",
+							"format": "double"
+						},
+						"type": "array"
+					}
+				},
+				"required": [
+					"id",
+					"state",
+					"expectedRanges",
+					"receivedRanges",
+					"completed",
+					"failed",
+					"bytes",
+					"missing"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"ApiResponse_ScanStatusDto_": {
 				"description": "Shared v1 response contract. Domain payloads remain typed by each endpoint.",
 				"properties": {
 					"success": {
@@ -3423,53 +3534,7 @@
 						"type": "string"
 					},
 					"data": {
-						"properties": {
-							"missing": {
-								"items": {
-									"type": "number",
-									"format": "double"
-								},
-								"type": "array"
-							},
-							"bytes": {
-								"type": "number",
-								"format": "double"
-							},
-							"failed": {
-								"type": "number",
-								"format": "double"
-							},
-							"completed": {
-								"type": "number",
-								"format": "double"
-							},
-							"receivedRanges": {
-								"type": "number",
-								"format": "double"
-							},
-							"expectedRanges": {
-								"type": "number",
-								"format": "double",
-								"nullable": true
-							},
-							"state": {
-								"type": "string"
-							},
-							"id": {
-								"type": "string"
-							}
-						},
-						"required": [
-							"missing",
-							"bytes",
-							"failed",
-							"completed",
-							"receivedRanges",
-							"expectedRanges",
-							"state",
-							"id"
-						],
-						"type": "object"
+						"$ref": "#/components/schemas/ScanStatusDto"
 					}
 				},
 				"required": [
@@ -5375,18 +5440,7 @@
 					"content": {
 						"application/json": {
 							"schema": {
-								"properties": {
-									"ids": {
-										"items": {
-											"type": "string"
-										},
-										"type": "array"
-									}
-								},
-								"required": [
-									"ids"
-								],
-								"type": "object"
+								"$ref": "#/components/schemas/ResultAckBody"
 							}
 						}
 					}
@@ -5402,7 +5456,7 @@
 						"content": {
 							"application/json": {
 								"schema": {
-									"$ref": "#/components/schemas/ApiResponse__acceptingScans-boolean--pending-number--retainedBytes-number--oldestWaitingMs-number--pauseUntil-string-or-null--maxBytes-number--maxChannelBytes-number--maxPending-number--states-Array__state-string--count-number--bytes-number____"
+									"$ref": "#/components/schemas/ApiResponse_QueueCapacityDto_"
 								}
 							}
 						}
@@ -5425,7 +5479,7 @@
 						"content": {
 							"application/json": {
 								"schema": {
-									"$ref": "#/components/schemas/ApiResponse__id-string--state-string__"
+									"$ref": "#/components/schemas/ApiResponse_ScanReceiptDto_"
 								}
 							}
 						}
@@ -5458,7 +5512,7 @@
 						"content": {
 							"application/json": {
 								"schema": {
-									"$ref": "#/components/schemas/ApiResponse__sealed-boolean--missing-number-Array__"
+									"$ref": "#/components/schemas/ApiResponse_ScanSealDto_"
 								}
 							}
 						}
@@ -5484,16 +5538,7 @@
 					"content": {
 						"application/json": {
 							"schema": {
-								"properties": {
-									"expectedRanges": {
-										"type": "number",
-										"format": "double"
-									}
-								},
-								"required": [
-									"expectedRanges"
-								],
-								"type": "object"
+								"$ref": "#/components/schemas/ScanSealBody"
 							}
 						}
 					}
@@ -5509,7 +5554,7 @@
 						"content": {
 							"application/json": {
 								"schema": {
-									"$ref": "#/components/schemas/ApiResponse__id-string--state-string--expectedRanges-number-or-null--receivedRanges-number--completed-number--failed-number--bytes-number--missing-number-Array__"
+									"$ref": "#/components/schemas/ApiResponse_ScanStatusDto_"
 								}
 							}
 						}

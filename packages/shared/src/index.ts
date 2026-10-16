@@ -8,3 +8,4 @@ export * from './tier1-filter.js';
 export * from './disentangler.js';
 export * from './admission.js';
 export * from './sync-jobs.js';
+export * from './analysis-queue.js';

@@ -1,3 +1,5 @@
+import { AnalysisQueueRepository } from '../repositories/analysis-queue.repository.js';
+import { AnalysisReceiptState, AnalysisScanState } from '@ggaddak/shared';
 import { SyncJobRepository } from '../repositories/sync-job.repository.js';
 import type { SyncJobView, SyncJobClaimDto } from '../dto/sync-job.dto.js';
 import type { SyncChannelResult, SyncJobUpdate } from '@ggaddak/shared';
@@ -20,7 +22,12 @@ const view = (job: SyncJob): SyncJobView => ({
   receivedChannels: Object.values(
     JSON.parse(job.channelResultsJson) as Record<string, SyncChannelResult>,
   ).filter(r => r.status === 'RECEIVED' || r.status === 'COMPLETED').length,
-  channels:(JSON.parse(job.channelIdsJson) as string[]).map(id=>({id,status:(JSON.parse(job.channelResultsJson) as Record<string,SyncChannelResult>)[id]?.status??'WAITING'})),
+  channels: (JSON.parse(job.channelIdsJson) as string[]).map(id => ({
+    id,
+    status:
+      (JSON.parse(job.channelResultsJson) as Record<string, SyncChannelResult>)[id]?.status ??
+      'WAITING',
+  })),
   analysisPendingChannels: Object.values(
     JSON.parse(job.channelResultsJson) as Record<string, SyncChannelResult>,
   ).filter(r => r.status === 'RECEIVED').length,
@@ -32,8 +39,10 @@ const view = (job: SyncJob): SyncJobView => ({
 
 @Service()
 export class SyncJobService {
+  private queue: AnalysisQueueRepository;
   private jobs: SyncJobRepository;
   constructor(private repo: DecisionRepository) {
+    this.queue = new AnalysisQueueRepository(repo.prisma);
     this.jobs = new SyncJobRepository(repo.prisma);
   }
 
@@ -83,11 +92,7 @@ export class SyncJobService {
       process.env.NODE_ENV !== 'test',
   ): Promise<SyncJobClaimDto | null> {
     if (deliveryOnly) {
-      const active = await this.repo.prisma.syncJob.findMany({
-        where: { status: 'PROCESSING' },
-        select: { id: true },
-        take: 100,
-      });
+      const active = await this.jobs.active();
       for (const job of active) await this.reconcile(job.id);
     }
     const now = new Date();
@@ -128,9 +133,7 @@ export class SyncJobService {
         )
           throw new BadRequestError('Invalid channel result');
         if (result.status === 'RECEIVED') {
-          const scan = await tx.analysisScan.findFirst({
-            where: { jobId, channelId: result.channelId, state: 'sealed' },
-          });
+          const scan = await this.jobs.scan(jobId, result.channelId, tx, true);
           if (!scan) throw new ConflictError('Channel has not been durably received');
           const current = channelIds.find(id => !results[id]);
           if (current !== result.channelId && !results[result.channelId])
@@ -141,7 +144,12 @@ export class SyncJobService {
       const values = Object.values(results);
       const completedChannels = values.filter(item => item.status === 'COMPLETED').length;
       const failedChannels = values.filter(item => item.status === 'FAILED').length;
-      const terminal = update.status === 'COMPLETED' || update.status === 'FAILED' || (update.release===true&&values.length===channelIds.length&&values.every(r=>r.status!=='RECEIVED'));
+      const terminal =
+        update.status === 'COMPLETED' ||
+        update.status === 'FAILED' ||
+        (update.release === true &&
+          values.length === channelIds.length &&
+          values.every(r => r.status !== 'RECEIVED'));
       if (
         terminal &&
         (values.length !== channelIds.length || values.some(r => r.status === 'RECEIVED'))
@@ -181,43 +189,49 @@ export class SyncJobService {
     });
   }
   async reconcile(jobId: string): Promise<void> {
-    await this.repo.prisma.$transaction(async tx => {
-      const job = await tx.syncJob.findUnique({ where: { id: jobId } });
-      if (!job || job.status !== 'PROCESSING') return;
+    await this.jobs.withTransaction(async tx => {
+      const job = await this.jobs.getById(jobId, tx);
+      if (!job || !['PROCESSING', 'FAILED'].includes(job.status)) return;
       // Fence against a concurrent Bot progress update before deriving persisted results.
-      await tx.syncJob.update({ where: { id: jobId }, data: { status: job.status } });
+      await this.jobs.patch(jobId, { status: job.status }, tx);
       const results = JSON.parse(job.channelResultsJson) as Record<string, SyncChannelResult>;
       let changed = false;
       for (const channelId of Object.keys(results)) {
-        if (results[channelId].status !== 'RECEIVED') continue;
-        const scan = await tx.analysisScan.findFirst({
-          where: { jobId, channelId, state: 'sealed' },
-        });
+        if (!['RECEIVED', 'FAILED'].includes(results[channelId].status)) continue;
+        const scan = await this.jobs.scan(jobId, channelId, tx, true);
         if (!scan) continue;
-        const rows = await tx.analysisReceipt.findMany({ where: { scanId: scan.id } });
-        if (rows.some(r => !['completed', 'failed'].includes(r.state))) continue;
-        const failed = rows.some(r => r.state === 'failed');
+        const rows = await this.queue.ranges(scan.id, tx);
+        if (
+          rows.some(
+            r =>
+              r.state !== AnalysisReceiptState.Completed && r.state !== AnalysisReceiptState.Failed,
+          )
+        )
+          continue;
+        const failed = rows.some(r => r.state === AnalysisReceiptState.Failed);
         let decisions = 0;
         for (const row of rows) {
-          const a = await tx.analysisRequest.findUnique({ where: { id: row.id } });
+          const a = await this.queue.analysis(row.id, tx);
           if (a?.resultJson) decisions += JSON.parse(a.resultJson).decisions.length;
         }
-        results[channelId] = {
+        const next: SyncChannelResult = {
           ...results[channelId],
           status: failed ? 'FAILED' : 'COMPLETED',
           decisionsFound: decisions,
           ...(failed ? { errorMessage: 'Analysis failure retained; retry from recovery' } : {}),
         };
-        changed = true;
+        if (!failed) delete next.errorMessage;
+        if (JSON.stringify(next) !== JSON.stringify(results[channelId])) changed = true;
+        results[channelId] = next;
       }
       if (!changed) return;
       const values = Object.values(results),
         done = values.filter(r => r.status === 'COMPLETED').length,
         failed = values.filter(r => r.status === 'FAILED').length;
       const terminal = done + failed === job.totalChannels;
-      await tx.syncJob.update({
-        where: { id: jobId },
-        data: {
+      await this.jobs.patch(
+        jobId,
+        {
           channelResultsJson: JSON.stringify(results),
           completedChannels: done,
           failedChannels: failed,
@@ -234,23 +248,41 @@ export class SyncJobService {
               }
             : {}),
         },
-      });
-      if (terminal) await tx.syncJobLock.deleteMany({ where: { jobId } });
+        tx,
+      );
+      if (terminal) await this.jobs.releaseLock(job.guildId, tx, jobId);
     });
   }
-  async resume(jobId:string,guildId:string,channelId:string):Promise<SyncJobView>{
-    await this.repo.prisma.$transaction(async tx=>{
-      const job=await tx.syncJob.findFirst({where:{id:jobId,guildId}});if(!job)throw new NotFoundError('Sync Job not found');
-      if(!['COMPLETED','FAILED'].includes(job.status))throw new ConflictError('Wait for the current transfer to finish');
-      const lock=await tx.syncJobLock.findUnique({where:{guildId}});if(lock&&lock.jobId!==jobId)throw new ConflictError('Another scan is active');
-      const results=JSON.parse(job.channelResultsJson) as Record<string,SyncChannelResult>;
-      if(results[channelId]?.status!=='FAILED')throw new ConflictError('Only failed channel transfers can resume');
-      const scan=await tx.analysisScan.findFirst({where:{jobId,channelId}});
-      if(scan?.state==='sealed')throw new ConflictError('Data already received; retry analysis from recovery');
+  async resume(jobId: string, guildId: string, channelId: string): Promise<SyncJobView> {
+    await this.jobs.withTransaction(async tx => {
+      const job = await this.jobs.getById(jobId, tx);
+      if (!job || job.guildId !== guildId) throw new NotFoundError('Sync Job not found');
+      if (!['COMPLETED', 'FAILED'].includes(job.status))
+        throw new ConflictError('Wait for the current transfer to finish');
+      const lock = await this.jobs.getLock(guildId, tx);
+      if (lock && lock.jobId !== jobId) throw new ConflictError('Another scan is active');
+      const results = JSON.parse(job.channelResultsJson) as Record<string, SyncChannelResult>;
+      if (results[channelId]?.status !== 'FAILED')
+        throw new ConflictError('Only failed channel transfers can resume');
+      const scan = await this.jobs.scan(jobId, channelId, tx);
+      if (scan?.state === AnalysisScanState.Sealed)
+        throw new ConflictError('Data already received; retry analysis from recovery');
       delete results[channelId];
-      await tx.syncJob.update({where:{id:jobId},data:{status:'QUEUED',owner:null,leaseUntil:null,completedAt:null,errorMessage:null,channelResultsJson:JSON.stringify(results),failedChannels:Object.values(results).filter(r=>r.status==='FAILED').length}});
-      await tx.syncJobLock.upsert({where:{guildId},create:{guildId,jobId},update:{jobId}});
+      await this.jobs.patch(
+        jobId,
+        {
+          status: 'QUEUED',
+          owner: null,
+          leaseUntil: null,
+          completedAt: null,
+          errorMessage: null,
+          channelResultsJson: JSON.stringify(results),
+          failedChannels: Object.values(results).filter(r => r.status === 'FAILED').length,
+        },
+        tx,
+      );
+      await this.jobs.upsertLock(guildId, jobId, tx);
     });
-    return this.get(jobId,guildId);
+    return this.get(jobId, guildId);
   }
 }

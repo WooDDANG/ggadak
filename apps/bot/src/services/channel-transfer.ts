@@ -83,12 +83,13 @@ export class ChannelTransfer {
     const state = saved;
     if (state.uploaded)
       return { scannedCount: state.messages, decisionsCount: 0, pendingAnalysis: true };
-    const capacity = await this.backend.queueRequest('/capacity', 'GET');
-    if (capacity?.acceptingScans === false) throw new BackendRequestError(429);
+
     const maxBytes = Number(process.env.BOT_SCAN_MAX_BYTES ?? 64 * 1024 * 1024);
     if (!Number.isSafeInteger(maxBytes) || maxBytes < 1)
       throw new Error('Invalid BOT_SCAN_MAX_BYTES');
     while (!state.collected) {
+      const capacity = await this.backend.queueRequest('/capacity', 'GET');
+      if (capacity?.acceptingScans === false) throw new BackendRequestError(429);
       const batch = await channel.messages.fetch({
         limit: 100,
         ...(state.before ? { before: state.before } : {}),

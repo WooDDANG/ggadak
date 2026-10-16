@@ -1,8 +1,31 @@
+import { AnalysisScanState } from '@ggaddak/shared';
 import { Prisma } from '@prisma/client';
 import { BaseRepository } from './base.repository.js';
 
 /** Sync Job storage and conditional writes; the Service owns lifecycle policy. */
 export class SyncJobRepository extends BaseRepository {
+  active() {
+    return this.prisma.syncJob.findMany({
+      where: { status: 'PROCESSING' },
+      select: { id: true },
+      take: 100,
+    });
+  }
+  patch(id: string, data: Prisma.SyncJobUpdateInput, tx: Prisma.TransactionClient) {
+    return tx.syncJob.update({ where: { id }, data });
+  }
+  scan(jobId: string, channelId: string, tx: Prisma.TransactionClient, sealed = false) {
+    return tx.analysisScan.findFirst({
+      where: { jobId, channelId, ...(sealed ? { state: AnalysisScanState.Sealed } : {}) },
+    });
+  }
+  upsertLock(guildId: string, jobId: string, tx: Prisma.TransactionClient) {
+    return tx.syncJobLock.upsert({
+      where: { guildId },
+      create: { guildId, jobId },
+      update: { jobId },
+    });
+  }
   monitoredChannels(guildId: string) {
     return this.prisma.monitoredChannel.findMany({ where: { guildId }, orderBy: { id: 'asc' } });
   }

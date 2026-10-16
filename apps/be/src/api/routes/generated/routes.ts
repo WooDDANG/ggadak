@@ -868,11 +868,16 @@ const models: TsoaRoute.Models = {
         "additionalProperties": false,
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "AnalysisReceiptState": {
+        "dataType": "refEnum",
+        "enums": ["receiving","pending","processing","retry","completed","failed"],
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "ReceiptView": {
         "dataType": "refObject",
         "properties": {
             "requestId": {"dataType":"string","required":true},
-            "state": {"dataType":"string","required":true},
+            "state": {"ref":"AnalysisReceiptState","required":true},
             "attempts": {"dataType":"double","required":true},
             "nextAttemptAt": {"dataType":"string","required":true},
             "errorCategory": {"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},
@@ -928,24 +933,62 @@ const models: TsoaRoute.Models = {
         "additionalProperties": false,
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
-    "ApiResponse__acceptingScans-boolean--pending-number--retainedBytes-number--oldestWaitingMs-number--pauseUntil-string-or-null--maxBytes-number--maxChannelBytes-number--maxPending-number--states-Array__state-string--count-number--bytes-number____": {
+    "ResultAckBody": {
         "dataType": "refObject",
         "properties": {
-            "success": {"dataType":"boolean","required":true},
-            "code": {"dataType":"string","required":true},
-            "message": {"dataType":"string","required":true},
-            "data": {"dataType":"nestedObjectLiteral","nestedProperties":{"states":{"dataType":"array","array":{"dataType":"nestedObjectLiteral","nestedProperties":{"bytes":{"dataType":"double","required":true},"count":{"dataType":"double","required":true},"state":{"dataType":"string","required":true}}},"required":true},"maxPending":{"dataType":"double","required":true},"maxChannelBytes":{"dataType":"double","required":true},"maxBytes":{"dataType":"double","required":true},"pauseUntil":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},"oldestWaitingMs":{"dataType":"double","required":true},"retainedBytes":{"dataType":"double","required":true},"pending":{"dataType":"double","required":true},"acceptingScans":{"dataType":"boolean","required":true}},"required":true},
+            "ids": {"dataType":"array","array":{"dataType":"string"},"required":true},
         },
         "additionalProperties": false,
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
-    "ApiResponse__id-string--state-string__": {
+    "QueueCapacityDto": {
+        "dataType": "refObject",
+        "properties": {
+            "acceptingScans": {"dataType":"boolean","required":true},
+            "pending": {"dataType":"double","required":true},
+            "retainedBytes": {"dataType":"double","required":true},
+            "oldestWaitingMs": {"dataType":"double","required":true},
+            "pauseUntil": {"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},
+            "maxBytes": {"dataType":"double","required":true},
+            "maxChannelBytes": {"dataType":"double","required":true},
+            "maxPending": {"dataType":"double","required":true},
+            "states": {"dataType":"array","array":{"dataType":"nestedObjectLiteral","nestedProperties":{"bytes":{"dataType":"double","required":true},"count":{"dataType":"double","required":true},"state":{"ref":"AnalysisReceiptState","required":true}}},"required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "ApiResponse_QueueCapacityDto_": {
         "dataType": "refObject",
         "properties": {
             "success": {"dataType":"boolean","required":true},
             "code": {"dataType":"string","required":true},
             "message": {"dataType":"string","required":true},
-            "data": {"dataType":"nestedObjectLiteral","nestedProperties":{"state":{"dataType":"string","required":true},"id":{"dataType":"string","required":true}},"required":true},
+            "data": {"ref":"QueueCapacityDto","required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "AnalysisScanState": {
+        "dataType": "refEnum",
+        "enums": ["receiving","capacity-exceeded","sealed"],
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "ScanReceiptDto": {
+        "dataType": "refObject",
+        "properties": {
+            "id": {"dataType":"string","required":true},
+            "state": {"ref":"AnalysisScanState","required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "ApiResponse_ScanReceiptDto_": {
+        "dataType": "refObject",
+        "properties": {
+            "success": {"dataType":"boolean","required":true},
+            "code": {"dataType":"string","required":true},
+            "message": {"dataType":"string","required":true},
+            "data": {"ref":"ScanReceiptDto","required":true},
         },
         "additionalProperties": false,
     },
@@ -964,24 +1007,56 @@ const models: TsoaRoute.Models = {
         "additionalProperties": false,
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
-    "ApiResponse__sealed-boolean--missing-number-Array__": {
+    "ScanSealDto": {
         "dataType": "refObject",
         "properties": {
-            "success": {"dataType":"boolean","required":true},
-            "code": {"dataType":"string","required":true},
-            "message": {"dataType":"string","required":true},
-            "data": {"dataType":"nestedObjectLiteral","nestedProperties":{"missing":{"dataType":"array","array":{"dataType":"double"},"required":true},"sealed":{"dataType":"boolean","required":true}},"required":true},
+            "sealed": {"dataType":"boolean","required":true},
+            "missing": {"dataType":"array","array":{"dataType":"double"},"required":true},
         },
         "additionalProperties": false,
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
-    "ApiResponse__id-string--state-string--expectedRanges-number-or-null--receivedRanges-number--completed-number--failed-number--bytes-number--missing-number-Array__": {
+    "ApiResponse_ScanSealDto_": {
         "dataType": "refObject",
         "properties": {
             "success": {"dataType":"boolean","required":true},
             "code": {"dataType":"string","required":true},
             "message": {"dataType":"string","required":true},
-            "data": {"dataType":"nestedObjectLiteral","nestedProperties":{"missing":{"dataType":"array","array":{"dataType":"double"},"required":true},"bytes":{"dataType":"double","required":true},"failed":{"dataType":"double","required":true},"completed":{"dataType":"double","required":true},"receivedRanges":{"dataType":"double","required":true},"expectedRanges":{"dataType":"union","subSchemas":[{"dataType":"double"},{"dataType":"enum","enums":[null]}],"required":true},"state":{"dataType":"string","required":true},"id":{"dataType":"string","required":true}},"required":true},
+            "data": {"ref":"ScanSealDto","required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "ScanSealBody": {
+        "dataType": "refObject",
+        "properties": {
+            "expectedRanges": {"dataType":"double","required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "ScanStatusDto": {
+        "dataType": "refObject",
+        "properties": {
+            "id": {"dataType":"string","required":true},
+            "state": {"ref":"AnalysisScanState","required":true},
+            "expectedRanges": {"dataType":"union","subSchemas":[{"dataType":"double"},{"dataType":"enum","enums":[null]}],"required":true},
+            "receivedRanges": {"dataType":"double","required":true},
+            "completed": {"dataType":"double","required":true},
+            "failed": {"dataType":"double","required":true},
+            "bytes": {"dataType":"double","required":true},
+            "missing": {"dataType":"array","array":{"dataType":"double"},"required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "ApiResponse_ScanStatusDto_": {
+        "dataType": "refObject",
+        "properties": {
+            "success": {"dataType":"boolean","required":true},
+            "code": {"dataType":"string","required":true},
+            "message": {"dataType":"string","required":true},
+            "data": {"ref":"ScanStatusDto","required":true},
         },
         "additionalProperties": false,
     },
@@ -2406,7 +2481,7 @@ export function RegisterRoutes(app: Router) {
         });
         // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
         const argsAnalysisQueueController_acknowledge: Record<string, TsoaRoute.ParameterSchema> = {
-                body: {"in":"body","name":"body","required":true,"dataType":"nestedObjectLiteral","nestedProperties":{"ids":{"dataType":"array","array":{"dataType":"string"},"required":true}}},
+                body: {"in":"body","name":"body","required":true,"ref":"ResultAckBody"},
         };
         app.post('/api/v1/internal/analysis-queue/ack',
             authenticateMiddleware([{"service":[]}]),
@@ -2514,7 +2589,7 @@ export function RegisterRoutes(app: Router) {
         // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
         const argsAnalysisQueueController_seal: Record<string, TsoaRoute.ParameterSchema> = {
                 id: {"in":"path","name":"id","required":true,"dataType":"string"},
-                body: {"in":"body","name":"body","required":true,"dataType":"nestedObjectLiteral","nestedProperties":{"expectedRanges":{"dataType":"double","required":true}}},
+                body: {"in":"body","name":"body","required":true,"ref":"ScanSealBody"},
         };
         app.post('/api/v1/internal/analysis-queue/scans/:id/seal',
             authenticateMiddleware([{"service":[]}]),

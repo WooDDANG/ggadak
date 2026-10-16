@@ -36,3 +36,15 @@ After result application is acknowledged and the default seven-day retention pas
 Bot compacts acknowledged archived results into replay tombstones and removes eligible fully analyzed transfer pages; failed or incomplete transfer pages remain. The manifest and replay fingerprint remain, and unconfirmed feedback/input is never deleted automatically. `ANALYSIS_COMPLETED_RETENTION_MS` controls the interval; each maintenance pass is bounded.
 
 Discord slash scan replies distinguish data delivery from analysis completion and link to Web results. For long-running scans the persisted Web result is authoritative; the slash reply is a handoff, not proof that AI has finished.
+
+## Implementation validation (2026-10-17)
+
+The implementation and review fixes are committed on the working branch. Queue receipt/scan states are shared TypeScript enums (`AnalysisReceiptState`, `AnalysisScanState`) and exposed as enum schemas in generated OpenAPI/FE clients. Stored SQLite columns remain strings for compatibility; response projections validate their values. This does not add a database enum constraint.
+
+The full offline suite passed: Shared 15, BE 125, Bot 40, FE 15, E2E 8. After the final bounded cleanup cursor fix, BE queue 9 and Bot asynchronous-delivery 5 tests passed again. Type checking passed; lint has zero errors and one existing unused-import warning in shared logger tests. Test fixtures use isolated databases, fake Discord and fake AI. These timings are local fixture measurements and do not establish production login/dashboard latency or real Discord throughput.
+
+Standards and spec reviews found and fixed repository boundary violations, capacity-blocked resume/seal, stale failed job summaries after analysis recovery, ACK/archive crash recovery, and cleanup starvation after the first 50 records. No remaining documented standards breach or blocking spec issue was identified in the final reviews.
+
+Discord history is collected to a bounded on-disk spool, checking BE capacity per page, then uploaded oldest-first in receipt-confirmed ranges. It does not stream each Discord fetch page directly to BE: Discord pagination runs newest-first while analysis coverage runs oldest-first. A collected transfer may replay receipt/seal when admission is full; the BE still enforces receipt limits atomically. Bot cleanup persists its scan cursor across restarts; BE cleanup rotates by receipt ID in-process and restarts scanning safely after process restart.
+
+The ticket checklists remain the detailed acceptance record; production load measurements and deployment are not implied by these offline checks.

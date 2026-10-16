@@ -4,11 +4,12 @@
  * @ggaddak/be
  * OpenAPI spec version: 1.0.0
  */
+import type { AnalysisReceiptState } from './analysisReceiptState';
 import type { AnalyzeDiscussionResponseDto } from './analyzeDiscussionResponseDto';
 
 export interface ReceiptView {
   requestId: string;
-  state: string;
+  state: AnalysisReceiptState;
   attempts: number;
   nextAttemptAt: string;
   /** @nullable */

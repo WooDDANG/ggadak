@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, readdir, rename } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { BackendApiService } from './backend-api.service.js';
@@ -64,7 +64,11 @@ test('Bot completes receipt before AI and independently reconciles its result af
       feedback++;
     });
     await restarted.reconcileResults();
+    // Reconstruct a crash between persisting the server ACK and archiving the root file.
+    const archived = (await readdir(join(dir, 'completed')))[0];
+    await rename(join(dir, 'completed', archived), join(dir, archived));
     await restarted.reconcileResults();
+    assert.equal((await readdir(join(dir, 'completed'))).length, 1);
     assert.equal(feedback, 1);
     assert.equal(posts, 1);
     await restarted.cleanupCompleted(0);
@@ -120,6 +124,7 @@ test('Bot refuses a new delivery when its durable journal budget is exhausted', 
 test('channel transfer pages to disk, uploads in order and seals without waiting for AI', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'channel-transfer-'));
   const sent: any[] = [];
+  let sealAttempts = 0;
   const messages = Array.from({ length: 205 }, (_, i) => ({
     id: String(i + 1),
     content: '의사결정 내용',
@@ -140,7 +145,14 @@ test('channel transfer pages to disk, uploads in order and seals without waiting
           { status: 202 },
         );
       }
-      if (path.includes('/seal')) return Response.json({ data: { sealed: true, missing: [] } });
+      if (path.includes('/capacity'))
+        return Response.json({ data: { acceptingScans: sealAttempts === 0 } });
+      if (path.includes('/seal')) {
+        sealAttempts++;
+        if (sealAttempts === 1)
+          return Response.json({ error: 'temporarily unavailable' }, { status: 503 });
+        return Response.json({ data: { sealed: true, missing: [] } });
+      }
       if (path.includes('/checkpoint')) return Response.json({ lastMessageId: null });
       return Response.json({ data: { id: 'scan', state: 'receiving' } });
     },
@@ -167,7 +179,9 @@ test('channel transfer pages to disk, uploads in order and seals without waiting
   };
   try {
     const transfer = new ChannelTransfer(api);
+    await assert.rejects(transfer.run(channel, { full: true, requestId: 'scan' }));
     const result = await transfer.run(channel, { full: true, requestId: 'scan' });
+    assert.equal(sealAttempts, 2);
     assert.equal(result.scannedCount, 205);
     assert.equal(result.pendingAnalysis, true);
     assert.equal(sent[0].input.rawMessages[0].id, '1');
@@ -210,6 +224,43 @@ test('idle delivery synchronization sends no repeated snapshot changes', async (
     await api.synchronizeDeliveryStatus();
     assert.equal(snapshots[0].length, 1);
     assert.equal(snapshots[1].length, 0);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('bounded transfer cleanup advances past compacted manifests across restarts', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'transfer-cleanup-'));
+  const makeApi = () =>
+    new BackendApiService(
+      'http://fixture',
+      dir,
+      async () => Response.json({ data: { completed: 1, failed: 0 } }),
+      undefined,
+      'service',
+      undefined,
+      undefined,
+      true,
+    );
+  try {
+    const api = makeApi();
+    const ids = Array.from({ length: 51 }, (_, i) => `scan-${i}`).sort((a, b) =>
+      api.transferDirectory(a).localeCompare(api.transferDirectory(b)),
+    );
+    for (const id of ids)
+      await api.writeTransfer(id, 'manifest.json', {
+        id,
+        uploaded: true,
+        uploadedAt: 1,
+        ranges: 1,
+        pages: 1,
+        compacted: id !== ids.at(-1),
+      });
+    await api.writeTransfer(ids.at(-1)!, 'page-0.json', [{ id: '100' }]);
+    await api.cleanupCompleted(0);
+    assert.ok(await api.readTransfer(ids.at(-1)!, 'page-0.json'));
+    await makeApi().cleanupCompleted(0);
+    assert.equal(await api.readTransfer(ids.at(-1)!, 'page-0.json'), null);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

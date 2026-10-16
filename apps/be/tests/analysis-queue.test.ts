@@ -1,3 +1,4 @@
+import { AnalysisDeliveryService } from '../src/services/analysis-delivery.service.js';
 import { test, expect } from 'vitest';
 import { createApp } from '../src/server.js';
 import http from 'node:http';
@@ -150,13 +151,22 @@ test('provider retry-after defers analysis in BE without retransmitting stored i
 
 test('BE permits channel B transfer while channel A is queued and completes the job after analysis', async () => {
   const db = await isolatedRepository();
+  let failing = true;
+  let clock = Date.now();
   const queue = new AnalysisQueueService(
     db.repo,
     new DiscussionService(
       db.repo,
-      fixtureAiAdapter({ analyzeTranscript: async () => ({ summary: 'none', decisions: [] }) }),
+      fixtureAiAdapter({
+        analyzeTranscript: async () => {
+          if (failing) throw new AppError('provider unavailable', 503);
+          return { summary: 'none', decisions: [] };
+        },
+      }),
       new DecisionExtractorCore(),
     ),
+    { maxAttempts: 1 },
+    () => clock,
   );
   const jobs = new SyncJobService(db.repo);
   try {
@@ -230,6 +240,14 @@ test('BE permits channel B transfer while channel A is queued and completes the 
     });
     await queue.runOnce();
     expect(await jobs.get(job.jobId, 'guild')).toMatchObject({
+      status: 'FAILED',
+      failedChannels: 1,
+    });
+    failing = false;
+    await new AnalysisDeliveryService(db.repo).retry('guild', input.requestId, 'retry-summary');
+    clock += 300001;
+    await queue.runOnce();
+    expect(await jobs.get(job.jobId, 'guild')).toMatchObject({
       status: 'COMPLETED',
       completedChannels: 2,
     });
@@ -238,17 +256,39 @@ test('BE permits channel B transfer while channel A is queued and completes the 
   }
 });
 
-test('exhausted channel transfer closes the job and an explicit resume preserves its identity',async()=>{
-  const db=await isolatedRepository();const jobs=new SyncJobService(db.repo);
-  try{
-    await db.client.guild.create({data:{id:'guild',name:'Guild',channels:{create:{id:'channel',name:'A'}}}});
-    const job=await jobs.create('guild',true),claim=(await jobs.claim(true))!;
-    await jobs.update(job.jobId,{owner:claim.owner,channelResult:{channelId:'channel',status:'FAILED',messagesScanned:0,decisionsFound:0,errorMessage:'capacity'},release:true});
-    expect(await jobs.get(job.jobId,'guild')).toMatchObject({status:'FAILED'});
-    expect(await jobs.resume(job.jobId,'guild','channel')).toMatchObject({jobId:job.jobId,status:'QUEUED'});
-    const resumed=(await jobs.claim(true))!;expect(resumed.jobId).toBe(job.jobId);expect(resumed.channelIds).toEqual(['channel']);expect(resumed.owner).not.toBe(claim.owner);
-    await expect(jobs.update(job.jobId,{owner:claim.owner})).rejects.toThrow(/lease/);
-  }finally{await db.cleanup();}
+test('exhausted channel transfer closes the job and an explicit resume preserves its identity', async () => {
+  const db = await isolatedRepository();
+  const jobs = new SyncJobService(db.repo);
+  try {
+    await db.client.guild.create({
+      data: { id: 'guild', name: 'Guild', channels: { create: { id: 'channel', name: 'A' } } },
+    });
+    const job = await jobs.create('guild', true),
+      claim = (await jobs.claim(true))!;
+    await jobs.update(job.jobId, {
+      owner: claim.owner,
+      channelResult: {
+        channelId: 'channel',
+        status: 'FAILED',
+        messagesScanned: 0,
+        decisionsFound: 0,
+        errorMessage: 'capacity',
+      },
+      release: true,
+    });
+    expect(await jobs.get(job.jobId, 'guild')).toMatchObject({ status: 'FAILED' });
+    expect(await jobs.resume(job.jobId, 'guild', 'channel')).toMatchObject({
+      jobId: job.jobId,
+      status: 'QUEUED',
+    });
+    const resumed = (await jobs.claim(true))!;
+    expect(resumed.jobId).toBe(job.jobId);
+    expect(resumed.channelIds).toEqual(['channel']);
+    expect(resumed.owner).not.toBe(claim.owner);
+    await expect(jobs.update(job.jobId, { owner: claim.owner })).rejects.toThrow(/lease/);
+  } finally {
+    await db.cleanup();
+  }
 });
 
 test('channel receipt waits for a complete seal, selectively reports gaps and advances only analyzed coverage', async () => {
@@ -356,6 +396,46 @@ test('cleanup retains unacknowledged results and permanent replay identity', asy
       inputRetained: false,
     });
     expect(await queue.metrics()).toMatchObject({ pending: 0, retainedBytes: 0 });
+  } finally {
+    await db.cleanup();
+  }
+});
+
+test('bounded cleanup advances past completed ranges blocked by checkpoint gaps', async () => {
+  const db = await isolatedRepository();
+  const queue = new AnalysisQueueService(
+    db.repo,
+    new DiscussionService(
+      db.repo,
+      fixtureAiAdapter({ analyzeTranscript: async () => ({ summary: 'none', decisions: [] }) }),
+      new DecisionExtractorCore(),
+    ),
+    { retentionMs: 0 },
+  );
+  try {
+    for (let i = 0; i < 51; i++)
+      await db.client.analysisReceipt.create({
+        data: {
+          id: i === 50 ? 'z-eligible' : `blocked-${String(i).padStart(2, '0')}`,
+          fingerprint: 'retained',
+          guildId: 'guild',
+          channelId: 'gap',
+          inputJson: '{}',
+          inputBytes: 2,
+          state: 'completed',
+          completedAt: new Date(1),
+          acknowledgedAt: new Date(1),
+          ...(i === 50 ? {} : { rangeJson: JSON.stringify({ endMessageId: '100' }) }),
+        },
+      });
+    expect(await queue.cleanup()).toMatchObject({ reclaimedBytes: 0 });
+    expect(await queue.cleanup()).toMatchObject({ reclaimedBytes: 2 });
+    expect(
+      (await db.client.analysisReceipt.findUnique({ where: { id: 'z-eligible' } }))?.inputJson,
+    ).toBeNull();
+    expect(
+      (await db.client.analysisReceipt.findUnique({ where: { id: 'blocked-00' } }))?.inputJson,
+    ).toBe('{}');
   } finally {
     await db.cleanup();
   }
