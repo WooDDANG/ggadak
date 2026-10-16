@@ -1,3 +1,4 @@
+import { AuthError } from '../../errors/AuthError.js';
 import { requirePrincipal } from '../guards/authorization.js';
 import type { AuthUserDto } from '../../dto/auth.dto.js';
 import { Controller, Route, Tags, Get, Post, Request, Body, Security } from 'tsoa';
@@ -27,13 +28,34 @@ export class AuthController extends Controller {
   ): Promise<
     ApiResponse<{ accessToken: string; tokenType: string; expiresAt: string; user: AuthUserDto }>
   > {
-    const result = await this.auth.login(body.code, body.state, request.headers.cookie);
-    this.setHeader(
-      'Set-Cookie',
-      'ggaddak_oauth=; HttpOnly; SameSite=Lax; Path=/api/v1/auth; Max-Age=0',
+    if (request.headers.origin) this.auth.requireBrowserOrigin(request.headers.origin);
+    const { sessionCookie, ...result } = await this.auth.login(
+      body.code,
+      body.state,
+      request.headers.cookie,
     );
+    this.setHeader('Set-Cookie', [
+      'ggaddak_oauth=; HttpOnly; SameSite=Lax; Path=/api/v1/auth; Max-Age=0',
+      sessionCookie,
+    ]);
     this.setHeader('Cache-Control', 'no-store');
     return apiSuccess(result);
+  }
+  @Post('session')
+  async restoreBrowserSession(
+    @Request() request: ExpressRequest,
+  ): Promise<
+    ApiResponse<{
+      accessToken: string;
+      tokenType: string;
+      expiresAt: string;
+      user: AuthUserDto;
+      guilds: DiscordGuild[];
+    }>
+  > {
+    this.setHeader('Cache-Control', 'no-store');
+    this.auth.requireBrowserOrigin(request.headers.origin);
+    return apiSuccess(await this.auth.restore(request.headers.cookie));
   }
   @Security('jwt')
   @Get('me')
@@ -55,10 +77,22 @@ export class AuthController extends Controller {
     this.setHeader('Cache-Control', 'no-store');
     return apiSuccess(await this.auth.refresh(requirePrincipal(request)));
   }
-  @Security('jwt')
   @Post('logout')
   async logoutSession(@Request() request: ExpressRequest): Promise<ApiResponse<null>> {
-    await this.auth.logout(requirePrincipal(request));
+    let principal;
+    if (this.auth.hasBrowserCookie(request.headers.cookie)) {
+      this.auth.requireBrowserOrigin(request.headers.origin);
+      try {
+        principal = await this.auth.browserPrincipal(request.headers.cookie);
+      } catch (error) {
+        if (!(error instanceof AuthError) || error.statusCode !== 401) throw error;
+      }
+    } else {
+      principal = await this.auth.authenticate(request.headers.authorization);
+    }
+    if (principal) await this.auth.logout(principal);
+    this.setHeader('Set-Cookie', this.auth.clearBrowserCookie());
+    this.setHeader('Cache-Control', 'no-store');
     return apiSuccess(null);
   }
 }

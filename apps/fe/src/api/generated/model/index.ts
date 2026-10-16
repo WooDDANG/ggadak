@@ -29,6 +29,8 @@ export * from './apiResponseAccessTokenStringTokenTypeStringExpiresAtStringUserA
 export * from './apiResponseAccessTokenStringTokenTypeStringExpiresAtStringUserAuthUserData';
 export * from './apiResponseAccessTokenStringTokenTypeStringExpiresAtStringUserAuthUserDto';
 export * from './apiResponseAccessTokenStringTokenTypeStringExpiresAtStringUserAuthUserDtoData';
+export * from './apiResponseAccessTokenStringTokenTypeStringExpiresAtStringUserAuthUserDtoGuildsDiscordGuildArray';
+export * from './apiResponseAccessTokenStringTokenTypeStringExpiresAtStringUserAuthUserDtoGuildsDiscordGuildArrayData';
 export * from './apiResponseAnalysisDeliveryQueueDto';
 export * from './apiResponseAnalysisRetryCommandDto';
 export * from './apiResponseAnalysisRetryCommandDtoArray';

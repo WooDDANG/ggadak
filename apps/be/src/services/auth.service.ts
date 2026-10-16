@@ -13,7 +13,7 @@ import {
 } from 'node:crypto';
 import { Service } from 'typedi';
 import { PrismaClient } from '@prisma/client';
-import { NotFoundError } from '../errors/AppError.js';
+import { AppError, NotFoundError } from '../errors/AppError.js';
 import { DiscordAuthAdapter, HttpDiscordAuthAdapter } from '../adapters/discord-auth.adapter.js';
 export interface AuthOptions {
   channelAdapter?: DiscordChannelsAdapter;
@@ -120,6 +120,8 @@ export class AuthService {
       this.discord.guilds(tokens.access_token),
     ]);
     const sessionId = randomUUID();
+    const browserToken = randomBytes(32).toString('base64url');
+    const expiresAt = new Date(this.now() + 7 * 86400000);
     await this.prisma.$transaction(async tx => {
       await tx.user.upsert({
         where: { id: user.id },
@@ -146,17 +148,22 @@ export class AuthService {
       await tx.authSession.create({
         data: {
           id: sessionId,
+          browserTokenHash: this.browserHash(browserToken),
           userId: user.id,
           refreshToken: this.encrypt(tokens.refresh_token),
-          expiresAt: new Date(this.now() + 7 * 86400000),
+          expiresAt,
           refreshedAt: new Date(this.now()),
         },
       });
     });
-    return { ...this.token({ userId: user.id, sessionId }), user: this.publicUser(user) };
+    return {
+      ...this.token({ userId: user.id, sessionId }, expiresAt.getTime()),
+      user: this.publicUser(user),
+      sessionCookie: this.browserCookie(browserToken, expiresAt),
+    };
   }
-  private token(user: AuthPrincipal) {
-    const expiresAt = new Date(this.now() + TTL).toISOString();
+  private token(user: AuthPrincipal, sessionExpiry = Infinity) {
+    const expiresAt = new Date(Math.min(this.now() + TTL, sessionExpiry)).toISOString();
     const head = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
     const payload = Buffer.from(
       JSON.stringify({
@@ -164,7 +171,7 @@ export class AuthService {
         sid: user.sessionId,
         iss: 'ggaddak',
         aud: 'ggaddak-web',
-        exp: Math.floor((this.now() + TTL) / 1000),
+        exp: Math.floor(new Date(expiresAt).getTime() / 1000),
       }),
     ).toString('base64url');
     return {
@@ -263,39 +270,123 @@ export class AuthService {
     });
     return membership.map(m => ({ ...m.guild, owner: m.owner, permissions: m.permissions }));
   }
+  private browserHash(token: string) {
+    return createHash('sha256').update(token).digest('hex');
+  }
+  private browserCookie(token: string, expiresAt: Date) {
+    const maxAge = Math.max(0, Math.floor((expiresAt.getTime() - this.now()) / 1000));
+    return `ggaddak_session=${token}; HttpOnly; SameSite=Lax; Path=/api/v1/auth; Max-Age=${maxAge}; Expires=${expiresAt.toUTCString()}${this.config.secureCookie ? '; Secure' : ''}`;
+  }
+  clearBrowserCookie() {
+    return this.browserCookie('', new Date(0));
+  }
+  requireBrowserOrigin(origin?: string) {
+    this.configured();
+    if (!origin || origin !== new URL(this.config.redirectUri).origin)
+      throw new AuthError('Browser origin is not allowed', 403);
+  }
+  hasBrowserCookie(cookie?: string) {
+    return cookie?.split(';').some(part => part.trim().startsWith('ggaddak_session=')) ?? false;
+  }
+  async browserPrincipal(cookie?: string): Promise<AuthPrincipal> {
+    this.configured();
+    const token = cookie
+      ?.split(';')
+      .map(part => part.trim())
+      .find(part => part.startsWith('ggaddak_session='))
+      ?.slice('ggaddak_session='.length);
+    if (!token || !/^[A-Za-z0-9_-]{43}$/.test(token)) throw new AuthError();
+    const session = await this.prisma.authSession.findUnique({
+      where: { browserTokenHash: this.browserHash(token) },
+    });
+    if (!session || session.expiresAt.getTime() <= this.now()) throw new AuthError();
+    return { userId: session.userId, sessionId: session.id };
+  }
+  async restore(cookie?: string) {
+    const principal = await this.browserPrincipal(cookie);
+    const token = await this.refresh(principal);
+    return { ...token, user: await this.me(principal), guilds: await this.guilds(principal) };
+  }
   async refresh(user: AuthPrincipal) {
-    const session = await this.prisma.authSession.findUniqueOrThrow({
-      where: { id: user.sessionId },
-    });
-    const tokens = await this.discord.refresh(this.decrypt(session.refreshToken));
-    const guilds = await this.discord.guilds(tokens.access_token);
-    await this.prisma.$transaction(async tx => {
-      await tx.membership.deleteMany({ where: { userId: user.userId } });
-      for (const guild of guilds) {
-        await tx.guild.upsert({
-          where: { id: guild.id },
-          create: { id: guild.id, name: guild.name, icon: guild.icon },
-          update: { name: guild.name, icon: guild.icon },
-        });
-        await tx.membership.create({
-          data: {
-            userId: user.userId,
-            guildId: guild.id,
-            owner: guild.owner,
-            permissions: guild.permissions,
-            refreshedAt: new Date(this.now()),
-          },
-        });
-      }
-      await tx.authSession.update({
-        where: { id: user.sessionId },
-        data: {
-          refreshToken: this.encrypt(tokens.refresh_token),
-          refreshedAt: new Date(this.now()),
+    const initial = await this.prisma.authSession.findUnique({ where: { id: user.sessionId } });
+    if (!initial || initial.userId !== user.userId || initial.expiresAt.getTime() <= this.now())
+      throw new AuthError();
+    const owner = randomUUID();
+    const waitUntil = Date.now() + 35000;
+    while (true) {
+      const current = await this.prisma.authSession.findUnique({ where: { id: user.sessionId } });
+      if (!current || current.userId !== user.userId || current.expiresAt.getTime() <= this.now())
+        throw new AuthError();
+      if (current.refreshVersion > initial.refreshVersion)
+        return this.token(user, current.expiresAt.getTime());
+      const acquired = await this.prisma.authSession.updateMany({
+        where: {
+          id: user.sessionId,
+          refreshVersion: initial.refreshVersion,
+          OR: [{ refreshOwner: null }, { refreshLeaseUntil: { lte: new Date(this.now()) } }],
         },
+        data: { refreshOwner: owner, refreshLeaseUntil: new Date(this.now() + 45000) },
       });
-    });
-    return this.token(user);
+      if (acquired.count) break;
+      if (Date.now() >= waitUntil)
+        throw new AppError('Session refresh is busy; retry shortly', 503);
+      await new Promise(resolve => setTimeout(resolve, 25));
+    }
+    try {
+      let secret: string;
+      const locked = await this.prisma.authSession.findUnique({ where: { id: user.sessionId } });
+      if (!locked || locked.refreshOwner !== owner) throw new AuthError();
+      try {
+        secret = this.decrypt(locked.refreshToken);
+      } catch {
+        throw new AuthError('Session credential is no longer valid');
+      }
+      const tokens = await this.discord.refresh(secret);
+      // Persist rotation before the guild request: an outage there must not lose the new credential.
+      const rotated = await this.prisma.authSession.updateMany({
+        where: { id: user.sessionId, refreshOwner: owner, expiresAt: { gt: new Date(this.now()) } },
+        data: { refreshToken: this.encrypt(tokens.refresh_token) },
+      });
+      if (!rotated.count) throw new AuthError();
+      const guilds = await this.discord.guilds(tokens.access_token);
+      await this.prisma.$transaction(async tx => {
+        const saved = await tx.authSession.updateMany({
+          where: {
+            id: user.sessionId,
+            refreshOwner: owner,
+            expiresAt: { gt: new Date(this.now()) },
+          },
+          data: { refreshedAt: new Date(this.now()), refreshVersion: { increment: 1 } },
+        });
+        if (!saved.count) throw new AuthError();
+        await tx.membership.deleteMany({ where: { userId: user.userId } });
+        for (const guild of guilds) {
+          await tx.guild.upsert({
+            where: { id: guild.id },
+            create: { id: guild.id, name: guild.name, icon: guild.icon },
+            update: { name: guild.name, icon: guild.icon },
+          });
+          await tx.membership.create({
+            data: {
+              userId: user.userId,
+              guildId: guild.id,
+              owner: guild.owner,
+              permissions: guild.permissions,
+              refreshedAt: new Date(this.now()),
+            },
+          });
+        }
+      });
+      return this.token(user, initial.expiresAt.getTime());
+    } catch (error) {
+      if (error instanceof AuthError && error.statusCode === 401) await this.logout(user);
+      throw error;
+    } finally {
+      await this.prisma.authSession.updateMany({
+        where: { id: user.sessionId, refreshOwner: owner },
+        data: { refreshOwner: null, refreshLeaseUntil: null },
+      });
+    }
   }
   async logout(user: AuthPrincipal) {
     await this.prisma.authSession.deleteMany({

@@ -1,3 +1,4 @@
+import { AuthError } from '../errors/AuthError.js';
 import { AppError } from '../errors/AppError.js';
 export interface DiscordIdentity {
   id: string;
@@ -33,9 +34,18 @@ export class HttpDiscordAuthAdapter implements DiscordAuthAdapter {
         ...init,
         signal: AbortSignal.timeout(10000),
       });
-      if (!response.ok) throw new Error('Discord request failed');
+      if (!response.ok) {
+        const body = (await response.json().catch(() => ({}))) as { error?: string };
+        if (
+          (path !== '/oauth2/token' && response.status === 401) ||
+          (path === '/oauth2/token' && response.status === 400 && body.error === 'invalid_grant')
+        )
+          throw new AuthError('Discord authorization expired; sign in again');
+        throw new AppError('Discord authentication unavailable; retry shortly', 502);
+      }
       return (await response.json()) as T;
-    } catch {
+    } catch (error) {
+      if (error instanceof AppError) throw error;
       throw new AppError('Discord authentication unavailable; retry login', 502);
     }
   }

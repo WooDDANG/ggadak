@@ -1,6 +1,6 @@
 # 웹 로그인 주소와 지속 세션
 
-2026-10-16. 상태: 동작 정책 합의, 구현 전 전체 명세 최종 확인 대기. 현재 런타임 동작은 [인증 운영 문서](../../apps/be/AUTH.md)를 따른다. 이 문서의 지속 세션은 아직 구현되지 않았다.
+2026-10-16. 상태: 구현·회귀 검증 완료, 실제 Discord Portal 콜백 등록 확인 대기. 현재 런타임 동작은 [인증 운영 문서](../../apps/be/AUTH.md)를 따른다. 지속 세션은 신규 로그인부터 적용된다. 마이그레이션 전 세션에는 복원 쿠키가 없어 한 번 새 로그인이 필요하다.
 
 ## 문제
 
@@ -57,6 +57,19 @@ flowchart TD
 - 서버 탈퇴·권한 변경·선택 서버 소멸·다른 사용자 로그인 때 접근 범위를 확인한다.
 - 쿠키 위조·재사용·CSRF, 잘못된 Origin, 실제 만료·폐기된 credential 거절을 검증한다.
 
-구현 시 Discord Portal에 `http://localhost:3002/`을 등록하는 외부 설정이 필요하다. 현재 설정이나 Portal을 이미 변경했다는 의미는 아니다.
+구현 시 Discord Portal에 `http://localhost:3002/`을 등록하는 외부 설정이 필요하다. 루트 .env와 FE 기본 주소는 3002로 변경했다. Portal은 외부 계정 설정이라 사용자 등록 확인이 필요하다.
 
 [인터뷰 기록](../../.scratch/persistent-web-session/map.md).
+
+## 구현·검증 기록
+
+- 복원 endpoint는 POST /api/v1/auth/session이며 Origin과 HttpOnly 쿠키를 검증한다. access JWT는 메모리에만 유지한다.
+- 브라우저 쿠키의 256-bit 임의 credential은 SHA-256 hash로 DB에 저장한다. 고정 만료는 최초 로그인부터 7일이다.
+- DB lease·version으로 동시 refresh를 직렬화하고, provider credential 회전을 먼저 저장해 후속 권한 조회 장애에도 복구한다.
+- 같은 브라우저의 login/logout 신호는 BroadcastChannel과 storage-event fallback을 사용한다. 사용자 전환은 요청 세대를 바꿔 이전 요청의 새 계정 재전송·응답 반영을 막는다.
+- 실제 HTTP 테스트에서 재시작·access JWT 만료 후 복원, 고정 7일 만료, cookie 위조·Origin 거절, 로그아웃 후 재사용 거절, 다른 브라우저 독립, 동시 복원, provider 일시 장애 후 credential 복구, 제거된 서버 권한을 확인했다.
+- 설치된 Chrome의 격리 임시 프로필로 실제 React AuthGate를 검증했다. StrictMode callback 중복 방지, 선택 서버 복원, 장애 시 데이터 차단·재연결, 탭 신호와 로그아웃이 통과했다. Chrome이 없는 환경에서는 이 브라우저 테스트만 skip하며 나머지 HTTP·FE API 테스트는 실행한다.
+- 신규 migration 전 활성 SQLite backup을 만들었고, 기존 Decision 326건의 전체 행 내용이 보존됐으며 무결성은 ok였다. 백업과 자격증명은 커밋하지 않는다.
+- 실제 Discord OAuth 사용자 로그인은 Portal에 http://localhost:3002/ 등록 후 확인해야 하며, fixture·브라우저 테스트 성공과 구분한다.
+
+최종 전체 테스트는 BE 115, FE 14(격리 Chrome 포함), Bot 36, Shared 15, E2E 7이 통과했고 타입 검사·lint도 통과했다. FE는 루트 FE_PORT를 읽고 strictPort로 실행하며 기본값은 3002다. 임시 실제 FE 실행 확인 후 자체 검증 프로세스를 종료해 사용자 dev 프로세스와 중복 실행하지 않는다.

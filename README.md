@@ -85,18 +85,21 @@ DISCORD_BOT_TOKEN=your_discord_bot_token_here
 TRIGGER_EMOJI=📌
 BE_PORT=3001
 BE_DATABASE_PATH=./decisions.sqlite
-FE_PORT=3000
+FE_PORT=3002
 AI_PROVIDER=agy # agy, gemini, openai, mock
 AI_MODEL=gemini-3.8-flash-low
 ```
+
+로그인 콜백은 `http://localhost:3002/`입니다. Discord Portal에도 동일한 주소를 등록하세요. 새 로그인은 HttpOnly 쿠키로 최초 로그인부터 7일간 복원되며, [세션 동작](docs/model/web-session.md)을 따릅니다.
 
 ### 3) 데이터베이스 마이그레이션 및 API 명세 빌드
 ```bash
 # 백엔드 Swagger 및 TSOA 라우트 생성
 npm run swagger --workspace=@ggaddak/be
 
-# Prisma 마이그레이션 (필요 시)
-npx prisma generate --schema=apps/be/prisma/schema.prisma
+# Prisma client 생성 및 백업한 활성 DB에 additive migration 적용
+npm run db:generate --workspace=@ggaddak/be
+npm run db:migrate --workspace=@ggaddak/be
 ```
 
 ### 4) 전체 프로젝트 빌드 및 실행
@@ -106,7 +109,7 @@ npm run build
 
 # 개별 서비스 실행 (별도 터미널 권장)
 npm run dev:be   # 백엔드 API 서버 (포트 3001, Swagger: http://localhost:3001/api-docs)
-npm run dev:fe   # 프론트엔드 대시보드 (포트 3000: http://localhost:3000)
+npm run dev:fe   # 프론트엔드 대시보드 (포트 3002: http://localhost:3002)
 npm run dev:bot  # 디스코드 봇 데몬
 ```
 

@@ -61,7 +61,7 @@ export class ScanCommand {
     interaction: CommandInteraction,
   ): Promise<void> {
     await interaction.deferReply({ ephemeral: true });
-    const reviewLink = process.env.REVIEW_WEB_URL || process.env.WEB_URL || 'http://localhost:5173';
+    const reviewLink = process.env.REVIEW_WEB_URL || process.env.WEB_URL || 'http://localhost:3002';
     const reply = async (content: string) =>
       interaction.editReply(`${content}\n검토·분석 복구: ${reviewLink}`);
 

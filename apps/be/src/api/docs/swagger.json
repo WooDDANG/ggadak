@@ -2384,31 +2384,6 @@
 				"type": "object",
 				"additionalProperties": false
 			},
-			"ApiResponse_AuthUserDto_": {
-				"description": "Shared v1 response contract. Domain payloads remain typed by each endpoint.",
-				"properties": {
-					"success": {
-						"type": "boolean"
-					},
-					"code": {
-						"type": "string"
-					},
-					"message": {
-						"type": "string"
-					},
-					"data": {
-						"$ref": "#/components/schemas/AuthUserDto"
-					}
-				},
-				"required": [
-					"success",
-					"code",
-					"message",
-					"data"
-				],
-				"type": "object",
-				"additionalProperties": false
-			},
 			"DiscordGuild": {
 				"properties": {
 					"id": {
@@ -2434,6 +2409,83 @@
 					"icon",
 					"owner",
 					"permissions"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"ApiResponse__accessToken-string--tokenType-string--expiresAt-string--user-AuthUserDto--guilds-DiscordGuild-Array__": {
+				"description": "Shared v1 response contract. Domain payloads remain typed by each endpoint.",
+				"properties": {
+					"success": {
+						"type": "boolean"
+					},
+					"code": {
+						"type": "string"
+					},
+					"message": {
+						"type": "string"
+					},
+					"data": {
+						"properties": {
+							"guilds": {
+								"items": {
+									"$ref": "#/components/schemas/DiscordGuild"
+								},
+								"type": "array"
+							},
+							"user": {
+								"$ref": "#/components/schemas/AuthUserDto"
+							},
+							"expiresAt": {
+								"type": "string"
+							},
+							"tokenType": {
+								"type": "string"
+							},
+							"accessToken": {
+								"type": "string"
+							}
+						},
+						"required": [
+							"guilds",
+							"user",
+							"expiresAt",
+							"tokenType",
+							"accessToken"
+						],
+						"type": "object"
+					}
+				},
+				"required": [
+					"success",
+					"code",
+					"message",
+					"data"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"ApiResponse_AuthUserDto_": {
+				"description": "Shared v1 response contract. Domain payloads remain typed by each endpoint.",
+				"properties": {
+					"success": {
+						"type": "boolean"
+					},
+					"code": {
+						"type": "string"
+					},
+					"message": {
+						"type": "string"
+					},
+					"data": {
+						"$ref": "#/components/schemas/AuthUserDto"
+					}
+				},
+				"required": [
+					"success",
+					"code",
+					"message",
+					"data"
 				],
 				"type": "object",
 				"additionalProperties": false
@@ -4388,6 +4440,28 @@
 				}
 			}
 		},
+		"/api/v1/auth/session": {
+			"post": {
+				"operationId": "RestoreBrowserSession",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiResponse__accessToken-string--tokenType-string--expiresAt-string--user-AuthUserDto--guilds-DiscordGuild-Array__"
+								}
+							}
+						}
+					}
+				},
+				"tags": [
+					"Auth"
+				],
+				"security": [],
+				"parameters": []
+			}
+		},
 		"/api/v1/auth/me": {
 			"get": {
 				"operationId": "GetCurrentUser",
@@ -4484,11 +4558,7 @@
 				"tags": [
 					"Auth"
 				],
-				"security": [
-					{
-						"jwt": []
-					}
-				],
+				"security": [],
 				"parameters": []
 			}
 		},

@@ -146,7 +146,7 @@ async function api<T>(path: string, token?: string, init: RequestInit = {}): Pro
 
 ### 3.1 랜딩·Discord 로그인
 
-로그인 순서는 authorize 응답 URL로 브라우저 이동 → FE 콜백의 code/state 수신 → login 요청입니다. HttpOnly state 쿠키를 JavaScript로 직접 읽을 필요가 없습니다. state는 브라우저에 묶인 일회성 값이라 로그인 실패 시 authorize부터 다시 시작합니다. JWT 만료 전에 refresh(예: 10분 주기)하며, 이미 만료된 토큰은 다시 로그인합니다.
+로그인 순서는 authorize 응답 URL로 브라우저 이동 → FE 콜백의 code/state 수신 → login 요청입니다. HttpOnly state 쿠키를 JavaScript로 직접 읽을 필요가 없습니다. state는 브라우저에 묶인 일회성 값이라 로그인 실패 시 authorize부터 다시 시작합니다. 로그인 성공 시 HttpOnly 지속 쿠키도 설정합니다. FE 시작·재접속·access JWT 만료 시 POST `/api/v1/auth/session`으로 7일 서버 세션을 복원합니다. 최초 7일 만료나 실제 세션 폐기 뒤에는 다시 로그인합니다.
 
 #### `GET /api/v1/auth/authorize`
 
@@ -281,11 +281,17 @@ async function api<T>(path: string, token?: string, init: RequestInit = {}): Pro
 }
 ```
 
+#### `POST /api/v1/auth/session`
+
+**operationId:** `RestoreBrowserSession` · **인증:** HttpOnly 브라우저 세션 쿠키 + 설정된 FE Origin.
+
+body/query는 없습니다. 최초 로그인부터 고정 7일인 세션을 확인하고 Discord 권한을 갱신한 뒤 accessToken/tokenType/expiresAt/user/guilds를 반환합니다. 새로고침·브라우저 재시작·JWT 만료 후에도 사용할 수 있습니다. 응답은 no-store이며 cookie 원문은 포함하지 않습니다. 401은 재로그인, 403은 Origin 확인, 일시적인 5xx는 세션을 삭제하지 않고 재연결합니다. 쿠키를 쓰는 브라우저 POST의 Origin은 callback과 일치해야 합니다.
+
 #### `POST /api/v1/auth/refresh`
 
 **operationId:** `RefreshSession` · **인증:** Bearer JWT
 
-**구현 보완:** 유효한 Bearer JWT가 필요합니다. refreshToken을 보내는 API가 아닙니다. 새 accessToken과 expiresAt으로 교체하고 서버 목록을 갱신합니다. 이미 만료된 JWT는 재로그인이 필요합니다.
+**구현 보완:** 유효한 Bearer JWT가 필요합니다. refreshToken을 보내는 API가 아닙니다. 새 accessToken과 expiresAt으로 교체하고 서버 목록을 갱신합니다. 이미 만료된 JWT는 이 legacy endpoint 대신 `/api/v1/auth/session`으로 복원합니다.
 
 **Path/query 입력:** 없음.
 
@@ -301,9 +307,9 @@ async function api<T>(path: string, token?: string, init: RequestInit = {}): Pro
 
 #### `POST /api/v1/auth/logout`
 
-**operationId:** `LogoutSession` · **인증:** Bearer JWT
+**operationId:** `LogoutSession` · **인증:** HttpOnly 세션 쿠키 + 일치하는 Origin, 또는 기존 Bearer JWT
 
-현재 세션을 삭제합니다. 응답 data는 null이고 FE도 토큰·사용자·서버별 캐시를 제거합니다.
+현재 브라우저 세션을 삭제하고 지속 쿠키를 만료시킵니다. 응답 data는 null이고 FE도 토큰·사용자·서버별 캐시를 제거하며 다른 탭에 알립니다. 다른 기기의 별도 세션은 유지합니다.
 
 **Path/query 입력:** 없음.
 

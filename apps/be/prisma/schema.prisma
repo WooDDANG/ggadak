@@ -140,6 +140,10 @@ model Membership {
 }
 
 model AuthSession {
+  browserTokenHash String? @unique
+  refreshOwner String?
+  refreshLeaseUntil DateTime?
+  refreshVersion Int @default(0)
   id String @id
   userId String
   refreshToken String

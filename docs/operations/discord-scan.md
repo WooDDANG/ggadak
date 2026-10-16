@@ -8,7 +8,7 @@
 2. 활성 DB와 별도로 존재하는 legacy DB를 검사·백업한다. 실행 중인 SQLite는 파일 복사 대신 SQLite backup API를 사용해 일관된 snapshot을 만든다. 백업에는 대화·자격증명 저장 데이터가 포함될 수 있으므로 `.data` 등 추적되지 않는 로컬 저장소에 보관한다.
 3. `npm run db:migrate --workspace=@ggaddak/be`로 기존 additive migration을 적용한다. 기존 Decision의 개수와 내용 보존, SQLite 무결성, 미적용 migration 여부를 확인한다.
 4. `DISCORD_BOT_TOKEN`은 Bot의 Discord 접근에 사용한다. `BOT_SERVICE_TOKEN`은 BE와 Bot이 공유하는 별도의 임의 비밀값이다. 웹 OAuth의 Client ID·Secret·Redirect URI·AUTH_SECRET도 별도다. [웹 로그인 설정](../../apps/be/AUTH.md)을 참고한다.
-5. 루트 `.env` 변경 후 BE와 Bot을 모두 재시작한다. 기본 dev 명령은 빌드된 파일을 실행하므로 소스 변경은 먼저 빌드해야 한다. FE의 기본 로컬 주소는 `http://localhost:3000/`이다.
+5. 루트 `.env` 변경 후 BE와 Bot을 모두 재시작한다. 기본 dev 명령은 빌드된 파일을 실행하므로 소스 변경은 먼저 빌드해야 한다. FE의 현재 기본 로컬 주소는 `http://localhost:3002/`이다.
 6. FE의 채널 설정에서 사용자가 선택한 채널을 저장한다. Bot의 채널 보기·메시지 기록 보기 권한이 있어야 한다. 등록이 0개라면 웹 Sync Job은 생성되지 않으며, Discord 수동 스캔도 미등록 채널의 메시지를 분석하지 않는다.
 
 ## 확인 순서

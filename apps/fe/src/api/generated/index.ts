@@ -28,6 +28,7 @@ import type {
   AnalyzeDiscussionResponseDto,
   ApiResponseAccessTokenStringTokenTypeStringExpiresAtString,
   ApiResponseAccessTokenStringTokenTypeStringExpiresAtStringUserAuthUserDto,
+  ApiResponseAccessTokenStringTokenTypeStringExpiresAtStringUserAuthUserDtoGuildsDiscordGuildArray,
   ApiResponseAnalysisDeliveryQueueDto,
   ApiResponseAnalysisRetryCommandDto,
   ApiResponseAnalysisRetryCommandDtoArray,
@@ -2781,6 +2782,86 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
         TContext
       > => {
       return useMutation(getLoginDiscordMutationOptions(options), queryClient);
+    }
+
+export type restoreBrowserSessionResponse200 = {
+  data: ApiResponseAccessTokenStringTokenTypeStringExpiresAtStringUserAuthUserDtoGuildsDiscordGuildArray
+  status: 200
+}
+
+export type restoreBrowserSessionResponseSuccess = (restoreBrowserSessionResponse200) & {
+  headers: Headers;
+};
+;
+
+export type restoreBrowserSessionResponse = (restoreBrowserSessionResponseSuccess)
+
+export const getRestoreBrowserSessionUrl = () => {
+
+
+
+
+  return `/api/v1/auth/session`
+}
+
+export const restoreBrowserSession = async ( options?: Parameters<typeof authenticatedClient>[1]): Promise<restoreBrowserSessionResponse> => {
+
+  return authenticatedClient<restoreBrowserSessionResponse>(getRestoreBrowserSessionUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getRestoreBrowserSessionMutationKey = () => ['restoreBrowserSession'] as const;
+
+export const getRestoreBrowserSessionMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof restoreBrowserSession>>, TError,void, TContext>, request?: SecondParameter<typeof authenticatedClient>}
+): UseMutationOptions<Awaited<ReturnType<typeof restoreBrowserSession>>, TError,void, TContext> => {
+
+const mutationKey = getRestoreBrowserSessionMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof restoreBrowserSession>>, void> = () => {
+
+
+          return  restoreBrowserSession(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RestoreBrowserSessionMutationResult = NonNullable<Awaited<ReturnType<typeof restoreBrowserSession>>>
+
+    export type RestoreBrowserSessionMutationError = unknown
+
+
+    export const useRestoreBrowserSession = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof restoreBrowserSession>>, TError,void, TContext>, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof restoreBrowserSession>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getRestoreBrowserSessionMutationOptions(options), queryClient);
     }
 
 export type getCurrentUserResponse200 = {
