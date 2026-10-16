@@ -5,14 +5,14 @@
  * OpenAPI spec version: 1.0.0
  */
 import type { ActionItemDto } from './actionItemDto';
+import type { CategoryTag } from './categoryTag';
+import type { DecisionObservation } from './decisionObservation';
+import type { DecisionState } from './decisionState';
 import type { DecisionStatus } from './decisionStatus';
+import type { RationaleStatus } from './rationaleStatus';
 import type { RecordStringAny } from './recordStringAny';
 import type { V1DecisionDtoAlternativesItem } from './v1DecisionDtoAlternativesItem';
-import type { V1DecisionDtoCategoryTag } from './v1DecisionDtoCategoryTag';
 import type { V1DecisionDtoDates } from './v1DecisionDtoDates';
-import type { V1DecisionDtoObservation } from './v1DecisionDtoObservation';
-import type { V1DecisionDtoRationaleStatus } from './v1DecisionDtoRationaleStatus';
-import type { V1DecisionDtoState } from './v1DecisionDtoState';
 
 export interface V1DecisionDto {
   id: string;
@@ -23,13 +23,13 @@ export interface V1DecisionDto {
   title?: string;
   decisionContent?: string;
   rationale: string;
-  rationaleStatus?: V1DecisionDtoRationaleStatus;
-  observation?: V1DecisionDtoObservation;
+  rationaleStatus?: RationaleStatus;
+  observation?: DecisionObservation;
   rationaleSummary?: string;
   rationaleQuotes?: string[];
-  categoryTag?: V1DecisionDtoCategoryTag;
+  categoryTag?: CategoryTag;
   actionItems?: ActionItemDto[];
-  state: V1DecisionDtoState;
+  state: DecisionState;
   supersedesId?: string;
   isPivot?: boolean;
   approvedBy?: string;

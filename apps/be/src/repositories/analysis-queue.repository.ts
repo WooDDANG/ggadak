@@ -1,4 +1,5 @@
-import { AnalysisReceiptState } from '@ggaddak/shared';
+import { AnalysisReceiptState, DeliveryPolicy } from '@ggaddak/shared';
+
 import { Prisma, PrismaClient } from '@prisma/client';
 import { BaseRepository } from './base.repository.js';
 export type QueueTransaction = Prisma.TransactionClient;
@@ -84,7 +85,7 @@ export class AnalysisQueueRepository extends BaseRepository {
         completedAt: { lte: cutoff },
         inputJson: { not: null },
       },
-      take: 50,
+      take: DeliveryPolicy.cleanupBatchSize,
       orderBy: { id: 'asc' },
     });
   }
@@ -175,7 +176,7 @@ export class AnalysisQueueRepository extends BaseRepository {
     return this.prisma.analysisReceipt.findMany({
       where: { guildId },
       orderBy: { createdAt: 'desc' },
-      take: 500,
+      take: DeliveryPolicy.historyPageSize,
     });
   }
   acknowledgeRetry(id: string, guildId: string, requestId: string, at: Date, tx: QueueTransaction) {

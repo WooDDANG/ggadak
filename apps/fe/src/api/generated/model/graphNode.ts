@@ -4,22 +4,19 @@
  * @ggaddak/be
  * OpenAPI spec version: 1.0.0
  */
-import type { GraphNodeCategory } from './graphNodeCategory';
+import type { CategoryTag } from './categoryTag';
 import type { GraphNodeHistoryItem } from './graphNodeHistoryItem';
-import type { GraphNodeObservation } from './graphNodeObservation';
-import type { GraphNodeRationaleStatus } from './graphNodeRationaleStatus';
 import type { GraphNodeType } from './graphNodeType';
+import type { GraphObservation } from './graphObservation';
+import type { RationaleStatus } from './rationaleStatus';
 
 export interface GraphNode {
   id: string;
   type: GraphNodeType;
   summary: string;
-  /** @nullable */
-  observation?: GraphNodeObservation;
-  /** @nullable */
-  rationaleStatus?: GraphNodeRationaleStatus;
-  /** @nullable */
-  category?: GraphNodeCategory;
+  observation?: GraphObservation | null;
+  rationaleStatus?: RationaleStatus | null;
+  category?: CategoryTag | null;
   /** @nullable */
   history?: GraphNodeHistoryItem[] | null;
   /** @nullable */

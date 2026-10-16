@@ -1,5 +1,8 @@
+import { AnalysisRequestState } from '../domain/analysis-workflow.js';
+import { AnalysisPolicy, Decision, DecisionState } from '@ggaddak/shared';
+
 import { createHash, randomUUID } from 'node:crypto';
-import { Decision } from '@ggaddak/shared';
+
 import { DecisionRepository } from './decision.repository.js';
 import type { AnalyzeDiscussionParams, AnalyzeDiscussionResult } from '../domain/analysis.js';
 import type { AnalysisWorkflow, AnalysisFailure } from '../domain/analysis-workflow.js';
@@ -49,7 +52,7 @@ export interface CandidateHistoryEntry {
 export class AnalysisRequestRepository {
   constructor(
     private repo: DecisionRepository,
-    private leaseMs = 60_000,
+    private leaseMs = AnalysisPolicy.leaseMs,
   ) {}
 
   async claim(
@@ -69,7 +72,7 @@ export class AnalysisRequestRepository {
         guildId: params.guildId ?? 'discord',
         channelId: params.channelId ?? 'channel',
         manual: Boolean(params.isManualOverride),
-        state: 'pending',
+        state: AnalysisRequestState.Pending,
       },
     });
     const row = await this.repo.prisma.analysisRequest.findUniqueOrThrow({
@@ -77,8 +80,9 @@ export class AnalysisRequestRepository {
     });
     if (row.fingerprint !== fingerprint)
       throw new AnalysisRequestError('requestId was already used with different payload', 409);
-    if (row.state === 'completed') return { owner, result: JSON.parse(row.resultJson!) };
-    if (row.state === 'terminal') {
+    if (row.state === AnalysisRequestState.Completed)
+      return { owner, result: JSON.parse(row.resultJson!) };
+    if (row.state === AnalysisRequestState.Terminal) {
       const failure: AnalysisFailure = JSON.parse(row.errorJson!);
       throw new AnalysisRequestError(failure.message, failure.status);
     }
@@ -86,16 +90,21 @@ export class AnalysisRequestRepository {
       where: {
         id: requestId,
         fingerprint,
-        state: { in: ['pending', 'processing'] },
+        state: { in: [AnalysisRequestState.Pending, AnalysisRequestState.Processing] },
         OR: [{ owner: null }, { leaseUntil: { lte: now } }],
       },
-      data: { owner, state: 'processing', leaseUntil: new Date(now.getTime() + this.leaseMs) },
+      data: {
+        owner,
+        state: AnalysisRequestState.Processing,
+        leaseUntil: new Date(now.getTime() + this.leaseMs),
+      },
     });
     if (!changed.count) {
       const current = await this.repo.prisma.analysisRequest.findUniqueOrThrow({
         where: { id: requestId },
       });
-      if (current.state === 'completed') return { owner, result: JSON.parse(current.resultJson!) };
+      if (current.state === AnalysisRequestState.Completed)
+        return { owner, result: JSON.parse(current.resultJson!) };
       throw new AnalysisRequestError('Analysis is already in progress; retry this request', 503);
     }
     return { owner };
@@ -112,7 +121,12 @@ export class AnalysisRequestRepository {
     input: AnalyzeDiscussionParams,
   ): Promise<void> {
     const changed = await this.repo.prisma.analysisRequest.updateMany({
-      where: { id: requestId, owner, state: 'processing', leaseUntil: { gt: new Date() } },
+      where: {
+        id: requestId,
+        owner,
+        state: AnalysisRequestState.Processing,
+        leaseUntil: { gt: new Date() },
+      },
       data: {
         workflowJson: JSON.stringify(workflow),
         inputJson: JSON.stringify(input),
@@ -126,9 +140,14 @@ export class AnalysisRequestRepository {
 
   async fail(requestId: string, owner: string, failure: AnalysisFailure): Promise<void> {
     await this.repo.prisma.analysisRequest.updateMany({
-      where: { id: requestId, owner, state: 'processing', leaseUntil: { gt: new Date() } },
+      where: {
+        id: requestId,
+        owner,
+        state: AnalysisRequestState.Processing,
+        leaseUntil: { gt: new Date() },
+      },
       data: {
-        state: failure.retryable ? 'pending' : 'terminal',
+        state: failure.retryable ? AnalysisRequestState.Pending : AnalysisRequestState.Terminal,
         errorJson: JSON.stringify(failure),
         owner: null,
         leaseUntil: null,
@@ -138,7 +157,12 @@ export class AnalysisRequestRepository {
 
   async renew(requestId: string, owner: string): Promise<void> {
     const changed = await this.repo.prisma.analysisRequest.updateMany({
-      where: { id: requestId, owner, state: 'processing', leaseUntil: { gt: new Date() } },
+      where: {
+        id: requestId,
+        owner,
+        state: AnalysisRequestState.Processing,
+        leaseUntil: { gt: new Date() },
+      },
       data: { leaseUntil: new Date(Date.now() + this.leaseMs) },
     });
     if (!changed.count)
@@ -146,8 +170,8 @@ export class AnalysisRequestRepository {
   }
   async release(requestId: string, owner: string): Promise<void> {
     await this.repo.prisma.analysisRequest.updateMany({
-      where: { id: requestId, owner, state: 'processing' },
-      data: { state: 'pending', owner: null, leaseUntil: null },
+      where: { id: requestId, owner, state: AnalysisRequestState.Processing },
+      data: { state: AnalysisRequestState.Pending, owner: null, leaseUntil: null },
     });
   }
 
@@ -161,8 +185,13 @@ export class AnalysisRequestRepository {
     return this.repo.prisma.$transaction(async tx => {
       // Take the write lock and fence an expired/stolen owner before creating anything.
       const fenced = await tx.analysisRequest.updateMany({
-        where: { id: params.requestId, owner, state: 'processing', leaseUntil: { gt: new Date() } },
-        data: { state: 'committing' },
+        where: {
+          id: params.requestId,
+          owner,
+          state: AnalysisRequestState.Processing,
+          leaseUntil: { gt: new Date() },
+        },
+        data: { state: AnalysisRequestState.Committing },
       });
       if (!fenced.count)
         throw new AnalysisRequestError('Analysis ownership expired; retry this request', 503);
@@ -202,7 +231,7 @@ export class AnalysisRequestRepository {
           ? await tx.decision.findUnique({ where: { id: identity.decisionId } })
           : (matchingLegacy ?? null);
         const rejectedLegacyRows = legacyRows.filter(
-          row => row.status === 'Rejected' || row.status === 'rejected',
+          row => row.status === DecisionState.Rejected || row.status === 'rejected',
         );
         const legacyRejected =
           !identity &&
@@ -220,7 +249,7 @@ export class AnalysisRequestRepository {
         // Rejections are candidate-scoped. Legacy hashes apply only to their exact original session.
         if (
           !params.isManualOverride &&
-          (existingRow?.status === 'Rejected' ||
+          (existingRow?.status === DecisionState.Rejected ||
             existingRow?.status === 'rejected' ||
             suppressLegacy)
         ) {
@@ -312,7 +341,7 @@ export class AnalysisRequestRepository {
       await tx.analysisRequest.update({
         where: { id: params.requestId },
         data: {
-          state: 'completed',
+          state: AnalysisRequestState.Completed,
           owner: null,
           leaseUntil: null,
           resultJson: JSON.stringify(completed),

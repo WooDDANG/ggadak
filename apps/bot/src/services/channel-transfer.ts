@@ -1,3 +1,9 @@
+import {
+  DeliveryPolicy,
+  DurationMs,
+  DiscordHistoryPolicy,
+  positiveIntegerSetting,
+} from '@ggaddak/shared';
 import { randomUUID } from 'node:crypto';
 import { statfs } from 'node:fs/promises';
 import type { Message, TextChannel } from 'discord.js';
@@ -72,9 +78,9 @@ export class ChannelTransfer {
         rangeIndex: 0,
         after: '0',
         cutoff: options.hours
-          ? Date.now() - options.hours * 3600000
+          ? Date.now() - options.hours * DurationMs.Hour
           : options.initialOnly
-            ? Date.now() - (options.lookbackDays ?? 3) * 86400000
+            ? Date.now() - (options.lookbackDays ?? 3) * DurationMs.Day
             : null,
         limit: options.limit,
       };
@@ -84,14 +90,18 @@ export class ChannelTransfer {
     if (state.uploaded)
       return { scannedCount: state.messages, decisionsCount: 0, pendingAnalysis: true };
 
-    const maxBytes = Number(process.env.BOT_SCAN_MAX_BYTES ?? 64 * 1024 * 1024);
+    const maxBytes = positiveIntegerSetting(
+      process.env,
+      'BOT_SCAN_MAX_BYTES',
+      DeliveryPolicy.scanBytes,
+    );
     if (!Number.isSafeInteger(maxBytes) || maxBytes < 1)
       throw new Error('Invalid BOT_SCAN_MAX_BYTES');
     while (!state.collected) {
       const capacity = await this.backend.queueRequest('/capacity', 'GET');
       if (capacity?.acceptingScans === false) throw new BackendRequestError(429);
       const batch = await channel.messages.fetch({
-        limit: 100,
+        limit: DiscordHistoryPolicy.pageSize,
         ...(state.before ? { before: state.before } : {}),
       });
       const all = [...batch.values()].sort((a, b) => (BigInt(a.id) < BigInt(b.id) ? -1 : 1));
@@ -106,7 +116,11 @@ export class ChannelTransfer {
       let part: Array<ReturnType<ChannelTransfer['raw']>> = [];
       for (const message of selected) {
         const value = this.raw(message);
-        if (part.length && Buffer.byteLength(JSON.stringify([...part, value])) > 180000) {
+        if (
+          part.length &&
+          Buffer.byteLength(JSON.stringify([...part, value])) >
+            DiscordHistoryPolicy.uploadChunkBytes
+        ) {
           parts.push(part);
           part = [];
         }
@@ -119,7 +133,7 @@ export class ChannelTransfer {
           'Channel receive capacity exceeded; adjust BOT_SCAN_MAX_BYTES before resuming',
         );
       const disk = await statfs(this.backend.transferDirectory(id));
-      if (disk.bavail * disk.bsize < bytes + 64 * 1024 * 1024)
+      if (disk.bavail * disk.bsize < bytes + DeliveryPolicy.minFreeBytes)
         throw new Error('Bot receive disk capacity unavailable');
       if (parts.length) {
         await this.backend.writeTransfer(id, `page-${state.pages}.json`, parts);

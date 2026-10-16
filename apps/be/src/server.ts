@@ -1,3 +1,4 @@
+import { AnalysisPolicy, DeliveryPolicy } from '@ggaddak/shared';
 import type { EmbeddingProvider } from './services/search.service.js';
 import type { AuthOptions } from './services/auth.service.js';
 import http from 'node:http';
@@ -33,7 +34,7 @@ export async function createServer(
       void app.locals.analysisQueue
         .runOnce()
         .catch((error: Error) => (app.locals.queueError = error.message));
-    timer = setInterval(tick, 500);
+    timer = setInterval(tick, AnalysisPolicy.workerIntervalMs);
     timer.unref();
     tick();
     maintenance = setInterval(
@@ -41,7 +42,7 @@ export async function createServer(
         void app.locals.analysisQueue
           .cleanup()
           .catch((error: Error) => (app.locals.queueError = error.message)),
-      60000,
+      DeliveryPolicy.maintenanceIntervalMs,
     );
     maintenance.unref();
   });

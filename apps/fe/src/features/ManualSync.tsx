@@ -1,3 +1,6 @@
+import { QueryPolicy } from '../config';
+import { includesValue, SyncJobStatus } from '@ggaddak/shared';
+
 import { dashboardQueryKey } from '../api/dashboard.api';
 import { decisionsQueryKey } from '../api/session';
 import React, { useState } from 'react';
@@ -24,28 +27,34 @@ export function ManualSync({ guildId }: { guildId: string }) {
   });
   const status = useQuery({
     queryKey: ['sync-job', guildId, job?.jobId],
-    enabled: Boolean(job && (job.status === 'QUEUED' || job.status === 'PROCESSING')),
+    enabled: Boolean(
+      job && (job.status === SyncJobStatus.Queued || job.status === SyncJobStatus.Processing),
+    ),
     queryFn: async () => {
       const result = await getSyncJob(job!.jobId, { guildId });
       if (result.status !== 200 || !result.data.success)
         throw new Error(result.data.message || `HTTP ${result.status}`);
-      if (['COMPLETED', 'FAILED'].includes(result.data.data.status)) {
+      if (includesValue([SyncJobStatus.Completed, SyncJobStatus.Failed], result.data.data.status)) {
         queryClient.invalidateQueries({ queryKey: dashboardQueryKey(guildId) });
         queryClient.invalidateQueries({ queryKey: decisionsQueryKey(guildId) });
         queryClient.invalidateQueries({ queryKey: ['review-queue', guildId] });
       }
       return result.data.data as SyncJob;
     },
-    refetchInterval: 1500,
+    refetchInterval: QueryPolicy.syncJobPollMs,
   });
   const current = status.data ?? job;
-  const pending = current?.status === 'QUEUED' || current?.status === 'PROCESSING';
-  const resume=useMutation({
-    mutationFn:async(channelId:string)=>{
-      const response=await resumeChannel(current!.jobId,channelId,{guildId});
+  const pending =
+    current?.status === SyncJobStatus.Queued || current?.status === SyncJobStatus.Processing;
+  const resume = useMutation({
+    mutationFn: async (channelId: string) => {
+      const response = await resumeChannel(current!.jobId, channelId, { guildId });
       return response.data.data as SyncJob;
     },
-    onSuccess:updated=>{setJob(updated);queryClient.setQueryData(['sync-job',guildId,updated.jobId],updated);},
+    onSuccess: updated => {
+      setJob(updated);
+      queryClient.setQueryData(['sync-job', guildId, updated.jobId], updated);
+    },
   });
   return (
     <section className="max-w-2xl space-y-5">
@@ -82,11 +91,11 @@ export function ManualSync({ guildId }: { guildId: string }) {
       {current && (
         <div className="rounded border border-slate-700 p-4 space-y-2" aria-live="polite">
           <p role="status">
-            {current.status === 'QUEUED'
+            {current.status === SyncJobStatus.Queued
               ? '봇이 작업을 시작하기를 기다리는 중입니다.'
-              : current.status === 'PROCESSING'
+              : current.status === SyncJobStatus.Processing
                 ? '동기화 진행 중입니다.'
-                : current.status === 'COMPLETED'
+                : current.status === SyncJobStatus.Completed
                   ? '동기화가 완료되었습니다.'
                   : '동기화에 실패했습니다.'}
           </p>
@@ -105,15 +114,28 @@ export function ManualSync({ guildId }: { guildId: string }) {
               {current.errorMessage}
             </p>
           )}
-          {current.status === 'FAILED' && (
+          {current.status === SyncJobStatus.Failed && (
             <p>
-              완료된 채널의 후보는 Review Queue에서 확인할 수 있습니다. 데이터 전달 실패는 아래에서 재개하고, 분석 실패는 분석 복구 화면에서 재시도하세요.
+              완료된 채널의 후보는 Review Queue에서 확인할 수 있습니다. 데이터 전달 실패는 아래에서
+              재개하고, 분석 실패는 분석 복구 화면에서 재시도하세요.
             </p>
           )}
         </div>
       )}
-      {current?.status==='FAILED'&&current.channels?.filter(c=>c.status==='FAILED').map(channel=><button key={channel.id} className="bg-indigo-600 rounded px-3 py-2 disabled:opacity-50" disabled={resume.isPending} onClick={()=>resume.mutate(channel.id)}>채널 {channel.id} 데이터 전달 재개</button>)}
-      {resume.error&&<p role="alert">{resume.error.message}</p>}
+      {current?.status === SyncJobStatus.Failed &&
+        current.channels
+          ?.filter(c => c.status === SyncJobStatus.Failed)
+          .map(channel => (
+            <button
+              key={channel.id}
+              className="bg-indigo-600 rounded px-3 py-2 disabled:opacity-50"
+              disabled={resume.isPending}
+              onClick={() => resume.mutate(channel.id)}
+            >
+              채널 {channel.id} 데이터 전달 재개
+            </button>
+          ))}
+      {resume.error && <p role="alert">{resume.error.message}</p>}
     </section>
   );
 }

@@ -1,3 +1,4 @@
+import { SyncJobStatus } from '@ggaddak/shared';
 import { DecisionRepository } from '../repositories/decision.repository.js';
 import { DashboardDto } from '../dto/dashboard.dto.js';
 import { toV1Decision } from '../dto/v1-decision.dto.js';
@@ -15,7 +16,7 @@ export class DashboardService {
         take: 5,
       }),
       db.syncJob.findFirst({
-        where: { guildId, status: 'COMPLETED', completedAt: { not: null } },
+        where: { guildId, status: SyncJobStatus.Completed, completedAt: { not: null } },
         orderBy: [{ completedAt: 'desc' }, { id: 'asc' }],
       }),
       db.syncJob.findFirst({ where: { guildId }, orderBy: [{ createdAt: 'desc' }, { id: 'asc' }] }),

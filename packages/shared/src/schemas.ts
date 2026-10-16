@@ -1,18 +1,21 @@
+import {
+  DecisionState,
+  CategoryTag,
+  FeedbackSourceType,
+  ActionItemState,
+  RationaleStatus,
+  DecisionObservation,
+  ReviewActionType,
+  ReviewResolution,
+  TaskDisposition,
+} from './domain-values.js';
 import { z } from 'zod';
 
-export const DecisionStateSchema = z.enum([
-  'Draft',
-  'Proposed',
-  'Discussing',
-  'Decided',
-  'Deferred',
-  'Superseded',
-  'Rejected',
-]);
+export const DecisionStateSchema = z.nativeEnum(DecisionState);
 
-export const CategoryTagSchema = z.enum(['타깃', '문제정의', '기능', '기술', 'BM', '기타']);
+export const CategoryTagSchema = z.nativeEnum(CategoryTag);
 
-export const FeedbackSourceTypeSchema = z.enum(['교수', '심사위원', '팀원', '인터뷰이']);
+export const FeedbackSourceTypeSchema = z.nativeEnum(FeedbackSourceType);
 
 export const AlternativeOptionSchema = z.object({
   id: z.string().optional(),
@@ -22,7 +25,7 @@ export const AlternativeOptionSchema = z.object({
 
 export const ActionItemSchema = z.object({
   id: z.string().optional(),
-  state: z.enum(['unknown', 'open', 'completed', 'canceled', 'transferred']).optional(),
+  state: z.nativeEnum(ActionItemState).optional(),
   transferredFromDecisionId: z.string().optional(),
   transferredFromActionItemId: z.string().optional(),
   transferredToDecisionId: z.string().optional(),
@@ -60,15 +63,15 @@ export const DecisionSchema = z.object({
   title: z.string().optional(),
   decisionContent: z.string().optional(),
   rationale: z.string(),
-  rationaleStatus: z.enum(['stated', 'not_stated']).optional(),
-  observation: z.enum(['proposed', 'agreed', 'withdrawn', 'unclear']).optional(),
+  rationaleStatus: z.nativeEnum(RationaleStatus).optional(),
+  observation: z.nativeEnum(DecisionObservation).optional(),
   rationaleSummary: z.string().optional(),
   rationaleQuotes: z.array(z.string()).default([]),
   alternatives: z.array(AlternativeOptionSchema).default([]),
-  categoryTag: CategoryTagSchema.default('기타'),
+  categoryTag: CategoryTagSchema.default(CategoryTag.Other),
   actionItems: z.array(ActionItemSchema).default([]),
   // State Machine & Audit
-  state: DecisionStateSchema.default('Draft'),
+  state: DecisionStateSchema.default(DecisionState.Draft),
   supersedesId: z.string().nullable().default(null),
   isPivot: z.boolean().default(false),
   approvedBy: z.string().nullable().default(null),
@@ -112,9 +115,9 @@ export const ExternalFeedbackSchema = z.object({
 });
 
 export const ReviewActionSchema = z.object({
-  action: z.enum(['confirm', 'defer', 'reject', 'edit']),
+  action: z.nativeEnum(ReviewActionType),
   expectedVersion: z.number().int().positive(),
-  resolution: z.enum(['independent', 'replace']).optional(),
+  resolution: z.nativeEnum(ReviewResolution).optional(),
   predecessorId: z.string().optional(),
   predecessorVersion: z.number().int().positive().optional(),
   taskDispositions: z
@@ -122,7 +125,7 @@ export const ReviewActionSchema = z.object({
       z.object({
         actionItemId: z.string(),
         classification: z.enum(['open', 'completed']).optional(),
-        disposition: z.enum(['cancel', 'transfer']).optional(),
+        disposition: z.nativeEnum(TaskDisposition).optional(),
       }),
     )
     .optional(),

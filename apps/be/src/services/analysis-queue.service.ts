@@ -1,9 +1,15 @@
 import {
+  AnalysisPolicy,
   AnalysisReceiptState,
   AnalysisScanState,
+  DeliveryErrorCategory,
+  DeliveryPolicy,
   parseReceiptState,
   parseScanState,
+  positiveIntegerSetting,
+  SyncJobStatus,
 } from '@ggaddak/shared';
+
 import { randomUUID } from 'node:crypto';
 import {
   AnalysisQueueRepository,
@@ -40,9 +46,7 @@ export interface QueueOptions {
   foregroundBurst: number;
 }
 function positive(name: string, fallback: number) {
-  const n = Number(process.env[name] ?? fallback);
-  if (!Number.isSafeInteger(n) || n <= 0) throw new Error(`Invalid ${name}`);
-  return n;
+  return positiveIntegerSetting(process.env, name, fallback);
 }
 const view = (r: ReceiptRecord): ReceiptView => ({
   requestId: r.id,
@@ -69,17 +73,17 @@ export class AnalysisQueueService {
   ) {
     this.storage = new AnalysisQueueRepository(repo.prisma);
     this.options = {
-      maxBytes: positive('ANALYSIS_QUEUE_MAX_BYTES', 256 * 1024 * 1024),
-      maxRequestBytes: positive('ANALYSIS_QUEUE_REQUEST_BYTES', 256 * 1024),
-      maxChannelBytes: positive('ANALYSIS_QUEUE_CHANNEL_BYTES', 64 * 1024 * 1024),
-      maxPending: positive('ANALYSIS_QUEUE_MAX_PENDING', 2000),
-      maxMessages: 100,
-      minFreeBytes: positive('ANALYSIS_QUEUE_MIN_FREE_BYTES', 64 * 1024 * 1024),
-      maxAttempts: positive('ANALYSIS_MAX_ATTEMPTS', 5),
-      retryMs: positive('ANALYSIS_RETRY_DELAY_MS', 5000),
-      leaseMs: 60000,
-      retentionMs: positive('ANALYSIS_COMPLETED_RETENTION_MS', 7 * 86400000),
-      foregroundBurst: positive('ANALYSIS_FOREGROUND_BURST', 5),
+      maxBytes: positive('ANALYSIS_QUEUE_MAX_BYTES', AnalysisPolicy.maxBytes),
+      maxRequestBytes: positive('ANALYSIS_QUEUE_REQUEST_BYTES', AnalysisPolicy.maxRequestBytes),
+      maxChannelBytes: positive('ANALYSIS_QUEUE_CHANNEL_BYTES', AnalysisPolicy.maxChannelBytes),
+      maxPending: positive('ANALYSIS_QUEUE_MAX_PENDING', AnalysisPolicy.maxPending),
+      maxMessages: AnalysisPolicy.maxMessages,
+      minFreeBytes: positive('ANALYSIS_QUEUE_MIN_FREE_BYTES', DeliveryPolicy.minFreeBytes),
+      maxAttempts: positive('ANALYSIS_MAX_ATTEMPTS', DeliveryPolicy.maxAttempts),
+      retryMs: positive('ANALYSIS_RETRY_DELAY_MS', DeliveryPolicy.initialRetryMs),
+      leaseMs: AnalysisPolicy.leaseMs,
+      retentionMs: positive('ANALYSIS_COMPLETED_RETENTION_MS', DeliveryPolicy.retentionMs),
+      foregroundBurst: positive('ANALYSIS_FOREGROUND_BURST', AnalysisPolicy.foregroundBurst),
       ...options,
     };
   }
@@ -95,7 +99,7 @@ export class AnalysisQueueService {
     if (
       !job ||
       job.owner !== scan.jobOwner ||
-      job.status !== 'PROCESSING' ||
+      job.status !== SyncJobStatus.Processing ||
       !job.leaseUntil ||
       job.leaseUntil.getTime() <= this.now()
     )
@@ -245,8 +249,12 @@ export class AnalysisQueueService {
         const usage = await this.storage.usage(body.scanId, tx);
         if (
           (usage._sum.inputBytes ?? 0) + bytes >
-            Math.min(this.options.maxChannelBytes, Math.floor(this.options.maxBytes * 0.9)) ||
-          usage._count >= Math.max(1, Math.floor(this.options.maxPending * 0.9))
+            Math.min(
+              this.options.maxChannelBytes,
+              Math.floor(this.options.maxBytes * DeliveryPolicy.dataBudgetRatio),
+            ) ||
+          usage._count >=
+            Math.max(1, Math.floor(this.options.maxPending * DeliveryPolicy.dataBudgetRatio))
         ) {
           await this.storage.patchScan(
             body.scanId,
@@ -261,17 +269,19 @@ export class AnalysisQueueService {
         throw new BadRequestError('Range requires scan');
       const usage = await this.storage.usage(undefined, tx);
       const byteLimit = body.scanId
-        ? Math.floor(this.options.maxBytes * 0.9)
+        ? Math.floor(this.options.maxBytes * DeliveryPolicy.dataBudgetRatio)
         : this.options.maxBytes;
       const countLimit = body.scanId
-        ? Math.max(1, Math.floor(this.options.maxPending * 0.9))
+        ? Math.max(1, Math.floor(this.options.maxPending * DeliveryPolicy.dataBudgetRatio))
         : this.options.maxPending;
       if ((usage._sum.inputBytes ?? 0) + bytes > byteLimit)
         throw new AppError('Receive storage is full; retry after capacity is available', 429, {
-          retryAfterMs: 5000,
+          retryAfterMs: DeliveryPolicy.initialRetryMs,
         });
       if ((await this.storage.pendingCount(tx)) >= countLimit)
-        throw new AppError('Analysis queue is full', 429, { retryAfterMs: 5000 });
+        throw new AppError('Analysis queue is full', 429, {
+          retryAfterMs: DeliveryPolicy.initialRetryMs,
+        });
       if (body.scanId && control.pauseUntil && control.pauseUntil.getTime() > this.now())
         throw new AppError('Scan paused by provider overload', 429);
       const file = await this.storage.databaseFile(tx);
@@ -312,7 +322,8 @@ export class AnalysisQueueService {
     return view(result);
   }
   async results(ids: string[]): Promise<ReceiptView[]> {
-    if (ids.length > 100) throw new BadRequestError('At most 100 request IDs');
+    if (ids.length > DeliveryPolicy.maxBatchSize)
+      throw new BadRequestError('At most 100 request IDs');
     const rows = await this.storage.results(ids);
     return Promise.all(
       rows.map(async r => {
@@ -327,7 +338,8 @@ export class AnalysisQueueService {
     );
   }
   async acknowledge(ids: string[]) {
-    if (ids.length > 100) throw new BadRequestError('At most 100 result acknowledgements');
+    if (ids.length > DeliveryPolicy.maxBatchSize)
+      throw new BadRequestError('At most 100 result acknowledgements');
     await this.storage.acknowledge(ids, new Date(this.now()));
   }
   async cleanup() {
@@ -371,8 +383,8 @@ export class AnalysisQueueService {
       retainedBytes,
       acceptingScans:
         (!control?.pauseUntil || control.pauseUntil.getTime() <= this.now()) &&
-        retainedBytes < Math.floor(this.options.maxBytes * 0.9) &&
-        pending < Math.max(1, Math.floor(this.options.maxPending * 0.9)),
+        retainedBytes < Math.floor(this.options.maxBytes * DeliveryPolicy.dataBudgetRatio) &&
+        pending < Math.max(1, Math.floor(this.options.maxPending * DeliveryPolicy.dataBudgetRatio)),
       states: grouped.map(g => ({
         state: parseReceiptState(g.state),
         count: g._count,
@@ -443,7 +455,7 @@ export class AnalysisQueueService {
         const attempts = r.attempts + (busy ? 0 : 1),
           retryable = status >= 500 || status === 429 || status === 408;
         const base = Math.min(
-          300000,
+          DeliveryPolicy.maxRetryMs,
           this.options.retryMs * 2 ** Math.min(Math.max(0, attempts - 1), 6),
         );
         const retryAfter = Number((error as AppError).details?.retryAfterMs ?? 0);
@@ -461,10 +473,10 @@ export class AnalysisQueueService {
           leaseUntil: null,
           nextAttemptAt: new Date(this.now() + (busy ? 500 : delay)),
           errorCategory: busy
-            ? 'analysis-capacity'
+            ? DeliveryErrorCategory.AnalysisCapacity
             : retryable
-              ? 'provider-or-storage'
-              : 'analysis-terminal',
+              ? DeliveryErrorCategory.ProviderOrStorage
+              : DeliveryErrorCategory.AnalysisTerminal,
         });
         if (retryable && !busy)
           await this.storage.patchControl({ pauseUntil: new Date(this.now() + delay) });

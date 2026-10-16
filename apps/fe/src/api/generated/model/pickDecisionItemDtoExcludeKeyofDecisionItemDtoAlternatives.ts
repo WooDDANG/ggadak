@@ -5,10 +5,10 @@
  * OpenAPI spec version: 1.0.0
  */
 import type { ActionItemDto } from './actionItemDto';
-import type { PickDecisionItemDtoExcludeKeyofDecisionItemDtoAlternativesCategoryTag } from './pickDecisionItemDtoExcludeKeyofDecisionItemDtoAlternativesCategoryTag';
-import type { PickDecisionItemDtoExcludeKeyofDecisionItemDtoAlternativesObservation } from './pickDecisionItemDtoExcludeKeyofDecisionItemDtoAlternativesObservation';
-import type { PickDecisionItemDtoExcludeKeyofDecisionItemDtoAlternativesRationaleStatus } from './pickDecisionItemDtoExcludeKeyofDecisionItemDtoAlternativesRationaleStatus';
-import type { PickDecisionItemDtoExcludeKeyofDecisionItemDtoAlternativesState } from './pickDecisionItemDtoExcludeKeyofDecisionItemDtoAlternativesState';
+import type { CategoryTag } from './categoryTag';
+import type { DecisionObservation } from './decisionObservation';
+import type { DecisionState } from './decisionState';
+import type { RationaleStatus } from './rationaleStatus';
 import type { RecordStringAny } from './recordStringAny';
 
 /**
@@ -23,13 +23,13 @@ export interface PickDecisionItemDtoExcludeKeyofDecisionItemDtoAlternatives {
   title?: string;
   decisionContent?: string;
   rationale: string;
-  rationaleStatus?: PickDecisionItemDtoExcludeKeyofDecisionItemDtoAlternativesRationaleStatus;
-  observation?: PickDecisionItemDtoExcludeKeyofDecisionItemDtoAlternativesObservation;
+  rationaleStatus?: RationaleStatus;
+  observation?: DecisionObservation;
   rationaleSummary?: string;
   rationaleQuotes?: string[];
-  categoryTag?: PickDecisionItemDtoExcludeKeyofDecisionItemDtoAlternativesCategoryTag;
+  categoryTag?: CategoryTag;
   actionItems?: ActionItemDto[];
-  state: PickDecisionItemDtoExcludeKeyofDecisionItemDtoAlternativesState;
+  state: DecisionState;
   supersedesId?: string;
   isPivot?: boolean;
   approvedBy?: string;

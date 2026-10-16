@@ -17,20 +17,50 @@
 					"SUPERSEDED"
 				]
 			},
+			"RationaleStatus": {
+				"type": "string",
+				"enum": [
+					"stated",
+					"not_stated"
+				]
+			},
+			"DecisionObservation": {
+				"type": "string",
+				"enum": [
+					"proposed",
+					"agreed",
+					"withdrawn",
+					"unclear"
+				]
+			},
+			"CategoryTag": {
+				"type": "string",
+				"enum": [
+					"타깃",
+					"문제정의",
+					"기능",
+					"기술",
+					"BM",
+					"기타"
+				]
+			},
+			"ActionItemState": {
+				"type": "string",
+				"enum": [
+					"unknown",
+					"open",
+					"completed",
+					"canceled",
+					"transferred"
+				]
+			},
 			"ActionItemDto": {
 				"properties": {
 					"id": {
 						"type": "string"
 					},
 					"state": {
-						"type": "string",
-						"enum": [
-							"unknown",
-							"open",
-							"completed",
-							"canceled",
-							"transferred"
-						]
+						"$ref": "#/components/schemas/ActionItemState"
 					},
 					"transferredFromDecisionId": {
 						"type": "string"
@@ -56,6 +86,19 @@
 				],
 				"type": "object",
 				"additionalProperties": false
+			},
+			"DecisionState": {
+				"type": "string",
+				"enum": [
+					"Proposed",
+					"Draft",
+					"Discussing",
+					"Decided",
+					"Deferred",
+					"Superseded",
+					"Rejected"
+				],
+				"description": "Runtime enum objects keep wire values and string-literal types compatible."
 			},
 			"Record_string.any_": {
 				"properties": {},
@@ -91,20 +134,10 @@
 						"type": "string"
 					},
 					"rationaleStatus": {
-						"type": "string",
-						"enum": [
-							"stated",
-							"not_stated"
-						]
+						"$ref": "#/components/schemas/RationaleStatus"
 					},
 					"observation": {
-						"type": "string",
-						"enum": [
-							"proposed",
-							"agreed",
-							"withdrawn",
-							"unclear"
-						]
+						"$ref": "#/components/schemas/DecisionObservation"
 					},
 					"rationaleSummary": {
 						"type": "string"
@@ -116,15 +149,7 @@
 						"type": "array"
 					},
 					"categoryTag": {
-						"type": "string",
-						"enum": [
-							"타깃",
-							"문제정의",
-							"기능",
-							"기술",
-							"BM",
-							"기타"
-						]
+						"$ref": "#/components/schemas/CategoryTag"
 					},
 					"actionItems": {
 						"items": {
@@ -133,16 +158,7 @@
 						"type": "array"
 					},
 					"state": {
-						"type": "string",
-						"enum": [
-							"Draft",
-							"Proposed",
-							"Discussing",
-							"Decided",
-							"Superseded",
-							"Deferred",
-							"Rejected"
-						]
+						"$ref": "#/components/schemas/DecisionState"
 					},
 					"supersedesId": {
 						"type": "string"
@@ -237,20 +253,10 @@
 						"type": "string"
 					},
 					"rationaleStatus": {
-						"type": "string",
-						"enum": [
-							"stated",
-							"not_stated"
-						]
+						"$ref": "#/components/schemas/RationaleStatus"
 					},
 					"observation": {
-						"type": "string",
-						"enum": [
-							"proposed",
-							"agreed",
-							"withdrawn",
-							"unclear"
-						]
+						"$ref": "#/components/schemas/DecisionObservation"
 					},
 					"rationaleSummary": {
 						"type": "string"
@@ -262,15 +268,7 @@
 						"type": "array"
 					},
 					"categoryTag": {
-						"type": "string",
-						"enum": [
-							"타깃",
-							"문제정의",
-							"기능",
-							"기술",
-							"BM",
-							"기타"
-						]
+						"$ref": "#/components/schemas/CategoryTag"
 					},
 					"actionItems": {
 						"items": {
@@ -279,16 +277,7 @@
 						"type": "array"
 					},
 					"state": {
-						"type": "string",
-						"enum": [
-							"Draft",
-							"Proposed",
-							"Discussing",
-							"Decided",
-							"Superseded",
-							"Deferred",
-							"Rejected"
-						]
+						"$ref": "#/components/schemas/DecisionState"
 					},
 					"supersedesId": {
 						"type": "string"
@@ -515,20 +504,10 @@
 						"type": "string"
 					},
 					"rationaleStatus": {
-						"type": "string",
-						"enum": [
-							"stated",
-							"not_stated"
-						]
+						"$ref": "#/components/schemas/RationaleStatus"
 					},
 					"observation": {
-						"type": "string",
-						"enum": [
-							"proposed",
-							"agreed",
-							"withdrawn",
-							"unclear"
-						]
+						"$ref": "#/components/schemas/DecisionObservation"
 					},
 					"rationaleSummary": {
 						"type": "string"
@@ -540,15 +519,7 @@
 						"type": "array"
 					},
 					"categoryTag": {
-						"type": "string",
-						"enum": [
-							"타깃",
-							"문제정의",
-							"기능",
-							"기술",
-							"BM",
-							"기타"
-						]
+						"$ref": "#/components/schemas/CategoryTag"
 					},
 					"actionItems": {
 						"items": {
@@ -557,16 +528,7 @@
 						"type": "array"
 					},
 					"state": {
-						"type": "string",
-						"enum": [
-							"Draft",
-							"Proposed",
-							"Discussing",
-							"Decided",
-							"Superseded",
-							"Deferred",
-							"Rejected"
-						]
+						"$ref": "#/components/schemas/DecisionState"
 					},
 					"supersedesId": {
 						"type": "string"
@@ -718,6 +680,20 @@
 				"type": "object",
 				"additionalProperties": false
 			},
+			"ReviewResolution": {
+				"type": "string",
+				"enum": [
+					"independent",
+					"replace"
+				]
+			},
+			"TaskDisposition": {
+				"type": "string",
+				"enum": [
+					"cancel",
+					"transfer"
+				]
+			},
 			"Pick_ReviewDecisionDto.Exclude_keyofReviewDecisionDto.action-or-approvedBy__": {
 				"properties": {
 					"title": {
@@ -739,26 +715,14 @@
 						"type": "array"
 					},
 					"categoryTag": {
-						"type": "string",
-						"enum": [
-							"타깃",
-							"문제정의",
-							"기능",
-							"기술",
-							"BM",
-							"기타"
-						]
+						"$ref": "#/components/schemas/CategoryTag"
 					},
 					"expectedVersion": {
 						"type": "number",
 						"format": "double"
 					},
 					"resolution": {
-						"type": "string",
-						"enum": [
-							"independent",
-							"replace"
-						]
+						"$ref": "#/components/schemas/ReviewResolution"
 					},
 					"predecessorId": {
 						"type": "string"
@@ -771,11 +735,7 @@
 						"items": {
 							"properties": {
 								"disposition": {
-									"type": "string",
-									"enum": [
-										"cancel",
-										"transfer"
-									]
+									"$ref": "#/components/schemas/TaskDisposition"
 								},
 								"classification": {
 									"type": "string",
@@ -824,26 +784,14 @@
 						"type": "array"
 					},
 					"categoryTag": {
-						"type": "string",
-						"enum": [
-							"타깃",
-							"문제정의",
-							"기능",
-							"기술",
-							"BM",
-							"기타"
-						]
+						"$ref": "#/components/schemas/CategoryTag"
 					},
 					"expectedVersion": {
 						"type": "number",
 						"format": "double"
 					},
 					"resolution": {
-						"type": "string",
-						"enum": [
-							"independent",
-							"replace"
-						]
+						"$ref": "#/components/schemas/ReviewResolution"
 					},
 					"predecessorId": {
 						"type": "string"
@@ -856,11 +804,7 @@
 						"items": {
 							"properties": {
 								"disposition": {
-									"type": "string",
-									"enum": [
-										"cancel",
-										"transfer"
-									]
+									"$ref": "#/components/schemas/TaskDisposition"
 								},
 								"classification": {
 									"type": "string",
@@ -998,15 +942,7 @@
 						"description": "Required Rationale, 1–10000 trimmed characters."
 					},
 					"category": {
-						"type": "string",
-						"enum": [
-							"타깃",
-							"문제정의",
-							"기능",
-							"기술",
-							"BM",
-							"기타"
-						]
+						"$ref": "#/components/schemas/CategoryTag"
 					},
 					"alternatives": {
 						"items": {
@@ -1158,20 +1094,10 @@
 						"type": "string"
 					},
 					"rationaleStatus": {
-						"type": "string",
-						"enum": [
-							"stated",
-							"not_stated"
-						]
+						"$ref": "#/components/schemas/RationaleStatus"
 					},
 					"observation": {
-						"type": "string",
-						"enum": [
-							"proposed",
-							"agreed",
-							"withdrawn",
-							"unclear"
-						]
+						"$ref": "#/components/schemas/DecisionObservation"
 					},
 					"rationaleSummary": {
 						"type": "string"
@@ -1189,15 +1115,7 @@
 						"type": "array"
 					},
 					"categoryTag": {
-						"type": "string",
-						"enum": [
-							"타깃",
-							"문제정의",
-							"기능",
-							"기술",
-							"BM",
-							"기타"
-						]
+						"$ref": "#/components/schemas/CategoryTag"
 					},
 					"actionItems": {
 						"items": {
@@ -1206,16 +1124,7 @@
 						"type": "array"
 					},
 					"state": {
-						"type": "string",
-						"enum": [
-							"Draft",
-							"Proposed",
-							"Discussing",
-							"Decided",
-							"Superseded",
-							"Deferred",
-							"Rejected"
-						]
+						"$ref": "#/components/schemas/DecisionState"
 					},
 					"supersedesId": {
 						"type": "string",
@@ -1367,6 +1276,24 @@
 				"type": "object",
 				"additionalProperties": false
 			},
+			"SyncJobStatus": {
+				"type": "string",
+				"enum": [
+					"COMPLETED",
+					"QUEUED",
+					"PROCESSING",
+					"FAILED"
+				]
+			},
+			"SyncChannelStatus": {
+				"type": "string",
+				"enum": [
+					"COMPLETED",
+					"FAILED",
+					"WAITING",
+					"RECEIVED"
+				]
+			},
 			"SyncJobView": {
 				"properties": {
 					"completedAt": {
@@ -1388,7 +1315,7 @@
 						"items": {
 							"properties": {
 								"status": {
-									"type": "string"
+									"$ref": "#/components/schemas/SyncChannelStatus"
 								},
 								"id": {
 									"type": "string"
@@ -1431,7 +1358,7 @@
 						"format": "double"
 					},
 					"status": {
-						"type": "string"
+						"$ref": "#/components/schemas/SyncJobStatus"
 					},
 					"forceFullSync": {
 						"type": "boolean"
@@ -1506,7 +1433,7 @@
 						"items": {
 							"properties": {
 								"status": {
-									"type": "string"
+									"$ref": "#/components/schemas/SyncChannelStatus"
 								},
 								"id": {
 									"type": "string"
@@ -1549,7 +1476,7 @@
 						"format": "double"
 					},
 					"status": {
-						"type": "string"
+						"$ref": "#/components/schemas/SyncJobStatus"
 					},
 					"forceFullSync": {
 						"type": "boolean"
@@ -1652,18 +1579,22 @@
 				"type": "object",
 				"additionalProperties": false
 			},
+			"Exclude_SyncChannelStatus.WAITING_": {
+				"type": "string",
+				"enum": [
+					"COMPLETED",
+					"FAILED",
+					"RECEIVED"
+				],
+				"description": "Exclude from T those types that are assignable to U"
+			},
 			"SyncChannelResult": {
 				"properties": {
 					"channelId": {
 						"type": "string"
 					},
 					"status": {
-						"type": "string",
-						"enum": [
-							"COMPLETED",
-							"FAILED",
-							"RECEIVED"
-						]
+						"$ref": "#/components/schemas/Exclude_SyncChannelStatus.WAITING_"
 					},
 					"messagesScanned": {
 						"type": "number",
@@ -1686,6 +1617,15 @@
 				"type": "object",
 				"additionalProperties": false
 			},
+			"Exclude_SyncJobStatus.QUEUED_": {
+				"type": "string",
+				"enum": [
+					"COMPLETED",
+					"PROCESSING",
+					"FAILED"
+				],
+				"description": "Exclude from T those types that are assignable to U"
+			},
 			"SyncJobUpdate": {
 				"properties": {
 					"release": {
@@ -1698,12 +1638,7 @@
 						"$ref": "#/components/schemas/SyncChannelResult"
 					},
 					"status": {
-						"type": "string",
-						"enum": [
-							"PROCESSING",
-							"COMPLETED",
-							"FAILED"
-						]
+						"$ref": "#/components/schemas/Exclude_SyncJobStatus.QUEUED_"
 					}
 				},
 				"required": [
@@ -2626,57 +2561,60 @@
 				"type": "object",
 				"additionalProperties": false
 			},
+			"GraphNodeType": {
+				"type": "string",
+				"enum": [
+					"Topic",
+					"Issue",
+					"DecisionCandidate",
+					"Alternative",
+					"Rationale",
+					"ActionItem"
+				]
+			},
+			"GraphObservation": {
+				"type": "string",
+				"enum": [
+					"proposed",
+					"agreed",
+					"withdrawn",
+					"unclear",
+					"adopted",
+					"rejected"
+				]
+			},
 			"GraphNode": {
 				"properties": {
 					"id": {
 						"type": "string"
 					},
 					"type": {
-						"type": "string",
-						"enum": [
-							"Topic",
-							"Issue",
-							"DecisionCandidate",
-							"Alternative",
-							"Rationale",
-							"ActionItem"
-						]
+						"$ref": "#/components/schemas/GraphNodeType"
 					},
 					"summary": {
 						"type": "string"
 					},
 					"observation": {
-						"type": "string",
-						"enum": [
-							"proposed",
-							"agreed",
-							"withdrawn",
-							"unclear",
-							"adopted",
-							"rejected",
-							null
+						"allOf": [
+							{
+								"$ref": "#/components/schemas/GraphObservation"
+							}
 						],
 						"nullable": true
 					},
 					"rationaleStatus": {
-						"type": "string",
-						"enum": [
-							"stated",
-							"not_stated",
-							null
+						"allOf": [
+							{
+								"$ref": "#/components/schemas/RationaleStatus"
+							}
 						],
 						"nullable": true
 					},
 					"category": {
-						"type": "string",
-						"enum": [
-							"타깃",
-							"문제정의",
-							"기능",
-							"기술",
-							"BM",
-							"기타",
-							null
+						"allOf": [
+							{
+								"$ref": "#/components/schemas/CategoryTag"
+							}
 						],
 						"nullable": true
 					},
@@ -2691,13 +2629,7 @@
 									"type": "string"
 								},
 								"observation": {
-									"type": "string",
-									"enum": [
-										"proposed",
-										"agreed",
-										"withdrawn",
-										"unclear"
-									]
+									"$ref": "#/components/schemas/DecisionObservation"
 								}
 							},
 							"required": [
@@ -2756,22 +2688,25 @@
 					}
 				]
 			},
+			"GraphEdgeType": {
+				"type": "string",
+				"enum": [
+					"contains",
+					"has_alternative",
+					"supports",
+					"opposes",
+					"triggers",
+					"conflicts_with",
+					"depends_on"
+				]
+			},
 			"GraphEdge": {
 				"properties": {
 					"id": {
 						"type": "string"
 					},
 					"type": {
-						"type": "string",
-						"enum": [
-							"contains",
-							"has_alternative",
-							"supports",
-							"opposes",
-							"triggers",
-							"conflicts_with",
-							"depends_on"
-						]
+						"$ref": "#/components/schemas/GraphEdgeType"
 					},
 					"sourceId": {
 						"type": "string"
@@ -3546,6 +3481,16 @@
 				"type": "object",
 				"additionalProperties": false
 			},
+			"DeliveryStatus": {
+				"type": "string",
+				"enum": [
+					"pending",
+					"retry-pending",
+					"retained-failure",
+					"completed-with-candidates",
+					"completed-no-decision"
+				]
+			},
 			"AnalysisDeliveryViewDto": {
 				"properties": {
 					"requestId": {
@@ -3561,14 +3506,7 @@
 						"type": "string"
 					},
 					"status": {
-						"type": "string",
-						"enum": [
-							"pending",
-							"retry-pending",
-							"retained-failure",
-							"completed-with-candidates",
-							"completed-no-decision"
-						]
+						"$ref": "#/components/schemas/DeliveryStatus"
 					},
 					"attempts": {
 						"type": "number",
@@ -3792,14 +3730,7 @@
 						"type": "string"
 					},
 					"status": {
-						"type": "string",
-						"enum": [
-							"pending",
-							"retry-pending",
-							"retained-failure",
-							"completed-with-candidates",
-							"completed-no-decision"
-						]
+						"$ref": "#/components/schemas/DeliveryStatus"
 					},
 					"attempts": {
 						"type": "number",

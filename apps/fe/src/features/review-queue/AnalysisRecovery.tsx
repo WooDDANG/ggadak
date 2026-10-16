@@ -1,3 +1,6 @@
+import { QueryPolicy } from '../../config';
+import { DeliveryStatus, includesValue } from '@ggaddak/shared';
+
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { recoveryApi } from '../../api/recovery.api';
@@ -23,9 +26,11 @@ export function AnalysisRecovery({ guildId }: { guildId: string }) {
   const queue = useQuery({
     queryKey: ['analysis-deliveries', guildId],
     queryFn: () => recoveryApi.list(guildId),
-    refetchInterval: 5000,
+    refetchInterval: QueryPolicy.activityPollMs,
   });
-  const pending = Object.entries(commands).filter(([, command]) => command.phase === 'pending');
+  const pending = Object.entries(commands).filter(
+    ([, command]) => command.phase === DeliveryStatus.Pending,
+  );
   const acknowledgements = useQuery({
     queryKey: ['analysis-retries', guildId, pending.map(([, command]) => command.id).join(',')],
     enabled: pending.length > 0,
@@ -42,7 +47,7 @@ export function AnalysisRecovery({ guildId }: { guildId: string }) {
       );
       return true;
     },
-    refetchInterval: 2000,
+    refetchInterval: QueryPolicy.retryCommandPollMs,
   });
   const retry = async (requestId: string) => {
     const previous = commands[requestId];
@@ -58,7 +63,7 @@ export function AnalysisRecovery({ guildId }: { guildId: string }) {
         [requestId]: {
           ...command,
           id: result.id,
-          phase: result.acknowledgedAt ? 'acknowledged' : 'pending',
+          phase: result.acknowledgedAt ? 'acknowledged' : DeliveryStatus.Pending,
         },
       }));
       await queue.refetch();
@@ -75,7 +80,10 @@ export function AnalysisRecovery({ guildId }: { guildId: string }) {
   };
   const retained =
     queue.data?.requests.filter(r =>
-      ['pending', 'retry-pending', 'retained-failure'].includes(r.status),
+      includesValue(
+        [DeliveryStatus.Pending, DeliveryStatus.RetryPending, DeliveryStatus.RetainedFailure],
+        r.status,
+      ),
     ) || [];
   return (
     <section
@@ -102,12 +110,13 @@ export function AnalysisRecovery({ guildId }: { guildId: string }) {
       )}
       {retained.map(request => {
         const command = commands[request.requestId];
-        const pendingCommand = command && ['requesting', 'pending'].includes(command.phase);
+        const pendingCommand =
+          command && includesValue(['requesting', DeliveryStatus.Pending], command.phase);
         return (
           <div key={request.requestId} className="border-t border-slate-700 pt-3 space-y-2 text-sm">
             {request.channelName && <p className="font-medium">#{request.channelName}</p>}
             <p>
-              {request.status === 'retained-failure'
+              {request.status === DeliveryStatus.RetainedFailure
                 ? '분석 실패 · 확인 필요'
                 : '분석 대기 · 자동 재시도 예정'}{' '}
               · 시도 {request.attempts}회
@@ -143,7 +152,7 @@ export function AnalysisRecovery({ guildId }: { guildId: string }) {
               <p role={command.phase === 'error' ? 'alert' : 'status'}>
                 {command.phase === 'requesting'
                   ? '재시도 요청 중…'
-                  : command.phase === 'pending'
+                  : command.phase === DeliveryStatus.Pending
                     ? '재시도 접수됨 · 봇의 확인 대기 중'
                     : command.phase === 'acknowledged'
                       ? '재시도를 확인했습니다. 분석 결과를 기다리세요.'
@@ -156,7 +165,7 @@ export function AnalysisRecovery({ guildId }: { guildId: string }) {
                 (request.managedBy !== 'backend' && !queue.data?.available) ||
                 !!queue.error ||
                 !!pendingCommand ||
-                request.status !== 'retained-failure' ||
+                request.status !== DeliveryStatus.RetainedFailure ||
                 request.requiresNewAnalysis === true
               }
               onClick={() => void retry(request.requestId)}

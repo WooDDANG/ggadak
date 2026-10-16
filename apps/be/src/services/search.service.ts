@@ -1,5 +1,8 @@
+import { AiDefaults } from '../config/policies.js';
+import { type Decision, DecisionState, DeliveryPolicy, includesValue } from '@ggaddak/shared';
+
 import { createHash } from 'node:crypto';
-import type { Decision } from '@ggaddak/shared';
+
 import { DecisionRepository } from '../repositories/decision.repository.js';
 import { AppError, BadRequestError } from '../errors/AppError.js';
 import { toV1Decision, V1DecisionDto } from '../dto/v1-decision.dto.js';
@@ -20,9 +23,9 @@ export interface SearchResponse {
 
 /** Production embeddings are never replaced by lexical/heuristic vectors after failure. */
 export class OpenAIEmbeddingProvider implements EmbeddingProvider {
-  readonly model = process.env.EMBEDDING_MODEL ?? 'text-embedding-3-small';
+  readonly model = process.env.EMBEDDING_MODEL ?? AiDefaults.embeddingModel;
   async embed(input: string): Promise<number[]> {
-    if ((process.env.EMBEDDING_PROVIDER ?? 'openai') !== 'openai')
+    if ((process.env.EMBEDDING_PROVIDER ?? AiDefaults.embeddingProvider) !== 'openai')
       throw new AppError('Unsupported embedding provider', 503);
     if (!process.env.OPENAI_API_KEY)
       throw new AppError('Embedding provider is not configured', 503);
@@ -34,7 +37,7 @@ export class OpenAIEmbeddingProvider implements EmbeddingProvider {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ model: this.model, input }),
-        signal: AbortSignal.timeout(15000),
+        signal: AbortSignal.timeout(DeliveryPolicy.serviceTimeoutMs),
       });
       if (!response.ok) throw new Error('provider rejected embedding');
       return ((await response.json()) as { data: { embedding: number[] }[] }).data[0].embedding;
@@ -95,7 +98,7 @@ export class SearchService {
   }
   async backfill(guildId?: string): Promise<{ indexed: number }> {
     const decisions = (await this.repo.getDecisions({ guildId })).filter(d =>
-      ['Decided', 'Superseded'].includes(d.state),
+      includesValue([DecisionState.Decided, DecisionState.Superseded], d.state),
     );
     for (const d of decisions) await this.index(d);
     return { indexed: decisions.length };
@@ -137,7 +140,7 @@ export class SearchService {
       throw new BadRequestError('query must contain 1–1000 characters; limit must be 1–50');
     const queryVector = await this.embed(query.trim());
     const candidates = (await this.repo.getDecisions({ guildId })).filter(d =>
-      ['Decided', 'Superseded'].includes(d.state),
+      includesValue([DecisionState.Decided, DecisionState.Superseded], d.state),
     );
     const items: SearchResult[] = [];
     for (const d of candidates) {
@@ -147,7 +150,7 @@ export class SearchService {
       if (
         !current ||
         current.source.guildId !== guildId ||
-        !['Decided', 'Superseded'].includes(current.state) ||
+        !includesValue([DecisionState.Decided, DecisionState.Superseded], current.state) ||
         document(current) !== document(d)
       )
         continue;

@@ -1,17 +1,31 @@
-import { z } from 'zod';
-import { CategoryTagSchema } from '@ggaddak/shared';
+import {
+  type CategoryTag,
+  CategoryTagSchema,
+  DecisionObservation,
+  GraphEdgeType,
+  GraphNodeType,
+  includesValue,
+  RationaleStatus,
+} from '@ggaddak/shared';
+import { GraphPolicy } from '../config/policies.js';
 
-export const ObservationSchema = z.enum(['proposed', 'agreed', 'withdrawn', 'unclear']);
-const text = z.string().trim().min(1).max(10000);
+import { z } from 'zod';
+
+export const ObservationSchema = z.nativeEnum(DecisionObservation);
+const text = z.string().trim().min(1).max(GraphPolicy.maxTextChars);
+// Legacy observations remain readable; candidates still use DecisionObservation.
+export const GraphObservation = {
+  ...DecisionObservation,
+  Adopted: 'adopted',
+  Rejected: 'rejected',
+} as const;
+export type GraphObservation = (typeof GraphObservation)[keyof typeof GraphObservation];
 export const GraphNodeSchema = z.object({
   id: z.string().trim().min(1),
-  type: z.enum(['Topic', 'Issue', 'DecisionCandidate', 'Alternative', 'Rationale', 'ActionItem']),
+  type: z.nativeEnum(GraphNodeType),
   summary: text,
-  observation: z
-    .enum(['proposed', 'agreed', 'withdrawn', 'unclear', 'adopted', 'rejected'])
-    .nullable()
-    .optional(),
-  rationaleStatus: z.enum(['stated', 'not_stated']).nullable().optional(),
+  observation: z.nativeEnum(GraphObservation).nullable().optional(),
+  rationaleStatus: z.nativeEnum(RationaleStatus).nullable().optional(),
   category: CategoryTagSchema.nullable().optional(),
   history: z
     .array(
@@ -28,25 +42,17 @@ export const GraphNodeSchema = z.object({
 });
 export const GraphEdgeSchema = z.object({
   id: z.string().trim().min(1),
-  type: z.enum([
-    'contains',
-    'has_alternative',
-    'supports',
-    'opposes',
-    'triggers',
-    'conflicts_with',
-    'depends_on',
-  ]),
+  type: z.nativeEnum(GraphEdgeType),
   sourceId: z.string().min(1),
   targetId: z.string().min(1),
 });
 export const GraphSchema = z.object({
   summary: text,
-  nodes: z.array(GraphNodeSchema).max(500),
-  edges: z.array(GraphEdgeSchema).max(2000),
+  nodes: z.array(GraphNodeSchema).max(GraphPolicy.maxNodes),
+  edges: z.array(GraphEdgeSchema).max(GraphPolicy.maxEdges),
   discussionProblems: z
     .array(z.object({ summary: text, nodeIds: z.array(z.string()), edgeIds: z.array(z.string()) }))
-    .max(500),
+    .max(GraphPolicy.maxProblems),
 });
 export const VerificationSchema = z
   .object({
@@ -55,19 +61,19 @@ export const VerificationSchema = z
       .array(
         z.object({ message: text, nodeIds: z.array(z.string()), edgeIds: z.array(z.string()) }),
       )
-      .max(500),
+      .max(GraphPolicy.maxVerificationIssues),
   })
   .refine(value => value.valid === (value.issues.length === 0), 'valid must agree with issues');
 export interface GraphNode {
   id: string;
-  type: 'Topic' | 'Issue' | 'DecisionCandidate' | 'Alternative' | 'Rationale' | 'ActionItem';
+  type: GraphNodeType;
   summary: string;
-  observation?: 'proposed' | 'agreed' | 'withdrawn' | 'unclear' | 'adopted' | 'rejected' | null;
-  rationaleStatus?: 'stated' | 'not_stated' | null;
-  category?: '타깃' | '문제정의' | '기능' | '기술' | 'BM' | '기타' | null;
+  observation?: GraphObservation | null;
+  rationaleStatus?: RationaleStatus | null;
+  category?: CategoryTag | null;
   history?:
     | {
-        observation: 'proposed' | 'agreed' | 'withdrawn' | 'unclear';
+        observation: DecisionObservation;
         summary: string;
         at: string | null;
       }[]
@@ -77,14 +83,7 @@ export interface GraphNode {
 }
 export interface GraphEdge {
   id: string;
-  type:
-    | 'contains'
-    | 'has_alternative'
-    | 'supports'
-    | 'opposes'
-    | 'triggers'
-    | 'conflicts_with'
-    | 'depends_on';
+  type: GraphEdgeType;
   sourceId: string;
   targetId: string;
 }
@@ -115,25 +114,29 @@ export interface GraphSnapshot {
   sessions: GraphSession[];
 }
 
-const allowed: Record<string, Array<[GraphNode['type'][], GraphNode['type'][]]>> = {
+const allowed: Record<GraphEdgeType, Array<[GraphNode['type'][], GraphNode['type'][]]>> = {
   contains: [
-    [['Topic'], ['Issue', 'DecisionCandidate']],
-    [['Issue'], ['DecisionCandidate']],
+    [[GraphNodeType.Topic], [GraphNodeType.Issue, GraphNodeType.DecisionCandidate]],
+    [[GraphNodeType.Issue], [GraphNodeType.DecisionCandidate]],
   ],
-  has_alternative: [[['DecisionCandidate'], ['Alternative']]],
-  supports: [[['Rationale'], ['DecisionCandidate', 'Alternative']]],
-  opposes: [[['Rationale'], ['DecisionCandidate', 'Alternative']]],
-  triggers: [[['DecisionCandidate'], ['ActionItem']]],
+  has_alternative: [[[GraphNodeType.DecisionCandidate], [GraphNodeType.Alternative]]],
+  supports: [
+    [[GraphNodeType.Rationale], [GraphNodeType.DecisionCandidate, GraphNodeType.Alternative]],
+  ],
+  opposes: [
+    [[GraphNodeType.Rationale], [GraphNodeType.DecisionCandidate, GraphNodeType.Alternative]],
+  ],
+  triggers: [[[GraphNodeType.DecisionCandidate], [GraphNodeType.ActionItem]]],
   conflicts_with: [
     [
-      ['DecisionCandidate', 'Alternative'],
-      ['DecisionCandidate', 'Alternative'],
+      [GraphNodeType.DecisionCandidate, GraphNodeType.Alternative],
+      [GraphNodeType.DecisionCandidate, GraphNodeType.Alternative],
     ],
   ],
   depends_on: [
     [
-      ['DecisionCandidate', 'ActionItem'],
-      ['DecisionCandidate', 'ActionItem'],
+      [GraphNodeType.DecisionCandidate, GraphNodeType.ActionItem],
+      [GraphNodeType.DecisionCandidate, GraphNodeType.ActionItem],
     ],
   ],
 };
@@ -156,7 +159,7 @@ export function graphIssues(graph: DecisionGraph): string[] {
     )
       issues.push(`Invalid endpoints: ${edge.id}`);
     const endpoints =
-      edge.type === 'conflicts_with'
+      edge.type === GraphEdgeType.ConflictsWith
         ? [edge.sourceId, edge.targetId].sort()
         : [edge.sourceId, edge.targetId];
     const key = [edge.type, ...endpoints].join(':');
@@ -164,7 +167,7 @@ export function graphIssues(graph: DecisionGraph): string[] {
     identities.add(key);
   }
   for (const node of graph.nodes) {
-    if (node.type === 'DecisionCandidate') {
+    if (node.type === GraphNodeType.DecisionCandidate) {
       if (
         !ObservationSchema.safeParse(node.observation).success ||
         !node.rationaleStatus ||
@@ -174,19 +177,22 @@ export function graphIssues(graph: DecisionGraph): string[] {
         issues.push(`Incomplete candidate: ${node.id}`);
       const alternatives = new Set(
         graph.edges
-          .filter(e => e.type === 'has_alternative' && e.sourceId === node.id)
+          .filter(e => e.type === GraphEdgeType.HasAlternative && e.sourceId === node.id)
           .map(e => e.targetId),
       );
       const rationale = graph.edges.some(
         e =>
-          ['supports', 'opposes'].includes(e.type) &&
+          includesValue([GraphEdgeType.Supports, GraphEdgeType.Opposes], e.type) &&
           (e.targetId === node.id || alternatives.has(e.targetId)),
       );
-      if ((node.rationaleStatus === 'stated') !== rationale)
+      if ((node.rationaleStatus === RationaleStatus.Stated) !== rationale)
         issues.push(`Inconsistent rationale status: ${node.id}`);
     }
     if (
-      ['Alternative', 'Rationale', 'ActionItem'].includes(node.type) &&
+      includesValue(
+        [GraphNodeType.Alternative, GraphNodeType.Rationale, GraphNodeType.ActionItem],
+        node.type,
+      ) &&
       !graph.edges.some(edge => edge.sourceId === node.id || edge.targetId === node.id)
     )
       issues.push(`Unlinked node: ${node.id}`);

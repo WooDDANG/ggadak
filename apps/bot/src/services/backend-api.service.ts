@@ -1,4 +1,18 @@
-import { AnalysisReceiptState } from '@ggaddak/shared';
+import {
+  AnalysisReceiptState,
+  asyncDeliveryEnabled,
+  createLogger,
+  DEFAULT_HARVESTING_POLICY,
+  DeliveryErrorCategory,
+  DeliveryPolicy,
+  DeliveryStatus,
+  DurationMs,
+  HarvestingPolicyConfig,
+  HarvestingPolicyConfigSchema,
+} from '@ggaddak/shared';
+
+import { deliveryOptions as getDeliveryOptions } from '../config.js';
+
 import type { SyncJobClaim, SyncWorkerUpdate } from './sync-job-worker.js';
 import { analysisScheduler } from './channel-scheduler.js';
 import { createHash, randomUUID } from 'node:crypto';
@@ -15,12 +29,6 @@ import {
 } from 'node:fs/promises';
 import { JournalBudget } from './journal-budget.js';
 import { resolve, join, dirname } from 'node:path';
-import {
-  HarvestingPolicyConfig,
-  HarvestingPolicyConfigSchema,
-  DEFAULT_HARVESTING_POLICY,
-  createLogger,
-} from '@ggaddak/shared';
 
 const logger = createLogger('BOT-BACKEND-API');
 
@@ -119,16 +127,9 @@ export class BackendApiService {
     private readonly transport: typeof fetch = fetch,
     private readonly now: () => number = Date.now,
     private readonly serviceToken = process.env.BOT_SERVICE_TOKEN,
-    private readonly deliveryOptions: DeliveryOptions = {
-      maxAttempts: Number(process.env.ANALYSIS_MAX_ATTEMPTS || 5),
-      initialDelayMs: Number(process.env.ANALYSIS_RETRY_DELAY_MS || 5000),
-      maxDelayMs: Number(process.env.ANALYSIS_MAX_DELAY_MS || 300000),
-      timeoutMs: Number(process.env.ANALYSIS_TIMEOUT_MS || 190000),
-      jitter: Number(process.env.ANALYSIS_RETRY_JITTER || 0.2),
-    },
+    private readonly deliveryOptions: DeliveryOptions = getDeliveryOptions(),
     private readonly random: () => number = Math.random,
-    readonly asyncDelivery = process.env.ANALYSIS_ASYNC_DELIVERY !== 'false' &&
-      process.env.NODE_ENV !== 'test',
+    readonly asyncDelivery = asyncDeliveryEnabled(),
   ) {
     this.journal = new JournalBudget(pendingDirectory);
     const o = deliveryOptions;
@@ -137,7 +138,7 @@ export class BackendApiService {
       o.maxAttempts < 1 ||
       o.maxAttempts > 100 ||
       ![o.initialDelayMs, o.maxDelayMs, o.timeoutMs].every(
-        n => Number.isFinite(n) && n > 0 && n <= 3600000,
+        n => Number.isFinite(n) && n > 0 && n <= DurationMs.Hour,
       ) ||
       o.maxDelayMs < o.initialDelayMs ||
       !Number.isFinite(o.jitter) ||
@@ -229,8 +230,8 @@ export class BackendApiService {
           !e.record.serverAcknowledged &&
           (e.record.feedbackNextAttemptAt ?? 0) <= this.now(),
       );
-      for (let offset = 0; offset < records.length; offset += 100) {
-        const batch = records.slice(offset, offset + 100);
+      for (let offset = 0; offset < records.length; offset += DeliveryPolicy.maxBatchSize) {
+        const batch = records.slice(offset, offset + DeliveryPolicy.maxBatchSize);
         const results = await this.queueRequest(
           `/results?ids=${encodeURIComponent(batch.map(e => e.record.payload.requestId).join(','))}`,
           'GET',
@@ -248,7 +249,7 @@ export class BackendApiService {
                 );
               entry.record.failureFeedbackApplied = true;
               entry.record.errorCategory = result.errorCategory;
-              entry.record.feedbackNextAttemptAt = this.now() + 30000;
+              entry.record.feedbackNextAttemptAt = this.now() + DeliveryPolicy.failedResultPollMs;
               await this.persistJson(entry.record, entry.filename);
               continue;
             }
@@ -269,7 +270,10 @@ export class BackendApiService {
             entry.record.feedbackAttempts = (entry.record.feedbackAttempts ?? 0) + 1;
             entry.record.feedbackNextAttemptAt =
               this.now() +
-              Math.min(300000, 5000 * 2 ** Math.min(entry.record.feedbackAttempts - 1, 6));
+              Math.min(
+                DeliveryPolicy.maxRetryMs,
+                DeliveryPolicy.initialRetryMs * 2 ** Math.min(entry.record.feedbackAttempts - 1, 6),
+              );
             await this.persistJson(entry.record, entry.filename);
             logger.warn(
               `Result feedback retained for ${result.requestId}: ${error instanceof Error ? error.message : 'unavailable'}`,
@@ -286,7 +290,7 @@ export class BackendApiService {
     return this.backendUrl;
   }
   async cleanupCompleted(
-    retentionMs = Number(process.env.ANALYSIS_COMPLETED_RETENTION_MS ?? 7 * 86400000),
+    retentionMs = Number(process.env.ANALYSIS_COMPLETED_RETENTION_MS ?? DeliveryPolicy.retentionMs),
   ) {
     if (!Number.isFinite(retentionMs) || retentionMs < 0)
       throw new Error('Invalid completed retention');
@@ -299,7 +303,7 @@ export class BackendApiService {
     }
     let compacted = 0;
     for (const name of files.filter(n => n.endsWith('.json'))) {
-      if (compacted >= 50) break;
+      if (compacted >= DeliveryPolicy.cleanupBatchSize) break;
       const filename = join(archive, name),
         record = this.parseDelivery(await readFile(filename, 'utf8'));
       if (
@@ -343,7 +347,7 @@ export class BackendApiService {
       ...scans.filter(name => name > cursor),
       ...scans.filter(name => name <= cursor),
     ];
-    for (const name of ordered.slice(0, 50)) {
+    for (const name of ordered.slice(0, DeliveryPolicy.cleanupBatchSize)) {
       await this.persistJson({ scan: name }, cursorFile);
       const filename = join(transfers, name, 'manifest.json');
       let manifest: any;
@@ -384,7 +388,7 @@ export class BackendApiService {
       method,
       headers: { Authorization: `Bearer ${this.serviceToken}`, 'Content-Type': 'application/json' },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-      signal: AbortSignal.timeout(15_000),
+      signal: AbortSignal.timeout(DeliveryPolicy.serviceTimeoutMs),
     });
     if (!response.ok) throw new BackendRequestError(response.status);
     const envelope = (await response.json()) as { data?: unknown };
@@ -437,7 +441,7 @@ export class BackendApiService {
         `${this.backendUrl}/api/v1/internal/monitoring?guildId=${encodeURIComponent(guildId)}`,
         {
           headers: { Authorization: `Bearer ${this.serviceToken}` },
-          signal: AbortSignal.timeout(15_000),
+          signal: AbortSignal.timeout(DeliveryPolicy.serviceTimeoutMs),
         },
       );
       if (!response.ok) return false;
@@ -461,7 +465,7 @@ export class BackendApiService {
   async syncPolicy(): Promise<HarvestingPolicyConfig> {
     try {
       const res = await this.transport(`${this.backendUrl}/api/config/policy`, {
-        signal: AbortSignal.timeout(15000),
+        signal: AbortSignal.timeout(DeliveryPolicy.serviceTimeoutMs),
       });
       if (res.ok) {
         const policy = HarvestingPolicyConfigSchema.parse(await res.json());
@@ -564,7 +568,10 @@ export class BackendApiService {
       const temporary = `${filename}.${randomUUID()}.tmp`;
       await this.journal.reserve(Buffer.byteLength(JSON.stringify(record)), true);
       const disk = await statfs(this.pendingDirectory);
-      if (disk.bavail * disk.bsize < Buffer.byteLength(JSON.stringify(record)) + 64 * 1024 * 1024)
+      if (
+        disk.bavail * disk.bsize <
+        Buffer.byteLength(JSON.stringify(record)) + DeliveryPolicy.minFreeBytes
+      )
         throw new Error('Bot receive disk capacity unavailable');
       const file = await open(temporary, 'wx', 0o600);
       try {
@@ -590,7 +597,7 @@ export class BackendApiService {
     }
     if (deliveryIdentity(record.payload) !== deliveryIdentity(payload))
       throw new Error('Analysis Request ID already has a different payload');
-    if (scan && record.stopped && record.errorCategory === 'receive-capacity') {
+    if (scan && record.stopped && record.errorCategory === DeliveryErrorCategory.ReceiveCapacity) {
       record.stopped = false;
       record.attempts = 0;
       record.nextAttemptAt = 0;
@@ -695,13 +702,13 @@ export class BackendApiService {
     if (record.stopped || record.attempts >= this.deliveryOptions.maxAttempts)
       throw new AnalysisDeliveryError(
         'Analysis delivery requires explicit manual retry',
-        'retained-failure',
+        DeliveryStatus.RetainedFailure,
         record.payload.requestId,
       );
     if (record.nextAttemptAt > this.now())
       throw new AnalysisDeliveryError(
         'Analysis delivery waiting for retry backoff',
-        'retry-pending',
+        DeliveryStatus.RetryPending,
         record.payload.requestId,
       );
     record.attempts++;
@@ -752,19 +759,19 @@ export class BackendApiService {
         ) {
           record.attempts--;
           record.stopped = false;
-          record.errorCategory = 'analysis-in-progress';
+          record.errorCategory = DeliveryErrorCategory.AnalysisInProgress;
           throw new Error('Backend analysis is still processing; waiting for completion');
         }
         permanent =
           response.status >= 400 && response.status < 500 && ![408, 429].includes(response.status);
         record.errorCategory =
           response.status === 413
-            ? 'receive-capacity'
+            ? DeliveryErrorCategory.ReceiveCapacity
             : response.status === 422
-              ? 'analysis-terminal'
+              ? DeliveryErrorCategory.AnalysisTerminal
               : permanent
-                ? 'configuration-or-payload'
-                : 'backend-unavailable';
+                ? DeliveryErrorCategory.ConfigurationOrPayload
+                : DeliveryErrorCategory.BackendUnavailable;
         const retryAfter = response.headers.get('retry-after');
         if (retryAfter) {
           const ms = /^\d+(\.\d+)?$/.test(retryAfter)
@@ -773,7 +780,7 @@ export class BackendApiService {
           if (Number.isFinite(ms) && ms > 0)
             record.nextAttemptAt = Math.max(
               record.nextAttemptAt,
-              this.now() + Math.min(ms, 86400000),
+              this.now() + Math.min(ms, DeliveryPolicy.maxRetryAfterMs),
             );
         }
         throw new Error(`Backend AI returned status ${response.status}`);
@@ -789,7 +796,7 @@ export class BackendApiService {
       }
       if (typeof result.found !== 'boolean' || !Array.isArray(result.decisions)) {
         permanent = true;
-        record.errorCategory = 'invalid-result';
+        record.errorCategory = DeliveryErrorCategory.InvalidResult;
         throw new Error('Backend returned an invalid analysis result');
       }
       record.result = result;
@@ -802,14 +809,14 @@ export class BackendApiService {
     } catch (error: any) {
       if (error instanceof SyntaxError) {
         permanent = true;
-        record.errorCategory = 'invalid-result';
+        record.errorCategory = DeliveryErrorCategory.InvalidResult;
       }
       record.stopped ||= permanent;
       record.lastError = error.message;
       await this.persistJson(record, filename);
       throw new AnalysisDeliveryError(
         error.message,
-        record.stopped ? 'retained-failure' : 'retry-pending',
+        record.stopped ? DeliveryStatus.RetainedFailure : DeliveryStatus.RetryPending,
         record.payload.requestId,
       );
     }
@@ -875,10 +882,10 @@ export class BackendApiService {
       async () => {
         const record = this.parseDelivery(await readFile(entry.filename, 'utf8'));
         if (record.result) return record.result;
-        if (record.errorCategory === 'analysis-terminal')
+        if (record.errorCategory === DeliveryErrorCategory.AnalysisTerminal)
           throw new AnalysisDeliveryError(
             'Analysis is terminal; request a new manual analysis',
-            'retained-failure',
+            DeliveryStatus.RetainedFailure,
             requestId,
           );
         if (!commandId || !record.retryCommandIds?.includes(commandId)) {
@@ -1039,17 +1046,18 @@ export class BackendApiService {
         channelName: record.payload.channelName,
         status: record.result
           ? record.result.decisions.length
-            ? 'completed-with-candidates'
-            : 'completed-no-decision'
+            ? DeliveryStatus.CompletedWithCandidates
+            : DeliveryStatus.CompletedNoDecision
           : record.stopped
-            ? 'retained-failure'
+            ? DeliveryStatus.RetainedFailure
             : record.attempts
-              ? 'retry-pending'
-              : 'pending',
+              ? DeliveryStatus.RetryPending
+              : DeliveryStatus.Pending,
         attempts: record.attempts,
         nextAttemptAt: record.nextAttemptAt,
         errorCategory:
-          record.errorCategory || (record.lastError ? 'network-or-timeout' : undefined),
+          record.errorCategory ||
+          (record.lastError ? DeliveryErrorCategory.NetworkOrTimeout : undefined),
         lastError: record.lastError,
         scanRange: record.scanRange,
       }));
@@ -1066,8 +1074,12 @@ export class BackendApiService {
       r => acks[r.requestId] !== createHash('sha256').update(stablePayload(r)).digest('hex'),
     );
     const commands: any[] = [];
-    for (let offset = 0; offset < Math.max(1, changes.length); offset += 100) {
-      const batch = changes.slice(offset, offset + 100);
+    for (
+      let offset = 0;
+      offset < Math.max(1, changes.length);
+      offset += DeliveryPolicy.maxBatchSize
+    ) {
+      const batch = changes.slice(offset, offset + DeliveryPolicy.maxBatchSize);
       commands.push(
         ...((await this.syncJobRequest('/api/v1/internal/analysis-deliveries/sync', 'POST', {
           requests: batch,
@@ -1121,7 +1133,7 @@ export class BackendApiService {
     try {
       const res = await this.transport(`${this.backendUrl}/api/channels/${channelId}/checkpoint`, {
         headers: this.serviceToken ? { Authorization: `Bearer ${this.serviceToken}` } : {},
-        signal: AbortSignal.timeout(15000),
+        signal: AbortSignal.timeout(DeliveryPolicy.serviceTimeoutMs),
       });
       if (res.ok) {
         const data = (await res.json()) as { lastMessageId?: string };
@@ -1144,7 +1156,7 @@ export class BackendApiService {
           ...(this.serviceToken ? { Authorization: `Bearer ${this.serviceToken}` } : {}),
         },
         body: JSON.stringify({ lastMessageId }),
-        signal: AbortSignal.timeout(15_000),
+        signal: AbortSignal.timeout(DeliveryPolicy.serviceTimeoutMs),
       },
     );
     if (!response.ok) throw new Error(`Checkpoint write failed (HTTP ${response.status})`);

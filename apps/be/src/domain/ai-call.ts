@@ -1,4 +1,5 @@
-export type AiStage = 'extract' | 'verify' | 'repair';
+export const AiStage = { Extract: 'extract', Verify: 'verify', Repair: 'repair' } as const;
+export type AiStage = (typeof AiStage)[keyof typeof AiStage];
 
 export interface AiSettings {
   provider: string;

@@ -4,9 +4,9 @@
  * @ggaddak/be
  * OpenAPI spec version: 1.0.0
  */
+import type { CategoryTag } from './categoryTag';
+import type { ReviewResolution } from './reviewResolution';
 import type { V1ReviewRequestDtoAction } from './v1ReviewRequestDtoAction';
-import type { V1ReviewRequestDtoCategoryTag } from './v1ReviewRequestDtoCategoryTag';
-import type { V1ReviewRequestDtoResolution } from './v1ReviewRequestDtoResolution';
 import type { V1ReviewRequestDtoTaskDispositionsItem } from './v1ReviewRequestDtoTaskDispositionsItem';
 
 /**
@@ -18,9 +18,9 @@ export interface V1ReviewRequestDto {
   rationale?: string;
   rationaleSummary?: string;
   rationaleQuotes?: string[];
-  categoryTag?: V1ReviewRequestDtoCategoryTag;
+  categoryTag?: CategoryTag;
   expectedVersion: number;
-  resolution?: V1ReviewRequestDtoResolution;
+  resolution?: ReviewResolution;
   predecessorId?: string;
   predecessorVersion?: number;
   taskDispositions?: V1ReviewRequestDtoTaskDispositionsItem[];

@@ -4,12 +4,12 @@
  * @ggaddak/be
  * OpenAPI spec version: 1.0.0
  */
+import type { ExcludeSyncJobStatusQUEUED } from './excludeSyncJobStatusQUEUED';
 import type { SyncChannelResult } from './syncChannelResult';
-import type { SyncJobUpdateStatus } from './syncJobUpdateStatus';
 
 export interface SyncJobUpdate {
   release?: boolean;
   owner: string;
   channelResult?: SyncChannelResult;
-  status?: SyncJobUpdateStatus;
+  status?: ExcludeSyncJobStatusQUEUED;
 }

@@ -1,3 +1,4 @@
+import { backendUrl as getBackendUrl, reviewWebUrl } from '../config.js';
 import { CommandInteraction, ApplicationCommandOptionType, TextChannel } from 'discord.js';
 import { Discord, Slash, SlashOption, SlashChoice } from 'discordx';
 import { DEFAULT_HARVESTING_POLICY, createLogger } from '@ggaddak/shared';
@@ -12,7 +13,7 @@ export class ScanCommand {
   private apiService: BackendApiService;
 
   constructor() {
-    const backendUrl = process.env.BE_URL || 'http://localhost:3001';
+    const backendUrl = getBackendUrl();
     this.apiService = new BackendApiService(backendUrl);
   }
 
@@ -61,7 +62,7 @@ export class ScanCommand {
     interaction: CommandInteraction,
   ): Promise<void> {
     await interaction.deferReply({ ephemeral: true });
-    const reviewLink = process.env.REVIEW_WEB_URL || process.env.WEB_URL || 'http://localhost:3002';
+    const reviewLink = reviewWebUrl();
     const reply = async (content: string) =>
       interaction.editReply(`${content}\n검토·분석 복구: ${reviewLink}`);
 

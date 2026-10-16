@@ -4,6 +4,7 @@
  * @ggaddak/be
  * OpenAPI spec version: 1.0.0
  */
+import type { SyncJobStatus } from './syncJobStatus';
 import type { SyncJobViewChannelsItem } from './syncJobViewChannelsItem';
 
 export interface SyncJobView {
@@ -22,7 +23,7 @@ export interface SyncJobView {
   failedChannels: number;
   completedChannels: number;
   totalChannels: number;
-  status: string;
+  status: SyncJobStatus;
   forceFullSync: boolean;
   guildId: string;
   jobId: string;

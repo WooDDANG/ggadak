@@ -6,14 +6,14 @@
  */
 import type { AnalysisDeliveryViewDtoManagedBy } from './analysisDeliveryViewDtoManagedBy';
 import type { AnalysisDeliveryViewDtoScanRange } from './analysisDeliveryViewDtoScanRange';
-import type { AnalysisDeliveryViewDtoStatus } from './analysisDeliveryViewDtoStatus';
+import type { DeliveryStatus } from './deliveryStatus';
 
 export interface AnalysisDeliveryViewDto {
   requestId: string;
   guildId: string;
   channelId: string;
   channelName?: string;
-  status: AnalysisDeliveryViewDtoStatus;
+  status: DeliveryStatus;
   attempts: number;
   nextAttemptAt: number;
   errorCategory?: string;

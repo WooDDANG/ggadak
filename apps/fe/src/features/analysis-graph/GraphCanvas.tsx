@@ -1,3 +1,4 @@
+import { GraphNodeType } from '@ggaddak/shared';
 import { useId, useState } from 'react';
 import type { GraphSession } from '../../api/generated/model';
 
@@ -8,7 +9,14 @@ type Props = {
   problemIndex: number | null;
   onSelect: (id: string) => void;
 };
-const types = ['Topic', 'Issue', 'Rationale', 'DecisionCandidate', 'Alternative', 'ActionItem'];
+const types = [
+  GraphNodeType.Topic,
+  GraphNodeType.Issue,
+  GraphNodeType.Rationale,
+  GraphNodeType.DecisionCandidate,
+  GraphNodeType.Alternative,
+  GraphNodeType.ActionItem,
+];
 const colors: Record<string, string> = {
   Topic: '#38bdf8',
   Issue: '#fbbf24',

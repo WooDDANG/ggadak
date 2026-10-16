@@ -1,9 +1,25 @@
+export const AnalysisRequestState = {
+  Pending: 'pending',
+  Processing: 'processing',
+  Committing: 'committing',
+  Completed: 'completed',
+  Terminal: 'terminal',
+} as const;
+export type AnalysisRequestState = (typeof AnalysisRequestState)[keyof typeof AnalysisRequestState];
 import type { AiSettings } from './ai-call.js';
 import type { DiscussionMessage } from './analysis.js';
 import type { GraphSession } from './decision-graph.js';
 
-export type AnalysisPhase =
-  'extract' | 'check' | 'verify' | 'repair' | 'recheck' | 'reverify' | 'done';
+export const AnalysisPhase = {
+  Extract: 'extract',
+  Check: 'check',
+  Verify: 'verify',
+  Repair: 'repair',
+  Recheck: 'recheck',
+  Reverify: 'reverify',
+  Done: 'done',
+} as const;
+export type AnalysisPhase = (typeof AnalysisPhase)[keyof typeof AnalysisPhase];
 export interface StageAttempt {
   phase: AnalysisPhase;
   provider?: string;

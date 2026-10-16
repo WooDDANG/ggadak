@@ -1,5 +1,5 @@
+import { CategoryTag, Decision } from '@ggaddak/shared';
 import { EmbedBuilder } from 'discord.js';
-import { Decision } from '@ggaddak/shared';
 
 export class BotEmbedView {
   static renderCandidateEmbed(decision: Decision, totalMessagesCount: number): EmbedBuilder {
@@ -22,7 +22,7 @@ export class BotEmbedView {
         },
         {
           name: '🏷️ 카테고리',
-          value: decision.categoryTag || '기타',
+          value: decision.categoryTag || CategoryTag.Other,
           inline: true,
         },
         {

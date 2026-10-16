@@ -1,13 +1,17 @@
+import {
+  createLogger,
+  Decision,
+  DEFAULT_HARVESTING_POLICY,
+  DeliveryPolicy,
+  HarvestingPolicyConfig,
+  SyncJobPolicy,
+} from '@ggaddak/shared';
+import { BotPolicy } from '../config.js';
 import { SyncJobWorker } from '../services/sync-job-worker.js';
 import 'reflect-metadata';
 import { GatewayIntentBits, Partials, Message, Events } from 'discord.js';
 import { Client } from 'discordx';
-import {
-  Decision,
-  createLogger,
-  HarvestingPolicyConfig,
-  DEFAULT_HARVESTING_POLICY,
-} from '@ggaddak/shared';
+
 import { BackendApiService } from '../services/backend-api.service.js';
 import { DiscussionHarvester, ScanIncompleteError } from '../services/harvester.service.js';
 import { DecisionHarvestingEngine } from '../services/decision-harvesting-engine.js';
@@ -85,7 +89,7 @@ export class DecisionTrackerBot {
         void this.backendApi.syncPolicy().then(policy => {
           this.policy = policy;
         });
-      }, 60000);
+      }, BotPolicy.policyRefreshMs);
       policyTimer.unref();
       const syncWorker = new SyncJobWorker(this.backendApi, async (job, channelId) => {
         const channel = await this.client.channels.fetch(channelId);
@@ -114,7 +118,7 @@ export class DecisionTrackerBot {
       void processSyncJob();
       const syncTimer = setInterval(() => {
         void processSyncJob();
-      }, 5_000);
+      }, SyncJobPolicy.pollIntervalMs);
       syncTimer.unref();
 
       let synchronizing = false;
@@ -132,7 +136,7 @@ export class DecisionTrackerBot {
       void synchronize();
       const statusTimer = setInterval(() => {
         void synchronize();
-      }, 5000);
+      }, DeliveryPolicy.statusHeartbeatMs);
       statusTimer.unref();
       let cleaning = false;
       const cleanupTimer = setInterval(() => {
@@ -144,7 +148,7 @@ export class DecisionTrackerBot {
           .finally(() => {
             cleaning = false;
           });
-      }, 60000);
+      }, DeliveryPolicy.maintenanceIntervalMs);
       cleanupTimer.unref();
 
       let recovering = false;
@@ -175,7 +179,7 @@ export class DecisionTrackerBot {
           .then(() => this.backendApi.reconcileDeliveryReactions())
           .then(recover)
           .catch(error => logger.warn(`Processing reaction recovery failed: ${error.message}`));
-      }, 5_000);
+      }, SyncJobPolicy.pollIntervalMs);
       retryTimer.unref();
     });
 

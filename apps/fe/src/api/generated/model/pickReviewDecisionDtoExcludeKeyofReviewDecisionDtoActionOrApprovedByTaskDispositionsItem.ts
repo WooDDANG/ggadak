@@ -5,10 +5,10 @@
  * OpenAPI spec version: 1.0.0
  */
 import type { PickReviewDecisionDtoExcludeKeyofReviewDecisionDtoActionOrApprovedByTaskDispositionsItemClassification } from './pickReviewDecisionDtoExcludeKeyofReviewDecisionDtoActionOrApprovedByTaskDispositionsItemClassification';
-import type { PickReviewDecisionDtoExcludeKeyofReviewDecisionDtoActionOrApprovedByTaskDispositionsItemDisposition } from './pickReviewDecisionDtoExcludeKeyofReviewDecisionDtoActionOrApprovedByTaskDispositionsItemDisposition';
+import type { TaskDisposition } from './taskDisposition';
 
 export type PickReviewDecisionDtoExcludeKeyofReviewDecisionDtoActionOrApprovedByTaskDispositionsItem = {
-  disposition?: PickReviewDecisionDtoExcludeKeyofReviewDecisionDtoActionOrApprovedByTaskDispositionsItemDisposition;
+  disposition?: TaskDisposition;
   classification?: PickReviewDecisionDtoExcludeKeyofReviewDecisionDtoActionOrApprovedByTaskDispositionsItemClassification;
   actionItemId: string;
 };

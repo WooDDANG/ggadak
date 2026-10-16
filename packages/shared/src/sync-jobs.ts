@@ -1,6 +1,7 @@
+import type { SyncChannelStatus, SyncJobStatus } from './domain-values.js';
 export interface SyncChannelResult {
   channelId: string;
-  status: 'COMPLETED' | 'FAILED' | 'RECEIVED';
+  status: Exclude<SyncChannelStatus, 'WAITING'>;
   messagesScanned: number;
   decisionsFound: number;
   errorMessage?: string;
@@ -9,7 +10,7 @@ export interface SyncJobUpdate {
   release?: boolean;
   owner: string;
   channelResult?: SyncChannelResult;
-  status?: 'PROCESSING' | 'COMPLETED' | 'FAILED';
+  status?: Exclude<SyncJobStatus, 'QUEUED'>;
 }
 
 export interface SyncJobClaim {

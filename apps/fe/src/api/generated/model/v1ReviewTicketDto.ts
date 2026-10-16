@@ -5,14 +5,14 @@
  * OpenAPI spec version: 1.0.0
  */
 import type { ActionItemDto } from './actionItemDto';
+import type { CategoryTag } from './categoryTag';
+import type { DecisionObservation } from './decisionObservation';
+import type { DecisionState } from './decisionState';
 import type { DecisionStatus } from './decisionStatus';
+import type { RationaleStatus } from './rationaleStatus';
 import type { RecordStringAny } from './recordStringAny';
 import type { V1ReviewTicketDtoAlternativesItem } from './v1ReviewTicketDtoAlternativesItem';
-import type { V1ReviewTicketDtoCategoryTag } from './v1ReviewTicketDtoCategoryTag';
 import type { V1ReviewTicketDtoDates } from './v1ReviewTicketDtoDates';
-import type { V1ReviewTicketDtoObservation } from './v1ReviewTicketDtoObservation';
-import type { V1ReviewTicketDtoRationaleStatus } from './v1ReviewTicketDtoRationaleStatus';
-import type { V1ReviewTicketDtoState } from './v1ReviewTicketDtoState';
 
 /**
  * A Review Queue ticket is the Decision Candidate itself. Both IDs are identical strings.
@@ -26,13 +26,13 @@ export interface V1ReviewTicketDto {
   title?: string;
   decisionContent?: string;
   rationale: string;
-  rationaleStatus?: V1ReviewTicketDtoRationaleStatus;
-  observation?: V1ReviewTicketDtoObservation;
+  rationaleStatus?: RationaleStatus;
+  observation?: DecisionObservation;
   rationaleSummary?: string;
   rationaleQuotes?: string[];
-  categoryTag?: V1ReviewTicketDtoCategoryTag;
+  categoryTag?: CategoryTag;
   actionItems?: ActionItemDto[];
-  state: V1ReviewTicketDtoState;
+  state: DecisionState;
   supersedesId?: string;
   isPivot?: boolean;
   approvedBy?: string;

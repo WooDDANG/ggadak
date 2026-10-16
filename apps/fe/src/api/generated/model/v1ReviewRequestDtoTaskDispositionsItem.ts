@@ -4,11 +4,11 @@
  * @ggaddak/be
  * OpenAPI spec version: 1.0.0
  */
+import type { TaskDisposition } from './taskDisposition';
 import type { V1ReviewRequestDtoTaskDispositionsItemClassification } from './v1ReviewRequestDtoTaskDispositionsItemClassification';
-import type { V1ReviewRequestDtoTaskDispositionsItemDisposition } from './v1ReviewRequestDtoTaskDispositionsItemDisposition';
 
 export type V1ReviewRequestDtoTaskDispositionsItem = {
-  disposition?: V1ReviewRequestDtoTaskDispositionsItemDisposition;
+  disposition?: TaskDisposition;
   classification?: V1ReviewRequestDtoTaskDispositionsItemClassification;
   actionItemId: string;
 };

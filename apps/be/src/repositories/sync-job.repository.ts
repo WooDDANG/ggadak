@@ -1,4 +1,5 @@
-import { AnalysisScanState } from '@ggaddak/shared';
+import { AnalysisScanState, SyncJobStatus } from '@ggaddak/shared';
+
 import { Prisma } from '@prisma/client';
 import { BaseRepository } from './base.repository.js';
 
@@ -6,7 +7,7 @@ import { BaseRepository } from './base.repository.js';
 export class SyncJobRepository extends BaseRepository {
   active() {
     return this.prisma.syncJob.findMany({
-      where: { status: 'PROCESSING' },
+      where: { status: SyncJobStatus.Processing },
       select: { id: true },
       take: 100,
     });
@@ -57,7 +58,10 @@ export class SyncJobRepository extends BaseRepository {
   async claimNext(owner: string, now: Date, leaseUntil: Date) {
     return this.withPrismaErrors(async () => {
       const eligible = {
-        OR: [{ status: 'QUEUED' }, { status: 'PROCESSING', leaseUntil: { lte: now } }],
+        OR: [
+          { status: SyncJobStatus.Queued },
+          { status: SyncJobStatus.Processing, leaseUntil: { lte: now } },
+        ],
       };
       const job = await this.prisma.syncJob.findFirst({
         where: eligible,
@@ -66,7 +70,12 @@ export class SyncJobRepository extends BaseRepository {
       if (!job) return null;
       const changed = await this.prisma.syncJob.updateMany({
         where: { id: job.id, ...eligible },
-        data: { status: 'PROCESSING', owner, startedAt: job.startedAt ?? now, leaseUntil },
+        data: {
+          status: SyncJobStatus.Processing,
+          owner,
+          startedAt: job.startedAt ?? now,
+          leaseUntil,
+        },
       });
       return changed.count === 1 ? job : null;
     });
@@ -80,7 +89,7 @@ export class SyncJobRepository extends BaseRepository {
     tx: Prisma.TransactionClient,
   ): Promise<boolean> {
     const saved = await tx.syncJob.updateMany({
-      where: { id, owner, status: 'PROCESSING', leaseUntil: { gt: now } },
+      where: { id, owner, status: SyncJobStatus.Processing, leaseUntil: { gt: now } },
       data,
     });
     return saved.count === 1;

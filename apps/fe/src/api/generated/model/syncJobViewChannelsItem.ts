@@ -4,8 +4,9 @@
  * @ggaddak/be
  * OpenAPI spec version: 1.0.0
  */
+import type { SyncChannelStatus } from './syncChannelStatus';
 
 export type SyncJobViewChannelsItem = {
-  status: string;
+  status: SyncChannelStatus;
   id: string;
 };

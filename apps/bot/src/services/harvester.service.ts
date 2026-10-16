@@ -1,10 +1,13 @@
-import { Client, Message, TextChannel } from 'discord.js';
 import {
-  Decision,
-  HarvestingPolicyConfig,
-  createLogger,
   calculateDiscussionScore,
+  createLogger,
+  Decision,
+  DiscordHistoryPolicy,
+  DurationMs,
+  HarvestingPolicyConfig,
 } from '@ggaddak/shared';
+import { Client, Message, TextChannel } from 'discord.js';
+
 import {
   AnalysisDeliveryError,
   BackendApiService,
@@ -355,15 +358,18 @@ export class DiscussionHarvester {
     const incremental = !options.full && !options.hours && !options.forceFullSync;
     const boundary = incremental ? pendingBoundary || lastCheckpoint : null;
     const timeCutoff = options.hours
-      ? Date.now() - options.hours * 3600000
+      ? Date.now() - options.hours * DurationMs.Hour
       : options.initialOnly
-        ? Date.now() - policy.lookbackDays * 86400000
+        ? Date.now() - policy.lookbackDays * DurationMs.Day
         : null;
     const limit = options.limit ?? (options.initialOnly ? policy.initialScanLimit : undefined);
     let fetchedMessages: Message[] = [];
     let before: string | undefined;
     while (true) {
-      const batch = await channel.messages.fetch({ limit: 100, ...(before ? { before } : {}) });
+      const batch = await channel.messages.fetch({
+        limit: DiscordHistoryPolicy.pageSize,
+        ...(before ? { before } : {}),
+      });
       if (!batch.size) break;
       const items = [...batch.values()].sort((a, b) =>
         BigInt(a.id) < BigInt(b.id) ? -1 : BigInt(a.id) > BigInt(b.id) ? 1 : 0,
@@ -399,8 +405,8 @@ export class DiscussionHarvester {
 
     let afterMessageId = boundary || (BigInt(fetchedMessages[0].id) - 1n).toString();
     const manifest: SyncScanManifest = { scannedCount: fetchedMessages.length, entries: [] };
-    for (let offset = 0; offset < fetchedMessages.length; offset += 100) {
-      const messages = fetchedMessages.slice(offset, offset + 100);
+    for (let offset = 0; offset < fetchedMessages.length; offset += DiscordHistoryPolicy.pageSize) {
+      const messages = fetchedMessages.slice(offset, offset + DiscordHistoryPolicy.pageSize);
       const newest = messages[messages.length - 1];
       const scanRange = { afterMessageId, startMessageId: messages[0].id, endMessageId: newest.id };
       const participants = new Set(messages.map(m => m.author?.id || m.author?.username));

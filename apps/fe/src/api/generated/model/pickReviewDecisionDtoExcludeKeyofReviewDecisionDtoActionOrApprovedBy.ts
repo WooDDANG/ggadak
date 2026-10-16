@@ -4,9 +4,9 @@
  * @ggaddak/be
  * OpenAPI spec version: 1.0.0
  */
-import type { PickReviewDecisionDtoExcludeKeyofReviewDecisionDtoActionOrApprovedByCategoryTag } from './pickReviewDecisionDtoExcludeKeyofReviewDecisionDtoActionOrApprovedByCategoryTag';
-import type { PickReviewDecisionDtoExcludeKeyofReviewDecisionDtoActionOrApprovedByResolution } from './pickReviewDecisionDtoExcludeKeyofReviewDecisionDtoActionOrApprovedByResolution';
+import type { CategoryTag } from './categoryTag';
 import type { PickReviewDecisionDtoExcludeKeyofReviewDecisionDtoActionOrApprovedByTaskDispositionsItem } from './pickReviewDecisionDtoExcludeKeyofReviewDecisionDtoActionOrApprovedByTaskDispositionsItem';
+import type { ReviewResolution } from './reviewResolution';
 
 /**
  * From T, pick a set of properties whose keys are in the union K
@@ -17,9 +17,9 @@ export interface PickReviewDecisionDtoExcludeKeyofReviewDecisionDtoActionOrAppro
   rationale?: string;
   rationaleSummary?: string;
   rationaleQuotes?: string[];
-  categoryTag?: PickReviewDecisionDtoExcludeKeyofReviewDecisionDtoActionOrApprovedByCategoryTag;
+  categoryTag?: CategoryTag;
   expectedVersion: number;
-  resolution?: PickReviewDecisionDtoExcludeKeyofReviewDecisionDtoActionOrApprovedByResolution;
+  resolution?: ReviewResolution;
   predecessorId?: string;
   predecessorVersion?: number;
   taskDispositions?: PickReviewDecisionDtoExcludeKeyofReviewDecisionDtoActionOrApprovedByTaskDispositionsItem[];

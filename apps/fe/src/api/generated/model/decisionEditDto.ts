@@ -4,8 +4,8 @@
  * @ggaddak/be
  * OpenAPI spec version: 1.0.0
  */
+import type { CategoryTag } from './categoryTag';
 import type { DecisionEditDtoAlternativesItem } from './decisionEditDtoAlternativesItem';
-import type { DecisionEditDtoCategory } from './decisionEditDtoCategory';
 
 export interface DecisionEditDto {
   /** Version last read; stale edits return 409. */
@@ -16,7 +16,7 @@ export interface DecisionEditDto {
   decision: string;
   /** Required Rationale, 1–10000 trimmed characters. */
   rationale: string;
-  category: DecisionEditDtoCategory;
+  category: CategoryTag;
   /** Full replacement (max 20). Keep existing IDs, omit ID to add; omitted existing alternatives are deleted. Unknown/duplicate IDs rejected. */
   alternatives: DecisionEditDtoAlternativesItem[];
   [key: string]: unknown;

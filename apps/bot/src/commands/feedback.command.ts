@@ -1,3 +1,4 @@
+import { backendUrl as getBackendUrl } from '../config.js';
 import { CommandInteraction, ApplicationCommandOptionType } from 'discord.js';
 import { Discord, Slash, SlashOption, SlashChoice } from 'discordx';
 import { createLogger, FeedbackSourceType } from '@ggaddak/shared';
@@ -10,7 +11,7 @@ export class FeedbackCommand {
   private apiService: BackendApiService;
 
   constructor() {
-    const backendUrl = process.env.BE_URL || 'http://localhost:3001';
+    const backendUrl = getBackendUrl();
     this.apiService = new BackendApiService(backendUrl);
   }
 
@@ -19,10 +20,10 @@ export class FeedbackCommand {
     description: '교수님, 심사위원 등 외부 피드백을 기록하여 AI 의사결정 맥락에 주입합니다.',
   })
   async execute(
-    @SlashChoice({ name: '교수', value: '교수' })
-    @SlashChoice({ name: '심사위원', value: '심사위원' })
-    @SlashChoice({ name: '팀원', value: '팀원' })
-    @SlashChoice({ name: '인터뷰이', value: '인터뷰이' })
+    @SlashChoice({ name: FeedbackSourceType.Professor, value: FeedbackSourceType.Professor })
+    @SlashChoice({ name: FeedbackSourceType.Judge, value: FeedbackSourceType.Judge })
+    @SlashChoice({ name: FeedbackSourceType.Teammate, value: FeedbackSourceType.Teammate })
+    @SlashChoice({ name: FeedbackSourceType.Interviewee, value: FeedbackSourceType.Interviewee })
     @SlashOption({
       name: '출처',
       description: '피드백 출처',

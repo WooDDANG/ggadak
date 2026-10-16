@@ -1,3 +1,6 @@
+import { includesValue } from '@ggaddak/shared';
+import { AnalysisPhase } from '../domain/analysis-workflow.js';
+import { GraphPolicy } from '../config/policies.js';
 import { randomUUID } from 'node:crypto';
 import type { IAiAdapter, AiResult } from '../adapters/ai.adapter.js';
 import type {
@@ -37,10 +40,11 @@ export class GraphWorkflow {
       delete session.active;
       await save();
     }
-    while (session.phase !== 'done') {
+    while (session.phase !== AnalysisPhase.Done) {
       if (signal.aborted) throw new AppError('Analysis ownership lost', 503);
-      if (session.elapsedMs >= 180000) throw new AppError('Analysis time budget exhausted', 422);
-      if (['check', 'recheck'].includes(session.phase)) {
+      if (session.elapsedMs >= GraphPolicy.sessionBudgetMs)
+        throw new AppError('Analysis time budget exhausted', 422);
+      if (includesValue([AnalysisPhase.Check, AnalysisPhase.Recheck], session.phase)) {
         const checkStarted = Date.now();
         const checked = GraphSchema.safeParse(session.value);
         const issues = checked.success
@@ -55,7 +59,7 @@ export class GraphWorkflow {
           }
         } else {
           session.value = checked.success ? checked.data : session.value;
-          session.phase = session.repairs ? 'reverify' : 'verify';
+          session.phase = session.repairs ? AnalysisPhase.Reverify : AnalysisPhase.Verify;
         }
         session.elapsedMs += Math.max(0, Date.now() - checkStarted);
         await save();
@@ -64,18 +68,28 @@ export class GraphWorkflow {
       const phase = session.phase;
       if (!session.calls.includes(phase)) {
         session.calls.push(phase);
-        if (phase === 'repair') session.repairs++;
+        if (phase === AnalysisPhase.Repair) session.repairs++;
       }
-      if (session.calls.length > 4 || session.repairs > 1)
+      if (
+        session.calls.length > GraphPolicy.maxLogicalCalls ||
+        session.repairs > GraphPolicy.maxRepairs
+      )
         throw new AppError('Analysis call budget exhausted', 422);
-      const timeoutMs = Math.min(45000, 180000 - session.elapsedMs);
+      const timeoutMs = Math.min(
+        GraphPolicy.callTimeoutMs,
+        GraphPolicy.sessionBudgetMs - session.elapsedMs,
+      );
       const startedAt = Date.now();
       const attempt: StageAttempt = {
         phase,
         provider: workflow.settings.provider,
         model: modelForStage(
           workflow.settings,
-          phase === 'extract' ? 'extract' : phase === 'repair' ? 'repair' : 'verify',
+          phase === AnalysisPhase.Extract
+            ? AnalysisPhase.Extract
+            : phase === AnalysisPhase.Repair
+              ? AnalysisPhase.Repair
+              : AnalysisPhase.Verify,
         ),
         owner,
         startedAt,
@@ -93,9 +107,9 @@ export class GraphWorkflow {
       try {
         const context = { signal: controller.signal, settings: workflow.settings };
         const operation =
-          phase === 'extract'
+          phase === AnalysisPhase.Extract
             ? this.ai.extractGraph(session.transcript, context)
-            : phase === 'repair'
+            : phase === AnalysisPhase.Repair
               ? this.ai.repairGraph(session.transcript, session.value, session.feedback, context)
               : this.ai.verifyGraph(session.transcript, session.value, context);
         const interrupted = new Promise<never>((_, reject) => {
@@ -117,9 +131,10 @@ export class GraphWorkflow {
           inputTokens: result.usage?.inputTokens ?? 0,
           outputTokens: result.usage?.outputTokens ?? 0,
         });
-        if (phase === 'extract' || phase === 'repair') {
+        if (phase === AnalysisPhase.Extract || phase === AnalysisPhase.Repair) {
           session.value = result.value;
-          session.phase = phase === 'extract' ? 'check' : 'recheck';
+          session.phase =
+            phase === AnalysisPhase.Extract ? AnalysisPhase.Check : AnalysisPhase.Recheck;
         } else {
           session.verification = result.value;
           attempt.verification = result.value;
@@ -133,7 +148,7 @@ export class GraphWorkflow {
           else {
             const graph = GraphSchema.parse(session.value);
             session.graph = this.link(graph, session);
-            session.phase = 'done';
+            session.phase = AnalysisPhase.Done;
           }
         }
       } catch (error) {
@@ -152,15 +167,16 @@ export class GraphWorkflow {
         delete session.active;
         await save();
       }
-      if (session.elapsedMs >= 180000) throw new AppError('Analysis time budget exhausted', 422);
+      if (session.elapsedMs >= GraphPolicy.sessionBudgetMs)
+        throw new AppError('Analysis time budget exhausted', 422);
     }
   }
 
   private requestRepair(session: AnalysisSession, feedback: string[]): void {
     session.feedback = feedback;
-    if (session.repairs || session.calls.includes('repair'))
+    if (session.repairs || session.calls.includes(AnalysisPhase.Repair))
       throw new AppError('Analysis validation failed after repair', 422);
-    session.phase = 'repair';
+    session.phase = AnalysisPhase.Repair;
   }
 
   private link(graph: DecisionGraph, session: AnalysisSession) {

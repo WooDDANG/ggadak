@@ -1,5 +1,12 @@
+import {
+  type Decision,
+  DecisionState,
+  type ReviewAction,
+  ReviewActionType,
+  ReviewResolution as ReviewResolutionType,
+} from '@ggaddak/shared';
+
 import { useState } from 'react';
-import type { Decision, ReviewAction } from '@ggaddak/shared';
 
 interface Props {
   candidate: Decision;
@@ -15,7 +22,7 @@ export function ReviewResolution({ candidate, records, disabled, onConfirm }: Pr
     Record<string, { classification?: 'open' | 'completed'; disposition?: 'cancel' | 'transfer' }>
   >({});
   const eligible = records.filter(
-    record => record.state === 'Decided' && record.id !== candidate.id,
+    record => record.state === DecisionState.Decided && record.id !== candidate.id,
   );
   const tasks = predecessor?.actionItems ?? [];
   const complete = tasks.every(task => {
@@ -111,9 +118,11 @@ export function ReviewResolution({ candidate, records, disabled, onConfirm }: Pr
         className="px-3.5 py-2 bg-emerald-600 rounded-xl text-xs font-semibold disabled:opacity-40"
         onClick={() =>
           onConfirm({
-            action: 'confirm',
+            action: ReviewActionType.Confirm,
             expectedVersion: candidate.version!,
-            resolution: predecessor ? 'replace' : 'independent',
+            resolution: predecessor
+              ? ReviewResolutionType.Replace
+              : ReviewResolutionType.Independent,
             ...(predecessor
               ? {
                   predecessorId: predecessor.id,

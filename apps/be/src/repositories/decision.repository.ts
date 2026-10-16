@@ -1,9 +1,16 @@
+import {
+  ActionItemState,
+  CategoryTag,
+  Decision,
+  DecisionState,
+  ExternalFeedback,
+} from '@ggaddak/shared';
+
 import { BaseRepository } from './base.repository.js';
 import { Service } from 'typedi';
 import { PrismaClient, Prisma } from '@prisma/client';
 import { BadRequestError, ConflictError } from '../errors/AppError.js';
 import { randomUUID } from 'node:crypto';
-import { Decision, ExternalFeedback } from '@ggaddak/shared';
 
 type TimelineGroupBy = 'month' | 'topic' | 'channel' | 'category';
 
@@ -104,9 +111,9 @@ export class DecisionRepository extends BaseRepository {
         updatedAt: row.updatedAt.toISOString(),
       };
     const states: Record<string, Decision['state']> = {
-      proposed: 'Proposed',
-      confirmed: 'Decided',
-      rejected: 'Rejected',
+      proposed: DecisionState.Proposed,
+      confirmed: DecisionState.Decided,
+      rejected: DecisionState.Rejected,
     };
     return {
       id: row.id,
@@ -120,7 +127,7 @@ export class DecisionRepository extends BaseRepository {
       supersededById: row.supersededById,
       rationaleQuotes: [],
       alternatives: JSON.parse(row.alternatives),
-      categoryTag: JSON.parse(row.tags)[0] ?? '기타',
+      categoryTag: JSON.parse(row.tags)[0] ?? CategoryTag.Other,
       actionItems: [],
       isPivot: false,
       approvedBy: row.decisionMaker === 'AI' ? null : row.decisionMaker || null,
@@ -149,13 +156,13 @@ export class DecisionRepository extends BaseRepository {
   decisionData(decision: Decision) {
     return {
       lifecycle:
-        decision.state === 'Decided'
+        decision.state === DecisionState.Decided
           ? 'CONFIRMED'
-          : decision.state === 'Superseded'
+          : decision.state === DecisionState.Superseded
             ? 'SUPERSEDED'
-            : decision.state === 'Deferred'
+            : decision.state === DecisionState.Deferred
               ? 'ON_HOLD'
-              : decision.state === 'Rejected'
+              : decision.state === DecisionState.Rejected
                 ? 'DISCARDED'
                 : 'IN_REVIEW',
       category: decision.categoryTag,
@@ -274,7 +281,7 @@ export class DecisionRepository extends BaseRepository {
       actionItems: decision.actionItems.map((item, index) => ({
         ...item,
         id: item.id ?? existing?.actionItems[index]?.id ?? randomUUID(),
-        state: item.state ?? existing?.actionItems[index]?.state ?? ('unknown' as const),
+        state: item.state ?? existing?.actionItems[index]?.state ?? ActionItemState.Unknown,
       })),
     };
     const data = this.decisionData(stored);
@@ -392,7 +399,9 @@ export class DecisionRepository extends BaseRepository {
       where: {
         id: decision.id,
         version: expectedVersion,
-        ...(requireActivePredecessor ? { status: 'Decided', supersededById: null } : {}),
+        ...(requireActivePredecessor
+          ? { status: DecisionState.Decided, supersededById: null }
+          : {}),
       },
       data: this.decisionData(decision),
     });

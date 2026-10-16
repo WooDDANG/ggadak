@@ -1,3 +1,5 @@
+import { type CategoryTag, CategoryTagSchema } from '@ggaddak/shared';
+
 import { z } from 'zod';
 export interface DecisionEditDto {
   /** Additional fields are rejected by edit validation; lifecycle is controlled by review. */
@@ -10,7 +12,7 @@ export interface DecisionEditDto {
   decision: string;
   /** Required Rationale, 1–10000 trimmed characters. */
   rationale: string;
-  category: '타깃' | '문제정의' | '기능' | '기술' | 'BM' | '기타';
+  category: CategoryTag;
   /** Full replacement (max 20). Keep existing IDs, omit ID to add; omitted existing alternatives are deleted. Unknown/duplicate IDs rejected. */
   alternatives: { id?: string; name: string; reason: string }[];
 }
@@ -20,7 +22,7 @@ export const DecisionEditSchema = z
     title: z.string().trim().min(1).max(200),
     decision: z.string().trim().min(1).max(10000),
     rationale: z.string().trim().max(10000),
-    category: z.enum(['타깃', '문제정의', '기능', '기술', 'BM', '기타']),
+    category: CategoryTagSchema,
     alternatives: z
       .array(
         z

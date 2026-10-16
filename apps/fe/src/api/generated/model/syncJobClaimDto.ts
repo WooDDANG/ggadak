@@ -5,6 +5,7 @@
  * OpenAPI spec version: 1.0.0
  */
 import type { SyncJobClaimDtoChannelsItem } from './syncJobClaimDtoChannelsItem';
+import type { SyncJobStatus } from './syncJobStatus';
 
 export interface SyncJobClaimDto {
   /** @nullable */
@@ -22,7 +23,7 @@ export interface SyncJobClaimDto {
   failedChannels: number;
   completedChannels: number;
   totalChannels: number;
-  status: string;
+  status: SyncJobStatus;
   forceFullSync: boolean;
   guildId: string;
   jobId: string;

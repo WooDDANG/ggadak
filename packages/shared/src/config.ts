@@ -14,17 +14,10 @@ export const HarvestingPolicyConfigSchema = z.object({
 
 export type HarvestingPolicyConfig = z.infer<typeof HarvestingPolicyConfigSchema>;
 
-export const DEFAULT_HARVESTING_POLICY: HarvestingPolicyConfig = {
-  semanticThreshold: 0.7,
-  initialScanLimit: 50,
-  contextWindowBefore: 15,
-  contextWindowAfter: 5,
-  maxMergedWindow: 40,
-  reactionThreshold: 3,
-  debounceMs: 15000,
-  agreementThreshold: 2,
-  lookbackDays: 30,
-};
+// The schema is the single source of defaults used by BE and Bot.
+export const DEFAULT_HARVESTING_POLICY: HarvestingPolicyConfig = HarvestingPolicyConfigSchema.parse(
+  {},
+);
 
 export function getHarvestingPolicyFromEnv(
   env: Record<string, string | undefined> = process.env,

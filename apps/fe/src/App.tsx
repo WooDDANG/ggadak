@@ -1,3 +1,5 @@
+import { QueryPolicy } from './config';
+import { DecisionState, ExternalFeedback, ReviewAction } from '@ggaddak/shared';
 import { reviewWithConflictReload } from './api/review-workflow';
 import { AnalysisRecovery } from './features/review-queue/AnalysisRecovery';
 import { Dashboard } from './features/Dashboard';
@@ -5,7 +7,7 @@ import { dashboardQueryKey } from './api/dashboard.api';
 import { WhySearch } from './features/WhySearch';
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ReviewAction, ExternalFeedback } from '@ggaddak/shared';
+
 import { decisionsApi } from './api/decisions.api';
 import { ChannelSettings } from './features/ChannelSettings';
 import { AuthGate } from './features/AuthGate';
@@ -36,7 +38,7 @@ function ServerApp({ guildId }: { guildId: string }) {
   } = useQuery({
     queryKey: decisionsQueryKey(guildId),
     queryFn: () => decisionsApi.getDecisions({ guildId }),
-    refetchInterval: 5000, // 5초 주기 폴링
+    refetchInterval: QueryPolicy.activityPollMs, // 5초 주기 폴링
   });
 
   const {
@@ -52,7 +54,7 @@ function ServerApp({ guildId }: { guildId: string }) {
           decisionsApi.getReviewQueue(guildId, 'ON_HOLD'),
         ])
       ).flat(),
-    refetchInterval: 5000,
+    refetchInterval: QueryPolicy.activityPollMs,
   });
 
   // 2. Fetch Feedbacks Query
@@ -87,7 +89,7 @@ function ServerApp({ guildId }: { guildId: string }) {
     );
   };
 
-  const draftCount = reviewCandidates.filter(d => d.state !== 'Deferred').length;
+  const draftCount = reviewCandidates.filter(d => d.state !== DecisionState.Deferred).length;
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-indigo-500 selection:text-white">

@@ -1,6 +1,19 @@
+import {
+  AnalysisPolicy,
+  CategoryTag,
+  Decision,
+  DecisionSchema,
+  DecisionState,
+  DeliveryErrorCategory,
+  GraphEdgeType,
+  GraphNodeType,
+  humanReactionCount,
+  includesValue,
+} from '@ggaddak/shared';
+
 import crypto from 'node:crypto';
 import { Inject, Service } from 'typedi';
-import { Decision, DecisionSchema, humanReactionCount } from '@ggaddak/shared';
+
 import type { AnalyzeDiscussionParams, AnalyzeDiscussionResult } from '../domain/analysis.js';
 import type {
   AnalysisWorkflow,
@@ -59,7 +72,7 @@ export class DiscussionService {
         requests.renew(params.requestId, claim.owner),
         execution.renew(slot),
       ]).catch(error => controller.abort(error));
-    }, 20000);
+    }, AnalysisPolicy.leaseHeartbeatMs);
     heartbeat.unref();
     const save = async () => {
       await execution.renew(slot);
@@ -94,7 +107,9 @@ export class DiscussionService {
           graphId: snapshot.id,
           graphAvailable: true,
           hasConflict: snapshot.sessions.some(
-            s => s.discussionProblems.length > 0 || s.edges.some(e => e.type === 'conflicts_with'),
+            s =>
+              s.discussionProblems.length > 0 ||
+              s.edges.some(e => e.type === GraphEdgeType.ConflictsWith),
           ),
         },
         drafts,
@@ -107,7 +122,7 @@ export class DiscussionService {
           : ((error as { status?: number }).status ?? 500);
       const retryable = status >= 500 || status === 429 || status === 408;
       await requests.fail(params.requestId, claim.owner, {
-        category: status === 422 ? 'validation-or-budget' : 'provider-or-storage',
+        category: status === 422 ? 'validation-or-budget' : DeliveryErrorCategory.ProviderOrStorage,
         message:
           status === 422
             ? 'Analysis requires a new manual reanalysis'
@@ -213,28 +228,34 @@ export class DiscussionService {
       .digest('hex');
     const participants = [...new Set(session.messages.map(m => m.author))];
     return graph.nodes
-      .filter(n => n.type === 'DecisionCandidate')
+      .filter(n => n.type === GraphNodeType.DecisionCandidate)
       .map(node => {
         const related = (type: string) =>
           graph.edges
             .filter(e => e.type === type && e.sourceId === node.id)
             .map(e => byId.get(e.targetId)!);
-        const alternatives = related('has_alternative');
+        const alternatives = related(GraphEdgeType.HasAlternative);
         const targets = new Set([node.id, ...alternatives.map(n => n.id)]);
         const reasons = graph.edges
-          .filter(e => ['supports', 'opposes'].includes(e.type) && targets.has(e.targetId))
+          .filter(
+            e =>
+              includesValue([GraphEdgeType.Supports, GraphEdgeType.Opposes], e.type) &&
+              targets.has(e.targetId),
+          )
           .map(e => byId.get(e.sourceId)!.summary);
         const rationale = [...new Set(reasons)].join('\n');
         const parents = graph.edges
-          .filter(e => e.type === 'contains' && e.targetId === node.id)
+          .filter(e => e.type === GraphEdgeType.Contains && e.targetId === node.id)
           .map(e => byId.get(e.sourceId)!);
         const topic =
-          parents.find(n => n.type === 'Topic') ??
+          parents.find(n => n.type === GraphNodeType.Topic) ??
           graph.edges
-            .filter(e => e.type === 'contains' && parents.some(p => p.id === e.targetId))
+            .filter(
+              e => e.type === GraphEdgeType.Contains && parents.some(p => p.id === e.targetId),
+            )
             .map(e => byId.get(e.sourceId)!)
-            .find(n => n.type === 'Topic');
-        const actionItems = related('triggers').map(n => ({
+            .find(n => n.type === GraphNodeType.Topic);
+        const actionItems = related(GraphEdgeType.Triggers).map(n => ({
           id: n.id,
           task: n.summary,
           ...(n.assignee ? { assignee: n.assignee } : {}),
@@ -261,13 +282,13 @@ export class DiscussionService {
             id: n.id,
             option: n.summary,
             reason: graph.edges
-              .filter(e => e.type === 'opposes' && e.targetId === n.id)
+              .filter(e => e.type === GraphEdgeType.Opposes && e.targetId === n.id)
               .map(e => byId.get(e.sourceId)!.summary)
               .join('\n'),
           })),
           actionItems,
-          categoryTag: node.category ?? '기타',
-          state: 'Draft',
+          categoryTag: node.category ?? CategoryTag.Other,
+          state: DecisionState.Draft,
           supersedesId: null,
           isPivot: false,
           approvedBy: null,

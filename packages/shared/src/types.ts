@@ -1,8 +1,5 @@
 import { z } from 'zod';
 import {
-  DecisionStateSchema,
-  CategoryTagSchema,
-  FeedbackSourceTypeSchema,
   AlternativeOptionSchema,
   ActionItemSchema,
   DiscordSourceSchema,
@@ -13,9 +10,9 @@ import {
   ReviewActionSchema,
 } from './schemas.js';
 
-export type DecisionState = z.infer<typeof DecisionStateSchema>;
-export type CategoryTag = z.infer<typeof CategoryTagSchema>;
-export type FeedbackSourceType = z.infer<typeof FeedbackSourceTypeSchema>;
+export { DecisionState } from './domain-values.js';
+export { CategoryTag } from './domain-values.js';
+export { FeedbackSourceType } from './domain-values.js';
 export type AlternativeOption = z.infer<typeof AlternativeOptionSchema>;
 export type ActionItem = z.infer<typeof ActionItemSchema>;
 export type DiscordSource = z.infer<typeof DiscordSourceSchema>;

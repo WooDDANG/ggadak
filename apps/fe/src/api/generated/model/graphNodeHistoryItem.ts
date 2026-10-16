@@ -4,11 +4,11 @@
  * @ggaddak/be
  * OpenAPI spec version: 1.0.0
  */
-import type { GraphNodeHistoryItemObservation } from './graphNodeHistoryItemObservation';
+import type { DecisionObservation } from './decisionObservation';
 
 export type GraphNodeHistoryItem = {
   /** @nullable */
   at: string | null;
   summary: string;
-  observation: GraphNodeHistoryItemObservation;
+  observation: DecisionObservation;
 };

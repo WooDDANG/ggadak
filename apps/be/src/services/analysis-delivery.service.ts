@@ -1,5 +1,12 @@
+import {
+  AnalysisReceiptState,
+  DeliveryErrorCategory,
+  DeliveryPolicy,
+  DeliveryStatus,
+} from '@ggaddak/shared';
+
 import { AnalysisQueueRepository } from '../repositories/analysis-queue.repository.js';
-import { AnalysisReceiptState } from '@ggaddak/shared';
+
 import { Service } from 'typedi';
 import { AnalysisRequestRepository } from '../repositories/analysis-request.repository.js';
 import { DecisionRepository } from '../repositories/decision.repository.js';
@@ -31,7 +38,8 @@ export class AnalysisDeliveryService {
   }
 
   async synchronize(requests: AnalysisDeliveryStatus[]): Promise<AnalysisRetryCommandDto[]> {
-    if (requests.length > 100) throw new BadRequestError('At most 100 status changes per request');
+    if (requests.length > DeliveryPolicy.maxBatchSize)
+      throw new BadRequestError('At most 100 status changes per request');
     const now = new Date();
     await this.repo.withTransaction(async tx => {
       await tx.analysisDeliveryHeartbeat.upsert({
@@ -112,7 +120,7 @@ export class AnalysisDeliveryService {
           .filter(r => !owned.has(r.requestId))
           .map(r => ({
             ...r,
-            requiresNewAnalysis: r.errorCategory === 'analysis-terminal',
+            requiresNewAnalysis: r.errorCategory === DeliveryErrorCategory.AnalysisTerminal,
             channelName: r.channelName ?? undefined,
             scanRange: r.scanRangeJson ? JSON.parse(r.scanRangeJson) : undefined,
             status: r.status as AnalysisDeliveryStatus['status'],
@@ -125,19 +133,19 @@ export class AnalysisDeliveryService {
           guildId: r.guildId,
           channelId: r.channelId,
           status: (r.state === AnalysisReceiptState.Failed
-            ? 'retained-failure'
+            ? DeliveryStatus.RetainedFailure
             : r.state === AnalysisReceiptState.Retry
-              ? 'retry-pending'
+              ? DeliveryStatus.RetryPending
               : r.state === AnalysisReceiptState.Completed
-                ? 'completed-no-decision'
-                : 'pending') as AnalysisDeliveryStatus['status'],
+                ? DeliveryStatus.CompletedNoDecision
+                : DeliveryStatus.Pending) as AnalysisDeliveryStatus['status'],
           phase: r.state,
           managedBy: 'backend' as const,
           inputRetained: r.inputJson !== null,
           attempts: r.attempts,
           nextAttemptAt: r.nextAttemptAt.getTime(),
           errorCategory: r.errorCategory ?? undefined,
-          requiresNewAnalysis: r.errorCategory === 'analysis-terminal',
+          requiresNewAnalysis: r.errorCategory === DeliveryErrorCategory.AnalysisTerminal,
           scanRange: r.rangeJson ? JSON.parse(r.rangeJson) : undefined,
           synchronizedAt: r.createdAt.toISOString(),
           receivedAt: r.createdAt.toISOString(),
@@ -145,7 +153,9 @@ export class AnalysisDeliveryService {
           completedAt: r.completedAt?.toISOString() ?? null,
         })),
       ],
-      available: !!heartbeat && Date.now() - heartbeat.synchronizedAt.getTime() < 15000,
+      available:
+        !!heartbeat &&
+        Date.now() - heartbeat.synchronizedAt.getTime() < DeliveryPolicy.statusFreshnessMs,
       lastSynchronizedAt: heartbeat?.synchronizedAt.toISOString() ?? null,
     };
   }
@@ -177,9 +187,12 @@ export class AnalysisDeliveryService {
       const request = await tx.analysisDelivery.findFirst({ where: { guildId, requestId } });
       if (!request) throw new NotFoundError('Analysis Request not found');
       const heartbeat = await tx.analysisDeliveryHeartbeat.findUnique({ where: { id: 'bot' } });
-      if (!heartbeat || Date.now() - heartbeat.synchronizedAt.getTime() >= 15000)
+      if (
+        !heartbeat ||
+        Date.now() - heartbeat.synchronizedAt.getTime() >= DeliveryPolicy.statusFreshnessMs
+      )
         throw new ConflictError('Bot queue status is unavailable; wait for reconnection');
-      if (request.status !== 'retained-failure')
+      if (request.status !== DeliveryStatus.RetainedFailure)
         throw new ConflictError('Only retained failures can be retried');
       const pending = await tx.analysisRetryCommand.findFirst({
         where: { guildId, requestId, acknowledgedAt: null },

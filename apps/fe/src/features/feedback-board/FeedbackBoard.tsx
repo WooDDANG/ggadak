@@ -1,5 +1,6 @@
+import { ExternalFeedback, FeedbackSourceType } from '@ggaddak/shared';
 import React, { useState } from 'react';
-import { ExternalFeedback } from '@ggaddak/shared';
+
 import { MessageSquarePlus, UserCheck, Send } from 'lucide-react';
 import { Badge } from '../../components/Badge';
 
@@ -14,7 +15,9 @@ export const FeedbackBoard: React.FC<FeedbackBoardProps> = ({
   onSubmitFeedback,
   isLoading,
 }) => {
-  const [source, setSource] = useState<'교수' | '심사위원' | '팀원' | '인터뷰이'>('교수');
+  const [source, setSource] = useState<'교수' | '심사위원' | '팀원' | '인터뷰이'>(
+    FeedbackSourceType.Professor,
+  );
   const [detail, setDetail] = useState('');
   const [content, setContent] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -46,7 +49,8 @@ export const FeedbackBoard: React.FC<FeedbackBoardProps> = ({
       <div>
         <h2 className="text-xl font-bold text-white tracking-tight">외부 피드백 허브</h2>
         <p className="text-sm text-slate-400">
-          교수님, 심사위원, 인터뷰이의 피드백을 기록해두면, AI가 팀 대화에서 의사결정을 추출할 때 해당 피드백과의 정합성을 자동 대조합니다.
+          교수님, 심사위원, 인터뷰이의 피드백을 기록해두면, AI가 팀 대화에서 의사결정을 추출할 때
+          해당 피드백과의 정합성을 자동 대조합니다.
         </p>
       </div>
 
@@ -135,7 +139,9 @@ export const FeedbackBoard: React.FC<FeedbackBoardProps> = ({
                   <div className="flex items-center space-x-2">
                     <UserCheck className="w-4 h-4 text-indigo-400" />
                     <Badge variant="category">{fb.source}</Badge>
-                    {fb.detail && <span className="text-xs text-slate-400 font-medium">({fb.detail})</span>}
+                    {fb.detail && (
+                      <span className="text-xs text-slate-400 font-medium">({fb.detail})</span>
+                    )}
                   </div>
                   <span className="text-xs text-slate-500 font-mono">
                     {new Date(fb.createdAt).toLocaleDateString()}

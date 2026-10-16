@@ -1,4 +1,11 @@
-import type { SyncJobClaim, SyncJobUpdate as SyncWorkerUpdate } from '@ggaddak/shared';
+import {
+  SyncChannelStatus,
+  type SyncJobClaim,
+  SyncJobPolicy,
+  SyncJobStatus,
+  type SyncJobUpdate as SyncWorkerUpdate,
+} from '@ggaddak/shared';
+
 import { ScanIncompleteError } from './harvester.service.js';
 import { AnalysisDeliveryError, BackendRequestError } from './backend-api.service.js';
 export type { SyncJobClaim, SyncJobUpdate as SyncWorkerUpdate } from '@ggaddak/shared';
@@ -43,7 +50,7 @@ export class SyncJobWorker {
             heartbeat = undefined;
           });
       };
-      const timer = setInterval(renew, 30_000);
+      const timer = setInterval(renew, SyncJobPolicy.heartbeatMs);
       timer.unref();
       const checkLease = async () => {
         await heartbeat;
@@ -59,7 +66,7 @@ export class SyncJobWorker {
             const result = await this.scan(job, channelId);
             channelResult = {
               channelId,
-              status: job.deliveryOnly ? 'RECEIVED' : 'COMPLETED',
+              status: job.deliveryOnly ? SyncChannelStatus.Received : SyncJobStatus.Completed,
               messagesScanned: result.scannedCount,
               decisionsFound: result.decisionsCount,
             };
@@ -78,7 +85,7 @@ export class SyncJobWorker {
             if (error instanceof ScanIncompleteError && error.pending > 0) throw error;
             channelResult = {
               channelId,
-              status: 'FAILED',
+              status: SyncJobStatus.Failed,
               messagesScanned: 0,
               decisionsFound: 0,
               errorMessage: error instanceof Error ? error.message : String(error),
@@ -94,7 +101,7 @@ export class SyncJobWorker {
           job.jobId,
           job.deliveryOnly
             ? { owner: job.owner, release: true }
-            : { owner: job.owner, status: 'COMPLETED' },
+            : { owner: job.owner, status: SyncJobStatus.Completed },
         );
       } finally {
         clearInterval(timer);

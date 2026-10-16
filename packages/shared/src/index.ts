@@ -9,3 +9,5 @@ export * from './disentangler.js';
 export * from './admission.js';
 export * from './sync-jobs.js';
 export * from './analysis-queue.js';
+export * from './domain-values.js';
+export * from './runtime-policy.js';

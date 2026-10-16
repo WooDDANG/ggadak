@@ -1,14 +1,10 @@
+import type { DeliveryStatus } from '@ggaddak/shared';
 export interface AnalysisDeliveryStatusDto {
   requestId: string;
   guildId: string;
   channelId: string;
   channelName?: string;
-  status:
-    | 'pending'
-    | 'retry-pending'
-    | 'retained-failure'
-    | 'completed-with-candidates'
-    | 'completed-no-decision';
+  status: DeliveryStatus;
   attempts: number;
   nextAttemptAt: number;
   errorCategory?: string;

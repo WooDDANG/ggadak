@@ -1,3 +1,4 @@
+import { AuthPolicy } from '../config/policies.js';
 import type { AuthUserDto, AuthPrincipal } from '../dto/auth.dto.js';
 import { AuthError } from '../errors/AuthError.js';
 import { config, validateAuthConfig, type AuthConfig } from '../config/index.js';
@@ -74,7 +75,7 @@ export class AuthService {
     const nonce = randomBytes(32).toString('base64url');
     await this.prisma.oAuthState.deleteMany({ where: { expiresAt: { lt: new Date(this.now()) } } });
     await this.prisma.oAuthState.create({
-      data: { nonce, expiresAt: new Date(this.now() + 5 * 60000) },
+      data: { nonce, expiresAt: new Date(this.now() + AuthPolicy.oauthStateTtlMs) },
     });
     const state = `${nonce}.${this.signature(nonce)}`;
     const params = new URLSearchParams({
@@ -121,7 +122,7 @@ export class AuthService {
     ]);
     const sessionId = randomUUID();
     const browserToken = randomBytes(32).toString('base64url');
-    const expiresAt = new Date(this.now() + 7 * 86400000);
+    const expiresAt = new Date(this.now() + AuthPolicy.sessionTtlMs);
     await this.prisma.$transaction(async tx => {
       await tx.user.upsert({
         where: { id: user.id },
@@ -312,7 +313,7 @@ export class AuthService {
     if (!initial || initial.userId !== user.userId || initial.expiresAt.getTime() <= this.now())
       throw new AuthError();
     const owner = randomUUID();
-    const waitUntil = Date.now() + 35000;
+    const waitUntil = Date.now() + AuthPolicy.refreshWaitMs;
     while (true) {
       const current = await this.prisma.authSession.findUnique({ where: { id: user.sessionId } });
       if (!current || current.userId !== user.userId || current.expiresAt.getTime() <= this.now())
@@ -325,7 +326,10 @@ export class AuthService {
           refreshVersion: initial.refreshVersion,
           OR: [{ refreshOwner: null }, { refreshLeaseUntil: { lte: new Date(this.now()) } }],
         },
-        data: { refreshOwner: owner, refreshLeaseUntil: new Date(this.now() + 45000) },
+        data: {
+          refreshOwner: owner,
+          refreshLeaseUntil: new Date(this.now() + AuthPolicy.refreshLeaseMs),
+        },
       });
       if (acquired.count) break;
       if (Date.now() >= waitUntil)

@@ -1,13 +1,15 @@
+import { AiDefaults } from './policies.js';
+import {
+  DEFAULT_HARVESTING_POLICY,
+  getHarvestingPolicyFromEnv,
+  HarvestingPolicyConfig,
+  ServiceDefaults,
+} from '@ggaddak/shared';
+import { AiStage } from '../domain/ai-call.js';
 import { z } from 'zod';
 import { AuthConfigurationError } from '../errors/AuthConfigurationError.js';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'node:url';
-import type { AiStage } from '../domain/ai-call.js';
-import {
-  DEFAULT_HARVESTING_POLICY,
-  HarvestingPolicyConfig,
-  getHarvestingPolicyFromEnv,
-} from '@ggaddak/shared';
 
 dotenv.config({ path: fileURLToPath(new URL('../../../../.env', import.meta.url)) });
 
@@ -72,7 +74,7 @@ export const config: AppConfig = {
   get auth() {
     return parseAuthConfig(process.env);
   },
-  port: parseInt(process.env.PORT || '3001', 10),
+  port: parseInt(process.env.PORT || String(ServiceDefaults.backendPort), 10),
   get nodeEnv() {
     return process.env.NODE_ENV || 'development';
   },
@@ -85,16 +87,16 @@ export const config: AppConfig = {
   harvestingPolicy: getHarvestingPolicyFromEnv() || DEFAULT_HARVESTING_POLICY,
   get ai() {
     return {
-      provider: process.env.AI_PROVIDER || 'agy',
+      provider: process.env.AI_PROVIDER || AiDefaults.provider,
       model: process.env.AI_MODEL,
       stageModels: Object.fromEntries(
-        (['extract', 'verify', 'repair'] as const)
+        Object.values(AiStage)
           .map(stage => [stage, process.env['AI_MODEL_' + stage.toUpperCase()]?.trim()] as const)
           .filter(([, model]) => model),
       ),
       geminiApiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GEMINI_API_KEY,
       openaiApiKey: process.env.OPENAI_API_KEY,
-      agyExecutable: process.env.AGY_EXECUTABLE || 'agy',
+      agyExecutable: process.env.AGY_EXECUTABLE || AiDefaults.agyExecutable,
     };
   },
 };

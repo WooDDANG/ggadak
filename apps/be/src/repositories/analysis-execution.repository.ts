@@ -1,3 +1,4 @@
+import { AnalysisPolicy } from '@ggaddak/shared';
 import { randomUUID } from 'node:crypto';
 import type { PrismaClient } from '@prisma/client';
 import { AppError } from '../errors/AppError.js';
@@ -7,8 +8,8 @@ import { AnalysisRequestError } from './analysis-request.repository.js';
 export class AnalysisExecutionRepository {
   constructor(private prisma: PrismaClient) {}
   async acquire(requestId: string, channelId: string) {
-    const max = Number(process.env.ANALYSIS_CONCURRENCY ?? 1);
-    if (!Number.isSafeInteger(max) || max < 1 || max > 32)
+    const max = Number(process.env.ANALYSIS_CONCURRENCY ?? AnalysisPolicy.concurrency);
+    if (!Number.isSafeInteger(max) || max < 1 || max > AnalysisPolicy.maxConcurrency)
       throw new Error('Invalid ANALYSIS_CONCURRENCY');
     return this.prisma.$transaction(async tx => {
       await tx.analysisQueueControl.upsert({
@@ -28,8 +29,19 @@ export class AnalysisExecutionRepository {
       const owner = randomUUID();
       await tx.analysisExecution.upsert({
         where: { id: slot },
-        create: { id: slot, owner, requestId, channelId, leaseUntil: new Date(Date.now() + 60000) },
-        update: { owner, requestId, channelId, leaseUntil: new Date(Date.now() + 60000) },
+        create: {
+          id: slot,
+          owner,
+          requestId,
+          channelId,
+          leaseUntil: new Date(Date.now() + AnalysisPolicy.leaseMs),
+        },
+        update: {
+          owner,
+          requestId,
+          channelId,
+          leaseUntil: new Date(Date.now() + AnalysisPolicy.leaseMs),
+        },
       });
       return { slot, owner };
     });
@@ -37,7 +49,7 @@ export class AnalysisExecutionRepository {
   async renew(lease: { slot: string; owner: string }) {
     const saved = await this.prisma.analysisExecution.updateMany({
       where: { id: lease.slot, owner: lease.owner, leaseUntil: { gt: new Date() } },
-      data: { leaseUntil: new Date(Date.now() + 60000) },
+      data: { leaseUntil: new Date(Date.now() + AnalysisPolicy.leaseMs) },
     });
     if (!saved.count) throw new AnalysisRequestError('Analysis capacity ownership lost', 503);
   }

@@ -1,11 +1,16 @@
+import { type Decision, DecisionState, includesValue } from '@ggaddak/shared';
+
 import { useState } from 'react';
-import type { Decision } from '@ggaddak/shared';
+
 import { CandidateHistory } from './CandidateHistory';
 const states: Record<string, string> = { Decided: '확정', Rejected: '반려', Superseded: '교체됨' };
 export function ReviewHistory({ records, guildId }: { records: Decision[]; guildId?: string }) {
   const [expanded, setExpanded] = useState<string | null>(null);
   const history = records.filter(record =>
-    ['Decided', 'Rejected', 'Superseded'].includes(record.state),
+    includesValue(
+      [DecisionState.Decided, DecisionState.Rejected, DecisionState.Superseded],
+      record.state,
+    ),
   );
   if (!history.length) return null;
   return (

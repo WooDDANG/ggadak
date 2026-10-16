@@ -1,5 +1,16 @@
+import {
+  type ActionItemState,
+  type CategoryTag,
+  CategoryTagSchema,
+  type DecisionObservation,
+  type DecisionState,
+  type RationaleStatus,
+  ReviewActionSchema,
+  type ReviewActionType,
+  type ReviewResolution,
+  type TaskDisposition,
+} from '@ggaddak/shared';
 import { z } from 'zod';
-import { CategoryTagSchema, ReviewActionSchema } from '@ggaddak/shared';
 
 export interface AlternativeItemDto {
   option: string;
@@ -8,7 +19,7 @@ export interface AlternativeItemDto {
 
 export interface ActionItemDto {
   id?: string;
-  state?: 'unknown' | 'open' | 'completed' | 'canceled' | 'transferred';
+  state?: ActionItemState;
   transferredFromDecisionId?: string;
   transferredFromActionItemId?: string;
   transferredToDecisionId?: string;
@@ -26,14 +37,14 @@ export interface DecisionItemDto {
   title?: string;
   decisionContent?: string;
   rationale: string;
-  rationaleStatus?: 'stated' | 'not_stated';
-  observation?: 'proposed' | 'agreed' | 'withdrawn' | 'unclear';
+  rationaleStatus?: RationaleStatus;
+  observation?: DecisionObservation;
   rationaleSummary?: string;
   rationaleQuotes?: string[];
   alternatives?: AlternativeItemDto[];
-  categoryTag?: '타깃' | '문제정의' | '기능' | '기술' | 'BM' | '기타';
+  categoryTag?: CategoryTag;
   actionItems?: ActionItemDto[];
-  state: 'Draft' | 'Proposed' | 'Discussing' | 'Decided' | 'Superseded' | 'Deferred' | 'Rejected';
+  state: DecisionState;
   supersedesId?: string | null;
   isPivot?: boolean | null;
   approvedBy?: string | null;
@@ -63,15 +74,15 @@ export type QueryDecisionsDto = z.infer<typeof QueryDecisionsDtoSchema>;
 export const ReviewDecisionDtoSchema = ReviewActionSchema;
 
 export interface ReviewDecisionDto {
-  action: 'confirm' | 'defer' | 'reject' | 'edit';
+  action: ReviewActionType;
   expectedVersion: number;
-  resolution?: 'independent' | 'replace';
+  resolution?: ReviewResolution;
   predecessorId?: string;
   predecessorVersion?: number;
   taskDispositions?: {
     actionItemId: string;
     classification?: 'open' | 'completed';
-    disposition?: 'cancel' | 'transfer';
+    disposition?: TaskDisposition;
   }[];
   rationaleSummary?: string;
   rationaleQuotes?: string[];
@@ -79,7 +90,7 @@ export interface ReviewDecisionDto {
   title?: string;
   decisionContent?: string;
   rationale?: string;
-  categoryTag?: '타깃' | '문제정의' | '기능' | '기술' | 'BM' | '기타';
+  categoryTag?: CategoryTag;
 }
 
 export interface DecisionListResponseDto {

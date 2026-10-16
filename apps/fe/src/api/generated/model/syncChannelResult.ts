@@ -4,11 +4,11 @@
  * @ggaddak/be
  * OpenAPI spec version: 1.0.0
  */
-import type { SyncChannelResultStatus } from './syncChannelResultStatus';
+import type { ExcludeSyncChannelStatusWAITING } from './excludeSyncChannelStatusWAITING';
 
 export interface SyncChannelResult {
   channelId: string;
-  status: SyncChannelResultStatus;
+  status: ExcludeSyncChannelStatusWAITING;
   messagesScanned: number;
   decisionsFound: number;
   errorMessage?: string;

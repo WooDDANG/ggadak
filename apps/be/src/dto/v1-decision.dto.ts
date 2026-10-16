@@ -1,4 +1,5 @@
-import type { Decision } from '@ggaddak/shared';
+import { type Decision, DecisionState } from '@ggaddak/shared';
+
 import type { DecisionItemDto } from './decision.dto.js';
 export type DecisionStatus = 'IN_REVIEW' | 'CONFIRMED' | 'ON_HOLD' | 'DISCARDED' | 'SUPERSEDED';
 export interface V1DecisionDto extends Omit<DecisionItemDto, 'alternatives'> {
@@ -17,13 +18,13 @@ export interface V1DecisionListDto {
 }
 export function toV1Decision(decision: Decision): V1DecisionDto {
   const status: DecisionStatus =
-    decision.state === 'Decided'
+    decision.state === DecisionState.Decided
       ? 'CONFIRMED'
-      : decision.state === 'Superseded'
+      : decision.state === DecisionState.Superseded
         ? 'SUPERSEDED'
-        : decision.state === 'Deferred'
+        : decision.state === DecisionState.Deferred
           ? 'ON_HOLD'
-          : decision.state === 'Rejected'
+          : decision.state === DecisionState.Rejected
             ? 'DISCARDED'
             : 'IN_REVIEW';
   return {

@@ -1,3 +1,4 @@
+import { CategoryTag } from '@ggaddak/shared';
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { decisionsApi } from '../../api/decisions.api';
@@ -11,7 +12,7 @@ export function DecisionEditor({ card, guildId }: { card: V1DecisionDto; guildId
     title: card.title || card.topic,
     decision: card.decisionContent || card.decision,
     rationale: card.rationale,
-    category: card.categoryTag ?? '기타',
+    category: card.categoryTag ?? CategoryTag.Other,
     alternatives: card.alternatives,
   });
   const save = useMutation({
@@ -32,7 +33,7 @@ export function DecisionEditor({ card, guildId }: { card: V1DecisionDto; guildId
             title: card.title || card.topic,
             decision: card.decisionContent || card.decision,
             rationale: card.rationale,
-            category: card.categoryTag ?? '기타',
+            category: card.categoryTag ?? CategoryTag.Other,
             alternatives: card.alternatives,
           });
           save.reset();
@@ -89,7 +90,14 @@ export function DecisionEditor({ card, guildId }: { card: V1DecisionDto; guildId
             setForm({ ...form, category: e.target.value as DecisionEditDto['category'] })
           }
         >
-          {['타깃', '문제정의', '기능', '기술', 'BM', '기타'].map(c => (
+          {[
+            CategoryTag.Target,
+            CategoryTag.Problem,
+            CategoryTag.Feature,
+            CategoryTag.Technology,
+            CategoryTag.BusinessModel,
+            CategoryTag.Other,
+          ].map(c => (
             <option key={c}>{c}</option>
           ))}
         </select>

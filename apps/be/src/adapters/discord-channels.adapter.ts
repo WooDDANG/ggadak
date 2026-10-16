@@ -1,3 +1,4 @@
+import { DeliveryPolicy } from '@ggaddak/shared';
 import { AppError } from '../errors/AppError.js';
 
 export interface DiscordChannel {
@@ -21,7 +22,7 @@ export class HttpDiscordChannelsAdapter implements DiscordChannelsAdapter {
     if (!this.token) throw new AppError('Discord bot is not configured', 503);
     const response = await this.transport(`https://discord.com/api/v10${path}`, {
       headers: { Authorization: `Bot ${this.token}` },
-      signal: AbortSignal.timeout(15000),
+      signal: AbortSignal.timeout(DeliveryPolicy.serviceTimeoutMs),
     });
     if (!response.ok)
       throw new AppError(

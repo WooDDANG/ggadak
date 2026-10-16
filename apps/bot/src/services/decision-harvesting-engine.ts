@@ -1,3 +1,4 @@
+import { BotPolicy } from '../config.js';
 import { ChannelScheduler } from './channel-scheduler.js';
 import { AnalysisDeliveryError } from './backend-api.service.js';
 import { Message, TextChannel, Guild } from 'discord.js';
@@ -123,7 +124,7 @@ export class DecisionHarvestingEngine implements IDecisionHarvestingEngine {
             },
           );
         },
-        Math.max(0, Math.min(policy.debounceMs, 60000 - (Date.now() - firstAt))),
+        Math.max(0, Math.min(policy.debounceMs, BotPolicy.maxDebounceMs - (Date.now() - firstAt))),
       );
       this.pending.set(channelId, { timer, firstAt, message, resolve, traceId, triggers });
     });

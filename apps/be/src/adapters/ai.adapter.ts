@@ -1,3 +1,6 @@
+import { AiStage } from '../domain/ai-call.js';
+import { AiDefaults } from '../config/policies.js';
+import { DeliveryPolicy } from '@ggaddak/shared';
 import { Service } from 'typedi';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 import type { ZodTypeAny } from 'zod';
@@ -11,7 +14,7 @@ import {
 } from '../extractor/graph-prompt.js';
 
 import type { AiSettings, AiCallContext, AiResult } from '../domain/ai-call.js';
-import { modelForStage, type AiStage } from '../domain/ai-call.js';
+import { modelForStage } from '../domain/ai-call.js';
 import { runAgyCli, type AgyTransport } from './agy-cli.js';
 export type { AiSettings, AiCallContext, AiResult } from '../domain/ai-call.js';
 export interface IAiAdapter {
@@ -74,15 +77,15 @@ export class AiAdapter implements IAiAdapter {
       model:
         options.model ||
         (options.provider === 'agy'
-          ? 'gemini-3.8-flash-low'
+          ? AiDefaults.models.agy
           : options.provider === 'gemini'
-            ? 'gemini-3.8-flash'
-            : 'gpt-4o-mini'),
+            ? AiDefaults.models.gemini
+            : AiDefaults.models.openai),
       promptVersion: GRAPH_PROMPT_VERSION,
-      maxOutputTokens: Number(process.env.AI_MAX_OUTPUT_TOKENS || 8192),
+      maxOutputTokens: Number(process.env.AI_MAX_OUTPUT_TOKENS || AiDefaults.maxOutputTokens),
       maxInputChars: Number(
         process.env.AI_MAX_INPUT_CHARS ??
-          (['gemini', 'agy'].includes(options.provider) ? 0 : 100000),
+          (['gemini', 'agy'].includes(options.provider) ? 0 : AiDefaults.maxInputChars),
       ),
       ...(process.env.AI_MAX_INPUT_TOKENS
         ? { maxInputTokens: Number(process.env.AI_MAX_INPUT_TOKENS) }
@@ -91,14 +94,14 @@ export class AiAdapter implements IAiAdapter {
     };
   }
   extractGraph(transcript: string, context: AiCallContext) {
-    return this.call('extract', GRAPH_SYSTEM_PROMPT, { transcript }, context);
+    return this.call(AiStage.Extract, GRAPH_SYSTEM_PROMPT, { transcript }, context);
   }
   verifyGraph(transcript: string, graph: unknown, context: AiCallContext) {
-    return this.call('verify', VERIFICATION_PROMPT, { transcript, graph }, context);
+    return this.call(AiStage.Verify, VERIFICATION_PROMPT, { transcript, graph }, context);
   }
   repairGraph(transcript: string, graph: unknown, issues: string[], context: AiCallContext) {
     return this.call(
-      'repair',
+      AiStage.Repair,
       GRAPH_SYSTEM_PROMPT + '\nCorrect only reported errors; preserve IDs of existing elements.',
       { transcript, graph, issues },
       context,
@@ -116,7 +119,7 @@ export class AiAdapter implements IAiAdapter {
       system,
       input,
       context,
-      stage === 'verify' ? VerificationSchema : GraphSchema,
+      stage === AiStage.Verify ? VerificationSchema : GraphSchema,
     );
   }
 
@@ -151,7 +154,7 @@ export class AiAdapter implements IAiAdapter {
         throw new AppError('Mock AI requires development or test environment', 422);
       return {
         value:
-          stage === 'verify'
+          stage === AiStage.Verify
             ? { valid: true, issues: [] }
             : {
                 summary: 'Development fixture; no inferred candidates',
@@ -273,7 +276,7 @@ export class AiAdapter implements IAiAdapter {
                 response_format: {
                   type: 'json_schema',
                   json_schema: {
-                    name: stage === 'verify' ? 'verification' : 'decision_graph',
+                    name: stage === AiStage.Verify ? 'verification' : 'decision_graph',
                     strict: true,
                     schema,
                   },
@@ -323,5 +326,5 @@ export class AiAdapter implements IAiAdapter {
 function retryAfterMs(value: string | null): number | undefined {
   if (!value) return undefined;
   const ms = /^\d+(\.\d+)?$/.test(value) ? Number(value) * 1000 : Date.parse(value) - Date.now();
-  return Number.isFinite(ms) && ms > 0 ? Math.min(ms, 86400000) : undefined;
+  return Number.isFinite(ms) && ms > 0 ? Math.min(ms, DeliveryPolicy.maxRetryAfterMs) : undefined;
 }

@@ -4,11 +4,11 @@
  * @ggaddak/be
  * OpenAPI spec version: 1.0.0
  */
-import type { ActionItemDtoState } from './actionItemDtoState';
+import type { ActionItemState } from './actionItemState';
 
 export interface ActionItemDto {
   id?: string;
-  state?: ActionItemDtoState;
+  state?: ActionItemState;
   transferredFromDecisionId?: string;
   transferredFromActionItemId?: string;
   transferredToDecisionId?: string;

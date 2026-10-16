@@ -1,8 +1,10 @@
+import { CategoryTag, Decision, DecisionState, includesValue, ReviewAction } from '@ggaddak/shared';
+
 import { ReviewHistory } from './ReviewHistory';
 import { CandidateHistory } from './CandidateHistory';
 import React, { useState } from 'react';
 import { ReviewResolution } from './ReviewResolution';
-import { Decision, ReviewAction } from '@ggaddak/shared';
+
 import {
   Check,
   Clock,
@@ -37,7 +39,15 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
   const draftDecisions = decisions.filter(d =>
-    ['Draft', 'Proposed', 'Discussing', 'Deferred'].includes(d.state),
+    includesValue(
+      [
+        DecisionState.Draft,
+        DecisionState.Proposed,
+        DecisionState.Discussing,
+        DecisionState.Deferred,
+      ],
+      d.state,
+    ),
   );
   const review = async (id: string, action: ReviewAction) => {
     setPending(true);
@@ -108,8 +118,10 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({
             <div className="flex items-start justify-between gap-4 mb-4">
               <div className="space-y-1.5 flex-1">
                 <div className="flex items-center space-x-2.5 flex-wrap gap-y-1">
-                  <Badge variant="category">{dec.categoryTag || '기타'}</Badge>
-                  <Badge variant="draft">{dec.state === 'Deferred' ? '보류' : '대기중'}</Badge>
+                  <Badge variant="category">{dec.categoryTag || CategoryTag.Other}</Badge>
+                  <Badge variant="draft">
+                    {dec.state === DecisionState.Deferred ? '보류' : '대기중'}
+                  </Badge>
                   {dec.isPivot && (
                     <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-rose-500/20 text-rose-300 border border-rose-500/30">
                       🚨 방향 전환 (Pivot)

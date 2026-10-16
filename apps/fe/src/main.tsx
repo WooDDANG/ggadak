@@ -1,3 +1,4 @@
+import { QueryPolicy } from './config';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -7,7 +8,7 @@ import './index.css';
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 1000 * 2,
+      staleTime: QueryPolicy.staleTimeMs,
       retry: 1,
     },
   },

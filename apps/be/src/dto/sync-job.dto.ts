@@ -1,10 +1,15 @@
-import type { SyncJobClaim, SyncJobUpdate } from '@ggaddak/shared';
+import {
+  type SyncChannelStatus,
+  type SyncJobClaim,
+  type SyncJobStatus,
+  type SyncJobUpdate,
+} from '@ggaddak/shared';
 
 export type SyncJobView = {
   jobId: string;
   guildId: string;
   forceFullSync: boolean;
-  status: string;
+  status: SyncJobStatus;
   totalChannels: number;
   completedChannels: number;
   failedChannels: number;
@@ -12,7 +17,7 @@ export type SyncJobView = {
   messagesScanned: number;
   receivedChannels?: number;
   analysisPendingChannels?: number;
-  channels?:Array<{id:string;status:string}>;
+  channels?: Array<{ id: string; status: SyncChannelStatus }>;
   errorMessage: string | null;
   createdAt: string;
   startedAt: string | null;

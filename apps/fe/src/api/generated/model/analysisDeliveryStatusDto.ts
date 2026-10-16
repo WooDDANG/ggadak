@@ -5,14 +5,14 @@
  * OpenAPI spec version: 1.0.0
  */
 import type { AnalysisDeliveryStatusDtoScanRange } from './analysisDeliveryStatusDtoScanRange';
-import type { AnalysisDeliveryStatusDtoStatus } from './analysisDeliveryStatusDtoStatus';
+import type { DeliveryStatus } from './deliveryStatus';
 
 export interface AnalysisDeliveryStatusDto {
   requestId: string;
   guildId: string;
   channelId: string;
   channelName?: string;
-  status: AnalysisDeliveryStatusDtoStatus;
+  status: DeliveryStatus;
   attempts: number;
   nextAttemptAt: number;
   errorCategory?: string;

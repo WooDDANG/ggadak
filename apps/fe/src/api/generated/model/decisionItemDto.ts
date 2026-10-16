@@ -6,10 +6,10 @@
  */
 import type { ActionItemDto } from './actionItemDto';
 import type { AlternativeItemDto } from './alternativeItemDto';
-import type { DecisionItemDtoCategoryTag } from './decisionItemDtoCategoryTag';
-import type { DecisionItemDtoObservation } from './decisionItemDtoObservation';
-import type { DecisionItemDtoRationaleStatus } from './decisionItemDtoRationaleStatus';
-import type { DecisionItemDtoState } from './decisionItemDtoState';
+import type { CategoryTag } from './categoryTag';
+import type { DecisionObservation } from './decisionObservation';
+import type { DecisionState } from './decisionState';
+import type { RationaleStatus } from './rationaleStatus';
 import type { RecordStringAny } from './recordStringAny';
 
 export interface DecisionItemDto {
@@ -22,14 +22,14 @@ export interface DecisionItemDto {
   title?: string;
   decisionContent?: string;
   rationale: string;
-  rationaleStatus?: DecisionItemDtoRationaleStatus;
-  observation?: DecisionItemDtoObservation;
+  rationaleStatus?: RationaleStatus;
+  observation?: DecisionObservation;
   rationaleSummary?: string;
   rationaleQuotes?: string[];
   alternatives?: AlternativeItemDto[];
-  categoryTag?: DecisionItemDtoCategoryTag;
+  categoryTag?: CategoryTag;
   actionItems?: ActionItemDto[];
-  state: DecisionItemDtoState;
+  state: DecisionState;
   /** @nullable */
   supersedesId?: string | null;
   /** @nullable */
