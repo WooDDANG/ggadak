@@ -12,4 +12,4 @@
 
 ## Comments
 
-실제 HTTP 경계에서 신규 cookie·재시작 후 복원·JWT 만료 복구·절대 7일 만료·Origin/위조 거절·로그아웃 재사용 거절·동시 refresh·일시 장애 중 credential 회전 보존을 검증했다. FE API 테스트와 격리 Chrome의 실제 AuthGate에서 StrictMode callback·장애 차단/재연결·선택 서버·탭 전파를 확인했다. BE115/FE14/Bot36/Shared15/E2E7 및 타입 검사·lint 통과. 실제 사용자 OAuth는 01번의 외부 설정 확인과 구분한다. 최종 코드 리뷰 결과는 후속 기록한다.
+실제 HTTP 경계에서 신규 cookie·재시작 후 복원·JWT 만료 복구·절대 7일 만료·Origin/위조 거절·로그아웃 재사용 거절·동시 refresh·일시 장애 중 credential 회전 보존을 검증했다. FE API 테스트와 격리 Chrome의 실제 AuthGate에서 StrictMode callback·장애 차단/재연결·선택 서버·탭 전파를 확인했다. BE115/FE14/Bot36/Shared15/E2E7 및 타입 검사·lint 통과. 실제 사용자 OAuth는 01번의 외부 설정 확인과 구분한다. 최종 Standards 리뷰 위반 0건. Spec 리뷰의 탭 간 계정 전환 중 이전 복원 응답 재사용 경합 1건을 수정했고, 지연 응답 회귀 테스트와 재리뷰를 통과했다.

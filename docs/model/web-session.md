@@ -73,3 +73,5 @@ flowchart TD
 - 실제 Discord OAuth 사용자 로그인은 Portal에 http://localhost:3002/ 등록 후 확인해야 하며, fixture·브라우저 테스트 성공과 구분한다.
 
 최종 전체 테스트는 BE 115, FE 14(격리 Chrome 포함), Bot 36, Shared 15, E2E 7이 통과했고 타입 검사·lint도 통과했다. FE는 루트 FE_PORT를 읽고 strictPort로 실행하며 기본값은 3002다. 임시 실제 FE 실행 확인 후 자체 검증 프로세스를 종료해 사용자 dev 프로세스와 중복 실행하지 않는다.
+
+최종 리뷰: Standards 위반 0건. Spec 리뷰에서 발견한 다른 탭 계정 전환 중 이전 사용자 복원 응답 재사용 경합은 세션 세대별 요청 분리로 수정했으며, 지연 응답 회귀 테스트와 재리뷰를 통과했다. Discord Portal의 3002 콜백 등록 및 실제 OAuth 검증은 외부 확인 대기로 유지한다.
