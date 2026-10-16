@@ -96,7 +96,7 @@ import type {
   SyncJobUpdate,
   SynchronizeBody,
   V1ReviewRequestDto
-} from './model';
+} from './model/index';
 
 import { authenticatedClient } from '../transport';
 

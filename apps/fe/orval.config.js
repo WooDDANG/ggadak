@@ -8,7 +8,7 @@ export default defineConfig({
       clean: true,
       mode: 'split',
       target: 'src/api/generated/index.ts',
-      schemas: 'src/api/generated/model',
+      schemas: { path: 'src/api/generated/model/index.ts', mode: 'single' },
       client: 'react-query',
       httpClient: 'fetch',
       override: { mutator: { path: './src/api/transport.ts', name: 'authenticatedClient' } },

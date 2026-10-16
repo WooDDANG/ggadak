@@ -4,174 +4,1562 @@
  * @ggaddak/be
  * OpenAPI spec version: 1.0.0
  */
+export type DecisionStatus = typeof DecisionStatus[keyof typeof DecisionStatus];
 
-export * from './actionItemDto';
-export * from './actionItemState';
-export * from './alternativeItemDto';
-export * from './analysisDeliveryQueueDto';
-export * from './analysisDeliveryStatus';
-export * from './analysisDeliveryStatusDto';
-export * from './analysisDeliveryStatusDtoScanRange';
-export * from './analysisDeliveryViewDto';
-export * from './analysisDeliveryViewDtoManagedBy';
-export * from './analysisDeliveryViewDtoScanRange';
-export * from './analysisFailure';
-export * from './analysisPhase';
-export * from './analysisReceiptState';
-export * from './analysisRetryCommandDto';
-export * from './analysisScanState';
-export * from './analysisStatus';
-export * from './analysisStatusSessionsItem';
-export * from './analyzeDiscussionRequestDto';
-export * from './analyzeDiscussionResponseDto';
-export * from './apiResponseAccessTokenStringTokenTypeStringExpiresAtString';
-export * from './apiResponseAccessTokenStringTokenTypeStringExpiresAtStringData';
-export * from './apiResponseAccessTokenStringTokenTypeStringExpiresAtStringUserAuthUserDto';
-export * from './apiResponseAccessTokenStringTokenTypeStringExpiresAtStringUserAuthUserDtoData';
-export * from './apiResponseAccessTokenStringTokenTypeStringExpiresAtStringUserAuthUserDtoGuildsDiscordGuildArray';
-export * from './apiResponseAccessTokenStringTokenTypeStringExpiresAtStringUserAuthUserDtoGuildsDiscordGuildArrayData';
-export * from './apiResponseAnalysisDeliveryQueueDto';
-export * from './apiResponseAnalysisRetryCommandDto';
-export * from './apiResponseAnalysisRetryCommandDtoArray';
-export * from './apiResponseAnalysisStatus';
-export * from './apiResponseAuthUserDto';
-export * from './apiResponseCandidateHistoryEntryArray';
-export * from './apiResponseChannelIdsStringArray';
-export * from './apiResponseChannelIdsStringArrayData';
-export * from './apiResponseChannelSettings';
-export * from './apiResponseDashboardDto';
-export * from './apiResponseDecisionTimelineDto';
-export * from './apiResponseGraphSnapshot';
-export * from './apiResponseGuildsDiscordGuildArray';
-export * from './apiResponseGuildsDiscordGuildArrayData';
-export * from './apiResponseNull';
-export * from './apiResponseQueueCapacityDto';
-export * from './apiResponseReceiptView';
-export * from './apiResponseReceiptViewArray';
-export * from './apiResponseScanReceiptDto';
-export * from './apiResponseScanSealDto';
-export * from './apiResponseScanStatusDto';
-export * from './apiResponseSearchResponse';
-export * from './apiResponseSyncJobClaimDtoOrNull';
-export * from './apiResponseSyncJobView';
-export * from './apiResponseUrlString';
-export * from './apiResponseUrlStringData';
-export * from './apiResponseV1DecisionDto';
-export * from './apiResponseV1DecisionListDto';
-export * from './apiResponseV1ReviewQueueDto';
-export * from './authUserDto';
-export * from './candidateHistoryEntry';
-export * from './categoryTag';
-export * from './channelSettings';
-export * from './checkpointResponseDto';
-export * from './createBody';
-export * from './createFeedback201';
-export * from './createFeedbackDto';
-export * from './createParams';
-export * from './dashboardDto';
-export * from './dashboardDtoCounts';
-export * from './dashboardDtoSync';
-export * from './dashboardDtoSyncLatestJob';
-export * from './decisionEditDto';
-export * from './decisionEditDtoAlternativesItem';
-export * from './decisionItemDto';
-export * from './decisionObservation';
-export * from './decisionState';
-export * from './decisionStatus';
-export * from './decisionTimelineDto';
-export * from './decisionTimelineDtoGroupsItem';
-export * from './decisionTimelineGroupBy';
-export * from './deliveryStatus';
-export * from './discordChannel';
-export * from './discordGuild';
-export * from './discussionMessage';
-export * from './discussionMessageReactionsItem';
-export * from './editV1DecisionParams';
-export * from './excludeSyncChannelStatusWAITING';
-export * from './excludeSyncJobStatusQUEUED';
-export * from './externalFeedbackItemDto';
-export * from './feedbackListResponseDto';
-export * from './feedbackSourceType';
-export * from './getDashboardParams';
-export * from './getDecisionTimelineParams';
-export * from './getMonitoredChannelsParams';
-export * from './getParams';
-export * from './getV1DecisionHistoryParams';
-export * from './getV1DecisionParams';
-export * from './graphEdge';
-export * from './graphEdgeType';
-export * from './graphNode';
-export * from './graphNodeHistoryItem';
-export * from './graphNodeType';
-export * from './graphObservation';
-export * from './graphParams';
-export * from './graphSession';
-export * from './graphSessionDiscussionProblemsItem';
-export * from './graphSnapshot';
-export * from './graphSnapshotSchemaVersion';
-export * from './harvestingPolicyDto';
-export * from './linkedGraphNode';
-export * from './listAnalysisDeliveriesParams';
-export * from './listDiscordChannelsParams';
-export * from './listFeedbacksParams';
-export * from './listV1DecisionsParams';
-export * from './listV1ReviewQueueParams';
-export * from './listV1ReviewQueueStatus';
-export * from './loginDiscordBody';
-export * from './pickDecisionItemDtoExcludeKeyofDecisionItemDtoAlternatives';
-export * from './pickReviewDecisionDtoExcludeKeyofReviewDecisionDtoActionOrApprovedBy';
-export * from './pickReviewDecisionDtoExcludeKeyofReviewDecisionDtoActionOrApprovedByTaskDispositionsItem';
-export * from './pickReviewDecisionDtoExcludeKeyofReviewDecisionDtoActionOrApprovedByTaskDispositionsItemClassification';
-export * from './queueCapacityDto';
-export * from './queueCapacityDtoStatesItem';
-export * from './rationaleStatus';
-export * from './rawMessageItemDto';
-export * from './receiptBody';
-export * from './receiptView';
-export * from './recordStringAny';
-export * from './resultAckBody';
-export * from './resultsParams';
-export * from './resumeChannelParams';
-export * from './retryAnalysisRequestBody';
-export * from './retryAnalysisRequestParams';
-export * from './reviewResolution';
-export * from './reviewV1CandidateParams';
-export * from './save200';
-export * from './saveCheckpointDto';
-export * from './saveDiscordChannelsBody';
-export * from './saveDiscordChannelsParams';
-export * from './scanBody';
-export * from './scanRangeDto';
-export * from './scanReceiptDto';
-export * from './scanSealBody';
-export * from './scanSealDto';
-export * from './scanStatusDto';
-export * from './searchDecisionsParams';
-export * from './searchResponse';
-export * from './searchResult';
-export * from './statusParams';
-export * from './syncChannelResult';
-export * from './syncChannelStatus';
-export * from './synchronizeBody';
-export * from './syncJobClaimDto';
-export * from './syncJobClaimDtoChannelsItem';
-export * from './syncJobStatus';
-export * from './syncJobUpdate';
-export * from './syncJobUpdateDto';
-export * from './syncJobView';
-export * from './syncJobViewChannelsItem';
-export * from './taskDisposition';
-export * from './v1DecisionDto';
-export * from './v1DecisionDtoAlternativesItem';
-export * from './v1DecisionDtoDates';
-export * from './v1DecisionListDto';
-export * from './v1DecisionListDtoPageInfo';
-export * from './v1ReviewQueueDto';
-export * from './v1ReviewQueueDtoPageInfo';
-export * from './v1ReviewRequestDto';
-export * from './v1ReviewRequestDtoAction';
-export * from './v1ReviewRequestDtoTaskDispositionsItem';
-export * from './v1ReviewRequestDtoTaskDispositionsItemClassification';
-export * from './v1ReviewTicketDto';
-export * from './v1ReviewTicketDtoAlternativesItem';
-export * from './v1ReviewTicketDtoDates';
+
+export const DecisionStatus = {
+  IN_REVIEW: 'IN_REVIEW',
+  CONFIRMED: 'CONFIRMED',
+  ON_HOLD: 'ON_HOLD',
+  DISCARDED: 'DISCARDED',
+  SUPERSEDED: 'SUPERSEDED',
+} as const;
+
+export type RationaleStatus = typeof RationaleStatus[keyof typeof RationaleStatus];
+
+
+export const RationaleStatus = {
+  stated: 'stated',
+  not_stated: 'not_stated',
+} as const;
+
+export type DecisionObservation = typeof DecisionObservation[keyof typeof DecisionObservation];
+
+
+export const DecisionObservation = {
+  proposed: 'proposed',
+  agreed: 'agreed',
+  withdrawn: 'withdrawn',
+  unclear: 'unclear',
+} as const;
+
+export type CategoryTag = typeof CategoryTag[keyof typeof CategoryTag];
+
+
+export const CategoryTag = {
+  타깃: '타깃',
+  문제정의: '문제정의',
+  기능: '기능',
+  기술: '기술',
+  BM: 'BM',
+  기타: '기타',
+} as const;
+
+export type ActionItemState = typeof ActionItemState[keyof typeof ActionItemState];
+
+
+export const ActionItemState = {
+  unknown: 'unknown',
+  open: 'open',
+  completed: 'completed',
+  canceled: 'canceled',
+  transferred: 'transferred',
+} as const;
+
+export interface ActionItemDto {
+  id?: string;
+  state?: ActionItemState;
+  transferredFromDecisionId?: string;
+  transferredFromActionItemId?: string;
+  transferredToDecisionId?: string;
+  task: string;
+  assignee?: string;
+  dueDate?: string;
+}
+
+/**
+ * Runtime enum objects keep wire values and string-literal types compatible.
+ */
+export type DecisionState = typeof DecisionState[keyof typeof DecisionState];
+
+
+export const DecisionState = {
+  Proposed: 'Proposed',
+  Draft: 'Draft',
+  Discussing: 'Discussing',
+  Decided: 'Decided',
+  Deferred: 'Deferred',
+  Superseded: 'Superseded',
+  Rejected: 'Rejected',
+} as const;
+
+/**
+ * Construct a type with a set of properties K of type T
+ */
+export interface RecordStringAny {[key: string]: unknown}
+
+/**
+ * From T, pick a set of properties whose keys are in the union K
+ */
+export interface PickDecisionItemDtoExcludeKeyofDecisionItemDtoAlternatives {
+  id: string;
+  version?: number;
+  supersededById?: string;
+  topic: string;
+  decision: string;
+  title?: string;
+  decisionContent?: string;
+  rationale: string;
+  rationaleStatus?: RationaleStatus;
+  observation?: DecisionObservation;
+  rationaleSummary?: string;
+  rationaleQuotes?: string[];
+  categoryTag?: CategoryTag;
+  actionItems?: ActionItemDto[];
+  state: DecisionState;
+  supersedesId?: string;
+  isPivot?: boolean;
+  approvedBy?: string;
+  decisionConfirmedDate?: string;
+  feedbackSourceType?: string;
+  feedbackSourceDetail?: string;
+  feedbackReceivedDate?: string;
+  rawEvidence?: string[];
+  evidenceHash?: string;
+  rawTranscript?: string;
+  source?: RecordStringAny;
+  messageCreatedAt?: string;
+  createdAt: string;
+  governanceScore?: number;
+  governanceReason?: string;
+  governancePassed?: boolean;
+}
+
+export type V1ReviewTicketDtoDates = {
+  /** @nullable */
+  feedbackDate: string | null;
+  /** @nullable */
+  confirmedDate: string | null;
+  createdDate: string;
+};
+
+export type V1ReviewTicketDtoAlternativesItem = {
+  reason: string;
+  name: string;
+  id: string;
+};
+
+/**
+ * A Review Queue ticket is the Decision Candidate itself. Both IDs are identical strings.
+ */
+export interface V1ReviewTicketDto {
+  id: string;
+  version?: number;
+  supersededById?: string;
+  topic: string;
+  decision: string;
+  title?: string;
+  decisionContent?: string;
+  rationale: string;
+  rationaleStatus?: RationaleStatus;
+  observation?: DecisionObservation;
+  rationaleSummary?: string;
+  rationaleQuotes?: string[];
+  categoryTag?: CategoryTag;
+  actionItems?: ActionItemDto[];
+  state: DecisionState;
+  supersedesId?: string;
+  isPivot?: boolean;
+  approvedBy?: string;
+  decisionConfirmedDate?: string;
+  feedbackSourceType?: string;
+  feedbackSourceDetail?: string;
+  feedbackReceivedDate?: string;
+  rawEvidence?: string[];
+  evidenceHash?: string;
+  rawTranscript?: string;
+  source?: RecordStringAny;
+  messageCreatedAt?: string;
+  createdAt: string;
+  governanceScore?: number;
+  governanceReason?: string;
+  governancePassed?: boolean;
+  updatedAt?: string;
+  status: DecisionStatus;
+  category: string;
+  /** @nullable */
+  confirmedDate: string | null;
+  dates: V1ReviewTicketDtoDates;
+  alternatives: V1ReviewTicketDtoAlternativesItem[];
+  ticketId: string;
+}
+
+export type V1ReviewQueueDtoPageInfo = {
+  totalPages: number;
+  totalElements: number;
+  pageSize: number;
+  currentPage: number;
+};
+
+export interface V1ReviewQueueDto {
+  items: V1ReviewTicketDto[];
+  pageInfo: V1ReviewQueueDtoPageInfo;
+}
+
+/**
+ * Shared v1 response contract. Domain payloads remain typed by each endpoint.
+ */
+export interface ApiResponseV1ReviewQueueDto {
+  success: boolean;
+  code: string;
+  message: string;
+  data: V1ReviewQueueDto;
+}
+
+export type V1DecisionDtoDates = {
+  /** @nullable */
+  feedbackDate: string | null;
+  /** @nullable */
+  confirmedDate: string | null;
+  createdDate: string;
+};
+
+export type V1DecisionDtoAlternativesItem = {
+  reason: string;
+  name: string;
+  id: string;
+};
+
+export interface V1DecisionDto {
+  id: string;
+  version?: number;
+  supersededById?: string;
+  topic: string;
+  decision: string;
+  title?: string;
+  decisionContent?: string;
+  rationale: string;
+  rationaleStatus?: RationaleStatus;
+  observation?: DecisionObservation;
+  rationaleSummary?: string;
+  rationaleQuotes?: string[];
+  categoryTag?: CategoryTag;
+  actionItems?: ActionItemDto[];
+  state: DecisionState;
+  supersedesId?: string;
+  isPivot?: boolean;
+  approvedBy?: string;
+  decisionConfirmedDate?: string;
+  feedbackSourceType?: string;
+  feedbackSourceDetail?: string;
+  feedbackReceivedDate?: string;
+  rawEvidence?: string[];
+  evidenceHash?: string;
+  rawTranscript?: string;
+  source?: RecordStringAny;
+  messageCreatedAt?: string;
+  createdAt: string;
+  governanceScore?: number;
+  governanceReason?: string;
+  governancePassed?: boolean;
+  updatedAt?: string;
+  status: DecisionStatus;
+  category: string;
+  /** @nullable */
+  confirmedDate: string | null;
+  dates: V1DecisionDtoDates;
+  alternatives: V1DecisionDtoAlternativesItem[];
+}
+
+/**
+ * Shared v1 response contract. Domain payloads remain typed by each endpoint.
+ */
+export interface ApiResponseV1DecisionDto {
+  success: boolean;
+  code: string;
+  message: string;
+  data: V1DecisionDto;
+}
+
+export type ReviewResolution = typeof ReviewResolution[keyof typeof ReviewResolution];
+
+
+export const ReviewResolution = {
+  independent: 'independent',
+  replace: 'replace',
+} as const;
+
+export type TaskDisposition = typeof TaskDisposition[keyof typeof TaskDisposition];
+
+
+export const TaskDisposition = {
+  cancel: 'cancel',
+  transfer: 'transfer',
+} as const;
+
+export type PickReviewDecisionDtoExcludeKeyofReviewDecisionDtoActionOrApprovedByTaskDispositionsItemClassification = typeof PickReviewDecisionDtoExcludeKeyofReviewDecisionDtoActionOrApprovedByTaskDispositionsItemClassification[keyof typeof PickReviewDecisionDtoExcludeKeyofReviewDecisionDtoActionOrApprovedByTaskDispositionsItemClassification];
+
+
+export const PickReviewDecisionDtoExcludeKeyofReviewDecisionDtoActionOrApprovedByTaskDispositionsItemClassification = {
+  open: 'open',
+  completed: 'completed',
+} as const;
+
+export type PickReviewDecisionDtoExcludeKeyofReviewDecisionDtoActionOrApprovedByTaskDispositionsItem = {
+  disposition?: TaskDisposition;
+  classification?: PickReviewDecisionDtoExcludeKeyofReviewDecisionDtoActionOrApprovedByTaskDispositionsItemClassification;
+  actionItemId: string;
+};
+
+/**
+ * From T, pick a set of properties whose keys are in the union K
+ */
+export interface PickReviewDecisionDtoExcludeKeyofReviewDecisionDtoActionOrApprovedBy {
+  title?: string;
+  decisionContent?: string;
+  rationale?: string;
+  rationaleSummary?: string;
+  rationaleQuotes?: string[];
+  categoryTag?: CategoryTag;
+  expectedVersion: number;
+  resolution?: ReviewResolution;
+  predecessorId?: string;
+  predecessorVersion?: number;
+  taskDispositions?: PickReviewDecisionDtoExcludeKeyofReviewDecisionDtoActionOrApprovedByTaskDispositionsItem[];
+}
+
+export type V1ReviewRequestDtoTaskDispositionsItemClassification = typeof V1ReviewRequestDtoTaskDispositionsItemClassification[keyof typeof V1ReviewRequestDtoTaskDispositionsItemClassification];
+
+
+export const V1ReviewRequestDtoTaskDispositionsItemClassification = {
+  open: 'open',
+  completed: 'completed',
+} as const;
+
+export type V1ReviewRequestDtoTaskDispositionsItem = {
+  disposition?: TaskDisposition;
+  classification?: V1ReviewRequestDtoTaskDispositionsItemClassification;
+  actionItemId: string;
+};
+
+export type V1ReviewRequestDtoAction = typeof V1ReviewRequestDtoAction[keyof typeof V1ReviewRequestDtoAction];
+
+
+export const V1ReviewRequestDtoAction = {
+  confirm: 'confirm',
+  defer: 'defer',
+  reject: 'reject',
+} as const;
+
+/**
+ * Reviewer identity is always taken from the authenticated session.
+ */
+export interface V1ReviewRequestDto {
+  title?: string;
+  decisionContent?: string;
+  rationale?: string;
+  rationaleSummary?: string;
+  rationaleQuotes?: string[];
+  categoryTag?: CategoryTag;
+  expectedVersion: number;
+  resolution?: ReviewResolution;
+  predecessorId?: string;
+  predecessorVersion?: number;
+  taskDispositions?: V1ReviewRequestDtoTaskDispositionsItem[];
+  action: V1ReviewRequestDtoAction;
+}
+
+export type DecisionTimelineGroupBy = typeof DecisionTimelineGroupBy[keyof typeof DecisionTimelineGroupBy];
+
+
+export const DecisionTimelineGroupBy = {
+  month: 'month',
+  topic: 'topic',
+  channel: 'channel',
+  category: 'category',
+} as const;
+
+export type DecisionTimelineDtoGroupsItem = {
+  items: V1DecisionDto[];
+  count: number;
+  key: string;
+};
+
+export interface DecisionTimelineDto {
+  groupBy: DecisionTimelineGroupBy;
+  timezone: string;
+  totalElements: number;
+  groups: DecisionTimelineDtoGroupsItem[];
+}
+
+/**
+ * Shared v1 response contract. Domain payloads remain typed by each endpoint.
+ */
+export interface ApiResponseDecisionTimelineDto {
+  success: boolean;
+  code: string;
+  message: string;
+  data: DecisionTimelineDto;
+}
+
+export type DecisionEditDtoAlternativesItem = {
+  reason: string;
+  name: string;
+  id?: string;
+};
+
+export interface DecisionEditDto {
+  /** Version last read; stale edits return 409. */
+  expectedVersion: number;
+  /** Required summary, 1–200 trimmed characters. */
+  title: string;
+  /** Required decision content, 1–10000 trimmed characters. */
+  decision: string;
+  /** Required Rationale, 1–10000 trimmed characters. */
+  rationale: string;
+  category: CategoryTag;
+  /** Full replacement (max 20). Keep existing IDs, omit ID to add; omitted existing alternatives are deleted. Unknown/duplicate IDs rejected. */
+  alternatives: DecisionEditDtoAlternativesItem[];
+  [key: string]: unknown;
+}
+
+export interface CandidateHistoryEntry {
+  requestId: string;
+  isManualOverride: boolean;
+  previousRequestIds: string[];
+  relatedCandidateIds: string[];
+  createdAt: string;
+  graphAvailable?: boolean;
+  candidateNodeIds?: string[];
+}
+
+/**
+ * Shared v1 response contract. Domain payloads remain typed by each endpoint.
+ */
+export interface ApiResponseCandidateHistoryEntryArray {
+  success: boolean;
+  code: string;
+  message: string;
+  data: CandidateHistoryEntry[];
+}
+
+export interface AlternativeItemDto {
+  option: string;
+  reason: string;
+}
+
+export interface DecisionItemDto {
+  id: string;
+  version?: number;
+  /** @nullable */
+  supersededById?: string | null;
+  topic: string;
+  decision: string;
+  title?: string;
+  decisionContent?: string;
+  rationale: string;
+  rationaleStatus?: RationaleStatus;
+  observation?: DecisionObservation;
+  rationaleSummary?: string;
+  rationaleQuotes?: string[];
+  alternatives?: AlternativeItemDto[];
+  categoryTag?: CategoryTag;
+  actionItems?: ActionItemDto[];
+  state: DecisionState;
+  /** @nullable */
+  supersedesId?: string | null;
+  /** @nullable */
+  isPivot?: boolean | null;
+  /** @nullable */
+  approvedBy?: string | null;
+  /** @nullable */
+  decisionConfirmedDate?: string | null;
+  /** @nullable */
+  feedbackSourceType?: string | null;
+  /** @nullable */
+  feedbackSourceDetail?: string | null;
+  /** @nullable */
+  feedbackReceivedDate?: string | null;
+  rawEvidence?: string[];
+  /** @nullable */
+  evidenceHash?: string | null;
+  /** @nullable */
+  rawTranscript?: string | null;
+  source?: RecordStringAny;
+  /** @nullable */
+  messageCreatedAt?: string | null;
+  createdAt: string;
+  governanceScore?: number;
+  governanceReason?: string;
+  governancePassed?: boolean;
+}
+
+export type V1DecisionListDtoPageInfo = {
+  totalPages: number;
+  totalElements: number;
+  pageSize: number;
+  currentPage: number;
+};
+
+export interface V1DecisionListDto {
+  items: V1DecisionDto[];
+  /** Compatibility projection for callers awaiting their feature migration. */
+  decisions: DecisionItemDto[];
+  pageInfo: V1DecisionListDtoPageInfo;
+}
+
+/**
+ * Shared v1 response contract. Domain payloads remain typed by each endpoint.
+ */
+export interface ApiResponseV1DecisionListDto {
+  success: boolean;
+  code: string;
+  message: string;
+  data: V1DecisionListDto;
+}
+
+export type SyncJobStatus = typeof SyncJobStatus[keyof typeof SyncJobStatus];
+
+
+export const SyncJobStatus = {
+  COMPLETED: 'COMPLETED',
+  QUEUED: 'QUEUED',
+  PROCESSING: 'PROCESSING',
+  FAILED: 'FAILED',
+} as const;
+
+export type SyncChannelStatus = typeof SyncChannelStatus[keyof typeof SyncChannelStatus];
+
+
+export const SyncChannelStatus = {
+  COMPLETED: 'COMPLETED',
+  FAILED: 'FAILED',
+  WAITING: 'WAITING',
+  RECEIVED: 'RECEIVED',
+} as const;
+
+export type SyncJobViewChannelsItem = {
+  status: SyncChannelStatus;
+  id: string;
+};
+
+export interface SyncJobView {
+  /** @nullable */
+  completedAt: string | null;
+  /** @nullable */
+  startedAt: string | null;
+  createdAt: string;
+  /** @nullable */
+  errorMessage: string | null;
+  channels?: SyncJobViewChannelsItem[];
+  analysisPendingChannels?: number;
+  receivedChannels?: number;
+  messagesScanned: number;
+  decisionsFound: number;
+  failedChannels: number;
+  completedChannels: number;
+  totalChannels: number;
+  status: SyncJobStatus;
+  forceFullSync: boolean;
+  guildId: string;
+  jobId: string;
+}
+
+/**
+ * Shared v1 response contract. Domain payloads remain typed by each endpoint.
+ */
+export interface ApiResponseSyncJobView {
+  success: boolean;
+  code: string;
+  message: string;
+  data: SyncJobView;
+}
+
+export type SyncJobClaimDtoChannelsItem = {
+  status: SyncChannelStatus;
+  id: string;
+};
+
+export interface SyncJobClaimDto {
+  /** @nullable */
+  completedAt: string | null;
+  /** @nullable */
+  startedAt: string | null;
+  createdAt: string;
+  /** @nullable */
+  errorMessage: string | null;
+  channels?: SyncJobClaimDtoChannelsItem[];
+  analysisPendingChannels?: number;
+  receivedChannels?: number;
+  messagesScanned: number;
+  decisionsFound: number;
+  failedChannels: number;
+  completedChannels: number;
+  totalChannels: number;
+  status: SyncJobStatus;
+  forceFullSync: boolean;
+  guildId: string;
+  jobId: string;
+  deliveryOnly?: boolean;
+  owner: string;
+  channelIds: string[];
+}
+
+/**
+ * Shared v1 response contract. Domain payloads remain typed by each endpoint.
+ */
+export interface ApiResponseSyncJobClaimDtoOrNull {
+  success: boolean;
+  code: string;
+  message: string;
+  data: SyncJobClaimDto | null;
+}
+
+/**
+ * Shared v1 response contract. Domain payloads remain typed by each endpoint.
+ */
+export interface ApiResponseNull {
+  success: boolean;
+  code: string;
+  message: string;
+  /** @nullable */
+  data: null;
+}
+
+/**
+ * Exclude from T those types that are assignable to U
+ */
+export type ExcludeSyncChannelStatusWAITING = typeof ExcludeSyncChannelStatusWAITING[keyof typeof ExcludeSyncChannelStatusWAITING];
+
+
+export const ExcludeSyncChannelStatusWAITING = {
+  COMPLETED: 'COMPLETED',
+  FAILED: 'FAILED',
+  RECEIVED: 'RECEIVED',
+} as const;
+
+export interface SyncChannelResult {
+  channelId: string;
+  status: ExcludeSyncChannelStatusWAITING;
+  messagesScanned: number;
+  decisionsFound: number;
+  errorMessage?: string;
+}
+
+/**
+ * Exclude from T those types that are assignable to U
+ */
+export type ExcludeSyncJobStatusQUEUED = typeof ExcludeSyncJobStatusQUEUED[keyof typeof ExcludeSyncJobStatusQUEUED];
+
+
+export const ExcludeSyncJobStatusQUEUED = {
+  COMPLETED: 'COMPLETED',
+  PROCESSING: 'PROCESSING',
+  FAILED: 'FAILED',
+} as const;
+
+export interface SyncJobUpdate {
+  release?: boolean;
+  owner: string;
+  channelResult?: SyncChannelResult;
+  status?: ExcludeSyncJobStatusQUEUED;
+}
+
+export type SyncJobUpdateDto = SyncJobUpdate;
+
+export interface SearchResult {
+  decision: V1DecisionDto;
+  score: number;
+  excerpt: string;
+  /** @nullable */
+  sourceUrl: string | null;
+}
+
+export interface SearchResponse {
+  items: SearchResult[];
+}
+
+/**
+ * Shared v1 response contract. Domain payloads remain typed by each endpoint.
+ */
+export interface ApiResponseSearchResponse {
+  success: boolean;
+  code: string;
+  message: string;
+  data: SearchResponse;
+}
+
+export interface HarvestingPolicyDto {
+  semanticThreshold: number;
+  initialScanLimit: number;
+  contextWindowBefore: number;
+  contextWindowAfter: number;
+  maxMergedWindow: number;
+  reactionThreshold: number;
+  debounceMs: number;
+  agreementThreshold: number;
+  lookbackDays: number;
+}
+
+export type FeedbackSourceType = typeof FeedbackSourceType[keyof typeof FeedbackSourceType];
+
+
+export const FeedbackSourceType = {
+  교수: '교수',
+  심사위원: '심사위원',
+  팀원: '팀원',
+  인터뷰이: '인터뷰이',
+} as const;
+
+export interface ExternalFeedbackItemDto {
+  id: string;
+  source: FeedbackSourceType;
+  detail?: string;
+  content: string;
+  channelId: string;
+  createdAt: string;
+}
+
+export interface FeedbackListResponseDto {
+  feedbacks: ExternalFeedbackItemDto[];
+}
+
+export interface CreateFeedbackDto {
+  id: string;
+  source: FeedbackSourceType;
+  detail?: string;
+  content: string;
+  channelId: string;
+  createdAt: string;
+}
+
+export interface AnalyzeDiscussionResponseDto {
+  requestId?: string;
+  graphAvailable?: boolean;
+  graphId?: string;
+  found: boolean;
+  summary: string;
+  decisions: DecisionItemDto[];
+  hasConflict?: boolean;
+  conflictingDecision?: DecisionItemDto;
+}
+
+export type DiscussionMessageReactionsItem = {
+  botCount?: number;
+  count: number;
+  emoji: string;
+};
+
+export interface DiscussionMessage {
+  isBot?: boolean;
+  id: string;
+  author: string;
+  content: string;
+  createdAt?: string;
+  replyingTo?: string;
+  reactionCount?: number;
+  reactions?: DiscussionMessageReactionsItem[];
+  isTrigger?: boolean;
+}
+
+export type RawMessageItemDto = DiscussionMessage;
+
+export interface AnalyzeDiscussionRequestDto {
+  requestId: string;
+  rawMessages: DiscussionMessage[];
+  guildId?: string;
+  channelId?: string;
+  channelName?: string;
+  triggerMessageId?: string;
+  messageUrl?: string;
+  isManualOverride?: boolean;
+  traceId?: string;
+  score?: number;
+  participantCount?: number;
+  reactionsCount?: number;
+}
+
+export type DashboardDtoCounts = {
+  inReview: number;
+  onHold: number;
+  confirmed: number;
+};
+
+/**
+ * @nullable
+ */
+export type DashboardDtoSyncLatestJob = {
+  /** @nullable */
+  completedAt: string | null;
+  createdAt: string;
+  failedChannels: number;
+  completedChannels: number;
+  totalChannels: number;
+  /** @nullable */
+  errorMessage: string | null;
+  status: string;
+  jobId: string;
+} | null;
+
+export type DashboardDtoSync = {
+  /** @nullable */
+  latestJob: DashboardDtoSyncLatestJob;
+  /** @nullable */
+  lastSuccessfulAt: string | null;
+};
+
+export interface DashboardDto {
+  counts: DashboardDtoCounts;
+  recentDecisions: V1DecisionDto[];
+  sync: DashboardDtoSync;
+}
+
+/**
+ * Shared v1 response contract. Domain payloads remain typed by each endpoint.
+ */
+export interface ApiResponseDashboardDto {
+  success: boolean;
+  code: string;
+  message: string;
+  data: DashboardDto;
+}
+
+export interface CheckpointResponseDto {
+  channelId: string;
+  /** @nullable */
+  lastMessageId: string | null;
+}
+
+export interface SaveCheckpointDto {
+  lastMessageId: string;
+}
+
+export interface DiscordChannel {
+  id: string;
+  guildId: string;
+  name: string;
+  type: number;
+  accessible: boolean;
+}
+
+export interface ChannelSettings {
+  channels: DiscordChannel[];
+  monitoredChannelIds: string[];
+}
+
+/**
+ * Shared v1 response contract. Domain payloads remain typed by each endpoint.
+ */
+export interface ApiResponseChannelSettings {
+  success: boolean;
+  code: string;
+  message: string;
+  data: ChannelSettings;
+}
+
+export type ApiResponseChannelIdsStringArrayData = {
+  channelIds: string[];
+};
+
+/**
+ * Shared v1 response contract. Domain payloads remain typed by each endpoint.
+ */
+export interface ApiResponseChannelIdsStringArray {
+  success: boolean;
+  code: string;
+  message: string;
+  data: ApiResponseChannelIdsStringArrayData;
+}
+
+export type ApiResponseUrlStringData = {
+  url: string;
+};
+
+/**
+ * Shared v1 response contract. Domain payloads remain typed by each endpoint.
+ */
+export interface ApiResponseUrlString {
+  success: boolean;
+  code: string;
+  message: string;
+  data: ApiResponseUrlStringData;
+}
+
+export interface AuthUserDto {
+  id: string;
+  name: string;
+  /** @nullable */
+  email: string | null;
+  /** @nullable */
+  avatarUrl: string | null;
+  discordUserId: string;
+}
+
+export type ApiResponseAccessTokenStringTokenTypeStringExpiresAtStringUserAuthUserDtoData = {
+  user: AuthUserDto;
+  expiresAt: string;
+  tokenType: string;
+  accessToken: string;
+};
+
+/**
+ * Shared v1 response contract. Domain payloads remain typed by each endpoint.
+ */
+export interface ApiResponseAccessTokenStringTokenTypeStringExpiresAtStringUserAuthUserDto {
+  success: boolean;
+  code: string;
+  message: string;
+  data: ApiResponseAccessTokenStringTokenTypeStringExpiresAtStringUserAuthUserDtoData;
+}
+
+export interface DiscordGuild {
+  id: string;
+  name: string;
+  /** @nullable */
+  icon: string | null;
+  owner: boolean;
+  permissions: string;
+}
+
+export type ApiResponseAccessTokenStringTokenTypeStringExpiresAtStringUserAuthUserDtoGuildsDiscordGuildArrayData = {
+  guilds: DiscordGuild[];
+  user: AuthUserDto;
+  expiresAt: string;
+  tokenType: string;
+  accessToken: string;
+};
+
+/**
+ * Shared v1 response contract. Domain payloads remain typed by each endpoint.
+ */
+export interface ApiResponseAccessTokenStringTokenTypeStringExpiresAtStringUserAuthUserDtoGuildsDiscordGuildArray {
+  success: boolean;
+  code: string;
+  message: string;
+  data: ApiResponseAccessTokenStringTokenTypeStringExpiresAtStringUserAuthUserDtoGuildsDiscordGuildArrayData;
+}
+
+/**
+ * Shared v1 response contract. Domain payloads remain typed by each endpoint.
+ */
+export interface ApiResponseAuthUserDto {
+  success: boolean;
+  code: string;
+  message: string;
+  data: AuthUserDto;
+}
+
+export type ApiResponseGuildsDiscordGuildArrayData = {
+  guilds: DiscordGuild[];
+};
+
+/**
+ * Shared v1 response contract. Domain payloads remain typed by each endpoint.
+ */
+export interface ApiResponseGuildsDiscordGuildArray {
+  success: boolean;
+  code: string;
+  message: string;
+  data: ApiResponseGuildsDiscordGuildArrayData;
+}
+
+export type ApiResponseAccessTokenStringTokenTypeStringExpiresAtStringData = {
+  expiresAt: string;
+  tokenType: string;
+  accessToken: string;
+};
+
+/**
+ * Shared v1 response contract. Domain payloads remain typed by each endpoint.
+ */
+export interface ApiResponseAccessTokenStringTokenTypeStringExpiresAtString {
+  success: boolean;
+  code: string;
+  message: string;
+  data: ApiResponseAccessTokenStringTokenTypeStringExpiresAtStringData;
+}
+
+export type GraphNodeType = typeof GraphNodeType[keyof typeof GraphNodeType];
+
+
+export const GraphNodeType = {
+  Topic: 'Topic',
+  Issue: 'Issue',
+  DecisionCandidate: 'DecisionCandidate',
+  Alternative: 'Alternative',
+  Rationale: 'Rationale',
+  ActionItem: 'ActionItem',
+} as const;
+
+export type GraphObservation = typeof GraphObservation[keyof typeof GraphObservation];
+
+
+export const GraphObservation = {
+  proposed: 'proposed',
+  agreed: 'agreed',
+  withdrawn: 'withdrawn',
+  unclear: 'unclear',
+  adopted: 'adopted',
+  rejected: 'rejected',
+} as const;
+
+export type GraphNodeHistoryItem = {
+  /** @nullable */
+  at: string | null;
+  summary: string;
+  observation: DecisionObservation;
+};
+
+export interface GraphNode {
+  id: string;
+  type: GraphNodeType;
+  summary: string;
+  observation?: GraphObservation | null;
+  rationaleStatus?: RationaleStatus | null;
+  category?: CategoryTag | null;
+  /** @nullable */
+  history?: GraphNodeHistoryItem[] | null;
+  /** @nullable */
+  assignee?: string | null;
+  /** @nullable */
+  dueDate?: string | null;
+}
+
+export type LinkedGraphNode = GraphNode & {
+  suppressed?: boolean;
+  stale?: boolean;
+  currentDecisionVersion?: number;
+  decisionVersion?: number;
+  decisionId?: string;
+};
+
+export type GraphEdgeType = typeof GraphEdgeType[keyof typeof GraphEdgeType];
+
+
+export const GraphEdgeType = {
+  contains: 'contains',
+  has_alternative: 'has_alternative',
+  supports: 'supports',
+  opposes: 'opposes',
+  triggers: 'triggers',
+  conflicts_with: 'conflicts_with',
+  depends_on: 'depends_on',
+} as const;
+
+export interface GraphEdge {
+  id: string;
+  type: GraphEdgeType;
+  sourceId: string;
+  targetId: string;
+}
+
+export type GraphSessionDiscussionProblemsItem = {
+  edgeIds: string[];
+  nodeIds: string[];
+  summary: string;
+};
+
+export interface GraphSession {
+  summary: string;
+  nodes: LinkedGraphNode[];
+  edges: GraphEdge[];
+  discussionProblems: GraphSessionDiscussionProblemsItem[];
+  sessionId: string;
+  inputMessageIds: string[];
+}
+
+export type GraphSnapshotSchemaVersion = typeof GraphSnapshotSchemaVersion[keyof typeof GraphSnapshotSchemaVersion];
+
+
+export const GraphSnapshotSchemaVersion = {
+  NUMBER_1: 1,
+} as const;
+
+export interface GraphSnapshot {
+  id: string;
+  schemaVersion: GraphSnapshotSchemaVersion;
+  requestId: string;
+  guildId: string;
+  sessions: GraphSession[];
+}
+
+/**
+ * Shared v1 response contract. Domain payloads remain typed by each endpoint.
+ */
+export interface ApiResponseGraphSnapshot {
+  success: boolean;
+  code: string;
+  message: string;
+  data: GraphSnapshot;
+}
+
+export interface AnalysisFailure {
+  category: string;
+  message: string;
+  status: number;
+  retryable: boolean;
+}
+
+export type AnalysisPhase = typeof AnalysisPhase[keyof typeof AnalysisPhase];
+
+
+export const AnalysisPhase = {
+  extract: 'extract',
+  check: 'check',
+  verify: 'verify',
+  repair: 'repair',
+  recheck: 'recheck',
+  reverify: 'reverify',
+  done: 'done',
+} as const;
+
+export type AnalysisStatusSessionsItem = {
+  outputTokens: number;
+  inputTokens: number;
+  attempts: number;
+  logicalCalls: number;
+  elapsedMs: number;
+  repairs: number;
+  phase: AnalysisPhase;
+  sessionId: string;
+};
+
+export interface AnalysisStatus {
+  requestId: string;
+  state: string;
+  graphAvailable: boolean;
+  retryable: boolean;
+  error: AnalysisFailure | null;
+  sessions: AnalysisStatusSessionsItem[];
+}
+
+/**
+ * Shared v1 response contract. Domain payloads remain typed by each endpoint.
+ */
+export interface ApiResponseAnalysisStatus {
+  success: boolean;
+  code: string;
+  message: string;
+  data: AnalysisStatus;
+}
+
+/**
+ * Durable input receipt lifecycle shared by the backend and bot.
+ */
+export type AnalysisReceiptState = typeof AnalysisReceiptState[keyof typeof AnalysisReceiptState];
+
+
+export const AnalysisReceiptState = {
+  receiving: 'receiving',
+  pending: 'pending',
+  processing: 'processing',
+  retry: 'retry',
+  completed: 'completed',
+  failed: 'failed',
+} as const;
+
+export interface ReceiptView {
+  requestId: string;
+  state: AnalysisReceiptState;
+  attempts: number;
+  nextAttemptAt: string;
+  /** @nullable */
+  errorCategory: string | null;
+  inputRetained: boolean;
+  result?: AnalyzeDiscussionResponseDto;
+  receivedAt: string;
+  /** @nullable */
+  startedAt: string | null;
+  /** @nullable */
+  completedAt: string | null;
+}
+
+/**
+ * Shared v1 response contract. Domain payloads remain typed by each endpoint.
+ */
+export interface ApiResponseReceiptView {
+  success: boolean;
+  code: string;
+  message: string;
+  data: ReceiptView;
+}
+
+export interface ScanRangeDto {
+  afterMessageId: string;
+  startMessageId: string;
+  endMessageId: string;
+}
+
+export interface ReceiptBody {
+  input: AnalyzeDiscussionRequestDto;
+  scanId?: string;
+  rangeIndex?: number;
+  range?: ScanRangeDto;
+}
+
+/**
+ * Shared v1 response contract. Domain payloads remain typed by each endpoint.
+ */
+export interface ApiResponseReceiptViewArray {
+  success: boolean;
+  code: string;
+  message: string;
+  data: ReceiptView[];
+}
+
+export interface ResultAckBody {
+  ids: string[];
+}
+
+export type QueueCapacityDtoStatesItem = {
+  bytes: number;
+  count: number;
+  state: AnalysisReceiptState;
+};
+
+export interface QueueCapacityDto {
+  acceptingScans: boolean;
+  pending: number;
+  retainedBytes: number;
+  oldestWaitingMs: number;
+  /** @nullable */
+  pauseUntil: string | null;
+  maxBytes: number;
+  maxChannelBytes: number;
+  maxPending: number;
+  states: QueueCapacityDtoStatesItem[];
+}
+
+/**
+ * Shared v1 response contract. Domain payloads remain typed by each endpoint.
+ */
+export interface ApiResponseQueueCapacityDto {
+  success: boolean;
+  code: string;
+  message: string;
+  data: QueueCapacityDto;
+}
+
+/**
+ * A scan becomes eligible for analysis only after its manifest is sealed.
+ */
+export type AnalysisScanState = typeof AnalysisScanState[keyof typeof AnalysisScanState];
+
+
+export const AnalysisScanState = {
+  receiving: 'receiving',
+  'capacity-exceeded': 'capacity-exceeded',
+  sealed: 'sealed',
+} as const;
+
+export interface ScanReceiptDto {
+  id: string;
+  state: AnalysisScanState;
+}
+
+/**
+ * Shared v1 response contract. Domain payloads remain typed by each endpoint.
+ */
+export interface ApiResponseScanReceiptDto {
+  success: boolean;
+  code: string;
+  message: string;
+  data: ScanReceiptDto;
+}
+
+export interface ScanBody {
+  id: string;
+  guildId: string;
+  channelId: string;
+  upperMessageId: string;
+  afterMessageId: string;
+  jobId?: string;
+  jobOwner?: string;
+}
+
+export interface ScanSealDto {
+  sealed: boolean;
+  missing: number[];
+}
+
+/**
+ * Shared v1 response contract. Domain payloads remain typed by each endpoint.
+ */
+export interface ApiResponseScanSealDto {
+  success: boolean;
+  code: string;
+  message: string;
+  data: ScanSealDto;
+}
+
+export interface ScanSealBody {
+  expectedRanges: number;
+}
+
+export interface ScanStatusDto {
+  id: string;
+  state: AnalysisScanState;
+  /** @nullable */
+  expectedRanges: number | null;
+  receivedRanges: number;
+  completed: number;
+  failed: number;
+  bytes: number;
+  missing: number[];
+}
+
+/**
+ * Shared v1 response contract. Domain payloads remain typed by each endpoint.
+ */
+export interface ApiResponseScanStatusDto {
+  success: boolean;
+  code: string;
+  message: string;
+  data: ScanStatusDto;
+}
+
+export type DeliveryStatus = typeof DeliveryStatus[keyof typeof DeliveryStatus];
+
+
+export const DeliveryStatus = {
+  pending: 'pending',
+  'retry-pending': 'retry-pending',
+  'retained-failure': 'retained-failure',
+  'completed-with-candidates': 'completed-with-candidates',
+  'completed-no-decision': 'completed-no-decision',
+} as const;
+
+export type AnalysisDeliveryViewDtoScanRange = {
+  endMessageId: string;
+  startMessageId: string;
+  afterMessageId: string;
+};
+
+export type AnalysisDeliveryViewDtoManagedBy = typeof AnalysisDeliveryViewDtoManagedBy[keyof typeof AnalysisDeliveryViewDtoManagedBy];
+
+
+export const AnalysisDeliveryViewDtoManagedBy = {
+  bot: 'bot',
+  backend: 'backend',
+} as const;
+
+export interface AnalysisDeliveryViewDto {
+  requestId: string;
+  guildId: string;
+  channelId: string;
+  channelName?: string;
+  status: DeliveryStatus;
+  attempts: number;
+  nextAttemptAt: number;
+  errorCategory?: string;
+  lastError?: string;
+  scanRange?: AnalysisDeliveryViewDtoScanRange;
+  managedBy?: AnalysisDeliveryViewDtoManagedBy;
+  phase?: string;
+  inputRetained?: boolean;
+  receivedAt?: string;
+  /** @nullable */
+  startedAt?: string | null;
+  /** @nullable */
+  completedAt?: string | null;
+  requiresNewAnalysis?: boolean;
+  synchronizedAt: string;
+}
+
+export interface AnalysisDeliveryQueueDto {
+  requests: AnalysisDeliveryViewDto[];
+  available: boolean;
+  /** @nullable */
+  lastSynchronizedAt: string | null;
+}
+
+/**
+ * Shared v1 response contract. Domain payloads remain typed by each endpoint.
+ */
+export interface ApiResponseAnalysisDeliveryQueueDto {
+  success: boolean;
+  code: string;
+  message: string;
+  data: AnalysisDeliveryQueueDto;
+}
+
+export interface AnalysisRetryCommandDto {
+  id: string;
+  requestId: string;
+  guildId: string;
+  createdAt: string;
+  /** @nullable */
+  acknowledgedAt: string | null;
+}
+
+/**
+ * Shared v1 response contract. Domain payloads remain typed by each endpoint.
+ */
+export interface ApiResponseAnalysisRetryCommandDto {
+  success: boolean;
+  code: string;
+  message: string;
+  data: AnalysisRetryCommandDto;
+}
+
+/**
+ * Shared v1 response contract. Domain payloads remain typed by each endpoint.
+ */
+export interface ApiResponseAnalysisRetryCommandDtoArray {
+  success: boolean;
+  code: string;
+  message: string;
+  data: AnalysisRetryCommandDto[];
+}
+
+export type AnalysisDeliveryStatusDtoScanRange = {
+  endMessageId: string;
+  startMessageId: string;
+  afterMessageId: string;
+};
+
+export interface AnalysisDeliveryStatusDto {
+  requestId: string;
+  guildId: string;
+  channelId: string;
+  channelName?: string;
+  status: DeliveryStatus;
+  attempts: number;
+  nextAttemptAt: number;
+  errorCategory?: string;
+  lastError?: string;
+  scanRange?: AnalysisDeliveryStatusDtoScanRange;
+}
+
+export type AnalysisDeliveryStatus = AnalysisDeliveryStatusDto;
+
+export type ListV1ReviewQueueParams = {
+guildId: string;
+status?: ListV1ReviewQueueStatus;
+page?: number;
+size?: number;
+};
+
+export type ListV1ReviewQueueStatus = typeof ListV1ReviewQueueStatus[keyof typeof ListV1ReviewQueueStatus];
+
+
+export const ListV1ReviewQueueStatus = {
+  IN_REVIEW: 'IN_REVIEW',
+  ON_HOLD: 'ON_HOLD',
+} as const;
+
+export type ReviewV1CandidateParams = {
+guildId: string;
+};
+
+export type GetDecisionTimelineParams = {
+guildId: string;
+groupBy?: DecisionTimelineGroupBy;
+timezone?: string;
+from?: string;
+to?: string;
+};
+
+export type EditV1DecisionParams = {
+guildId: string;
+};
+
+export type GetV1DecisionParams = {
+guildId: string;
+};
+
+export type GetV1DecisionHistoryParams = {
+guildId: string;
+};
+
+export type ListV1DecisionsParams = {
+guildId: string;
+topic?: string;
+state?: string;
+categoryTag?: string;
+status?: DecisionStatus;
+category?: string;
+page?: number;
+size?: number;
+};
+
+export type CreateParams = {
+guildId: string;
+};
+
+export type CreateBody = {
+  forceFullSync?: boolean;
+};
+
+export type GetParams = {
+guildId: string;
+};
+
+export type ResumeChannelParams = {
+guildId: string;
+};
+
+export type SearchDecisionsParams = {
+guildId: string;
+query: string;
+limit?: number;
+};
+
+export type ListFeedbacksParams = {
+channelId?: string;
+limit?: number;
+};
+
+export type CreateFeedback201 = {
+  id: string;
+  status: string;
+};
+
+export type GetDashboardParams = {
+guildId: string;
+};
+
+export type Save200 = {
+  lastMessageId: string;
+  channelId: string;
+  status: string;
+};
+
+export type ListDiscordChannelsParams = {
+guildId: string;
+};
+
+export type SaveDiscordChannelsParams = {
+guildId: string;
+};
+
+export type SaveDiscordChannelsBody = {
+  channelIds: string[];
+};
+
+export type GetMonitoredChannelsParams = {
+guildId: string;
+};
+
+export type LoginDiscordBody = {
+  state: string;
+  code: string;
+};
+
+export type GraphParams = {
+guildId: string;
+};
+
+export type StatusParams = {
+guildId: string;
+};
+
+export type ResultsParams = {
+ids: string;
+};
+
+export type ListAnalysisDeliveriesParams = {
+guildId: string;
+};
+
+export type RetryAnalysisRequestParams = {
+guildId: string;
+};
+
+export type RetryAnalysisRequestBody = {
+  commandId: string;
+};
+
+export type SynchronizeBody = {
+  requests: AnalysisDeliveryStatusDto[];
+};
