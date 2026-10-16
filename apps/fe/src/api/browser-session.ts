@@ -1,19 +1,22 @@
 import { restoreBrowserSession, loginDiscord } from './generated';
 import { unwrapApiResponse } from './api-response';
 import { ApiHttpError } from './transport';
-import { setAccessToken } from './session';
+import { getSessionEpoch } from './session';
 import type { DiscordGuild } from './generated/model';
 
-let restoring: ReturnType<typeof restore> | undefined;
+let restoring: { epoch: number; promise: ReturnType<typeof restore> } | undefined;
 async function restore() {
   return unwrapApiResponse(await restoreBrowserSession());
 }
 export function restoreBrowserLogin() {
-  if (!restoring)
-    restoring = restore().finally(() => {
-      restoring = undefined;
+  const epoch = getSessionEpoch();
+  if (!restoring || restoring.epoch !== epoch) {
+    const promise = restore().finally(() => {
+      if (restoring?.promise === promise) restoring = undefined;
     });
-  return restoring;
+    restoring = { epoch, promise };
+  }
+  return restoring.promise;
 }
 let callback: { key: string; promise: ReturnType<typeof loginDiscord> } | undefined;
 export async function finishDiscordLogin(code: string, state: string) {
@@ -24,10 +27,6 @@ export async function finishDiscordLogin(code: string, state: string) {
 }
 export function isExpiredSession(error: unknown) {
   return error instanceof ApiHttpError && error.status === 401;
-}
-export function clearBrowserLogin() {
-  setAccessToken('');
-  window.dispatchEvent(new Event('ggaddak:logout'));
 }
 export function rememberServer(userId: string, guildId: string) {
   try {

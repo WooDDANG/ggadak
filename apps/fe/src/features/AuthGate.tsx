@@ -104,7 +104,10 @@ export function AuthGate({ children }: { children: (guildId: string) => React.Re
     window.addEventListener('ggaddak:logout', onLogout);
     const stop = observeSessionChanges(action => {
       if (action === 'logout') clear();
-      else void restore().catch(() => {});
+      else {
+        clear();
+        void restore().catch(() => {});
+      }
     });
     setSessionRecovery(() => restore());
     return () => {

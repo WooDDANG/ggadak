@@ -78,6 +78,41 @@ test('browser bootstrap coalesces simultaneous tabs in a page, retries outages, 
   }
 });
 
+test('a changed login starts a fresh bootstrap while the previous user response is pending', async () => {
+  const browser = await import(browserUrl),
+    session = await import(sessionUrl);
+  const previousFetch = globalThis.fetch;
+  let release;
+  let calls = 0;
+  globalThis.fetch = async () => {
+    calls++;
+    if (calls === 1)
+      return new Promise(resolve => {
+        release = resolve;
+      });
+    return Response.json({
+      success: true,
+      data: { user: { id: 'new' }, guilds: [], accessToken: 'new' },
+    });
+  };
+  try {
+    const old = browser.restoreBrowserLogin();
+    const rejected = assert.rejects(old, error => error.status === 409);
+    session.invalidateSession();
+    assert.equal((await browser.restoreBrowserLogin()).user.id, 'new');
+    release(
+      Response.json({
+        success: true,
+        data: { user: { id: 'old' }, guilds: [], accessToken: 'old' },
+      }),
+    );
+    await rejected;
+    assert.equal(calls, 2);
+  } finally {
+    globalThis.fetch = previousFetch;
+  }
+});
+
 test('expired access is recovered once before retry; a transient recovery error does not broadcast logout', async () => {
   const session = await import(sessionUrl),
     transport = await import(transportUrl);
