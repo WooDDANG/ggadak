@@ -3,12 +3,15 @@ import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
+import { zodToJsonSchema } from 'zod-to-json-schema';
 import {
   AiAdapter,
   type IAiAdapter,
   type AiCallContext,
   type AiResult,
 } from '../adapters/ai.adapter.js';
+import { AgyProvider } from '../adapters/agy-provider.js';
+import type { AiProvider, AiProviderRequest } from '../adapters/ai-provider.js';
 import config from '../config/index.js';
 import { DiscussionService } from '../services/discussion.service.js';
 import { prepareAnalysis } from '../services/discussion-preprocessing.js';
@@ -39,32 +42,34 @@ export interface EvaluationBudget {
   maxOutputTokens: number;
 }
 
-/** Conservative reservation before each network request; usage reconciles after response. */
-export function budgetTransport(budget: EvaluationBudget, underlying: typeof fetch = fetch) {
+/** Reserve a conservative budget before each CLI call, then reconcile reported token usage. */
+export function budgetProvider(
+  budget: EvaluationBudget,
+  underlying: AiProvider,
+): {
+  provider: AiProvider;
+  usage: () => { calls: number; tokens: number };
+} {
   let calls = 0,
     tokens = 0;
-  const transport: typeof fetch = async (url, options) => {
-    const endpoint = new URL(String(url));
-    const preflight =
-      endpoint.hostname === 'generativelanguage.googleapis.com' &&
-      (endpoint.pathname.endsWith(':countTokens') || options?.method === 'GET');
-    const reservation = preflight
-      ? 0
-      : Buffer.byteLength(String(options?.body ?? ''), 'utf8') + budget.maxOutputTokens;
-    if (calls >= budget.maxCalls || tokens + reservation > budget.maxTokens)
-      throw new Error('Evaluation budget exhausted before provider call');
-    calls++;
-    tokens += reservation;
-    const response = await underlying(url, options);
-    if (response.ok && !preflight) {
-      const body = (await response.clone().json()) as any;
-      const measured = body.usageMetadata?.totalTokenCount ?? body.usage?.total_tokens;
-      if (typeof measured === 'number' && Number.isFinite(measured) && measured >= 0)
-        tokens += measured - reservation;
-    }
-    return response;
+  const provider: AiProvider = {
+    async generate(request: AiProviderRequest) {
+      const reservation =
+        Buffer.byteLength(
+          request.system + request.input + JSON.stringify(zodToJsonSchema(request.outputSchema)),
+          'utf8',
+        ) + request.maxOutputTokens;
+      if (calls >= budget.maxCalls || tokens + reservation > budget.maxTokens)
+        throw new Error('Evaluation budget exhausted before provider call');
+      calls++;
+      tokens += reservation;
+      const result = await underlying.generate(request);
+      const measured = (result.usage?.inputTokens ?? 0) + (result.usage?.outputTokens ?? 0);
+      tokens += measured - reservation;
+      return result;
+    },
   };
-  return { transport, usage: () => ({ calls, tokens }) };
+  return { provider, usage: () => ({ calls, tokens }) };
 }
 
 function payload(record: EvaluationInput, runId: string): AnalyzeDiscussionParams {
@@ -88,6 +93,7 @@ export async function evaluateRecords(
   records: EvaluationInput[],
   adapter: AiAdapter,
   fixtures?: Record<string, EvaluationFixture>,
+  baselineProvider: AiProvider = new AgyProvider({ executable: config.ai.agyExecutable }),
 ) {
   const database = await isolatedRepository();
   const results: unknown[] = [];
@@ -135,13 +141,14 @@ export async function evaluateRecords(
           };
           const response: AiResult = fixture
             ? fixtureResult(fixture.baseline, baselineIndex++)
-            : await adapter.generateStructured(
-                'baseline',
-                EXTRACTION_SYSTEM_PROMPT,
-                { transcript: session.transcript },
-                context,
-                ExtractionResultSchema,
-              );
+            : await baselineProvider.generate({
+                model: context.settings.model,
+                system: EXTRACTION_SYSTEM_PROMPT,
+                input: JSON.stringify({ transcript: session.transcript }),
+                outputSchema: ExtractionResultSchema,
+                maxOutputTokens: context.settings.maxOutputTokens,
+                signal: context.signal,
+              });
           baselineInputTokens += response.usage?.inputTokens ?? 0;
           baselineOutputTokens += response.usage?.outputTokens ?? 0;
           const extracted = ExtractionResultSchema.parse(response.value);
@@ -250,12 +257,10 @@ async function main() {
         maxOutputTokens: positive('--max-output-tokens'),
       }
     : { maxCalls: 0, maxTokens: 0, maxOutputTokens: 8192 };
-  if (
-    live &&
-    (!args.get('--model') || !['gemini', 'openai'].includes(args.get('--provider') ?? ''))
-  )
-    throw new Error('Explicit provider and model required for live execution');
-  const bounded = budgetTransport(budget);
+  if (live && (!args.get('--model') || args.get('--provider') !== 'agy'))
+    throw new Error('Explicit AGY provider and model required for live execution');
+  const provider = new AgyProvider({ executable: config.ai.agyExecutable });
+  const bounded = budgetProvider(budget, provider);
   const adapter = new AiAdapter(
     {
       ...config.ai,
@@ -265,7 +270,7 @@ async function main() {
       stageModels: undefined,
     },
     live ? 'production' : 'test',
-    bounded.transport,
+    bounded.provider,
   );
   if (live) {
     adapter.settings.maxOutputTokens = budget.maxOutputTokens;
@@ -317,7 +322,7 @@ async function main() {
           EvaluationFixture
         >)
       : undefined;
-    records = await evaluateRecords(inputRecords, adapter, fixtures);
+    records = await evaluateRecords(inputRecords, adapter, fixtures, bounded.provider);
   }
   const result = {
     schemaVersion: 1,

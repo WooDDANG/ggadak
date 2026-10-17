@@ -35,14 +35,15 @@ test('stage model selection is frozen at analysis start and survives restart wit
       stageModels: { extract: 'old-fast', verify: 'old-critic' },
     },
     'production',
-    undefined,
-    async request => {
-      models.push(request.model);
-      if (models.length === 1) {
-        old.settings.stageModels!.verify = 'changed-midflight';
-        return { value: graph };
-      }
-      throw new AppError('temporary', 503);
+    {
+      async generate(request) {
+        models.push(request.model);
+        if (models.length === 1) {
+          old.settings.stageModels!.verify = 'changed-midflight';
+          return { value: graph };
+        }
+        throw new AppError('temporary', 503);
+      },
     },
   );
   try {
@@ -58,10 +59,11 @@ test('stage model selection is frozen at analysis start and survives restart wit
         stageModels: { extract: 'new-fast', verify: 'new-critic' },
       },
       'production',
-      undefined,
-      async request => {
-        models.push(request.model);
-        return { value: { valid: true, issues: [] } };
+      {
+        async generate(request) {
+          models.push(request.model);
+          return { value: { valid: true, issues: [] } };
+        },
       },
     );
     const service = new DiscussionService(

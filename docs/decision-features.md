@@ -23,7 +23,7 @@ flowchart TD
     Search <--> Embedding["별도 OpenAI 임베딩 provider"]
 ```
 
-Bot 시작이나 새 서버 초대가 과거 대화 전체 스캔을 자동 생성하지 않는다. 과거 대화는 명시적 스캔/Sync Job으로 검사하며, 기존 보관 요청의 복구와 새 대화 추적은 유지한다. 기본 분석 전송은 agy이며 Gemini/OpenAI HTTP도 명시적 provider 설정으로 지원한다. 장애 시 다른 provider로 자동 전환하지 않는다.
+Bot 시작이나 새 서버 초대가 과거 대화 전체 스캔을 자동 생성하지 않는다. 과거 대화는 명시적 스캔/Sync Job으로 검사하며, 기존 보관 요청의 복구와 새 대화 추적은 유지한다. BE의 Decision 분석은 AGY CLI를 사용하며 mock은 개발·테스트에서만 허용한다. 검색 임베딩의 OpenAI 사용은 분석 생성과 별개다. AGY 장애 때 다른 생성 provider로 자동 전환하지 않는다.
 
 ## 구현 기능
 

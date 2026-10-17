@@ -21,8 +21,7 @@ export const AiDefaults = {
   provider: 'agy',
   agyExecutable: 'agy',
   maxOutputTokens: 8192,
-  maxInputChars: 100_000,
-  models: { agy: 'gemini-3.8-flash-low', gemini: 'gemini-3.8-flash', openai: 'gpt-4o-mini' },
+  models: { agy: 'gemini-3.8-flash-low' },
   embeddingProvider: 'openai',
   embeddingModel: 'text-embedding-3-small',
 } as const;

@@ -1,6 +1,7 @@
 import { test, expect } from 'vitest';
 import { AiAdapter } from '../src/adapters/ai.adapter.js';
-import { evaluateRecords, budgetTransport } from '../src/evaluation/runner.js';
+import { evaluateRecords, budgetProvider } from '../src/evaluation/runner.js';
+import type { AiProvider } from '../src/adapters/ai-provider.js';
 import { ExtractionResultSchema } from '../src/evaluation/baseline/schemas.js';
 
 test('provider nullable baseline completes with decision fallback and does not normalize graph nulls', async () => {
@@ -29,31 +30,16 @@ test('provider nullable baseline completes with decision fallback and does not n
     },
     { valid: true, issues: [] },
   ];
-  const adapter = new AiAdapter(
-    { provider: 'gemini', geminiApiKey: 'fixture' },
-    'production',
-    async (_url, options) => {
-      if (options?.method === 'GET')
-        return Response.json({ inputTokenLimit: 1048576, outputTokenLimit: 65536 });
-      if (String(_url).endsWith(':countTokens')) return Response.json({ totalTokens: 10 });
-      if (calls === 0) {
-        const schema = JSON.parse(options!.body as string).generationConfig.responseJsonSchema;
-        const decisions = schema.properties.decisions.anyOf.find(
-          (option: { type?: string }) => option.type === 'array',
-        );
-        expect(decisions.items.properties.decisionContent.anyOf).toContainEqual({
-          type: 'null',
-        });
-      }
-      const value = values[calls++];
-      return Response.json({
-        candidates: [
-          { finishReason: 'STOP', content: { parts: [{ text: JSON.stringify(value) }] } },
-        ],
-        usageMetadata: { promptTokenCount: 17, candidatesTokenCount: 9 },
-      });
+  const provider: AiProvider = {
+    generate: async request => {
+      if (calls === 0) expect(request.outputSchema).toBe(ExtractionResultSchema);
+      return {
+        value: values[calls++],
+        usage: { inputTokens: 17, outputTokens: 9 },
+      };
     },
-  );
+  };
+  const adapter = new AiAdapter({ provider: 'agy' }, 'production', provider);
   const records = (await evaluateRecords(
     [
       {
@@ -66,6 +52,8 @@ test('provider nullable baseline completes with decision fallback and does not n
       },
     ],
     adapter,
+    undefined,
+    provider,
   )) as any[];
   expect(records[0].baseline).toMatchObject({
     outcome: 'completed',
@@ -167,22 +155,13 @@ test('baseline parsing failure preserves returned provider usage and workflow st
     { summary: 'Context', nodes: [], edges: [], discussionProblems: [] },
     { valid: true, issues: [] },
   ];
-  const adapter = new AiAdapter(
-    { provider: 'gemini', geminiApiKey: 'fixture' },
-    'production',
-    async (url, options) => {
-      if (options?.method === 'GET')
-        return Response.json({ inputTokenLimit: 1048576, outputTokenLimit: 65536 });
-      if (String(url).endsWith(':countTokens')) return Response.json({ totalTokens: 10 });
-      const value = values[calls++];
-      return Response.json({
-        candidates: [
-          { finishReason: 'STOP', content: { parts: [{ text: JSON.stringify(value) }] } },
-        ],
-        usageMetadata: { promptTokenCount: 17, candidatesTokenCount: 9 },
-      });
-    },
-  );
+  const provider: AiProvider = {
+    generate: async () => ({
+      value: values[calls++],
+      usage: { inputTokens: 17, outputTokens: 9 },
+    }),
+  };
+  const adapter = new AiAdapter({ provider: 'agy' }, 'production', provider);
   const records = (await evaluateRecords(
     [
       {
@@ -195,6 +174,8 @@ test('baseline parsing failure preserves returned provider usage and workflow st
       },
     ],
     adapter,
+    undefined,
+    provider,
   )) as any[];
   expect(records[0].baseline).toMatchObject({
     outcome: 'failed',
@@ -206,8 +187,10 @@ test('baseline parsing failure preserves returned provider usage and workflow st
 });
 
 test('offline evaluation uses separate fixed baseline and workflow responses without provider calls', async () => {
-  const adapter = new AiAdapter({ provider: 'mock' }, 'test', async () => {
-    throw new Error('No network');
+  const adapter = new AiAdapter({ provider: 'mock' }, 'test', {
+    generate: async () => {
+      throw new Error('No provider calls expected');
+    },
   });
   const graph = {
     summary: 'Question only',
@@ -252,33 +235,51 @@ test('offline evaluation uses separate fixed baseline and workflow responses wit
   });
 });
 
-test('budget transport refuses the next paid call before exceeding call/token limits', async () => {
+test('budget provider refuses the next CLI call before exceeding call/token limits', async () => {
   let calls = 0;
-  const bounded = budgetTransport(
-    { maxCalls: 1, maxTokens: 100, maxOutputTokens: 20 },
-    async () => {
-      calls++;
-      return Response.json({ usage: { total_tokens: 5 } });
+  const bounded = budgetProvider(
+    { maxCalls: 1, maxTokens: 100_000, maxOutputTokens: 20 },
+    {
+      generate: async () => {
+        calls++;
+        return { value: {}, usage: { inputTokens: 2, outputTokens: 3 } };
+      },
     },
   );
-  await bounded.transport('https://fixture', { body: '{}' });
-  await expect(bounded.transport('https://fixture', { body: '{}' })).rejects.toThrow(/budget/i);
+  const request = {
+    model: 'fixture',
+    system: 's',
+    input: '{}',
+    outputSchema: ExtractionResultSchema,
+    maxOutputTokens: 20,
+    signal: new AbortController().signal,
+  };
+  await bounded.provider.generate(request);
+  await expect(bounded.provider.generate(request)).rejects.toThrow(/budget/i);
   expect(calls).toBe(1);
   expect(bounded.usage()).toEqual({ calls: 1, tokens: 5 });
 });
 
-test('Gemini preflight requests consume HTTP call budget without inventing generated token usage', async () => {
-  const bounded = budgetTransport(
-    { maxCalls: 3, maxTokens: 100, maxOutputTokens: 20 },
-    async url => {
-      if (String(url).endsWith(':countTokens')) return Response.json({ totalTokens: 1048576 });
-      return Response.json({ usageMetadata: { totalTokenCount: 5 } });
+test('budget provider rejects an oversized conservative reservation before invoking AGY', async () => {
+  let calls = 0;
+  const bounded = budgetProvider(
+    { maxCalls: 3, maxTokens: 24, maxOutputTokens: 20 },
+    {
+      generate: async () => {
+        calls++;
+        return { value: {} };
+      },
     },
   );
-  const model = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash';
-  await bounded.transport(model, { method: 'GET' });
-  await bounded.transport(model + ':countTokens', { method: 'POST', body: '{}' });
-  await bounded.transport(model + ':generateContent', { method: 'POST', body: '{}' });
-  expect(bounded.usage()).toEqual({ calls: 3, tokens: 5 });
-  await expect(bounded.transport(model, { method: 'GET' })).rejects.toThrow(/budget/i);
+  await expect(
+    bounded.provider.generate({
+      model: 'fixture',
+      system: 'system',
+      input: 'input',
+      outputSchema: ExtractionResultSchema,
+      maxOutputTokens: 20,
+      signal: new AbortController().signal,
+    }),
+  ).rejects.toThrow(/budget/i);
+  expect(calls).toBe(0);
 });

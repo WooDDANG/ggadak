@@ -16,10 +16,10 @@ Set the same `BOT_SERVICE_TOKEN` on Bot and BE. The Bot publishes status every f
 | `ANALYSIS_MAX_DELAY_MS` | `300000` | Maximum delay, including jitter |
 | `ANALYSIS_RETRY_JITTER` | `0.2` | Fractional jitter, between 0 and 1 |
 | `ANALYSIS_TIMEOUT_MS` | `50000` | Analysis HTTP deadline, including response body |
-| `AI_PROVIDER` | `gemini` | `gemini`, `openai`, or explicit development/test `mock` |
+| `AI_PROVIDER` | `agy` | `agy`, or explicit development/test `mock` |
 | `AI_MODEL` | Provider default | Configured provider model name |
 
-Missing credentials, unsupported providers/models and invalid structured AI output fail explicitly. Production never uses mock extraction. Configure a valid model and credentials operationally; tests use injected providers and never call external AI.
+Missing AGY login, unsupported providers/models and invalid structured AI output fail explicitly. Production never uses mock extraction. Configure a valid AGY model and cached login operationally; tests use injected providers and never call external AI.
 
 The Web Review Queue now includes the recovery screen and confirmed/rejected history. Scan Ranges persist with queued payloads and completed results; retain those journal files so recovery can acknowledge continuously completed coverage after restart.
 

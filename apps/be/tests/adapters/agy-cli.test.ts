@@ -3,38 +3,29 @@ import { mkdtemp, writeFile, chmod, rm, access, readFile } from 'node:fs/promise
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { AiAdapter } from '../../src/adapters/ai.adapter.js';
+import type { AiProviderRequest } from '../../src/adapters/ai-provider.js';
 import { runAgyCli } from '../../src/adapters/agy-cli.js';
 
 test('AGY adapter routes all workflow stages without API credentials or HTTP fallback', async () => {
-  const requests: any[] = [];
+  const requests: AiProviderRequest[] = [];
   const graph = { summary: '대화', nodes: [], edges: [], discussionProblems: [] };
-  const adapter = new AiAdapter(
-    { provider: 'agy' },
-    'production',
-    async () => {
-      throw new Error('No HTTP');
-    },
-    async request => {
+  const adapter = new AiAdapter({ provider: 'agy' }, 'production', {
+    generate: async request => {
       requests.push(request);
       return {
         value: requests.length === 2 ? { valid: true, issues: [] } : graph,
         usage: { inputTokens: 10, outputTokens: 3 },
       };
     },
-  );
+  });
   const context = { settings: adapter.settings, signal: new AbortController().signal };
   expect((await adapter.extractGraph('PostgreSQL로 가자', context)).value).toEqual(graph);
   await adapter.verifyGraph('input', graph, context);
   await adapter.repairGraph('input', graph, ['missing proposal'], context);
   expect(requests).toHaveLength(3);
-  expect(requests[0]).toMatchObject({
-    executable: 'agy',
-    model: 'gemini-3.8-flash-low',
-    signal: context.signal,
-  });
-  expect(requests[0].prompt).toContain('PostgreSQL로 가자');
-  expect(requests[2].prompt).toContain('missing proposal');
-  expect(JSON.stringify(requests[0].schema)).not.toContain('maxItems');
+  expect(requests[0]).toMatchObject({ model: 'gemini-3.8-flash-low', signal: context.signal });
+  expect(requests[0].input).toContain('PostgreSQL로 가자');
+  expect(requests[2].input).toContain('missing proposal');
 });
 
 test('stage models can differ while omitted stages and legacy settings keep the base model', async () => {
@@ -42,26 +33,20 @@ test('stage models can differ while omitted stages and legacy settings keep the 
   const adapter = new AiAdapter(
     { provider: 'agy', model: 'default', stageModels: { extract: 'fast', verify: 'critic' } },
     'production',
-    undefined,
-    async request => {
-      models.push(request.model);
-      return { value: {}, usage: { inputTokens: 1, outputTokens: 1 } };
+    {
+      generate: async request => {
+        models.push(request.model);
+        return { value: {}, usage: { inputTokens: 1, outputTokens: 1 } };
+      },
     },
   );
   const context = { settings: adapter.settings, signal: new AbortController().signal };
   await adapter.extractGraph('input', context);
   await adapter.verifyGraph('input', {}, context);
   await adapter.repairGraph('input', {}, [], context);
-  await adapter.generateStructured(
-    'baseline',
-    'system',
-    { transcript: 'input' },
-    context,
-    (await import('../../src/domain/decision-graph.js')).GraphSchema,
-  );
   const { stageModels: _models, ...legacy } = adapter.settings;
   await adapter.verifyGraph('input', {}, { ...context, settings: legacy });
-  expect(models).toEqual(['fast', 'critic', 'default', 'default', 'default']);
+  expect(models).toEqual(['fast', 'critic', 'default', 'default']);
 });
 
 async function fakeCli(body: string) {

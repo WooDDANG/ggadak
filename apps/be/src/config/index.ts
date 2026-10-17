@@ -64,8 +64,6 @@ export interface AppConfig {
     provider: string;
     model?: string;
     stageModels?: Partial<Record<AiStage, string>>;
-    geminiApiKey?: string;
-    openaiApiKey?: string;
     agyExecutable?: string;
   };
 }
@@ -94,8 +92,6 @@ export const config: AppConfig = {
           .map(stage => [stage, process.env['AI_MODEL_' + stage.toUpperCase()]?.trim()] as const)
           .filter(([, model]) => model),
       ),
-      geminiApiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GEMINI_API_KEY,
-      openaiApiKey: process.env.OPENAI_API_KEY,
       agyExecutable: process.env.AGY_EXECUTABLE || AiDefaults.agyExecutable,
     };
   },
