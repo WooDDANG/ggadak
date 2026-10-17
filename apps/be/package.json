@@ -10,6 +10,7 @@
     "dev": "node --watch dist/index.js",
     "test": "vitest run",
     "db:generate": "node scripts/prisma.mjs generate",
+    "db:studio": "node scripts/prisma.mjs studio",
     "db:migrate": "node scripts/prisma.mjs migrate deploy",
     "db:baseline": "node scripts/prisma.mjs migrate resolve --applied 202610100001_legacy",
     "db:inspect": "python3 scripts/legacy-database.py inspect decisions.sqlite prisma/decisions.sqlite",

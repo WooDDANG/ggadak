@@ -1,4 +1,4 @@
-import rateLimit from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import { apiFailure, isV1Request } from '../../dto/api-response.dto.js';
 import { hasValidServiceToken } from '../authentication.js';
 
@@ -7,6 +7,9 @@ export const apiLimiter = rateLimit({
   max: 120, // 120 requests per minute
   standardHeaders: true,
   legacyHeaders: false,
+  // Data polling must not consume the budget needed to recover or end a session.
+  keyGenerator: req =>
+    `${ipKeyGenerator(req.ip ?? '')}:${/^\/api\/v1\/auth(?:\/|$)/.test(req.originalUrl.split('?')[0]) ? 'auth' : 'data'}`,
   skip: req =>
     process.env.NODE_ENV === 'test' ||
     process.env.DISABLE_RATE_LIMIT === 'true' ||

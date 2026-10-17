@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
 import { decisionsApi } from '../../api/decisions.api';
 const states: Record<string, string> = {
   Draft: '검토 대기',
@@ -8,7 +9,9 @@ const states: Record<string, string> = {
   Superseded: '교체됨',
 };
 export function CandidateHistory({ decisionId, guildId }: { decisionId: string; guildId: string }) {
+  const [open, setOpen] = useState(false);
   const history = useQuery({
+    enabled: open,
     queryKey: ['candidate-history', guildId, decisionId],
     queryFn: async () => {
       const analyses = await decisionsApi.history(decisionId, guildId);
@@ -21,7 +24,10 @@ export function CandidateHistory({ decisionId, guildId }: { decisionId: string; 
     refetchInterval: 5000,
   });
   return (
-    <details className="my-3 border border-slate-700 rounded p-3 text-sm">
+    <details
+      className="my-3 border border-slate-700 rounded p-3 text-sm"
+      onToggle={event => setOpen(event.currentTarget.open)}
+    >
       <summary className="cursor-pointer">관련 후보와 재분석 이력</summary>
       {history.isLoading && <p>이력을 불러오는 중입니다.</p>}
       {history.error && <p role="alert">관련 이력을 불러오지 못했습니다.</p>}

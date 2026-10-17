@@ -13,6 +13,7 @@
     "dev:fe": "npm run dev --workspace=@ggaddak/fe",
     "build": "npm run build --workspaces --if-present",
     "api:sync": "npm run swagger --workspace=@ggaddak/be && npm run codegen --workspace=@ggaddak/fe",
+    "db:studio": "npm run db:studio --workspace=@ggaddak/be --",
     "test": "npm run build && npm run test --workspaces --if-present && npm run test:e2e",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",

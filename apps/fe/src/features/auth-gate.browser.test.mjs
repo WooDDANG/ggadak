@@ -28,9 +28,12 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthGate } from '../../src/features/AuthGate';
+import { CandidateHistory } from '../../src/features/review-queue/CandidateHistory';
 let loginCalls=0, restoreCalls=0, outage=false;
+let historyCalls=0;
 window.fetch=async input=>{
  const path=String(input);
+ if(path.includes('/history')){historyCalls++;return Response.json({success:true,data:[]});}
  if(path.includes('/auth/session')){restoreCalls++;if(outage)return Response.json({message:'offline'},{status:503});return Response.json({success:true,data:{accessToken:'fixture-token',user:{id:'fixture-user'},guilds:[{id:'a',name:'A'},{id:'b',name:'B'}]}});}
  if(path.includes('/auth/login')){loginCalls++;return Response.json({success:true,data:{accessToken:'fixture-token'}});}
  if(path.includes('/auth/logout'))return Response.json({success:true,data:null});
@@ -57,6 +60,18 @@ createRoot(document.getElementById('root')!).render(<React.StrictMode><QueryClie
   await wait(protectedView);
   Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='로그아웃')!.click();
   await wait(()=>document.body.textContent?.includes('Discord로 로그인'));
+  const historyContainer=document.createElement('div');document.body.append(historyContainer);
+  const historyRoot=createRoot(historyContainer);
+  historyRoot.render(<QueryClientProvider client={queryClient}><CandidateHistory decisionId="fixture" guildId="a" /></QueryClientProvider>);
+  await wait(()=>historyContainer.querySelector('summary'));
+  await new Promise(resolve=>setTimeout(resolve,100));
+  if(historyCalls!==0)throw new Error('Collapsed candidate history sent requests');
+  historyContainer.querySelector('summary')!.click();
+  await wait(()=>historyCalls===1);
+  historyContainer.querySelector('summary')!.click();
+  await new Promise(resolve=>setTimeout(resolve,5200));
+  if(historyCalls!==1)throw new Error('Closed candidate history kept polling');
+  historyRoot.unmount();
   document.getElementById('result')!.textContent='PASS';
  }catch(error){document.getElementById('result')!.textContent='FAIL: '+(error as Error).message;}
 })();
