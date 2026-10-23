@@ -44,6 +44,15 @@ test('checked-in additive migrations preserve a legacy-schema fixture and missin
     );
     for (const statement of domainMigration.split(';').filter(part => part.trim()))
       await client.$executeRawUnsafe(statement);
+    await client.$executeRawUnsafe(
+      "UPDATE Decision SET archivedAt=1577836800000 WHERE id='legacy'",
+    );
+    await client.$executeRawUnsafe(
+      "INSERT INTO RejectedEvidenceHash(evidenceHash,reason) VALUES ('old-rejected','historical reason')",
+    );
+    await client.$executeRawUnsafe(
+      "INSERT INTO ExternalFeedback(id,decisionId,source,author,content,externalUrl) VALUES ('legacy-feedback','channel-legacy','교수','Actual author','Useful feedback','original detail')",
+    );
     const historical = DecisionSchema.parse({
       id: 'historical-string-id',
       topic: 'Architecture',
@@ -85,6 +94,38 @@ test('checked-in additive migrations preserve a legacy-schema fixture and missin
     migrate(url, 'resolve', '--applied', '202610120009_sync_jobs');
     migrate(url, 'deploy');
     const repo = new DecisionRepository(client);
+    expect(
+      JSON.parse(
+        (
+          await client.storageArchive.findUniqueOrThrow({
+            where: { kind_id: { kind: 'Decision', id: 'legacy' } },
+          })
+        ).dataJson,
+      ).archivedAt,
+    ).toBe(1577836800000);
+    expect(
+      JSON.parse(
+        (
+          await client.storageArchive.findUniqueOrThrow({
+            where: { kind_id: { kind: 'ExternalFeedback', id: 'legacy-feedback' } },
+          })
+        ).dataJson,
+      ).author,
+    ).toBe('Actual author');
+    expect(await repo.isEvidenceRejected('old-rejected')).toBe(true);
+    expect(await repo.getRecentFeedbacks('channel-legacy')).toMatchObject([
+      { id: 'legacy-feedback', channelId: 'channel-legacy', detail: 'original detail' },
+    ]);
+    expect(
+      (await client.$queryRawUnsafe<{ name: string }[]>('PRAGMA table_info(Decision)')).map(
+        column => column.name,
+      ),
+    ).not.toContain('participants');
+    await expect(
+      client.decisionEdit.create({
+        data: { id: 'orphan', decisionId: 'missing', actorId: 'a', version: 1, beforeJson: '{}' },
+      }),
+    ).rejects.toThrow();
     const recovered = await repo.getDecisionById('legacy');
     expect(recovered?.state).toBe('Decided');
     expect(recovered?.source.guildId).toBe('g');

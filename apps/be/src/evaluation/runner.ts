@@ -4,6 +4,8 @@ import { dirname, resolve } from 'node:path';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { zodToJsonSchema } from 'zod-to-json-schema';
+import { PrismaClient } from '@prisma/client';
+import { AiCallScheduler } from '../services/ai-call-scheduler.js';
 import {
   AiAdapter,
   type IAiAdapter,
@@ -94,8 +96,10 @@ export async function evaluateRecords(
   adapter: AiAdapter,
   fixtures?: Record<string, EvaluationFixture>,
   baselineProvider: AiProvider = new AgyProvider({ executable: config.ai.agyExecutable }),
+  scheduler?: AiCallScheduler,
 ) {
   const database = await isolatedRepository();
+  scheduler ??= new AiCallScheduler(database.client);
   const results: unknown[] = [];
   try {
     for (const record of records) {
@@ -137,18 +141,20 @@ export async function evaluateRecords(
           baselineCalls++;
           const context: AiCallContext = {
             settings: adapter.settings,
-            signal: AbortSignal.timeout(45000),
+            signal: new AbortController().signal,
           };
           const response: AiResult = fixture
             ? fixtureResult(fixture.baseline, baselineIndex++)
-            : await baselineProvider.generate({
-                model: context.settings.model,
-                system: EXTRACTION_SYSTEM_PROMPT,
-                input: JSON.stringify({ transcript: session.transcript }),
-                outputSchema: ExtractionResultSchema,
-                maxOutputTokens: context.settings.maxOutputTokens,
-                signal: context.signal,
-              });
+            : await scheduler.run(context.signal, signal =>
+                baselineProvider.generate({
+                  model: context.settings.model,
+                  system: EXTRACTION_SYSTEM_PROMPT,
+                  input: JSON.stringify({ transcript: session.transcript }),
+                  outputSchema: ExtractionResultSchema,
+                  maxOutputTokens: context.settings.maxOutputTokens,
+                  signal: AbortSignal.any([signal, AbortSignal.timeout(45000)]),
+                }),
+              );
           baselineInputTokens += response.usage?.inputTokens ?? 0;
           baselineOutputTokens += response.usage?.outputTokens ?? 0;
           const extracted = ExtractionResultSchema.parse(response.value);
@@ -176,7 +182,12 @@ export async function evaluateRecords(
           durationMs: Date.now() - baselineStarted,
         },
       };
-      const service = new DiscussionService(database.repo, ai, new DecisionExtractorCore());
+      const service = new DiscussionService(
+        database.repo,
+        ai,
+        new DecisionExtractorCore(),
+        scheduler,
+      );
       const started = Date.now();
       let workflow: unknown;
       try {
@@ -260,94 +271,107 @@ async function main() {
   if (live && (!args.get('--model') || args.get('--provider') !== 'agy'))
     throw new Error('Explicit AGY provider and model required for live execution');
   const provider = new AgyProvider({ executable: config.ai.agyExecutable });
-  const bounded = budgetProvider(budget, provider);
-  const adapter = new AiAdapter(
-    {
-      ...config.ai,
-      provider: args.get('--provider') ?? 'mock',
-      model: args.get('--model') ?? 'fixture',
-      // Baseline comparison pins the CLI-selected model for every stage.
-      stageModels: undefined,
-    },
-    live ? 'production' : 'test',
-    bounded.provider,
-  );
-  if (live) {
-    adapter.settings.maxOutputTokens = budget.maxOutputTokens;
-    const inputChars = Number(args.get('--max-input-chars'));
-    if (!args.has('--max-input-chars') || !Number.isSafeInteger(inputChars) || inputChars < 0)
-      throw new Error(
-        'Explicit nonnegative limit required: --max-input-chars (0 disables character cap)',
-      );
-    adapter.settings.maxInputChars = inputChars;
-  }
-  if (!args.get('--output')) throw new Error('--output required');
-  const output = resolve(args.get('--output')!);
-  let records: unknown[], inputDigest: string | undefined;
-  if (smoke) {
-    const transcript = 'Redis 도입을 검토해보자';
-    const context = { settings: adapter.settings, signal: AbortSignal.timeout(45000) };
-    const extracted = await adapter.extractGraph(transcript, context);
-    const graph = GraphSchema.parse(extracted.value);
-    if (graphIssues(graph).length) throw new Error('Smoke returned invalid graph');
-    const verified = VerificationSchema.parse(
-      (
-        await adapter.verifyGraph(transcript, graph, {
-          ...context,
-          signal: AbortSignal.timeout(45000),
-        })
-      ).value,
-    );
-    records = [
+  const liveDatabase = live ? new PrismaClient() : undefined;
+  const scheduler = liveDatabase ? new AiCallScheduler(liveDatabase) : undefined;
+  try {
+    const bounded = budgetProvider(budget, provider);
+    const adapter = new AiAdapter(
       {
-        providerConnected: true,
-        structureValidated: true,
-        semanticVerdict: verified.valid,
+        ...config.ai,
+        provider: args.get('--provider') ?? 'mock',
+        model: args.get('--model') ?? 'fixture',
+        // Baseline comparison pins the CLI-selected model for every stage.
+        stageModels: undefined,
+      },
+      live ? 'production' : 'test',
+      bounded.provider,
+    );
+    if (live) {
+      adapter.settings.maxOutputTokens = budget.maxOutputTokens;
+      const inputChars = Number(args.get('--max-input-chars'));
+      if (!args.has('--max-input-chars') || !Number.isSafeInteger(inputChars) || inputChars < 0)
+        throw new Error(
+          'Explicit nonnegative limit required: --max-input-chars (0 disables character cap)',
+        );
+      adapter.settings.maxInputChars = inputChars;
+    }
+    if (!args.get('--output')) throw new Error('--output required');
+    const output = resolve(args.get('--output')!);
+    let records: unknown[], inputDigest: string | undefined;
+    if (smoke) {
+      const transcript = 'Redis 도입을 검토해보자';
+      const context = { settings: adapter.settings, signal: new AbortController().signal };
+      const extracted = await scheduler!.run(context.signal, signal =>
+        adapter.extractGraph(transcript, {
+          ...context,
+          signal: AbortSignal.any([signal, AbortSignal.timeout(45000)]),
+        }),
+      );
+      const graph = GraphSchema.parse(extracted.value);
+      if (graphIssues(graph).length) throw new Error('Smoke returned invalid graph');
+      const verified = VerificationSchema.parse(
+        (
+          await scheduler!.run(context.signal, signal =>
+            adapter.verifyGraph(transcript, graph, {
+              ...context,
+              signal: AbortSignal.any([signal, AbortSignal.timeout(45000)]),
+            }),
+          )
+        ).value,
+      );
+      records = [
+        {
+          providerConnected: true,
+          structureValidated: true,
+          semanticVerdict: verified.valid,
+          qualityEvaluated: false,
+        },
+      ];
+    } else {
+      if (!args.get('--input')) throw new Error('--input required');
+      const content = await readFile(resolve(args.get('--input')!), 'utf8');
+      inputDigest = createHash('sha256').update(content).digest('hex');
+      const limit = args.has('--limit') ? positive('--limit') : Infinity;
+      const inputRecords = content
+        .split('\n')
+        .filter(Boolean)
+        .map(line => JSON.parse(line) as EvaluationInput)
+        .slice(0, limit);
+      const fixtures = fixturesPath
+        ? (JSON.parse(await readFile(resolve(fixturesPath), 'utf8')) as Record<
+            string,
+            EvaluationFixture
+          >)
+        : undefined;
+      records = await evaluateRecords(inputRecords, adapter, fixtures, bounded.provider, scheduler);
+    }
+    const result = {
+      schemaVersion: 1,
+      mode: smoke ? 'live-smoke' : live ? 'live-evaluation' : 'offline-fixture',
+      manifest: {
+        settings: adapter.settings,
+        inputSha256: inputDigest,
+        budget,
+        consumption: bounded.usage(),
+        baselineVersion: 'b327749-single-call',
         qualityEvaluated: false,
       },
-    ];
-  } else {
-    if (!args.get('--input')) throw new Error('--input required');
-    const content = await readFile(resolve(args.get('--input')!), 'utf8');
-    inputDigest = createHash('sha256').update(content).digest('hex');
-    const limit = args.has('--limit') ? positive('--limit') : Infinity;
-    const inputRecords = content
-      .split('\n')
-      .filter(Boolean)
-      .map(line => JSON.parse(line) as EvaluationInput)
-      .slice(0, limit);
-    const fixtures = fixturesPath
-      ? (JSON.parse(await readFile(resolve(fixturesPath), 'utf8')) as Record<
-          string,
-          EvaluationFixture
-        >)
-      : undefined;
-    records = await evaluateRecords(inputRecords, adapter, fixtures, bounded.provider);
+      records,
+    };
+    await mkdir(dirname(output), { recursive: true });
+    await writeFile(output, JSON.stringify(result, null, 2) + '\n');
+    console.log(
+      JSON.stringify({
+        output,
+        mode: result.mode,
+        records: records.length,
+        ...bounded.usage(),
+        qualityEvaluated: false,
+      }),
+    );
+  } finally {
+    await liveDatabase?.$disconnect();
   }
-  const result = {
-    schemaVersion: 1,
-    mode: smoke ? 'live-smoke' : live ? 'live-evaluation' : 'offline-fixture',
-    manifest: {
-      settings: adapter.settings,
-      inputSha256: inputDigest,
-      budget,
-      consumption: bounded.usage(),
-      baselineVersion: 'b327749-single-call',
-      qualityEvaluated: false,
-    },
-    records,
-  };
-  await mkdir(dirname(output), { recursive: true });
-  await writeFile(output, JSON.stringify(result, null, 2) + '\n');
-  console.log(
-    JSON.stringify({
-      output,
-      mode: result.mode,
-      records: records.length,
-      ...bounded.usage(),
-      qualityEvaluated: false,
-    }),
-  );
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url))

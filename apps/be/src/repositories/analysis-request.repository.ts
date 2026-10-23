@@ -5,7 +5,11 @@ import { createHash, randomUUID } from 'node:crypto';
 
 import { DecisionRepository } from './decision.repository.js';
 import type { AnalyzeDiscussionParams, AnalyzeDiscussionResult } from '../domain/analysis.js';
-import type { AnalysisWorkflow, AnalysisFailure } from '../domain/analysis-workflow.js';
+import type {
+  AnalysisWorkflow,
+  AnalysisFailure,
+  AnalysisSession,
+} from '../domain/analysis-workflow.js';
 import type { GraphSnapshot } from '../domain/decision-graph.js';
 
 export class AnalysisRequestError extends Error {
@@ -111,7 +115,31 @@ export class AnalysisRequestRepository {
   }
 
   async get(requestId: string) {
-    return this.repo.prisma.analysisRequest.findUnique({ where: { id: requestId } });
+    const row = await this.repo.prisma.analysisRequest.findUnique({ where: { id: requestId } });
+    if (!row?.workflowJson) return row;
+    const metadata = JSON.parse(row.workflowJson);
+    if (metadata.version !== 2) return row;
+    const states = await this.repo.prisma.analysisSessionState.findMany({
+      where: { requestId },
+      orderBy: { position: 'asc' },
+    });
+    if (
+      states.length !== metadata.sessionIds.length ||
+      states.some((state, index) => state.id !== metadata.sessionIds[index])
+    )
+      throw new Error('Incomplete analysis checkpoint');
+    return {
+      ...row,
+      workflowJson: JSON.stringify({
+        version: 1,
+        settings: metadata.settings,
+        skipped: metadata.skipped,
+        sessions: states.map(state => ({
+          ...JSON.parse(state.inputJson),
+          ...JSON.parse(state.stateJson),
+        })),
+      }),
+    };
   }
 
   async checkpoint(
@@ -119,23 +147,52 @@ export class AnalysisRequestRepository {
     owner: string,
     workflow: AnalysisWorkflow,
     input: AnalyzeDiscussionParams,
+    session?: AnalysisSession,
   ): Promise<void> {
-    const changed = await this.repo.prisma.analysisRequest.updateMany({
-      where: {
-        id: requestId,
-        owner,
-        state: AnalysisRequestState.Processing,
-        leaseUntil: { gt: new Date() },
-      },
-      data: {
-        workflowJson: JSON.stringify(workflow),
-        inputJson: JSON.stringify(input),
-        configJson: JSON.stringify(workflow.settings),
-        errorJson: null,
-      },
+    // Acquire the fenced write before reading; independent sessions update distinct rows.
+    await this.repo.prisma.$transaction(async tx => {
+      const changed = await tx.analysisRequest.updateMany({
+        where: {
+          id: requestId,
+          owner,
+          state: AnalysisRequestState.Processing,
+          leaseUntil: { gt: new Date() },
+        },
+        data: { errorJson: null },
+      });
+      if (!changed.count)
+        throw new AnalysisRequestError('Analysis ownership expired; retry this request', 503);
+      const row = await tx.analysisRequest.findUniqueOrThrow({ where: { id: requestId } });
+      const initialized = row.workflowJson && JSON.parse(row.workflowJson).version === 2;
+      if (!initialized)
+        await tx.analysisRequest.update({
+          where: { id: requestId },
+          data: {
+            inputJson: row.inputJson ?? JSON.stringify(input),
+            workflowJson: JSON.stringify({
+              version: 2,
+              settings: workflow.settings,
+              skipped: workflow.skipped,
+              sessionIds: workflow.sessions.map(item => item.id),
+            }),
+          },
+        });
+      const selected = initialized && session ? [session] : workflow.sessions;
+      for (const item of selected) {
+        const { messages, transcript, ...state } = item;
+        await tx.analysisSessionState.upsert({
+          where: { requestId_id: { requestId, id: item.id } },
+          create: {
+            requestId,
+            id: item.id,
+            position: workflow.sessions.findIndex(value => value.id === item.id),
+            inputJson: JSON.stringify({ messages, transcript }),
+            stateJson: JSON.stringify(state),
+          },
+          update: { stateJson: JSON.stringify(state) },
+        });
+      }
     });
-    if (!changed.count)
-      throw new AnalysisRequestError('Analysis ownership expired; retry this request', 503);
   }
 
   async fail(requestId: string, owner: string, failure: AnalysisFailure): Promise<void> {
@@ -325,7 +382,7 @@ export class AnalysisRequestRepository {
           create: {
             requestId: params.requestId,
             decisionId: decision.id,
-            relatedJson: JSON.stringify(related),
+            relations: { create: related.map(relatedDecisionId => ({ relatedDecisionId })) },
             previousRequestsJson: JSON.stringify([...new Set(prior.map(row => row.requestId))]),
           },
         });
@@ -355,36 +412,31 @@ export class AnalysisRequestRepository {
   }
 
   async history(decisionId: string): Promise<CandidateHistoryEntry[]> {
-    const rows = await this.repo.prisma.candidateAnalysis.findMany({ where: { decisionId } });
-    return Promise.all(
-      rows.map(async row => {
-        const request = await this.repo.prisma.analysisRequest.findUniqueOrThrow({
-          where: { id: row.requestId },
-        });
-        // Include reverse overlap so earlier candidates also expose later related candidates.
-        const others = await this.repo.prisma.candidateAnalysis.findMany();
-        const related = [
-          ...new Set([
-            ...JSON.parse(row.relatedJson),
-            ...others
-              .filter(other => JSON.parse(other.relatedJson).includes(decisionId))
-              .map(other => other.decisionId),
-          ]),
-        ];
-        return {
-          requestId: row.requestId,
-          isManualOverride: request.manual,
-          previousRequestIds: JSON.parse(row.previousRequestsJson),
-          relatedCandidateIds: related,
-          createdAt: request.createdAt.toISOString(),
-          graphAvailable: Boolean(request.graphJson),
-          candidateNodeIds: request.graphJson
-            ? (JSON.parse(request.graphJson) as GraphSnapshot).sessions.flatMap(session =>
-                session.nodes.filter(node => node.decisionId === decisionId).map(node => node.id),
-              )
-            : [],
-        };
-      }),
-    );
+    const rows = await this.repo.prisma.candidateAnalysis.findMany({
+      where: { decisionId },
+      include: { request: true, relations: true },
+    });
+    const reverse = await this.repo.prisma.candidateRelation.findMany({
+      where: { relatedDecisionId: decisionId },
+      select: { decisionId: true },
+    });
+    return rows.map(row => ({
+      requestId: row.requestId,
+      isManualOverride: row.request.manual,
+      previousRequestIds: JSON.parse(row.previousRequestsJson),
+      relatedCandidateIds: [
+        ...new Set([
+          ...row.relations.map(relation => relation.relatedDecisionId),
+          ...reverse.map(relation => relation.decisionId),
+        ]),
+      ],
+      createdAt: row.request.createdAt.toISOString(),
+      graphAvailable: Boolean(row.request.graphJson),
+      candidateNodeIds: row.request.graphJson
+        ? (JSON.parse(row.request.graphJson) as GraphSnapshot).sessions.flatMap(session =>
+            session.nodes.filter(node => node.decisionId === decisionId).map(node => node.id),
+          )
+        : [],
+    }));
   }
 }

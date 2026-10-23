@@ -2928,6 +2928,10 @@
 									"type": "number",
 									"format": "double"
 								},
+								"waitMs": {
+									"type": "number",
+									"format": "double"
+								},
 								"elapsedMs": {
 									"type": "number",
 									"format": "double"

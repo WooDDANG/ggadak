@@ -8,56 +8,46 @@ generator client {
 }
 
 model Decision {
-  embedding DecisionEmbedding?
-  id              String   @id
-  domainJson      String?
-  lifecycle       String @default("IN_REVIEW")
-  category        String @default("기타")
-  topic           String @default("")
-  version         Int      @default(1)
-  guildId         String
-  channelId       String
-  messageId       String
-  title           String
-  decisionSummary String
-  keyReason       String
-  status          String   @default("proposed") // "proposed" | "confirmed" | "rejected"
-  decisionMaker   String
-  participants    String   // JSON string array
-  alternatives    String   // JSON string array
-  tags            String   // JSON string array
-  supersedesId    String?
-  supersededById  String?
-  sourceJumpUrl   String
-  evidenceSummary String
-  evidenceHash    String
-  governanceScore Float
-  governanceReason String
-  governancePassed Boolean
-  createdAt       DateTime @default(now())
-  confirmedAt     DateTime?
-  updatedAt       DateTime @updatedAt
-  archivedAt      DateTime?
+  embedding      DecisionEmbedding?
+  identities     CandidateIdentity[]
+  analyses       CandidateAnalysis[]
+  edits          DecisionEdit[]
+  relatedBy      CandidateRelation[]
+  id             String              @id
+  domainJson     String
+  storageVersion Int                 @default(1)
+  lifecycle      String              @default("IN_REVIEW")
+  category       String              @default("기타")
+  topic          String              @default("")
+  version        Int                 @default(1)
+  guildId        String
+  channelId      String
+  title          String
+  status         String              @default("Draft") // Derived from the canonical domain state.
+  supersedesId   String?
+  supersededById String?
+  evidenceHash   String
+  createdAt      DateTime            @default(now())
+  confirmedAt    DateTime?
+  updatedAt      DateTime            @updatedAt
 
   @@index([guildId, channelId])
   @@index([status])
   @@index([guildId, lifecycle, category, createdAt])
   @@index([guildId, lifecycle, confirmedAt])
   @@index([supersedesId])
+  @@index([guildId, channelId, evidenceHash])
 }
 
 model ExternalFeedback {
-  id           String   @id
-  domainJson   String?
-  channelId    String?
-  decisionId   String
-  source       String   // "slack" | "jira" | "github" | "manual"
-  author       String
-  content      String
-  externalUrl  String?
-  createdAt    DateTime @default(now())
+  id        String   @id
+  channelId String
+  source    String // "slack" | "jira" | "github" | "manual"
+  content   String
+  detail    String?
+  createdAt DateTime @default(now())
 
-  @@index([decisionId])
+  @@index([channelId, createdAt])
 }
 
 model ChannelCheckpoint {
@@ -68,230 +58,287 @@ model ChannelCheckpoint {
 
 model RejectedEvidenceHash {
   evidenceHash String   @id
-  reason       String
   createdAt    DateTime @default(now())
 }
 
 model AnalysisRequest {
-  id String @id
-  fingerprint String
-  guildId String
-  channelId String
-  manual Boolean
-  state String
-  owner String?
-  leaseUntil DateTime?
-  resultJson String?
-  inputJson String?
-  configJson String?
-  workflowJson String?
-  graphJson String?
-  errorJson String?
-  createdAt DateTime @default(now())
-  completedAt DateTime?
+  analyses      CandidateAnalysis[]
+  sessionStates AnalysisSessionState[]
+  id            String                 @id
+  fingerprint   String
+  guildId       String
+  channelId     String
+  manual        Boolean
+  state         String
+  owner         String?
+  leaseUntil    DateTime?
+  resultJson    String?
+  inputJson     String?
+  workflowJson  String?
+  graphJson     String?
+  errorJson     String?
+  createdAt     DateTime               @default(now())
+  completedAt   DateTime?
 }
 
 model AnalysisReceipt {
-  id String @id
-  fingerprint String
-  guildId String
-  channelId String
-  scanId String?
-  rangeIndex Int?
-  rangeJson String?
-  inputJson String?
-  inputBytes Int
-  state String @default("pending")
-  attempts Int @default(0)
-  nextAttemptAt DateTime @default(now())
-  owner String?
-  leaseUntil DateTime?
-  errorCategory String?
-  createdAt DateTime @default(now())
-  startedAt DateTime?
-  completedAt DateTime?
+  id             String    @id
+  fingerprint    String
+  guildId        String
+  channelId      String
+  scanId         String?
+  rangeIndex     Int?
+  rangeJson      String?
+  inputJson      String?
+  inputBytes     Int
+  state          String    @default("pending")
+  attempts       Int       @default(0)
+  nextAttemptAt  DateTime  @default(now())
+  owner          String?
+  leaseUntil     DateTime?
+  errorCategory  String?
+  createdAt      DateTime  @default(now())
+  startedAt      DateTime?
+  completedAt    DateTime?
   acknowledgedAt DateTime?
+
   @@unique([scanId, rangeIndex])
   @@index([state, nextAttemptAt])
   @@index([guildId, createdAt])
 }
 
 model AnalysisScan {
-  id String @id
-  guildId String
-  channelId String
+  id             String   @id
+  guildId        String
+  channelId      String
   upperMessageId String
   afterMessageId String
   expectedRanges Int?
-  state String @default("receiving")
-  jobId String?
-  jobOwner String?
-  createdAt DateTime @default(now())
+  state          String   @default("receiving")
+  jobId          String?
+  jobOwner       String?
+  createdAt      DateTime @default(now())
+
   @@index([jobId])
 }
 
 model AnalysisQueueControl {
-  id String @id
-  revision Int @default(0)
-  foregroundCount Int @default(0)
-  pauseUntil DateTime?
+  id              String    @id
+  revision        Int       @default(0)
+  foregroundCount Int       @default(0)
+  pauseUntil      DateTime?
 }
 
 model AnalysisExecution {
-  id String @id
-  owner String?
-  requestId String?
-  channelId String?
+  id         String    @id
+  owner      String?
+  requestId  String?
+  channelId  String?
   leaseUntil DateTime?
 }
 
 model CandidateIdentity {
-  key String @id
-  decisionId String
-  guildId String
-  channelId String
-  evidenceJson String
+  decision          Decision @relation(fields: [decisionId], references: [id], onDelete: Restrict)
+  key               String   @id
+  decisionId        String
+  guildId           String
+  channelId         String
+  evidenceJson      String
   normalizedContent String
+
   @@index([decisionId])
   @@index([guildId, channelId])
 }
 
 model CandidateAnalysis {
-  requestId String
-  decisionId String
-  relatedJson String
+  request              AnalysisRequest     @relation(fields: [requestId], references: [id], onDelete: Restrict)
+  decision             Decision            @relation(fields: [decisionId], references: [id], onDelete: Restrict)
+  relations            CandidateRelation[]
+  requestId            String
+  decisionId           String
   previousRequestsJson String
+
   @@id([requestId, decisionId])
   @@index([decisionId])
 }
 
 model User {
-  id String @id
-  username String
-  avatar String?
+  id          String        @id
+  username    String
+  avatar      String?
   memberships Membership[]
-  sessions AuthSession[]
-  createdAt DateTime @default(now())
+  sessions    AuthSession[]
+  createdAt   DateTime      @default(now())
 }
 
 model Guild {
-  channels MonitoredChannel[]
-  id String @id
-  name String
-  icon String?
+  channels    MonitoredChannel[]
+  id          String             @id
+  name        String
+  icon        String?
   memberships Membership[]
 }
 
 model Membership {
-  userId String
-  guildId String
-  owner Boolean @default(false)
-  permissions String @default("0")
+  userId      String
+  guildId     String
+  owner       Boolean  @default(false)
+  permissions String   @default("0")
   refreshedAt DateTime
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  guild       Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
   @@id([userId, guildId])
 }
 
 model AuthSession {
-  browserTokenHash String? @unique
-  refreshOwner String?
+  browserTokenHash  String?   @unique
+  refreshOwner      String?
   refreshLeaseUntil DateTime?
-  refreshVersion Int @default(0)
-  id String @id
-  userId String
-  refreshToken String
-  expiresAt DateTime
-  refreshedAt DateTime
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refreshVersion    Int       @default(0)
+  id                String    @id
+  userId            String
+  refreshToken      String
+  expiresAt         DateTime
+  refreshedAt       DateTime
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@index([userId])
 }
 
 model OAuthState {
-  nonce String @id
+  nonce     String   @id
   expiresAt DateTime
 }
 
 model DecisionEdit {
- id String @id
- decisionId String
- actorId String
- version Int
- beforeJson String
- createdAt DateTime @default(now())
- @@unique([decisionId, version])
+  decision   Decision @relation(fields: [decisionId], references: [id], onDelete: Restrict)
+  id         String   @id
+  decisionId String
+  actorId    String
+  version    Int
+  beforeJson String
+  createdAt  DateTime @default(now())
+
+  @@unique([decisionId, version])
+}
+
+model CandidateRelation {
+  requestId         String
+  decisionId        String
+  relatedDecisionId String
+  analysis          CandidateAnalysis @relation(fields: [requestId, decisionId], references: [requestId, decisionId], onDelete: Restrict)
+  relatedDecision   Decision          @relation(fields: [relatedDecisionId], references: [id], onDelete: Restrict)
+
+  @@id([requestId, decisionId, relatedDecisionId])
+  @@index([relatedDecisionId])
+}
+
+model StorageArchive {
+  kind      String
+  id        String
+  dataJson  String
+  createdAt DateTime @default(now())
+
+  @@id([kind, id])
+}
+
+model AnalysisSessionState {
+  requestId String
+  id        String
+  position  Int
+  inputJson String
+  stateJson String
+  request   AnalysisRequest @relation(fields: [requestId], references: [id], onDelete: Restrict)
+
+  @@id([requestId, id])
+  @@unique([requestId, position])
+}
+
+model AiCallLease {
+  id         String   @id
+  state      String
+  limit      Int
+  leaseUntil DateTime
+  createdAt  DateTime @default(now())
+
+  @@index([state, createdAt])
 }
 
 model MonitoredChannel {
-  id String @id
-  guildId String
-  name String
+  id        String   @id
+  guildId   String
+  name      String
   updatedAt DateTime @updatedAt
-  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  guild     Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
   @@index([guildId])
 }
 
 model SyncJob {
-  id String @id
-  guildId String
-  forceFullSync Boolean @default(false)
-  status String @default("QUEUED")
-  channelIdsJson String
-  channelResultsJson String @default("{}")
-  owner String?
-  totalChannels Int @default(0)
-  completedChannels Int @default(0)
-  failedChannels Int @default(0)
-  decisionsFound Int @default(0)
-  messagesScanned Int @default(0)
-  errorMessage String?
-  leaseUntil DateTime?
-  createdAt DateTime @default(now())
-  startedAt DateTime?
-  completedAt DateTime?
+  id                 String    @id
+  guildId            String
+  forceFullSync      Boolean   @default(false)
+  status             String    @default("QUEUED")
+  channelIdsJson     String
+  channelResultsJson String    @default("{}")
+  owner              String?
+  totalChannels      Int       @default(0)
+  completedChannels  Int       @default(0)
+  failedChannels     Int       @default(0)
+  decisionsFound     Int       @default(0)
+  messagesScanned    Int       @default(0)
+  errorMessage       String?
+  leaseUntil         DateTime?
+  createdAt          DateTime  @default(now())
+  startedAt          DateTime?
+  completedAt        DateTime?
+
   @@index([guildId, createdAt])
   @@index([status, leaseUntil])
 }
 
 model SyncJobLock {
   guildId String @id
-  jobId String @unique
+  jobId   String @unique
 }
 
 model DecisionEmbedding {
-  decisionId String @id
-  decision Decision @relation(fields: [decisionId], references: [id], onDelete: Cascade)
-  model String
+  decisionId  String   @id
+  decision    Decision @relation(fields: [decisionId], references: [id], onDelete: Cascade)
+  model       String
   contentHash String
-  vectorJson String
-  updatedAt DateTime @updatedAt
+  vectorJson  String
+  updatedAt   DateTime @updatedAt
 }
 
 model AnalysisDelivery {
-  channelName String?
-  scanRangeJson String?
-  requestId String @id
-  guildId String
-  channelId String
-  status String
-  attempts Int
-  nextAttemptAt Float
-  errorCategory String?
-  lastError String?
+  channelName    String?
+  scanRangeJson  String?
+  requestId      String   @id
+  guildId        String
+  channelId      String
+  status         String
+  attempts       Int
+  nextAttemptAt  Float
+  errorCategory  String?
+  lastError      String?
   synchronizedAt DateTime
+
   @@index([guildId])
 }
 
 model AnalysisRetryCommand {
-  id String @id
-  requestId String
-  guildId String
+  id             String    @id
+  requestId      String
+  guildId        String
   acknowledgedAt DateTime?
-  createdAt DateTime @default(now())
+  createdAt      DateTime  @default(now())
+
   @@index([acknowledgedAt])
 }
 
 model AnalysisDeliveryHeartbeat {
-  id String @id
+  id             String   @id
   synchronizedAt DateTime
 }

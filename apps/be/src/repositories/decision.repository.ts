@@ -1,9 +1,10 @@
 import {
   ActionItemState,
-  CategoryTag,
   Decision,
   DecisionState,
   ExternalFeedback,
+  ExternalFeedbackSchema,
+  DecisionSchema,
 } from '@ggaddak/shared';
 
 import { BaseRepository } from './base.repository.js';
@@ -51,14 +52,12 @@ export class DecisionRepository extends BaseRepository {
   }
 
   async saveFeedback(fb: ExternalFeedback, tx?: Prisma.TransactionClient): Promise<void> {
+    fb = ExternalFeedbackSchema.parse(fb);
     const data = {
-      decisionId: fb.channelId,
       channelId: fb.channelId,
       source: fb.source,
-      author: fb.source,
       content: fb.content,
-      externalUrl: fb.detail ?? null,
-      domainJson: JSON.stringify(fb),
+      detail: fb.detail ?? null,
       createdAt: new Date(fb.createdAt),
     };
     await (tx ?? this.prisma).externalFeedback.upsert({
@@ -73,29 +72,24 @@ export class DecisionRepository extends BaseRepository {
     tx?: Prisma.TransactionClient,
   ): Promise<ExternalFeedback[]> {
     const records = await (tx ?? this.prisma).externalFeedback.findMany({
+      where: channelId ? { channelId: { in: [channelId, 'global'] } } : {},
       orderBy: { createdAt: 'desc' },
+      take: limit,
     });
-    return records
-      .map(row =>
-        row.domainJson
-          ? (JSON.parse(row.domainJson) as ExternalFeedback)
-          : {
-              id: row.id,
-              channelId: row.channelId ?? row.decisionId,
-              source: row.source as ExternalFeedback['source'],
-              content: row.content,
-              ...(row.externalUrl ? { detail: row.externalUrl } : {}),
-              createdAt: row.createdAt.toISOString(),
-            },
-      )
-      .filter(fb => !channelId || fb.channelId === channelId || fb.channelId === 'global')
-      .slice(0, limit);
+    return records.map(row => ({
+      id: row.id,
+      channelId: row.channelId,
+      source: row.source as ExternalFeedback['source'],
+      content: row.content,
+      ...(row.detail !== null ? { detail: row.detail } : {}),
+      createdAt: row.createdAt.toISOString(),
+    }));
   }
   async recordRejectedEvidence(evidenceHash: string, tx?: Prisma.TransactionClient): Promise<void> {
     await (tx ?? this.prisma).rejectedEvidenceHash.upsert({
       where: { evidenceHash },
       update: {},
-      create: { evidenceHash, reason: 'rejected' },
+      create: { evidenceHash },
     });
   }
   async isEvidenceRejected(evidenceHash: string, tx?: Prisma.TransactionClient): Promise<boolean> {
@@ -104,57 +98,17 @@ export class DecisionRepository extends BaseRepository {
     );
   }
   decodeDecision(row: Prisma.DecisionGetPayload<object>): Decision {
-    if (row.domainJson)
-      return {
-        ...JSON.parse(row.domainJson),
-        version: row.version,
-        updatedAt: row.updatedAt.toISOString(),
-      };
-    const states: Record<string, Decision['state']> = {
-      proposed: DecisionState.Proposed,
-      confirmed: DecisionState.Decided,
-      rejected: DecisionState.Rejected,
-    };
-    return {
-      id: row.id,
+    if (row.storageVersion !== 1) throw new Error('Unsupported Decision storage version');
+    return DecisionSchema.parse({
+      ...JSON.parse(row.domainJson),
       version: row.version,
-      topic: row.title,
-      title: row.title,
-      decision: row.decisionSummary,
-      rationale: row.keyReason,
-      state: states[row.status] ?? (row.status as Decision['state']),
-      supersedesId: row.supersedesId,
-      supersededById: row.supersededById,
-      rationaleQuotes: [],
-      alternatives: JSON.parse(row.alternatives),
-      categoryTag: JSON.parse(row.tags)[0] ?? CategoryTag.Other,
-      actionItems: [],
-      isPivot: false,
-      approvedBy: row.decisionMaker === 'AI' ? null : row.decisionMaker || null,
-      decisionConfirmedDate: null,
-      feedbackSourceType: null,
-      feedbackSourceDetail: null,
-      feedbackReceivedDate: null,
-      rawEvidence: [],
-      evidenceHash: row.evidenceHash || undefined,
-      rawTranscript: row.evidenceSummary || undefined,
-      source: {
-        guildId: row.guildId,
-        channelId: row.channelId,
-        triggerMessageId: row.messageId,
-        participants: JSON.parse(row.participants),
-        rawMessages: [],
-        ...(row.sourceJumpUrl ? { messageUrl: row.sourceJumpUrl } : {}),
-      },
-      createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
-      governanceScore: row.governanceScore,
-      governanceReason: row.governanceReason,
-      governancePassed: row.governancePassed,
-    };
+    });
   }
   decisionData(decision: Decision) {
+    decision = DecisionSchema.parse(decision);
     return {
+      storageVersion: 1,
       lifecycle:
         decision.state === DecisionState.Decided
           ? 'CONFIRMED'
@@ -169,23 +123,11 @@ export class DecisionRepository extends BaseRepository {
       topic: decision.topic,
       guildId: decision.source.guildId,
       channelId: decision.source.channelId,
-      messageId: decision.source.triggerMessageId,
       title: decision.title ?? decision.topic,
-      decisionSummary: decision.decisionContent ?? decision.decision,
-      keyReason: decision.rationale,
       status: decision.state,
-      decisionMaker: decision.approvedBy ?? '',
-      participants: JSON.stringify(decision.source.participants),
-      alternatives: JSON.stringify(decision.alternatives),
-      tags: JSON.stringify([decision.categoryTag]),
       supersedesId: decision.supersedesId,
       supersededById: decision.supersededById ?? null,
-      sourceJumpUrl: decision.source.messageUrl ?? '',
-      evidenceSummary: decision.rawTranscript ?? '',
       evidenceHash: decision.evidenceHash ?? '',
-      governanceScore: decision.governanceScore ?? 0,
-      governanceReason: decision.governanceReason ?? '',
-      governancePassed: decision.governancePassed ?? false,
       createdAt: new Date(decision.createdAt),
       confirmedAt: decision.decisionConfirmedDate ? new Date(decision.decisionConfirmedDate) : null,
       domainJson: JSON.stringify(decision),
@@ -324,6 +266,14 @@ export class DecisionRepository extends BaseRepository {
       return this.getDecisionById(updated.id, context);
     }, tx);
   }
+  async getDecisionVersions(ids: string[]): Promise<Map<string, number>> {
+    const rows = await this.prisma.decision.findMany({
+      where: { id: { in: [...new Set(ids)] } },
+      select: { id: true, version: true },
+    });
+    return new Map(rows.map(row => [row.id, row.version]));
+  }
+
   async getDecisionById(id: string, tx?: Prisma.TransactionClient): Promise<Decision | null> {
     const row = await (tx ?? this.prisma).decision.findUnique({ where: { id } });
     return row ? this.decodeDecision(row) : null;
@@ -334,7 +284,11 @@ export class DecisionRepository extends BaseRepository {
   ): Promise<Decision[]> {
     return (
       await (tx ?? this.prisma).decision.findMany({
-        where: filter.guildId ? { guildId: filter.guildId } : {},
+        where: {
+          ...(filter.guildId ? { guildId: filter.guildId } : {}),
+          ...(filter.state ? { status: filter.state } : {}),
+          ...(filter.categoryTag ? { category: filter.categoryTag } : {}),
+        },
         orderBy: { createdAt: 'desc' },
       })
     )

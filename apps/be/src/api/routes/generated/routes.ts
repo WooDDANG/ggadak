@@ -922,7 +922,7 @@ const models: TsoaRoute.Models = {
             "graphAvailable": {"dataType":"boolean","required":true},
             "retryable": {"dataType":"boolean","required":true},
             "error": {"dataType":"union","subSchemas":[{"ref":"AnalysisFailure"},{"dataType":"enum","enums":[null]}],"required":true},
-            "sessions": {"dataType":"array","array":{"dataType":"nestedObjectLiteral","nestedProperties":{"outputTokens":{"dataType":"double","required":true},"inputTokens":{"dataType":"double","required":true},"attempts":{"dataType":"double","required":true},"logicalCalls":{"dataType":"double","required":true},"elapsedMs":{"dataType":"double","required":true},"repairs":{"dataType":"double","required":true},"phase":{"ref":"AnalysisPhase","required":true},"sessionId":{"dataType":"string","required":true}}},"required":true},
+            "sessions": {"dataType":"array","array":{"dataType":"nestedObjectLiteral","nestedProperties":{"outputTokens":{"dataType":"double","required":true},"inputTokens":{"dataType":"double","required":true},"attempts":{"dataType":"double","required":true},"logicalCalls":{"dataType":"double","required":true},"waitMs":{"dataType":"double"},"elapsedMs":{"dataType":"double","required":true},"repairs":{"dataType":"double","required":true},"phase":{"ref":"AnalysisPhase","required":true},"sessionId":{"dataType":"string","required":true}}},"required":true},
         },
         "additionalProperties": false,
     },

@@ -32,6 +32,7 @@ import { DiscussionController } from '../api/controllers/discussion.controller.j
 import { initExpress } from './express.js';
 import { initPrisma } from './prisma.js';
 import { appLogger } from './logger.js';
+import { assertStorageReady } from '../repositories/storage-readiness.js';
 
 export interface LoaderOptions {
   expressApp: Express;
@@ -58,6 +59,7 @@ export async function initLoaders({
   // 1. Prisma Client Loader
   const prisma = customRepo?.prisma ?? initPrisma();
   await prisma.$connect();
+  await assertStorageReady(prisma);
   // Ensure migrated domain tables are queryable before routes become ready.
   await Promise.all([
     prisma.decision.findFirst(),

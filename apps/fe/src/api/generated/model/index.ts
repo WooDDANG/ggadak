@@ -1108,6 +1108,7 @@ export type AnalysisStatusSessionsItem = {
   inputTokens: number;
   attempts: number;
   logicalCalls: number;
+  waitMs?: number;
   elapsedMs: number;
   repairs: number;
   phase: AnalysisPhase;

@@ -14,9 +14,15 @@
     "db:migrate": "node scripts/prisma.mjs migrate deploy",
     "db:baseline": "node scripts/prisma.mjs migrate resolve --applied 202610100001_legacy",
     "db:inspect": "python3 scripts/legacy-database.py inspect decisions.sqlite prisma/decisions.sqlite",
+    "db:check": "node scripts/database.mjs check",
+    "db:backup": "node scripts/database.mjs backup",
+    "db:upgrade": "node scripts/database.mjs upgrade",
+    "db:backfill": "node scripts/database.mjs backfill",
+    "db:audit": "node dist/scripts/storage-audit.js",
     "search:backfill": "node dist/scripts/search-backfill.js",
     "ai:evaluate": "node dist/evaluation/runner.js",
     "ai:smoke": "node dist/evaluation/runner.js --live --smoke",
+    "ai:benchmark": "node dist/evaluation/concurrency-benchmark.js",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.tests.json"
   },
   "dependencies": {

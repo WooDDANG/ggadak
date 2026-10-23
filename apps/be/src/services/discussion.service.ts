@@ -35,6 +35,7 @@ import {
   stableJson,
 } from '../repositories/analysis-request.repository.js';
 import { GraphWorkflow } from './graph-workflow.js';
+import { AiCallScheduler, concurrencySetting } from './ai-call-scheduler.js';
 import { prepareAnalysis } from './discussion-preprocessing.js';
 import { AnalysisExecutionRepository } from '../repositories/analysis-execution.repository.js';
 
@@ -44,13 +45,19 @@ export class DiscussionService {
     private repo: DecisionRepository,
     @Inject(() => AiAdapter) private extractor: IAiAdapter,
     private core: DecisionExtractorCore,
+    private scheduler: AiCallScheduler = new AiCallScheduler(repo.prisma),
   ) {}
 
-  async analyzeDiscussion(params: AnalyzeDiscussionParams): Promise<AnalyzeDiscussionResult> {
+  async analyzeDiscussion(
+    params: AnalyzeDiscussionParams,
+    options: { signal?: AbortSignal } = {},
+  ): Promise<AnalyzeDiscussionResult> {
+    if (options.signal?.aborted) throw new AppError('Analysis cancelled', 503);
     const parsed = AnalyzeDiscussionRequestDtoSchema.safeParse(params);
     if (!parsed.success)
       throw new BadRequestError('Invalid discussion payload', parsed.error.flatten());
     params = parsed.data;
+    const sessionWorkers = concurrencySetting('AI_SESSION_CONCURRENCY');
     const requests = new AnalysisRequestRepository(this.repo);
     const claim = await requests.claim(params);
     if (claim.result) return claim.result;
@@ -67,6 +74,9 @@ export class DiscussionService {
       ? JSON.parse(stored.workflowJson)
       : this.prepare(params);
     const controller = new AbortController();
+    const cancel = () => controller.abort(options.signal?.reason);
+    options.signal?.addEventListener('abort', cancel, { once: true });
+    if (options.signal?.aborted) cancel();
     const heartbeat = setInterval(() => {
       void Promise.all([
         requests.renew(params.requestId, claim.owner),
@@ -74,15 +84,41 @@ export class DiscussionService {
       ]).catch(error => controller.abort(error));
     }, AnalysisPolicy.leaseHeartbeatMs);
     heartbeat.unref();
-    const save = async () => {
-      await execution.renew(slot);
-      await requests.checkpoint(params.requestId, claim.owner, workflow, params);
+    let checkpoints = Promise.resolve();
+    const save = (session?: AnalysisSession) => {
+      const snapshot = session ? structuredClone(session) : undefined;
+      const task = checkpoints.then(async () => {
+        await execution.renew(slot);
+        await requests.checkpoint(params.requestId, claim.owner, workflow, params, snapshot);
+      });
+      checkpoints = task.catch(() => {});
+      return task;
     };
     try {
       await save();
-      const algorithm = new GraphWorkflow(this.extractor);
-      for (const session of workflow.sessions)
-        await algorithm.run(session, workflow, save, controller.signal, claim.owner);
+      const algorithm = new GraphWorkflow(this.extractor, this.scheduler);
+      let cursor = 0;
+      let failed = false;
+      let failure: unknown;
+      await Promise.all(
+        Array.from({ length: Math.min(sessionWorkers, workflow.sessions.length) }, async () => {
+          while (!controller.signal.aborted && cursor < workflow.sessions.length) {
+            const session = workflow.sessions[cursor++];
+            try {
+              await algorithm.run(session, workflow, save, controller.signal, claim.owner);
+            } catch (error) {
+              if (!failed) {
+                failed = true;
+                failure = error;
+              }
+              controller.abort(error);
+            }
+          }
+        }),
+      );
+      await checkpoints;
+      if (failed) throw failure;
+      if (controller.signal.aborted) throw new AppError('Analysis ownership lost', 503);
       const drafts: CandidateDraft[] = [];
       for (const session of workflow.sessions) drafts.push(...this.project(session, params));
       await save();
@@ -132,6 +168,7 @@ export class DiscussionService {
       });
       throw error;
     } finally {
+      options.signal?.removeEventListener('abort', cancel);
       clearInterval(heartbeat);
       await execution.release(slot);
     }
@@ -166,6 +203,7 @@ export class DiscussionService {
           phase: s.phase,
           repairs: s.repairs,
           elapsedMs: s.elapsedMs,
+          waitMs: s.waitMs ?? 0,
           logicalCalls: s.calls.length,
           attempts: s.attempts.length,
           inputTokens: s.attempts.reduce((n, a) => n + (a.inputTokens ?? 0), 0),
@@ -180,13 +218,15 @@ export class DiscussionService {
     if (row.state !== 'completed') throw new ConflictError('Analysis not completed');
     if (!row.graphJson) throw new NotFoundError('Graph unavailable for this legacy analysis');
     const snapshot: GraphSnapshot = JSON.parse(row.graphJson);
-    for (const node of snapshot.sessions.flatMap(s => s.nodes)) {
-      if (node.decisionId) {
-        const current = await this.repo.getDecisionById(node.decisionId);
-        if (current) {
-          node.currentDecisionVersion = current.version ?? 1;
-          node.stale = node.currentDecisionVersion !== node.decisionVersion;
-        }
+    const nodes = snapshot.sessions.flatMap(session => session.nodes);
+    const versions = await this.repo.getDecisionVersions(
+      nodes.flatMap(node => (node.decisionId ? [node.decisionId] : [])),
+    );
+    for (const node of nodes) {
+      const version = node.decisionId ? versions.get(node.decisionId) : undefined;
+      if (version !== undefined) {
+        node.currentDecisionVersion = version;
+        node.stale = version !== node.decisionVersion;
       }
     }
     return snapshot;

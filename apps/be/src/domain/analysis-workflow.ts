@@ -30,6 +30,7 @@ export interface StageAttempt {
   error?: { message: string; status: number };
   startedAt: number;
   timeoutMs: number;
+  waitMs?: number;
   endedAt?: number;
   outcome?: 'completed' | 'failed' | 'interrupted';
   inputTokens?: number;
@@ -45,6 +46,7 @@ export interface AnalysisSession {
   verification?: unknown;
   repairs: number;
   elapsedMs: number;
+  waitMs?: number;
   calls: AnalysisPhase[];
   attempts: StageAttempt[];
   active?: number;
@@ -74,6 +76,7 @@ export interface AnalysisStatus {
     phase: AnalysisPhase;
     repairs: number;
     elapsedMs: number;
+    waitMs?: number;
     logicalCalls: number;
     attempts: number;
     inputTokens: number;
