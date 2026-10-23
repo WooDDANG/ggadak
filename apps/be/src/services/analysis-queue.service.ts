@@ -2,7 +2,6 @@ import {
   AnalysisPolicy,
   AnalysisReceiptState,
   AnalysisScanState,
-  DeliveryErrorCategory,
   DeliveryPolicy,
   parseReceiptState,
   parseScanState,
@@ -20,7 +19,8 @@ import { statfs } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { Service } from 'typedi';
 import { DecisionRepository } from '../repositories/decision.repository.js';
-import { hash } from '../repositories/analysis-request.repository.js';
+import { hash } from '../domain/analysis-identity.js';
+import { classifyAnalysisError } from '../errors/analysis-error.js';
 import { AppError, BadRequestError, ConflictError, NotFoundError } from '../errors/AppError.js';
 import { AnalyzeDiscussionRequestDtoSchema } from '../dto/discussion.dto.js';
 import type {
@@ -442,27 +442,14 @@ export class AnalysisQueueService {
           errorCategory: null,
         });
       } catch (error) {
-        const busy =
-          error instanceof Error &&
-          [
-            'Analysis capacity busy',
-            'Analysis is already in progress; retry this request',
-          ].includes(error.message);
-        const status =
-          (error as { statusCode?: number; status?: number }).statusCode ??
-          (error as { status?: number }).status ??
-          500;
-        const attempts = r.attempts + (busy ? 0 : 1),
-          retryable = status >= 500 || status === 429 || status === 408;
+        const failure = classifyAnalysisError(error);
+        const { busy, retryable, retryAfterMs } = failure;
+        const attempts = r.attempts + (busy ? 0 : 1);
         const base = Math.min(
           DeliveryPolicy.maxRetryMs,
           this.options.retryMs * 2 ** Math.min(Math.max(0, attempts - 1), 6),
         );
-        const retryAfter = Number((error as AppError).details?.retryAfterMs ?? 0);
-        const delay = Math.max(
-          Math.round(base * (0.8 + Math.random() * 0.4)),
-          Number.isFinite(retryAfter) ? retryAfter : 0,
-        );
+        const delay = Math.max(Math.round(base * (0.8 + Math.random() * 0.4)), retryAfterMs);
         await this.storage.patchOwned(r.id, owner, {
           state:
             retryable && attempts < this.options.maxAttempts
@@ -472,11 +459,7 @@ export class AnalysisQueueService {
           owner: null,
           leaseUntil: null,
           nextAttemptAt: new Date(this.now() + (busy ? 500 : delay)),
-          errorCategory: busy
-            ? DeliveryErrorCategory.AnalysisCapacity
-            : retryable
-              ? DeliveryErrorCategory.ProviderOrStorage
-              : DeliveryErrorCategory.AnalysisTerminal,
+          errorCategory: failure.category,
         });
         if (retryable && !busy)
           await this.storage.patchControl({ pauseUntil: new Date(this.now() + delay) });

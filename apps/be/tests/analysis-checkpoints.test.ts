@@ -3,6 +3,8 @@ import { isolatedRepository } from '../src/repositories/test-database.js';
 import { AnalysisRequestRepository } from '../src/repositories/analysis-request.repository.js';
 import { prepareAnalysis } from '../src/services/discussion-preprocessing.js';
 import { AiAdapter } from '../src/adapters/ai.adapter.js';
+import { DiscussionService } from '../src/services/discussion.service.js';
+import { DecisionExtractorCore } from '../src/engine/extractor-core.js';
 
 test('session checkpoints preserve immutable input and independent sibling state', async () => {
   const db = await isolatedRepository();
@@ -45,6 +47,33 @@ test('session checkpoints preserve immutable input and independent sibling state
     expect(restored.sessions[0].transcript).toContain('DB를 선택해야');
     const rows = await db.client.analysisSessionState.findMany();
     expect(rows.every(row => !row.stateJson.includes('DB를 선택해야'))).toBe(true);
+  } finally {
+    await db.cleanup();
+  }
+});
+
+test('a checkpoint restore failure immediately frees capacity for another discussion', async () => {
+  const db = await isolatedRepository();
+  const input = {
+    requestId: 'incomplete-checkpoint',
+    guildId: 'g',
+    channelId: 'c',
+    rawMessages: [{ id: '1', author: 'Lee', content: 'DB를 선택해야 합니다' }],
+  };
+  const requests = new AnalysisRequestRepository(db.repo);
+  const ai = new AiAdapter({ provider: 'mock' }, 'test');
+  try {
+    const { owner } = await requests.claim(input);
+    await requests.checkpoint(input.requestId, owner, prepareAnalysis(input, ai.settings), input);
+    await requests.release(input.requestId, owner);
+    await db.client.analysisSessionState.deleteMany({ where: { requestId: input.requestId } });
+    const service = new DiscussionService(db.repo, ai, new DecisionExtractorCore());
+    await expect(service.analyzeDiscussion(input)).rejects.toThrow(
+      'Incomplete analysis checkpoint',
+    );
+    await expect(
+      service.analyzeDiscussion({ ...input, requestId: 'next-discussion' }),
+    ).resolves.toMatchObject({ found: false, graphAvailable: true });
   } finally {
     await db.cleanup();
   }

@@ -1,3 +1,4 @@
+import { AnalysisQueryService } from '../services/analysis-query.service.js';
 import { DashboardService } from '../services/dashboard.service.js';
 import { AnalysisQueueService } from '../services/analysis-queue.service.js';
 import { AnalysisQueueController } from '../api/controllers/analysis-queue.controller.js';
@@ -116,7 +117,7 @@ export async function initLoaders({
   container.set(DiscussionService, discussionService);
   container.set(
     AnalysisRequestController,
-    new AnalysisRequestController(discussionService, authService),
+    new AnalysisRequestController(new AnalysisQueryService(repo), authService),
   );
 
   // 5. Controller Layer Binding for TSOA IoC Container

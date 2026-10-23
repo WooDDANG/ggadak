@@ -2,7 +2,7 @@ import { Controller, Route, Tags, Get, Query, Security, Request, Path, Response 
 import { Service } from 'typedi';
 import type { Request as ExpressRequest } from 'express';
 import { AuthService } from '../../services/auth.service.js';
-import { DiscussionService } from '../../services/discussion.service.js';
+import { AnalysisQueryService } from '../../services/analysis-query.service.js';
 import { requirePrincipal } from '../guards/authorization.js';
 import { ApiResponse, apiSuccess } from '../../dto/api-response.dto.js';
 import type { AnalysisStatus } from '../../domain/analysis-workflow.js';
@@ -14,7 +14,7 @@ import type { GraphSnapshot } from '../../domain/decision-graph.js';
 @Service()
 export class AnalysisRequestController extends Controller {
   constructor(
-    private service: DiscussionService,
+    private service: AnalysisQueryService,
     private auth: AuthService,
   ) {
     super();

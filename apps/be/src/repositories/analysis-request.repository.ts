@@ -1,7 +1,10 @@
 import { AnalysisRequestState } from '../domain/analysis-workflow.js';
-import { AnalysisPolicy, Decision, DecisionState } from '@ggaddak/shared';
+import { AnalysisPolicy } from '@ggaddak/shared';
 
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
+import { hash } from '../domain/analysis-identity.js';
+import type { CandidateHistoryEntry } from '../domain/candidate-publication.js';
+export type { CandidateHistoryEntry } from '../domain/candidate-publication.js';
 
 import { DecisionRepository } from './decision.repository.js';
 import type { AnalyzeDiscussionParams, AnalyzeDiscussionResult } from '../domain/analysis.js';
@@ -11,6 +14,7 @@ import type {
   AnalysisSession,
 } from '../domain/analysis-workflow.js';
 import type { GraphSnapshot } from '../domain/decision-graph.js';
+import { AnalysisBusyError } from '../errors/analysis-error.js';
 
 export class AnalysisRequestError extends Error {
   constructor(
@@ -19,38 +23,6 @@ export class AnalysisRequestError extends Error {
   ) {
     super(message);
   }
-}
-
-/** Stable JSON removes object-key ordering while preserving meaningful array ordering. */
-export function stableJson(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
-  if (value && typeof value === 'object')
-    return `{${Object.entries(value)
-      .filter(([, v]) => v !== undefined)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([k, v]) => `${JSON.stringify(k)}:${stableJson(v)}`)
-      .join(',')}}`;
-  return JSON.stringify(value);
-}
-export function hash(value: unknown): string {
-  return createHash('sha256').update(stableJson(value)).digest('hex');
-}
-const normalizeContent = (value: string) => value.normalize('NFKC').trim().replace(/\s+/g, ' ');
-
-export interface CandidateDraft {
-  decision: Decision;
-  evidenceJson: string;
-  legacyHash: string;
-  graphNodeId?: string;
-}
-export interface CandidateHistoryEntry {
-  requestId: string;
-  isManualOverride: boolean;
-  previousRequestIds: string[];
-  relatedCandidateIds: string[];
-  createdAt: string;
-  graphAvailable?: boolean;
-  candidateNodeIds?: string[];
 }
 
 export class AnalysisRequestRepository {
@@ -109,7 +81,7 @@ export class AnalysisRequestRepository {
       });
       if (current.state === AnalysisRequestState.Completed)
         return { owner, result: JSON.parse(current.resultJson!) };
-      throw new AnalysisRequestError('Analysis is already in progress; retry this request', 503);
+      throw new AnalysisBusyError('Analysis is already in progress; retry this request');
     }
     return { owner };
   }
@@ -229,185 +201,6 @@ export class AnalysisRequestRepository {
     await this.repo.prisma.analysisRequest.updateMany({
       where: { id: requestId, owner, state: AnalysisRequestState.Processing },
       data: { state: AnalysisRequestState.Pending, owner: null, leaseUntil: null },
-    });
-  }
-
-  async complete(
-    params: AnalyzeDiscussionParams,
-    owner: string,
-    result: AnalyzeDiscussionResult,
-    drafts: CandidateDraft[],
-    graph?: GraphSnapshot,
-  ): Promise<AnalyzeDiscussionResult> {
-    return this.repo.prisma.$transaction(async tx => {
-      // Take the write lock and fence an expired/stolen owner before creating anything.
-      const fenced = await tx.analysisRequest.updateMany({
-        where: {
-          id: params.requestId,
-          owner,
-          state: AnalysisRequestState.Processing,
-          leaseUntil: { gt: new Date() },
-        },
-        data: { state: AnalysisRequestState.Committing },
-      });
-      if (!fenced.count)
-        throw new AnalysisRequestError('Analysis ownership expired; retry this request', 503);
-      const decisions: Decision[] = [];
-      for (const draft of drafts) {
-        const graphNode = graph?.sessions
-          .flatMap(session => session.nodes)
-          .find(node => node.id === draft.graphNodeId);
-        const normalizedContent = normalizeContent(
-          draft.decision.decisionContent ?? draft.decision.decision,
-        );
-        const key = hash({
-          guildId: draft.decision.source.guildId,
-          evidence: draft.evidenceJson,
-          content: normalizedContent,
-        });
-        const identity = await tx.candidateIdentity.findUnique({ where: { key } });
-        const legacyRows = identity
-          ? []
-          : await tx.decision.findMany({
-              where: {
-                guildId: draft.decision.source.guildId,
-                channelId: draft.decision.source.channelId,
-                evidenceHash: { in: [draft.legacyHash, draft.decision.evidenceHash ?? ''] },
-              },
-            });
-        const matchingLegacy = legacyRows.find(row => {
-          const stored = this.repo.decodeDecision(row);
-          return (
-            (normalizeContent(stored.decisionContent ?? stored.decision) === normalizedContent ||
-              normalizeContent(stored.decision) === normalizedContent) &&
-            stableJson(stored.source.rawMessages) ===
-              stableJson(JSON.parse(draft.evidenceJson).messages)
-          );
-        });
-        const existingRow = identity
-          ? await tx.decision.findUnique({ where: { id: identity.decisionId } })
-          : (matchingLegacy ?? null);
-        const rejectedLegacyRows = legacyRows.filter(
-          row => row.status === DecisionState.Rejected || row.status === 'rejected',
-        );
-        const legacyRejected =
-          !identity &&
-          (await tx.rejectedEvidenceHash.findUnique({ where: { evidenceHash: draft.legacyHash } }));
-        const suppressLegacy =
-          legacyRejected &&
-          (rejectedLegacyRows.length === 0 ||
-            rejectedLegacyRows.some(row => {
-              const stored = this.repo.decodeDecision(row);
-              return (
-                normalizeContent(stored.decisionContent ?? stored.decision) === normalizedContent ||
-                normalizeContent(stored.decision) === normalizedContent
-              );
-            }));
-        // Rejections are candidate-scoped. Legacy hashes apply only to their exact original session.
-        if (
-          !params.isManualOverride &&
-          (existingRow?.status === DecisionState.Rejected ||
-            existingRow?.status === 'rejected' ||
-            suppressLegacy)
-        ) {
-          if (graphNode) graphNode.suppressed = true;
-          continue;
-        }
-        let decision: Decision;
-        if (existingRow) {
-          decision = this.repo.decodeDecision(existingRow);
-          if (!identity)
-            await tx.candidateIdentity.create({
-              data: {
-                key,
-                decisionId: decision.id,
-                guildId: decision.source.guildId,
-                channelId: decision.source.channelId,
-                evidenceJson: draft.evidenceJson,
-                normalizedContent,
-              },
-            });
-        } else {
-          decision = {
-            ...draft.decision,
-            version: 1,
-            actionItems: draft.decision.actionItems.map(item => ({
-              ...item,
-              id: item.id ?? randomUUID(),
-              state: item.state ?? 'open',
-            })),
-          };
-          await tx.decision.create({
-            data: { id: decision.id, ...this.repo.decisionData(decision) },
-          });
-          await tx.candidateIdentity.create({
-            data: {
-              key,
-              decisionId: decision.id,
-              guildId: decision.source.guildId,
-              channelId: decision.source.channelId,
-              evidenceJson: draft.evidenceJson,
-              normalizedContent,
-            },
-          });
-        }
-        const evidenceIds: string[] = JSON.parse(draft.evidenceJson).messages.map(
-          (m: { id: string }) => m.id,
-        );
-        const nearby = await tx.candidateIdentity.findMany({
-          where: { guildId: decision.source.guildId, channelId: decision.source.channelId },
-        });
-        const related = [
-          ...new Set(
-            nearby
-              .filter(
-                row =>
-                  row.decisionId !== decision.id &&
-                  JSON.parse(row.evidenceJson).messages.some((m: { id: string }) =>
-                    evidenceIds.includes(m.id),
-                  ),
-              )
-              .map(row => row.decisionId),
-          ),
-        ];
-        const prior = await tx.candidateAnalysis.findMany({
-          where: {
-            decisionId: { in: [decision.id, ...related] },
-            requestId: { not: params.requestId },
-          },
-        });
-        await tx.candidateAnalysis.upsert({
-          where: { requestId_decisionId: { requestId: params.requestId, decisionId: decision.id } },
-          update: {},
-          create: {
-            requestId: params.requestId,
-            decisionId: decision.id,
-            relations: { create: related.map(relatedDecisionId => ({ relatedDecisionId })) },
-            previousRequestsJson: JSON.stringify([...new Set(prior.map(row => row.requestId))]),
-          },
-        });
-        if (!decisions.some(d => d.id === decision.id)) decisions.push(decision);
-        if (graphNode) {
-          graphNode.decisionId = decision.id;
-          graphNode.decisionVersion = decision.version ?? 1;
-        }
-      }
-      const completed: AnalyzeDiscussionResult = JSON.parse(
-        JSON.stringify({ ...result, decisions, found: decisions.length > 0 }),
-      );
-      await tx.analysisRequest.update({
-        where: { id: params.requestId },
-        data: {
-          state: AnalysisRequestState.Completed,
-          owner: null,
-          leaseUntil: null,
-          resultJson: JSON.stringify(completed),
-          completedAt: new Date(),
-          graphJson: graph ? JSON.stringify(graph) : null,
-          errorJson: null,
-        },
-      });
-      return completed;
     });
   }
 

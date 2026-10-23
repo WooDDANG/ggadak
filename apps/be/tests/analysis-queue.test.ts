@@ -149,6 +149,30 @@ test('provider retry-after defers analysis in BE without retransmitting stored i
   }
 });
 
+test('a provider failure with capacity-like wording still consumes a retry attempt', async () => {
+  const db = await isolatedRepository();
+  const ai = fixtureAiAdapter({
+    analyzeTranscript: async () => {
+      throw new AppError('Analysis capacity busy', 503);
+    },
+  });
+  const queue = new AnalysisQueueService(
+    db.repo,
+    new DiscussionService(db.repo, ai, new DecisionExtractorCore()),
+  );
+  try {
+    await queue.receive({ input });
+    await queue.runOnce();
+    expect((await queue.results([input.requestId]))[0]).toMatchObject({
+      state: 'retry',
+      attempts: 1,
+      errorCategory: 'provider-or-storage',
+    });
+  } finally {
+    await db.cleanup();
+  }
+});
+
 test('BE permits channel B transfer while channel A is queued and completes the job after analysis', async () => {
   const db = await isolatedRepository();
   let failing = true;
