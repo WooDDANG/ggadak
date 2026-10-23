@@ -1,3 +1,9 @@
+import 'reflect-metadata';
+import { SyncJobService } from '../services/sync-job.service.js';
+import {
+  SyncJobsController,
+  InternalSyncJobsController,
+} from '../api/controllers/sync-jobs.controller.js';
 import { AnalysisQueryService } from '../services/analysis-query.service.js';
 import { DashboardService } from '../services/dashboard.service.js';
 import { AnalysisQueueService } from '../services/analysis-queue.service.js';
@@ -15,7 +21,6 @@ import { AuthController } from '../api/controllers/auth.controller.js';
 import { V1DecisionController } from '../api/controllers/v1-decision.controller.js';
 import { randomUUID } from 'node:crypto';
 import { AuthService, AuthOptions } from '../services/auth.service.js';
-import 'reflect-metadata';
 import { Express } from 'express';
 import { Container } from 'typedi';
 import { DecisionRepository } from '../repositories/decision.repository.js';
@@ -105,6 +110,10 @@ export async function initLoaders({
   const feedbackService = new FeedbackService(repo);
   const decisionService = new DecisionService(repo);
   const discussionService = new DiscussionService(repo, aiAdapter as AiAdapter, core);
+  const syncJobs = new SyncJobService(repo);
+  container.set(SyncJobService, syncJobs);
+  container.set(SyncJobsController, new SyncJobsController(syncJobs, authService));
+  container.set(InternalSyncJobsController, new InternalSyncJobsController(syncJobs));
   const analysisQueue = new AnalysisQueueService(repo, discussionService);
   expressApp.locals.analysisQueue = analysisQueue;
   container.set(AnalysisQueueController, new AnalysisQueueController(analysisQueue));

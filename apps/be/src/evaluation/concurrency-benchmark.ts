@@ -122,6 +122,19 @@ export async function runConcurrencyBenchmark(options: BenchmarkOptions) {
     throw new Error('Invalid benchmark duration');
   for (const [key, value] of Object.entries(options.thresholds))
     if (!Number.isFinite(value) || value < 0) throw new Error('Invalid threshold: ' + key);
+  if (options.live) {
+    if (!options.probeUrl) throw new Error('Live benchmark requires a service probe URL');
+    try {
+      const response = await fetch(options.probeUrl, {
+        signal: AbortSignal.timeout(3000),
+        headers: process.env.BENCHMARK_COOKIE ? { Cookie: process.env.BENCHMARK_COOKIE } : {},
+      });
+      await response.arrayBuffer();
+      if (!response.ok) throw new Error('Probe response not successful');
+    } catch {
+      throw new Error('Live benchmark service probe unavailable; no AGY calls started');
+    }
+  }
   const deadline = AbortSignal.timeout(options.maxDurationMs);
   const bounded = budgetProvider(
     options.budget,

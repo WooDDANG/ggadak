@@ -1,3 +1,4 @@
+import 'reflect-metadata';
 import { AnalysisPolicy, DeliveryPolicy } from '@ggaddak/shared';
 import type { EmbeddingProvider } from './services/search.service.js';
 import type { AuthOptions } from './services/auth.service.js';

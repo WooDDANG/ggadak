@@ -1,19 +1,15 @@
 import { QueryPolicy } from './config';
-import { DecisionState, ExternalFeedback, ReviewAction } from '@ggaddak/shared';
-import { reviewWithConflictReload } from './api/review-workflow';
-import { AnalysisRecovery } from './features/review-queue/AnalysisRecovery';
+import { ExternalFeedback } from '@ggaddak/shared';
 import { Dashboard } from './features/Dashboard';
-import { dashboardQueryKey } from './api/dashboard.api';
+import { dashboardQueryKey, loadDashboard } from './api/dashboard.api';
 import { WhySearch } from './features/WhySearch';
 import React, { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useIsFetching, useQueryClient } from '@tanstack/react-query';
 
-import { decisionsApi } from './api/decisions.api';
 import { ChannelSettings } from './features/ChannelSettings';
 import { AuthGate } from './features/AuthGate';
-import { decisionsQueryKey } from './api/session';
 import { Header } from './components/Header';
-import { ReviewQueue } from './features/review-queue/ReviewQueue';
+import { ReviewQueuePage } from './features/review-queue/ReviewQueuePage';
 import { DecisionBrowser } from './features/decision-timeline/DecisionBrowser';
 import { FeedbackBoard } from './features/feedback-board/FeedbackBoard';
 import { ManualSync } from './features/ManualSync';
@@ -27,35 +23,14 @@ function ServerApp({ guildId }: { guildId: string }) {
     'review' | 'timeline' | 'feedback' | 'settings' | 'search' | 'sync' | 'dashboard'
   >('dashboard');
   const queryClient = useQueryClient();
-  const [reviewRevision, setReviewRevision] = useState(0);
-
-  // 1. Fetch Decisions Query
-  const {
-    data: decisions = [],
-    isLoading: isDecisionsLoading,
-    isRefetching,
-    refetch,
-  } = useQuery({
-    queryKey: decisionsQueryKey(guildId),
-    queryFn: () => decisionsApi.getDecisions({ guildId }),
-    refetchInterval: QueryPolicy.activityPollMs, // 5초 주기 폴링
+  const isRefetching = useIsFetching() > 0;
+  const summary = useQuery({
+    queryKey: dashboardQueryKey(guildId),
+    queryFn: () => loadDashboard(guildId),
+    enabled: activeTab === 'review',
+    refetchInterval: activeTab === 'review' ? QueryPolicy.reviewPollMs : false,
   });
-
-  const {
-    data: reviewCandidates = [],
-    isLoading: isQueueLoading,
-    error: queueError,
-  } = useQuery({
-    queryKey: [...decisionsQueryKey(guildId), 'review-queue'],
-    queryFn: async () =>
-      (
-        await Promise.all([
-          decisionsApi.getReviewQueue(guildId),
-          decisionsApi.getReviewQueue(guildId, 'ON_HOLD'),
-        ])
-      ).flat(),
-    refetchInterval: QueryPolicy.activityPollMs,
-  });
+  const draftCount = summary.data?.counts.inReview ?? 0;
 
   // 2. Fetch Feedbacks Query
   const { data: feedbacks = [], isLoading: isFeedbacksLoading } = useQuery({
@@ -64,40 +39,13 @@ function ServerApp({ guildId }: { guildId: string }) {
     enabled: false,
   });
 
-  // 3. Review Action Mutation
-  const reviewMutation = useMutation({
-    mutationFn: ({ id, action }: { id: string; action: ReviewAction }) =>
-      decisionsApi.reviewDecision(id, action, guildId),
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: decisionsQueryKey(guildId) });
-      queryClient.invalidateQueries({ queryKey: dashboardQueryKey(guildId) });
-      queryClient.invalidateQueries({ queryKey: ['decision-detail', guildId] });
-      queryClient.invalidateQueries({ queryKey: ['decision-cards', guildId] });
-    },
-  });
-
-  const handleReview = async (id: string, action: ReviewAction) => {
-    await reviewWithConflictReload(
-      () => reviewMutation.mutateAsync({ id, action }),
-      async () => {
-        await queryClient.refetchQueries(
-          { queryKey: decisionsQueryKey(guildId) },
-          { throwOnError: true },
-        );
-        setReviewRevision(value => value + 1);
-      },
-    );
-  };
-
-  const draftCount = reviewCandidates.filter(d => d.state !== DecisionState.Deferred).length;
-
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-indigo-500 selection:text-white">
       <Header
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         draftCount={draftCount}
-        onRefresh={() => refetch()}
+        onRefresh={() => void queryClient.refetchQueries({ type: 'active' })}
         isRefetching={isRefetching}
       />
 
@@ -105,22 +53,8 @@ function ServerApp({ guildId }: { guildId: string }) {
         {activeTab === 'search' && <WhySearch key={guildId} guildId={guildId} />}
         {activeTab === 'settings' && <ChannelSettings key={guildId} guildId={guildId} />}
         {activeTab === 'sync' && <ManualSync key={guildId} guildId={guildId} />}
-        {activeTab === 'review' && <AnalysisRecovery guildId={guildId} />}
-        {activeTab === 'review' && queueError && (
-          <p role="alert" className="text-rose-300">
-            검수 큐를 불러오지 못했습니다. {queueError.message}
-          </p>
-        )}
-        {activeTab === 'review' && !queueError && (
-          <ReviewQueue
-            guildId={guildId}
-            revision={reviewRevision}
-            decisions={reviewCandidates}
-            records={decisions}
-            onReview={handleReview}
-            isLoading={isQueueLoading || isDecisionsLoading}
-          />
-        )}
+        {activeTab === 'dashboard' && <Dashboard key={guildId} guildId={guildId} />}
+        {activeTab === 'review' && <ReviewQueuePage key={guildId} guildId={guildId} />}
 
         {activeTab === 'timeline' && <DecisionBrowser guildId={guildId} />}
 

@@ -24,6 +24,8 @@ export function ReviewResolution({ candidate, records, disabled, onConfirm }: Pr
   const eligible = records.filter(
     record => record.state === DecisionState.Decided && record.id !== candidate.id,
   );
+  if (predecessor && !eligible.some(record => record.id === predecessor.id))
+    eligible.unshift(predecessor);
   const tasks = predecessor?.actionItems ?? [];
   const complete = tasks.every(task => {
     if (!task.id) return false;

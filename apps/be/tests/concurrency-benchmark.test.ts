@@ -1,4 +1,5 @@
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
+import { AgyProvider } from '../src/adapters/agy-provider.js';
 import {
   runConcurrencyBenchmark,
   percentile,
@@ -83,3 +84,44 @@ test('completion latency includes all sequential sessions through the final comm
   expect(result.suggestedN).toBeNull();
   expect(result.productionRecommendation).toBeNull();
 }, 30000);
+
+test('live calibration rejects an unavailable service probe before invoking AGY', async () => {
+  const generate = vi
+    .spyOn(AgyProvider.prototype, 'generate')
+    .mockRejectedValue(new Error('External AI must not run'));
+  const fetch = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('Connection refused'));
+  try {
+    await expect(
+      runConcurrencyBenchmark({
+        ns: [1],
+        rounds: 1,
+        live: true,
+        model: 'fixture',
+        environment: 'test',
+        probeUrl: 'http://127.0.0.1:1/health',
+        maxDurationMs: 1000,
+        budget: { maxCalls: 1, maxTokens: 100, maxOutputTokens: 1 },
+        records: [
+          {
+            requestId: 'preflight',
+            guildId: 'g',
+            channelId: 'c',
+            rawMessages: [{ id: '1', author: 'Lee', content: '데이터베이스를 선택합시다.' }],
+          },
+        ],
+        thresholds: {
+          maxP95Ms: 1000,
+          maxErrorRate: 0,
+          maxRssMiB: 1000,
+          maxCpuPercent: 100,
+          maxDbP95Ms: 100,
+          maxProbeP95Ms: 100,
+        },
+      }),
+    ).rejects.toThrow('Live benchmark service probe unavailable');
+    expect(generate).not.toHaveBeenCalled();
+  } finally {
+    generate.mockRestore();
+    fetch.mockRestore();
+  }
+});

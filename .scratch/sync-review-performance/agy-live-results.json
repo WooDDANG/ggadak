@@ -1,0 +1,110 @@
+{
+  "mode": "live-agy",
+  "model": "gemini-3.8-flash-low",
+  "environment": "local-2026-10-24",
+  "inputSha256": "8da5a198e5f5512e51f09152089ef874d36c14dfa45e4bc70b8e658673cd6d94",
+  "thresholds": {
+    "maxP95Ms": 180000,
+    "maxErrorRate": 0,
+    "maxRssMiB": 1024,
+    "maxCpuPercent": 200,
+    "maxDbP95Ms": 100,
+    "maxProbeP95Ms": 200
+  },
+  "budget": {
+    "maxCalls": 64,
+    "maxTokens": 200000,
+    "maxOutputTokens": 8192
+  },
+  "consumption": {
+    "calls": 14,
+    "tokens": 197375
+  },
+  "deadlineExceeded": false,
+  "suggestedN": null,
+  "productionRecommendation": null,
+  "limitation": "Only measured N values are compared. Fixture results do not establish AGY account capacity; live recommendation requires successful external latency probes and process-tree resource samples.",
+  "rawReportSha256": "4f58608bdbacb3b5ee56ad1fcc37adabb370731d6739f27fad0768f3fc57272f",
+  "samples": [
+    {
+      "n": 1,
+      "sessionWorkers": 1,
+      "globalCallLimit": 1,
+      "completed": 4,
+      "total": 4,
+      "elapsedMs": 172098.396125,
+      "completedPerMinute": 1.3945510556977017,
+      "p50Ms": 133844.507416,
+      "p95Ms": 172040.806667,
+      "activeStageP95Ms": 55207,
+      "waitP50Ms": 36942,
+      "waitP95Ms": 41196,
+      "errorRate": 0,
+      "peakCalls": null,
+      "peakRssMiB": 1745.765625,
+      "peakCpuPercent": 593.5999999999999,
+      "resourceSamplesAvailable": true,
+      "dbP95Ms": 0.3422080000018468,
+      "probeP95Ms": null,
+      "writes": 134,
+      "dbErrors": 0,
+      "failureCounts": {
+        "probe": 2513
+      }
+    },
+    {
+      "n": 2,
+      "sessionWorkers": 2,
+      "globalCallLimit": 2,
+      "completed": 2,
+      "total": 4,
+      "elapsedMs": 52273.060624999984,
+      "completedPerMinute": 2.295637534233247,
+      "p50Ms": 52223.169250000006,
+      "p95Ms": 52223.169250000006,
+      "activeStageP95Ms": 36199,
+      "waitP50Ms": 15998,
+      "waitP95Ms": 16770,
+      "errorRate": 0.5,
+      "peakCalls": null,
+      "peakRssMiB": 2867.53125,
+      "peakCpuPercent": 722.6000000000001,
+      "resourceSamplesAvailable": true,
+      "dbP95Ms": 0.41983299999265,
+      "probeP95Ms": null,
+      "writes": 95,
+      "dbErrors": 0,
+      "failureCounts": {
+        "probe": 757,
+        "Evaluation budget exhausted before provider call": 1
+      }
+    },
+    {
+      "n": 4,
+      "sessionWorkers": 4,
+      "globalCallLimit": 4,
+      "completed": 0,
+      "total": 4,
+      "elapsedMs": 70.1277499999851,
+      "completedPerMinute": 0,
+      "p50Ms": null,
+      "p95Ms": null,
+      "activeStageP95Ms": null,
+      "waitP50Ms": null,
+      "waitP95Ms": null,
+      "errorRate": 1,
+      "peakCalls": null,
+      "peakRssMiB": 139.96875,
+      "peakCpuPercent": 3.1,
+      "resourceSamplesAvailable": true,
+      "dbP95Ms": 0.202499999984866,
+      "probeP95Ms": null,
+      "writes": 48,
+      "dbErrors": 0,
+      "failureCounts": {
+        "probe": 1,
+        "Evaluation budget exhausted before provider call": 2
+      }
+    }
+  ]
+}
