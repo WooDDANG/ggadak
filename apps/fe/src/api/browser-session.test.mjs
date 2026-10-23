@@ -113,6 +113,29 @@ test('a changed login starts a fresh bootstrap while the previous user response 
   }
 });
 
+test('an empty proxy failure preserves its HTTP status and a reconnect can restore the session', async () => {
+  const browser = await import(browserUrl);
+  const previousFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response(null, { status: 500 });
+  try {
+    await assert.rejects(browser.restoreBrowserLogin(), error => {
+      assert.equal(error.status, 500);
+      assert.equal(browser.isExpiredSession(error), false);
+      assert.match(error.message, /백엔드/);
+      assert.doesNotMatch(error.message, /JSON|Unexpected end/);
+      return true;
+    });
+    globalThis.fetch = async () =>
+      Response.json({
+        success: true,
+        data: { user: { id: 'reconnected' }, guilds: [], accessToken: 'restored' },
+      });
+    assert.equal((await browser.restoreBrowserLogin()).user.id, 'reconnected');
+  } finally {
+    globalThis.fetch = previousFetch;
+  }
+});
+
 test('expired access is recovered once before retry; a transient recovery error does not broadcast logout', async () => {
   const session = await import(sessionUrl),
     transport = await import(transportUrl);

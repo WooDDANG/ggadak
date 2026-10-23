@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { mkdtemp, rm, readFile } from 'node:fs/promises';
+import { mkdtemp, rm, readFile, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { PrismaClient } from '@prisma/client';
@@ -26,6 +26,16 @@ test('DB tooling checks the selected schema read-only and makes a consistent exp
       ),
     );
     expect((await readFile(backup.backup)).subarray(0, 15).toString()).toBe('SQLite format 3');
+    const backups = await readdir(join(db.dir, 'backup'));
+    const ready = JSON.parse(
+      execFileSync(
+        process.execPath,
+        [script, 'upgrade', ...args, '--apply', '--backup-dir', join(db.dir, 'backup')],
+        { cwd: root, encoding: 'utf8' },
+      ),
+    );
+    expect(ready.alreadyCurrent).toBe(true);
+    expect(await readdir(join(db.dir, 'backup'))).toEqual(backups);
     await db.client.$executeRawUnsafe('DROP TABLE AnalysisExecution');
     const failed = spawnSync(process.execPath, [script, 'check', ...args], {
       cwd: root,

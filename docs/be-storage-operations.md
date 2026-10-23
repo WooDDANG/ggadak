@@ -2,6 +2,8 @@
 
 The active SQLite database is selected by root DATABASE_URL, relative to the Prisma schema for file URLs. Use the root npm commands; the old BE environment file must not shadow root configuration. DB inspection does not apply migrations or create a missing database.
 
+Local development startup (`npm run dev`, `npm run dev:all`, or `npm run dev:be`) prepares shared code and the Prisma Client, then applies pending migrations through the backed-up upgrade workflow before BE starts. A preparation failure stops startup. An already-current schema skips backup and migration, including repeated preparation by the BE workspace hook. `npm start` does not apply migrations; production upgrades remain an explicit maintenance operation.
+
 ## Upgrade workflow
 
 1. Build the BE and regenerate the Prisma Client with the checked-in schema.

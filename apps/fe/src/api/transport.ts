@@ -40,7 +40,17 @@ export async function authorizedFetch(url: string, options: RequestInit = {}) {
 export async function authenticatedClient<T>(url: string, options: RequestInit = {}): Promise<T> {
   const requestEpoch = getSessionEpoch();
   const response = await authorizedFetch(url, options);
-  const data = response.status === 204 ? null : await response.json();
+  let data = null;
+  if (response.status !== 204) {
+    try {
+      data = await response.json();
+    } catch {
+      throw new ApiHttpError(
+        `API 서버 응답을 읽을 수 없습니다 (HTTP ${response.status}). 백엔드 실행 상태를 확인해 주세요.`,
+        response.ok ? 502 : response.status,
+      );
+    }
+  }
   if (response.ok && requestEpoch !== getSessionEpoch())
     throw new ApiHttpError('로그인 사용자가 바뀌었습니다. 다시 시도하세요.', 409);
   if (!response.ok)

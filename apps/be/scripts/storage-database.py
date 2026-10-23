@@ -51,6 +51,9 @@ if args.operation == 'check':
 if args.operation in ['upgrade', 'backfill'] and not args.apply:
     print(json.dumps({**report, 'applied': False, 'next': 'Repeat upgrade with --apply to back up and migrate the selected DB.'}, ensure_ascii=False))
     raise SystemExit(0)
+if args.operation == 'upgrade' and not report['pendingMigrations'] and not report['missingSchema']:
+    print(json.dumps({**report, 'applied': False, 'alreadyCurrent': True}, ensure_ascii=False))
+    raise SystemExit(0)
 directory = Path(args.backup_dir).resolve()
 directory.mkdir(parents=True, exist_ok=True, mode=0o700)
 backup = directory / (datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%S%fZ') + '.sqlite')

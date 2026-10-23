@@ -6,6 +6,9 @@
     "apps/*"
   ],
   "scripts": {
+    "dev:prepare": "npm run build --workspace=@ggaddak/shared && npm run db:generate --workspace=@ggaddak/be && npm run db:upgrade -- --apply",
+    "predev": "npm run dev:prepare",
+    "predev:all": "npm run dev:prepare",
     "dev": "npm run build && concurrently -n \"BE,BOT,FE\" -c \"blue,green,magenta\" \"npm run dev:be\" \"npm run dev:bot\" \"npm run dev:fe\"",
     "dev:all": "npm run build && concurrently -n \"BE,BOT,FE\" -c \"blue,green,magenta\" \"npm run dev:be\" \"npm run dev:bot\" \"npm run dev:fe\"",
     "dev:bot": "npm run dev --workspace=@ggaddak/bot",
