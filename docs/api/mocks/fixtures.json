@@ -1,0 +1,1843 @@
+{
+  "description": "합성 FE 테스트 데이터. 각 fixture는 독립적인 HTTP 응답 스냅샷입니다.",
+  "guildId": "119283746592019280",
+  "fixtures": {
+    "auth.me": {
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/auth/me"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "success": true,
+          "code": "OK",
+          "message": "Success",
+          "data": {
+            "id": "119283746592019282",
+            "discordUserId": "119283746592019282",
+            "name": "목 데이터 사용자",
+            "email": null,
+            "avatarUrl": null
+          }
+        }
+      }
+    },
+    "auth.guilds": {
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/auth/guilds"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "success": true,
+          "code": "OK",
+          "message": "Success",
+          "data": {
+            "guilds": [
+              {
+                "id": "119283746592019280",
+                "name": "까닭 FE 테스트 팀",
+                "icon": null,
+                "owner": true,
+                "permissions": "32"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "auth.session": {
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/auth/session"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "success": true,
+          "code": "OK",
+          "message": "Success",
+          "data": {
+            "accessToken": "mock-access-token",
+            "tokenType": "Bearer",
+            "expiresAt": "2099-01-01T00:00:00.000Z",
+            "user": {
+              "id": "119283746592019282",
+              "discordUserId": "119283746592019282",
+              "name": "목 데이터 사용자",
+              "email": null,
+              "avatarUrl": null
+            },
+            "guilds": [
+              {
+                "id": "119283746592019280",
+                "name": "까닭 FE 테스트 팀",
+                "icon": null,
+                "owner": true,
+                "permissions": "32"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "channels": {
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/discord/channels",
+        "query": {
+          "guildId": "119283746592019280"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "success": true,
+          "code": "OK",
+          "message": "Success",
+          "data": {
+            "channels": [
+              {
+                "id": "119283746592019281",
+                "guildId": "119283746592019280",
+                "name": "제품-논의",
+                "type": 0,
+                "accessible": true
+              },
+              {
+                "id": "119283746592019285",
+                "guildId": "119283746592019280",
+                "name": "공지",
+                "type": 0,
+                "accessible": false
+              }
+            ],
+            "monitoredChannelIds": ["119283746592019281"]
+          }
+        }
+      }
+    },
+    "dashboard": {
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/dashboard",
+        "query": {
+          "guildId": "119283746592019280"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "success": true,
+          "code": "OK",
+          "message": "Success",
+          "data": {
+            "counts": {
+              "confirmed": 1,
+              "onHold": 1,
+              "inReview": 1
+            },
+            "recentDecisions": [
+              {
+                "id": "mock-decision-confirmed",
+                "version": 2,
+                "topic": "초기 타깃",
+                "decision": "Discord로 협업하는 소규모 개발팀에 집중합니다.",
+                "title": "초기 타깃",
+                "decisionContent": "Discord로 협업하는 소규모 개발팀에 집중합니다.",
+                "rationale": "인터뷰에서 팀의 결정 근거가 대화에 묻혀 다시 찾기 어렵다는 문제가 반복되었습니다.",
+                "rationaleStatus": "stated",
+                "observation": "agreed",
+                "rationaleQuotes": [],
+                "alternatives": [
+                  {
+                    "id": "mock-alternative-1",
+                    "name": "모든 협업 도구를 동시에 지원",
+                    "reason": "초기 개발 범위가 너무 넓어집니다."
+                  }
+                ],
+                "categoryTag": "타깃",
+                "actionItems": [
+                  {
+                    "id": "mock-action-1",
+                    "state": "open",
+                    "task": "개발팀 사용자 인터뷰 3건 진행",
+                    "assignee": "지은",
+                    "dueDate": "2026-10-30"
+                  },
+                  {
+                    "id": "mock-action-2",
+                    "state": "completed",
+                    "task": "기존 인터뷰 결과 정리"
+                  }
+                ],
+                "state": "Decided",
+                "supersedesId": "mock-decision-superseded",
+                "isPivot": false,
+                "approvedBy": "119283746592019282",
+                "decisionConfirmedDate": "2026-10-21T03:00:00.000Z",
+                "feedbackSourceType": null,
+                "feedbackSourceDetail": null,
+                "feedbackReceivedDate": null,
+                "rawEvidence": [],
+                "source": {
+                  "guildId": "119283746592019280",
+                  "channelId": "119283746592019281",
+                  "channelName": "제품-논의",
+                  "triggerMessageId": "119283746592019283",
+                  "messageUrl": "https://discord.com/channels/119283746592019280/119283746592019281/119283746592019283",
+                  "participants": ["민수", "지은"],
+                  "rawMessages": [
+                    {
+                      "id": "119283746592019283",
+                      "author": "민수",
+                      "content": "초기에는 Discord 팀의 결정 기록에 집중하면 좋겠어요.",
+                      "createdAt": "2026-10-20T02:00:00.000Z"
+                    },
+                    {
+                      "id": "119283746592019284",
+                      "author": "지은",
+                      "content": "동의해요. 다음 인터뷰에서 기록을 찾기 어려웠던 사례를 확인하겠습니다.",
+                      "createdAt": "2026-10-20T02:01:00.000Z"
+                    }
+                  ]
+                },
+                "createdAt": "2026-10-20T02:02:00.000Z",
+                "updatedAt": "2026-10-20T02:02:00.000Z",
+                "governanceScore": 3,
+                "governanceReason": "두 참여자가 근거를 제시하고 명시적으로 동의했습니다.",
+                "governancePassed": true,
+                "status": "CONFIRMED",
+                "category": "타깃",
+                "confirmedDate": "2026-10-21T03:00:00.000Z",
+                "dates": {
+                  "createdDate": "2026-10-20T02:02:00.000Z",
+                  "confirmedDate": "2026-10-21T03:00:00.000Z",
+                  "feedbackDate": null
+                }
+              }
+            ],
+            "sync": {
+              "lastSuccessfulAt": "2026-10-21T04:00:00.000Z",
+              "latestJob": {
+                "jobId": "mock-sync-completed",
+                "status": "COMPLETED",
+                "errorMessage": null,
+                "totalChannels": 1,
+                "completedChannels": 1,
+                "failedChannels": 0,
+                "createdAt": "2026-10-21T03:59:00.000Z",
+                "completedAt": "2026-10-21T04:00:00.000Z"
+              }
+            }
+          }
+        }
+      }
+    },
+    "dashboard.empty": {
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/dashboard",
+        "query": {
+          "guildId": "119283746592019280"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "success": true,
+          "code": "OK",
+          "message": "Success",
+          "data": {
+            "counts": {
+              "confirmed": 0,
+              "onHold": 0,
+              "inReview": 0
+            },
+            "recentDecisions": [],
+            "sync": {
+              "lastSuccessfulAt": null,
+              "latestJob": null
+            }
+          }
+        }
+      }
+    },
+    "review.inReview": {
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/review-queue",
+        "query": {
+          "guildId": "119283746592019280",
+          "status": "IN_REVIEW",
+          "page": "1",
+          "size": "20"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "success": true,
+          "code": "OK",
+          "message": "Success",
+          "data": {
+            "items": [
+              {
+                "id": "mock-candidate-review",
+                "version": 1,
+                "topic": "검수 화면",
+                "decision": "확정 전에 결정 근거와 Discord 원문을 함께 보여줍니다.",
+                "title": "검수 화면",
+                "decisionContent": "확정 전에 결정 근거와 Discord 원문을 함께 보여줍니다.",
+                "rationale": "인터뷰에서 팀의 결정 근거가 대화에 묻혀 다시 찾기 어렵다는 문제가 반복되었습니다.",
+                "rationaleStatus": "stated",
+                "observation": "agreed",
+                "rationaleQuotes": [],
+                "alternatives": [],
+                "categoryTag": "기능",
+                "actionItems": [
+                  {
+                    "id": "mock-action-3",
+                    "state": "open",
+                    "task": "검수 화면 와이어프레임 작성"
+                  }
+                ],
+                "state": "Draft",
+                "supersedesId": null,
+                "isPivot": false,
+                "approvedBy": null,
+                "decisionConfirmedDate": null,
+                "feedbackSourceType": null,
+                "feedbackSourceDetail": null,
+                "feedbackReceivedDate": null,
+                "rawEvidence": [],
+                "source": {
+                  "guildId": "119283746592019280",
+                  "channelId": "119283746592019281",
+                  "channelName": "제품-논의",
+                  "triggerMessageId": "119283746592019283",
+                  "messageUrl": "https://discord.com/channels/119283746592019280/119283746592019281/119283746592019283",
+                  "participants": ["민수", "지은"],
+                  "rawMessages": [
+                    {
+                      "id": "119283746592019283",
+                      "author": "민수",
+                      "content": "초기에는 Discord 팀의 결정 기록에 집중하면 좋겠어요.",
+                      "createdAt": "2026-10-20T02:00:00.000Z"
+                    },
+                    {
+                      "id": "119283746592019284",
+                      "author": "지은",
+                      "content": "동의해요. 다음 인터뷰에서 기록을 찾기 어려웠던 사례를 확인하겠습니다.",
+                      "createdAt": "2026-10-20T02:01:00.000Z"
+                    }
+                  ]
+                },
+                "createdAt": "2026-10-20T02:02:00.000Z",
+                "updatedAt": "2026-10-20T02:02:00.000Z",
+                "governanceScore": 3,
+                "governanceReason": "두 참여자가 근거를 제시하고 명시적으로 동의했습니다.",
+                "governancePassed": true,
+                "status": "IN_REVIEW",
+                "category": "기능",
+                "confirmedDate": null,
+                "dates": {
+                  "createdDate": "2026-10-20T02:02:00.000Z",
+                  "confirmedDate": null,
+                  "feedbackDate": null
+                },
+                "ticketId": "mock-candidate-review"
+              }
+            ],
+            "pageInfo": {
+              "currentPage": 1,
+              "pageSize": 20,
+              "totalElements": 1,
+              "totalPages": 1
+            }
+          }
+        }
+      }
+    },
+    "review.onHold": {
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/review-queue",
+        "query": {
+          "guildId": "119283746592019280",
+          "status": "ON_HOLD",
+          "page": "1",
+          "size": "20"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "success": true,
+          "code": "OK",
+          "message": "Success",
+          "data": {
+            "items": [
+              {
+                "id": "mock-candidate-held",
+                "version": 1,
+                "topic": "과금 정책",
+                "decision": "팀별 구독 요금제를 도입합니다.",
+                "title": "과금 정책",
+                "decisionContent": "팀별 구독 요금제를 도입합니다.",
+                "rationale": "",
+                "rationaleStatus": "not_stated",
+                "observation": "proposed",
+                "rationaleQuotes": [],
+                "alternatives": [],
+                "categoryTag": "BM",
+                "actionItems": [],
+                "state": "Deferred",
+                "supersedesId": null,
+                "isPivot": false,
+                "approvedBy": null,
+                "decisionConfirmedDate": null,
+                "feedbackSourceType": null,
+                "feedbackSourceDetail": null,
+                "feedbackReceivedDate": null,
+                "rawEvidence": [],
+                "source": {
+                  "guildId": "119283746592019280",
+                  "channelId": "119283746592019281",
+                  "channelName": "제품-논의",
+                  "triggerMessageId": "119283746592019283",
+                  "messageUrl": "https://discord.com/channels/119283746592019280/119283746592019281/119283746592019283",
+                  "participants": ["민수", "지은"],
+                  "rawMessages": []
+                },
+                "createdAt": "2026-10-20T02:02:00.000Z",
+                "updatedAt": "2026-10-20T02:02:00.000Z",
+                "governanceScore": 1,
+                "governanceReason": "제안만 있으며 동의와 근거가 확인되지 않았습니다.",
+                "governancePassed": false,
+                "status": "ON_HOLD",
+                "category": "BM",
+                "confirmedDate": null,
+                "dates": {
+                  "createdDate": "2026-10-20T02:02:00.000Z",
+                  "confirmedDate": null,
+                  "feedbackDate": null
+                },
+                "ticketId": "mock-candidate-held"
+              }
+            ],
+            "pageInfo": {
+              "currentPage": 1,
+              "pageSize": 20,
+              "totalElements": 1,
+              "totalPages": 1
+            }
+          }
+        }
+      }
+    },
+    "review.empty": {
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/review-queue",
+        "query": {
+          "guildId": "119283746592019280",
+          "status": "IN_REVIEW",
+          "page": "1",
+          "size": "20"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "success": true,
+          "code": "OK",
+          "message": "Success",
+          "data": {
+            "items": [],
+            "pageInfo": {
+              "currentPage": 1,
+              "pageSize": 20,
+              "totalElements": 0,
+              "totalPages": 0
+            }
+          }
+        }
+      }
+    },
+    "decisions": {
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/decisions",
+        "query": {
+          "guildId": "119283746592019280",
+          "page": "1",
+          "size": "20"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "success": true,
+          "code": "OK",
+          "message": "Success",
+          "data": {
+            "items": [
+              {
+                "id": "mock-decision-confirmed",
+                "version": 2,
+                "topic": "초기 타깃",
+                "decision": "Discord로 협업하는 소규모 개발팀에 집중합니다.",
+                "title": "초기 타깃",
+                "decisionContent": "Discord로 협업하는 소규모 개발팀에 집중합니다.",
+                "rationale": "인터뷰에서 팀의 결정 근거가 대화에 묻혀 다시 찾기 어렵다는 문제가 반복되었습니다.",
+                "rationaleStatus": "stated",
+                "observation": "agreed",
+                "rationaleQuotes": [],
+                "alternatives": [
+                  {
+                    "id": "mock-alternative-1",
+                    "name": "모든 협업 도구를 동시에 지원",
+                    "reason": "초기 개발 범위가 너무 넓어집니다."
+                  }
+                ],
+                "categoryTag": "타깃",
+                "actionItems": [
+                  {
+                    "id": "mock-action-1",
+                    "state": "open",
+                    "task": "개발팀 사용자 인터뷰 3건 진행",
+                    "assignee": "지은",
+                    "dueDate": "2026-10-30"
+                  },
+                  {
+                    "id": "mock-action-2",
+                    "state": "completed",
+                    "task": "기존 인터뷰 결과 정리"
+                  }
+                ],
+                "state": "Decided",
+                "supersedesId": "mock-decision-superseded",
+                "isPivot": false,
+                "approvedBy": "119283746592019282",
+                "decisionConfirmedDate": "2026-10-21T03:00:00.000Z",
+                "feedbackSourceType": null,
+                "feedbackSourceDetail": null,
+                "feedbackReceivedDate": null,
+                "rawEvidence": [],
+                "source": {
+                  "guildId": "119283746592019280",
+                  "channelId": "119283746592019281",
+                  "channelName": "제품-논의",
+                  "triggerMessageId": "119283746592019283",
+                  "messageUrl": "https://discord.com/channels/119283746592019280/119283746592019281/119283746592019283",
+                  "participants": ["민수", "지은"],
+                  "rawMessages": [
+                    {
+                      "id": "119283746592019283",
+                      "author": "민수",
+                      "content": "초기에는 Discord 팀의 결정 기록에 집중하면 좋겠어요.",
+                      "createdAt": "2026-10-20T02:00:00.000Z"
+                    },
+                    {
+                      "id": "119283746592019284",
+                      "author": "지은",
+                      "content": "동의해요. 다음 인터뷰에서 기록을 찾기 어려웠던 사례를 확인하겠습니다.",
+                      "createdAt": "2026-10-20T02:01:00.000Z"
+                    }
+                  ]
+                },
+                "createdAt": "2026-10-20T02:02:00.000Z",
+                "updatedAt": "2026-10-20T02:02:00.000Z",
+                "governanceScore": 3,
+                "governanceReason": "두 참여자가 근거를 제시하고 명시적으로 동의했습니다.",
+                "governancePassed": true,
+                "status": "CONFIRMED",
+                "category": "타깃",
+                "confirmedDate": "2026-10-21T03:00:00.000Z",
+                "dates": {
+                  "createdDate": "2026-10-20T02:02:00.000Z",
+                  "confirmedDate": "2026-10-21T03:00:00.000Z",
+                  "feedbackDate": null
+                }
+              },
+              {
+                "id": "mock-candidate-review",
+                "version": 1,
+                "topic": "검수 화면",
+                "decision": "확정 전에 결정 근거와 Discord 원문을 함께 보여줍니다.",
+                "title": "검수 화면",
+                "decisionContent": "확정 전에 결정 근거와 Discord 원문을 함께 보여줍니다.",
+                "rationale": "인터뷰에서 팀의 결정 근거가 대화에 묻혀 다시 찾기 어렵다는 문제가 반복되었습니다.",
+                "rationaleStatus": "stated",
+                "observation": "agreed",
+                "rationaleQuotes": [],
+                "alternatives": [],
+                "categoryTag": "기능",
+                "actionItems": [
+                  {
+                    "id": "mock-action-3",
+                    "state": "open",
+                    "task": "검수 화면 와이어프레임 작성"
+                  }
+                ],
+                "state": "Draft",
+                "supersedesId": null,
+                "isPivot": false,
+                "approvedBy": null,
+                "decisionConfirmedDate": null,
+                "feedbackSourceType": null,
+                "feedbackSourceDetail": null,
+                "feedbackReceivedDate": null,
+                "rawEvidence": [],
+                "source": {
+                  "guildId": "119283746592019280",
+                  "channelId": "119283746592019281",
+                  "channelName": "제품-논의",
+                  "triggerMessageId": "119283746592019283",
+                  "messageUrl": "https://discord.com/channels/119283746592019280/119283746592019281/119283746592019283",
+                  "participants": ["민수", "지은"],
+                  "rawMessages": [
+                    {
+                      "id": "119283746592019283",
+                      "author": "민수",
+                      "content": "초기에는 Discord 팀의 결정 기록에 집중하면 좋겠어요.",
+                      "createdAt": "2026-10-20T02:00:00.000Z"
+                    },
+                    {
+                      "id": "119283746592019284",
+                      "author": "지은",
+                      "content": "동의해요. 다음 인터뷰에서 기록을 찾기 어려웠던 사례를 확인하겠습니다.",
+                      "createdAt": "2026-10-20T02:01:00.000Z"
+                    }
+                  ]
+                },
+                "createdAt": "2026-10-20T02:02:00.000Z",
+                "updatedAt": "2026-10-20T02:02:00.000Z",
+                "governanceScore": 3,
+                "governanceReason": "두 참여자가 근거를 제시하고 명시적으로 동의했습니다.",
+                "governancePassed": true,
+                "status": "IN_REVIEW",
+                "category": "기능",
+                "confirmedDate": null,
+                "dates": {
+                  "createdDate": "2026-10-20T02:02:00.000Z",
+                  "confirmedDate": null,
+                  "feedbackDate": null
+                }
+              },
+              {
+                "id": "mock-candidate-held",
+                "version": 1,
+                "topic": "과금 정책",
+                "decision": "팀별 구독 요금제를 도입합니다.",
+                "title": "과금 정책",
+                "decisionContent": "팀별 구독 요금제를 도입합니다.",
+                "rationale": "",
+                "rationaleStatus": "not_stated",
+                "observation": "proposed",
+                "rationaleQuotes": [],
+                "alternatives": [],
+                "categoryTag": "BM",
+                "actionItems": [],
+                "state": "Deferred",
+                "supersedesId": null,
+                "isPivot": false,
+                "approvedBy": null,
+                "decisionConfirmedDate": null,
+                "feedbackSourceType": null,
+                "feedbackSourceDetail": null,
+                "feedbackReceivedDate": null,
+                "rawEvidence": [],
+                "source": {
+                  "guildId": "119283746592019280",
+                  "channelId": "119283746592019281",
+                  "channelName": "제품-논의",
+                  "triggerMessageId": "119283746592019283",
+                  "messageUrl": "https://discord.com/channels/119283746592019280/119283746592019281/119283746592019283",
+                  "participants": ["민수", "지은"],
+                  "rawMessages": []
+                },
+                "createdAt": "2026-10-20T02:02:00.000Z",
+                "updatedAt": "2026-10-20T02:02:00.000Z",
+                "governanceScore": 1,
+                "governanceReason": "제안만 있으며 동의와 근거가 확인되지 않았습니다.",
+                "governancePassed": false,
+                "status": "ON_HOLD",
+                "category": "BM",
+                "confirmedDate": null,
+                "dates": {
+                  "createdDate": "2026-10-20T02:02:00.000Z",
+                  "confirmedDate": null,
+                  "feedbackDate": null
+                }
+              },
+              {
+                "id": "mock-decision-superseded",
+                "version": 1,
+                "supersededById": "mock-decision-confirmed",
+                "topic": "초기 타깃",
+                "decision": "모든 협업 도구를 사용하는 팀을 대상으로 합니다.",
+                "title": "초기 타깃",
+                "decisionContent": "모든 협업 도구를 사용하는 팀을 대상으로 합니다.",
+                "rationale": "인터뷰에서 팀의 결정 근거가 대화에 묻혀 다시 찾기 어렵다는 문제가 반복되었습니다.",
+                "rationaleStatus": "stated",
+                "observation": "agreed",
+                "rationaleQuotes": [],
+                "alternatives": [],
+                "categoryTag": "타깃",
+                "actionItems": [],
+                "state": "Superseded",
+                "supersedesId": null,
+                "isPivot": false,
+                "approvedBy": "119283746592019282",
+                "decisionConfirmedDate": "2026-10-19T03:00:00.000Z",
+                "feedbackSourceType": null,
+                "feedbackSourceDetail": null,
+                "feedbackReceivedDate": null,
+                "rawEvidence": [],
+                "source": {
+                  "guildId": "119283746592019280",
+                  "channelId": "119283746592019281",
+                  "channelName": "제품-논의",
+                  "triggerMessageId": "119283746592019283",
+                  "messageUrl": "https://discord.com/channels/119283746592019280/119283746592019281/119283746592019283",
+                  "participants": ["민수", "지은"],
+                  "rawMessages": []
+                },
+                "createdAt": "2026-10-18T02:00:00.000Z",
+                "updatedAt": "2026-10-21T03:00:00.000Z",
+                "governanceScore": 3,
+                "governanceReason": "두 참여자가 근거를 제시하고 명시적으로 동의했습니다.",
+                "governancePassed": true,
+                "status": "SUPERSEDED",
+                "category": "타깃",
+                "confirmedDate": "2026-10-19T03:00:00.000Z",
+                "dates": {
+                  "createdDate": "2026-10-18T02:00:00.000Z",
+                  "confirmedDate": "2026-10-19T03:00:00.000Z",
+                  "feedbackDate": null
+                }
+              },
+              {
+                "id": "mock-candidate-rejected",
+                "version": 1,
+                "topic": "자동 확정",
+                "decision": "추출한 결정을 검수 없이 자동으로 확정합니다.",
+                "title": "자동 확정",
+                "decisionContent": "추출한 결정을 검수 없이 자동으로 확정합니다.",
+                "rationale": "인터뷰에서 팀의 결정 근거가 대화에 묻혀 다시 찾기 어렵다는 문제가 반복되었습니다.",
+                "rationaleStatus": "stated",
+                "observation": "withdrawn",
+                "rationaleQuotes": [],
+                "alternatives": [],
+                "categoryTag": "기능",
+                "actionItems": [],
+                "state": "Rejected",
+                "supersedesId": null,
+                "isPivot": false,
+                "approvedBy": null,
+                "decisionConfirmedDate": null,
+                "feedbackSourceType": null,
+                "feedbackSourceDetail": null,
+                "feedbackReceivedDate": null,
+                "rawEvidence": [],
+                "source": {
+                  "guildId": "119283746592019280",
+                  "channelId": "119283746592019281",
+                  "channelName": "제품-논의",
+                  "triggerMessageId": "119283746592019283",
+                  "messageUrl": "https://discord.com/channels/119283746592019280/119283746592019281/119283746592019283",
+                  "participants": ["민수", "지은"],
+                  "rawMessages": []
+                },
+                "createdAt": "2026-10-20T02:02:00.000Z",
+                "updatedAt": "2026-10-20T02:02:00.000Z",
+                "governanceScore": 3,
+                "governanceReason": "두 참여자가 근거를 제시하고 명시적으로 동의했습니다.",
+                "governancePassed": true,
+                "status": "DISCARDED",
+                "category": "기능",
+                "confirmedDate": null,
+                "dates": {
+                  "createdDate": "2026-10-20T02:02:00.000Z",
+                  "confirmedDate": null,
+                  "feedbackDate": null
+                }
+              }
+            ],
+            "decisions": [
+              {
+                "id": "mock-decision-confirmed",
+                "version": 2,
+                "topic": "초기 타깃",
+                "decision": "Discord로 협업하는 소규모 개발팀에 집중합니다.",
+                "title": "초기 타깃",
+                "decisionContent": "Discord로 협업하는 소규모 개발팀에 집중합니다.",
+                "rationale": "인터뷰에서 팀의 결정 근거가 대화에 묻혀 다시 찾기 어렵다는 문제가 반복되었습니다.",
+                "rationaleStatus": "stated",
+                "observation": "agreed",
+                "rationaleQuotes": [],
+                "alternatives": [
+                  {
+                    "option": "모든 협업 도구를 동시에 지원",
+                    "reason": "초기 개발 범위가 너무 넓어집니다."
+                  }
+                ],
+                "categoryTag": "타깃",
+                "actionItems": [
+                  {
+                    "id": "mock-action-1",
+                    "state": "open",
+                    "task": "개발팀 사용자 인터뷰 3건 진행",
+                    "assignee": "지은",
+                    "dueDate": "2026-10-30"
+                  },
+                  {
+                    "id": "mock-action-2",
+                    "state": "completed",
+                    "task": "기존 인터뷰 결과 정리"
+                  }
+                ],
+                "state": "Decided",
+                "supersedesId": "mock-decision-superseded",
+                "isPivot": false,
+                "approvedBy": "119283746592019282",
+                "decisionConfirmedDate": "2026-10-21T03:00:00.000Z",
+                "feedbackSourceType": null,
+                "feedbackSourceDetail": null,
+                "feedbackReceivedDate": null,
+                "rawEvidence": [],
+                "source": {
+                  "guildId": "119283746592019280",
+                  "channelId": "119283746592019281",
+                  "channelName": "제품-논의",
+                  "triggerMessageId": "119283746592019283",
+                  "messageUrl": "https://discord.com/channels/119283746592019280/119283746592019281/119283746592019283",
+                  "participants": ["민수", "지은"],
+                  "rawMessages": [
+                    {
+                      "id": "119283746592019283",
+                      "author": "민수",
+                      "content": "초기에는 Discord 팀의 결정 기록에 집중하면 좋겠어요.",
+                      "createdAt": "2026-10-20T02:00:00.000Z"
+                    },
+                    {
+                      "id": "119283746592019284",
+                      "author": "지은",
+                      "content": "동의해요. 다음 인터뷰에서 기록을 찾기 어려웠던 사례를 확인하겠습니다.",
+                      "createdAt": "2026-10-20T02:01:00.000Z"
+                    }
+                  ]
+                },
+                "createdAt": "2026-10-20T02:02:00.000Z",
+                "governanceScore": 3,
+                "governanceReason": "두 참여자가 근거를 제시하고 명시적으로 동의했습니다.",
+                "governancePassed": true
+              },
+              {
+                "id": "mock-candidate-review",
+                "version": 1,
+                "topic": "검수 화면",
+                "decision": "확정 전에 결정 근거와 Discord 원문을 함께 보여줍니다.",
+                "title": "검수 화면",
+                "decisionContent": "확정 전에 결정 근거와 Discord 원문을 함께 보여줍니다.",
+                "rationale": "인터뷰에서 팀의 결정 근거가 대화에 묻혀 다시 찾기 어렵다는 문제가 반복되었습니다.",
+                "rationaleStatus": "stated",
+                "observation": "agreed",
+                "rationaleQuotes": [],
+                "alternatives": [],
+                "categoryTag": "기능",
+                "actionItems": [
+                  {
+                    "id": "mock-action-3",
+                    "state": "open",
+                    "task": "검수 화면 와이어프레임 작성"
+                  }
+                ],
+                "state": "Draft",
+                "supersedesId": null,
+                "isPivot": false,
+                "approvedBy": null,
+                "decisionConfirmedDate": null,
+                "feedbackSourceType": null,
+                "feedbackSourceDetail": null,
+                "feedbackReceivedDate": null,
+                "rawEvidence": [],
+                "source": {
+                  "guildId": "119283746592019280",
+                  "channelId": "119283746592019281",
+                  "channelName": "제품-논의",
+                  "triggerMessageId": "119283746592019283",
+                  "messageUrl": "https://discord.com/channels/119283746592019280/119283746592019281/119283746592019283",
+                  "participants": ["민수", "지은"],
+                  "rawMessages": [
+                    {
+                      "id": "119283746592019283",
+                      "author": "민수",
+                      "content": "초기에는 Discord 팀의 결정 기록에 집중하면 좋겠어요.",
+                      "createdAt": "2026-10-20T02:00:00.000Z"
+                    },
+                    {
+                      "id": "119283746592019284",
+                      "author": "지은",
+                      "content": "동의해요. 다음 인터뷰에서 기록을 찾기 어려웠던 사례를 확인하겠습니다.",
+                      "createdAt": "2026-10-20T02:01:00.000Z"
+                    }
+                  ]
+                },
+                "createdAt": "2026-10-20T02:02:00.000Z",
+                "governanceScore": 3,
+                "governanceReason": "두 참여자가 근거를 제시하고 명시적으로 동의했습니다.",
+                "governancePassed": true
+              },
+              {
+                "id": "mock-candidate-held",
+                "version": 1,
+                "topic": "과금 정책",
+                "decision": "팀별 구독 요금제를 도입합니다.",
+                "title": "과금 정책",
+                "decisionContent": "팀별 구독 요금제를 도입합니다.",
+                "rationale": "",
+                "rationaleStatus": "not_stated",
+                "observation": "proposed",
+                "rationaleQuotes": [],
+                "alternatives": [],
+                "categoryTag": "BM",
+                "actionItems": [],
+                "state": "Deferred",
+                "supersedesId": null,
+                "isPivot": false,
+                "approvedBy": null,
+                "decisionConfirmedDate": null,
+                "feedbackSourceType": null,
+                "feedbackSourceDetail": null,
+                "feedbackReceivedDate": null,
+                "rawEvidence": [],
+                "source": {
+                  "guildId": "119283746592019280",
+                  "channelId": "119283746592019281",
+                  "channelName": "제품-논의",
+                  "triggerMessageId": "119283746592019283",
+                  "messageUrl": "https://discord.com/channels/119283746592019280/119283746592019281/119283746592019283",
+                  "participants": ["민수", "지은"],
+                  "rawMessages": []
+                },
+                "createdAt": "2026-10-20T02:02:00.000Z",
+                "governanceScore": 1,
+                "governanceReason": "제안만 있으며 동의와 근거가 확인되지 않았습니다.",
+                "governancePassed": false
+              },
+              {
+                "id": "mock-decision-superseded",
+                "version": 1,
+                "supersededById": "mock-decision-confirmed",
+                "topic": "초기 타깃",
+                "decision": "모든 협업 도구를 사용하는 팀을 대상으로 합니다.",
+                "title": "초기 타깃",
+                "decisionContent": "모든 협업 도구를 사용하는 팀을 대상으로 합니다.",
+                "rationale": "인터뷰에서 팀의 결정 근거가 대화에 묻혀 다시 찾기 어렵다는 문제가 반복되었습니다.",
+                "rationaleStatus": "stated",
+                "observation": "agreed",
+                "rationaleQuotes": [],
+                "alternatives": [],
+                "categoryTag": "타깃",
+                "actionItems": [],
+                "state": "Superseded",
+                "supersedesId": null,
+                "isPivot": false,
+                "approvedBy": "119283746592019282",
+                "decisionConfirmedDate": "2026-10-19T03:00:00.000Z",
+                "feedbackSourceType": null,
+                "feedbackSourceDetail": null,
+                "feedbackReceivedDate": null,
+                "rawEvidence": [],
+                "source": {
+                  "guildId": "119283746592019280",
+                  "channelId": "119283746592019281",
+                  "channelName": "제품-논의",
+                  "triggerMessageId": "119283746592019283",
+                  "messageUrl": "https://discord.com/channels/119283746592019280/119283746592019281/119283746592019283",
+                  "participants": ["민수", "지은"],
+                  "rawMessages": []
+                },
+                "createdAt": "2026-10-18T02:00:00.000Z",
+                "governanceScore": 3,
+                "governanceReason": "두 참여자가 근거를 제시하고 명시적으로 동의했습니다.",
+                "governancePassed": true
+              },
+              {
+                "id": "mock-candidate-rejected",
+                "version": 1,
+                "topic": "자동 확정",
+                "decision": "추출한 결정을 검수 없이 자동으로 확정합니다.",
+                "title": "자동 확정",
+                "decisionContent": "추출한 결정을 검수 없이 자동으로 확정합니다.",
+                "rationale": "인터뷰에서 팀의 결정 근거가 대화에 묻혀 다시 찾기 어렵다는 문제가 반복되었습니다.",
+                "rationaleStatus": "stated",
+                "observation": "withdrawn",
+                "rationaleQuotes": [],
+                "alternatives": [],
+                "categoryTag": "기능",
+                "actionItems": [],
+                "state": "Rejected",
+                "supersedesId": null,
+                "isPivot": false,
+                "approvedBy": null,
+                "decisionConfirmedDate": null,
+                "feedbackSourceType": null,
+                "feedbackSourceDetail": null,
+                "feedbackReceivedDate": null,
+                "rawEvidence": [],
+                "source": {
+                  "guildId": "119283746592019280",
+                  "channelId": "119283746592019281",
+                  "channelName": "제품-논의",
+                  "triggerMessageId": "119283746592019283",
+                  "messageUrl": "https://discord.com/channels/119283746592019280/119283746592019281/119283746592019283",
+                  "participants": ["민수", "지은"],
+                  "rawMessages": []
+                },
+                "createdAt": "2026-10-20T02:02:00.000Z",
+                "governanceScore": 3,
+                "governanceReason": "두 참여자가 근거를 제시하고 명시적으로 동의했습니다.",
+                "governancePassed": true
+              }
+            ],
+            "pageInfo": {
+              "currentPage": 1,
+              "pageSize": 20,
+              "totalElements": 5,
+              "totalPages": 1
+            }
+          }
+        }
+      }
+    },
+    "decisions.empty": {
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/decisions",
+        "query": {
+          "guildId": "119283746592019280",
+          "page": "1",
+          "size": "20"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "success": true,
+          "code": "OK",
+          "message": "Success",
+          "data": {
+            "items": [],
+            "decisions": [],
+            "pageInfo": {
+              "currentPage": 1,
+              "pageSize": 20,
+              "totalElements": 0,
+              "totalPages": 0
+            }
+          }
+        }
+      }
+    },
+    "detail.CONFIRMED": {
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/decisions/mock-decision-confirmed",
+        "query": {
+          "guildId": "119283746592019280"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "success": true,
+          "code": "OK",
+          "message": "Success",
+          "data": {
+            "id": "mock-decision-confirmed",
+            "version": 2,
+            "topic": "초기 타깃",
+            "decision": "Discord로 협업하는 소규모 개발팀에 집중합니다.",
+            "title": "초기 타깃",
+            "decisionContent": "Discord로 협업하는 소규모 개발팀에 집중합니다.",
+            "rationale": "인터뷰에서 팀의 결정 근거가 대화에 묻혀 다시 찾기 어렵다는 문제가 반복되었습니다.",
+            "rationaleStatus": "stated",
+            "observation": "agreed",
+            "rationaleQuotes": [],
+            "alternatives": [
+              {
+                "id": "mock-alternative-1",
+                "name": "모든 협업 도구를 동시에 지원",
+                "reason": "초기 개발 범위가 너무 넓어집니다."
+              }
+            ],
+            "categoryTag": "타깃",
+            "actionItems": [
+              {
+                "id": "mock-action-1",
+                "state": "open",
+                "task": "개발팀 사용자 인터뷰 3건 진행",
+                "assignee": "지은",
+                "dueDate": "2026-10-30"
+              },
+              {
+                "id": "mock-action-2",
+                "state": "completed",
+                "task": "기존 인터뷰 결과 정리"
+              }
+            ],
+            "state": "Decided",
+            "supersedesId": "mock-decision-superseded",
+            "isPivot": false,
+            "approvedBy": "119283746592019282",
+            "decisionConfirmedDate": "2026-10-21T03:00:00.000Z",
+            "feedbackSourceType": null,
+            "feedbackSourceDetail": null,
+            "feedbackReceivedDate": null,
+            "rawEvidence": [],
+            "source": {
+              "guildId": "119283746592019280",
+              "channelId": "119283746592019281",
+              "channelName": "제품-논의",
+              "triggerMessageId": "119283746592019283",
+              "messageUrl": "https://discord.com/channels/119283746592019280/119283746592019281/119283746592019283",
+              "participants": ["민수", "지은"],
+              "rawMessages": [
+                {
+                  "id": "119283746592019283",
+                  "author": "민수",
+                  "content": "초기에는 Discord 팀의 결정 기록에 집중하면 좋겠어요.",
+                  "createdAt": "2026-10-20T02:00:00.000Z"
+                },
+                {
+                  "id": "119283746592019284",
+                  "author": "지은",
+                  "content": "동의해요. 다음 인터뷰에서 기록을 찾기 어려웠던 사례를 확인하겠습니다.",
+                  "createdAt": "2026-10-20T02:01:00.000Z"
+                }
+              ]
+            },
+            "createdAt": "2026-10-20T02:02:00.000Z",
+            "updatedAt": "2026-10-20T02:02:00.000Z",
+            "governanceScore": 3,
+            "governanceReason": "두 참여자가 근거를 제시하고 명시적으로 동의했습니다.",
+            "governancePassed": true,
+            "status": "CONFIRMED",
+            "category": "타깃",
+            "confirmedDate": "2026-10-21T03:00:00.000Z",
+            "dates": {
+              "createdDate": "2026-10-20T02:02:00.000Z",
+              "confirmedDate": "2026-10-21T03:00:00.000Z",
+              "feedbackDate": null
+            }
+          }
+        }
+      }
+    },
+    "detail.IN_REVIEW": {
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/decisions/mock-candidate-review",
+        "query": {
+          "guildId": "119283746592019280"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "success": true,
+          "code": "OK",
+          "message": "Success",
+          "data": {
+            "id": "mock-candidate-review",
+            "version": 1,
+            "topic": "검수 화면",
+            "decision": "확정 전에 결정 근거와 Discord 원문을 함께 보여줍니다.",
+            "title": "검수 화면",
+            "decisionContent": "확정 전에 결정 근거와 Discord 원문을 함께 보여줍니다.",
+            "rationale": "인터뷰에서 팀의 결정 근거가 대화에 묻혀 다시 찾기 어렵다는 문제가 반복되었습니다.",
+            "rationaleStatus": "stated",
+            "observation": "agreed",
+            "rationaleQuotes": [],
+            "alternatives": [],
+            "categoryTag": "기능",
+            "actionItems": [
+              {
+                "id": "mock-action-3",
+                "state": "open",
+                "task": "검수 화면 와이어프레임 작성"
+              }
+            ],
+            "state": "Draft",
+            "supersedesId": null,
+            "isPivot": false,
+            "approvedBy": null,
+            "decisionConfirmedDate": null,
+            "feedbackSourceType": null,
+            "feedbackSourceDetail": null,
+            "feedbackReceivedDate": null,
+            "rawEvidence": [],
+            "source": {
+              "guildId": "119283746592019280",
+              "channelId": "119283746592019281",
+              "channelName": "제품-논의",
+              "triggerMessageId": "119283746592019283",
+              "messageUrl": "https://discord.com/channels/119283746592019280/119283746592019281/119283746592019283",
+              "participants": ["민수", "지은"],
+              "rawMessages": [
+                {
+                  "id": "119283746592019283",
+                  "author": "민수",
+                  "content": "초기에는 Discord 팀의 결정 기록에 집중하면 좋겠어요.",
+                  "createdAt": "2026-10-20T02:00:00.000Z"
+                },
+                {
+                  "id": "119283746592019284",
+                  "author": "지은",
+                  "content": "동의해요. 다음 인터뷰에서 기록을 찾기 어려웠던 사례를 확인하겠습니다.",
+                  "createdAt": "2026-10-20T02:01:00.000Z"
+                }
+              ]
+            },
+            "createdAt": "2026-10-20T02:02:00.000Z",
+            "updatedAt": "2026-10-20T02:02:00.000Z",
+            "governanceScore": 3,
+            "governanceReason": "두 참여자가 근거를 제시하고 명시적으로 동의했습니다.",
+            "governancePassed": true,
+            "status": "IN_REVIEW",
+            "category": "기능",
+            "confirmedDate": null,
+            "dates": {
+              "createdDate": "2026-10-20T02:02:00.000Z",
+              "confirmedDate": null,
+              "feedbackDate": null
+            }
+          }
+        }
+      }
+    },
+    "detail.ON_HOLD": {
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/decisions/mock-candidate-held",
+        "query": {
+          "guildId": "119283746592019280"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "success": true,
+          "code": "OK",
+          "message": "Success",
+          "data": {
+            "id": "mock-candidate-held",
+            "version": 1,
+            "topic": "과금 정책",
+            "decision": "팀별 구독 요금제를 도입합니다.",
+            "title": "과금 정책",
+            "decisionContent": "팀별 구독 요금제를 도입합니다.",
+            "rationale": "",
+            "rationaleStatus": "not_stated",
+            "observation": "proposed",
+            "rationaleQuotes": [],
+            "alternatives": [],
+            "categoryTag": "BM",
+            "actionItems": [],
+            "state": "Deferred",
+            "supersedesId": null,
+            "isPivot": false,
+            "approvedBy": null,
+            "decisionConfirmedDate": null,
+            "feedbackSourceType": null,
+            "feedbackSourceDetail": null,
+            "feedbackReceivedDate": null,
+            "rawEvidence": [],
+            "source": {
+              "guildId": "119283746592019280",
+              "channelId": "119283746592019281",
+              "channelName": "제품-논의",
+              "triggerMessageId": "119283746592019283",
+              "messageUrl": "https://discord.com/channels/119283746592019280/119283746592019281/119283746592019283",
+              "participants": ["민수", "지은"],
+              "rawMessages": []
+            },
+            "createdAt": "2026-10-20T02:02:00.000Z",
+            "updatedAt": "2026-10-20T02:02:00.000Z",
+            "governanceScore": 1,
+            "governanceReason": "제안만 있으며 동의와 근거가 확인되지 않았습니다.",
+            "governancePassed": false,
+            "status": "ON_HOLD",
+            "category": "BM",
+            "confirmedDate": null,
+            "dates": {
+              "createdDate": "2026-10-20T02:02:00.000Z",
+              "confirmedDate": null,
+              "feedbackDate": null
+            }
+          }
+        }
+      }
+    },
+    "detail.SUPERSEDED": {
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/decisions/mock-decision-superseded",
+        "query": {
+          "guildId": "119283746592019280"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "success": true,
+          "code": "OK",
+          "message": "Success",
+          "data": {
+            "id": "mock-decision-superseded",
+            "version": 1,
+            "supersededById": "mock-decision-confirmed",
+            "topic": "초기 타깃",
+            "decision": "모든 협업 도구를 사용하는 팀을 대상으로 합니다.",
+            "title": "초기 타깃",
+            "decisionContent": "모든 협업 도구를 사용하는 팀을 대상으로 합니다.",
+            "rationale": "인터뷰에서 팀의 결정 근거가 대화에 묻혀 다시 찾기 어렵다는 문제가 반복되었습니다.",
+            "rationaleStatus": "stated",
+            "observation": "agreed",
+            "rationaleQuotes": [],
+            "alternatives": [],
+            "categoryTag": "타깃",
+            "actionItems": [],
+            "state": "Superseded",
+            "supersedesId": null,
+            "isPivot": false,
+            "approvedBy": "119283746592019282",
+            "decisionConfirmedDate": "2026-10-19T03:00:00.000Z",
+            "feedbackSourceType": null,
+            "feedbackSourceDetail": null,
+            "feedbackReceivedDate": null,
+            "rawEvidence": [],
+            "source": {
+              "guildId": "119283746592019280",
+              "channelId": "119283746592019281",
+              "channelName": "제품-논의",
+              "triggerMessageId": "119283746592019283",
+              "messageUrl": "https://discord.com/channels/119283746592019280/119283746592019281/119283746592019283",
+              "participants": ["민수", "지은"],
+              "rawMessages": []
+            },
+            "createdAt": "2026-10-18T02:00:00.000Z",
+            "updatedAt": "2026-10-21T03:00:00.000Z",
+            "governanceScore": 3,
+            "governanceReason": "두 참여자가 근거를 제시하고 명시적으로 동의했습니다.",
+            "governancePassed": true,
+            "status": "SUPERSEDED",
+            "category": "타깃",
+            "confirmedDate": "2026-10-19T03:00:00.000Z",
+            "dates": {
+              "createdDate": "2026-10-18T02:00:00.000Z",
+              "confirmedDate": "2026-10-19T03:00:00.000Z",
+              "feedbackDate": null
+            }
+          }
+        }
+      }
+    },
+    "detail.DISCARDED": {
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/decisions/mock-candidate-rejected",
+        "query": {
+          "guildId": "119283746592019280"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "success": true,
+          "code": "OK",
+          "message": "Success",
+          "data": {
+            "id": "mock-candidate-rejected",
+            "version": 1,
+            "topic": "자동 확정",
+            "decision": "추출한 결정을 검수 없이 자동으로 확정합니다.",
+            "title": "자동 확정",
+            "decisionContent": "추출한 결정을 검수 없이 자동으로 확정합니다.",
+            "rationale": "인터뷰에서 팀의 결정 근거가 대화에 묻혀 다시 찾기 어렵다는 문제가 반복되었습니다.",
+            "rationaleStatus": "stated",
+            "observation": "withdrawn",
+            "rationaleQuotes": [],
+            "alternatives": [],
+            "categoryTag": "기능",
+            "actionItems": [],
+            "state": "Rejected",
+            "supersedesId": null,
+            "isPivot": false,
+            "approvedBy": null,
+            "decisionConfirmedDate": null,
+            "feedbackSourceType": null,
+            "feedbackSourceDetail": null,
+            "feedbackReceivedDate": null,
+            "rawEvidence": [],
+            "source": {
+              "guildId": "119283746592019280",
+              "channelId": "119283746592019281",
+              "channelName": "제품-논의",
+              "triggerMessageId": "119283746592019283",
+              "messageUrl": "https://discord.com/channels/119283746592019280/119283746592019281/119283746592019283",
+              "participants": ["민수", "지은"],
+              "rawMessages": []
+            },
+            "createdAt": "2026-10-20T02:02:00.000Z",
+            "updatedAt": "2026-10-20T02:02:00.000Z",
+            "governanceScore": 3,
+            "governanceReason": "두 참여자가 근거를 제시하고 명시적으로 동의했습니다.",
+            "governancePassed": true,
+            "status": "DISCARDED",
+            "category": "기능",
+            "confirmedDate": null,
+            "dates": {
+              "createdDate": "2026-10-20T02:02:00.000Z",
+              "confirmedDate": null,
+              "feedbackDate": null
+            }
+          }
+        }
+      }
+    },
+    "timeline": {
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/decisions/timeline",
+        "query": {
+          "guildId": "119283746592019280",
+          "groupBy": "month",
+          "timezone": "Asia/Seoul"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "success": true,
+          "code": "OK",
+          "message": "Success",
+          "data": {
+            "groupBy": "month",
+            "timezone": "Asia/Seoul",
+            "totalElements": 1,
+            "groups": [
+              {
+                "key": "2026-10",
+                "count": 1,
+                "items": [
+                  {
+                    "id": "mock-decision-confirmed",
+                    "version": 2,
+                    "topic": "초기 타깃",
+                    "decision": "Discord로 협업하는 소규모 개발팀에 집중합니다.",
+                    "title": "초기 타깃",
+                    "decisionContent": "Discord로 협업하는 소규모 개발팀에 집중합니다.",
+                    "rationale": "인터뷰에서 팀의 결정 근거가 대화에 묻혀 다시 찾기 어렵다는 문제가 반복되었습니다.",
+                    "rationaleStatus": "stated",
+                    "observation": "agreed",
+                    "rationaleQuotes": [],
+                    "alternatives": [
+                      {
+                        "id": "mock-alternative-1",
+                        "name": "모든 협업 도구를 동시에 지원",
+                        "reason": "초기 개발 범위가 너무 넓어집니다."
+                      }
+                    ],
+                    "categoryTag": "타깃",
+                    "actionItems": [
+                      {
+                        "id": "mock-action-1",
+                        "state": "open",
+                        "task": "개발팀 사용자 인터뷰 3건 진행",
+                        "assignee": "지은",
+                        "dueDate": "2026-10-30"
+                      },
+                      {
+                        "id": "mock-action-2",
+                        "state": "completed",
+                        "task": "기존 인터뷰 결과 정리"
+                      }
+                    ],
+                    "state": "Decided",
+                    "supersedesId": "mock-decision-superseded",
+                    "isPivot": false,
+                    "approvedBy": "119283746592019282",
+                    "decisionConfirmedDate": "2026-10-21T03:00:00.000Z",
+                    "feedbackSourceType": null,
+                    "feedbackSourceDetail": null,
+                    "feedbackReceivedDate": null,
+                    "rawEvidence": [],
+                    "source": {
+                      "guildId": "119283746592019280",
+                      "channelId": "119283746592019281",
+                      "channelName": "제품-논의",
+                      "triggerMessageId": "119283746592019283",
+                      "messageUrl": "https://discord.com/channels/119283746592019280/119283746592019281/119283746592019283",
+                      "participants": ["민수", "지은"],
+                      "rawMessages": [
+                        {
+                          "id": "119283746592019283",
+                          "author": "민수",
+                          "content": "초기에는 Discord 팀의 결정 기록에 집중하면 좋겠어요.",
+                          "createdAt": "2026-10-20T02:00:00.000Z"
+                        },
+                        {
+                          "id": "119283746592019284",
+                          "author": "지은",
+                          "content": "동의해요. 다음 인터뷰에서 기록을 찾기 어려웠던 사례를 확인하겠습니다.",
+                          "createdAt": "2026-10-20T02:01:00.000Z"
+                        }
+                      ]
+                    },
+                    "createdAt": "2026-10-20T02:02:00.000Z",
+                    "updatedAt": "2026-10-20T02:02:00.000Z",
+                    "governanceScore": 3,
+                    "governanceReason": "두 참여자가 근거를 제시하고 명시적으로 동의했습니다.",
+                    "governancePassed": true,
+                    "status": "CONFIRMED",
+                    "category": "타깃",
+                    "confirmedDate": "2026-10-21T03:00:00.000Z",
+                    "dates": {
+                      "createdDate": "2026-10-20T02:02:00.000Z",
+                      "confirmedDate": "2026-10-21T03:00:00.000Z",
+                      "feedbackDate": null
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
+    "timeline.empty": {
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/decisions/timeline",
+        "query": {
+          "guildId": "119283746592019280",
+          "groupBy": "month",
+          "timezone": "Asia/Seoul"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "success": true,
+          "code": "OK",
+          "message": "Success",
+          "data": {
+            "groupBy": "month",
+            "timezone": "Asia/Seoul",
+            "totalElements": 0,
+            "groups": []
+          }
+        }
+      }
+    },
+    "search": {
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/search",
+        "query": {
+          "guildId": "119283746592019280",
+          "query": "왜 Discord 팀에 집중하나요?",
+          "limit": "10"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "success": true,
+          "code": "OK",
+          "message": "Success",
+          "data": {
+            "items": [
+              {
+                "decision": {
+                  "id": "mock-decision-confirmed",
+                  "version": 2,
+                  "topic": "초기 타깃",
+                  "decision": "Discord로 협업하는 소규모 개발팀에 집중합니다.",
+                  "title": "초기 타깃",
+                  "decisionContent": "Discord로 협업하는 소규모 개발팀에 집중합니다.",
+                  "rationale": "인터뷰에서 팀의 결정 근거가 대화에 묻혀 다시 찾기 어렵다는 문제가 반복되었습니다.",
+                  "rationaleStatus": "stated",
+                  "observation": "agreed",
+                  "rationaleQuotes": [],
+                  "alternatives": [
+                    {
+                      "id": "mock-alternative-1",
+                      "name": "모든 협업 도구를 동시에 지원",
+                      "reason": "초기 개발 범위가 너무 넓어집니다."
+                    }
+                  ],
+                  "categoryTag": "타깃",
+                  "actionItems": [
+                    {
+                      "id": "mock-action-1",
+                      "state": "open",
+                      "task": "개발팀 사용자 인터뷰 3건 진행",
+                      "assignee": "지은",
+                      "dueDate": "2026-10-30"
+                    },
+                    {
+                      "id": "mock-action-2",
+                      "state": "completed",
+                      "task": "기존 인터뷰 결과 정리"
+                    }
+                  ],
+                  "state": "Decided",
+                  "supersedesId": "mock-decision-superseded",
+                  "isPivot": false,
+                  "approvedBy": "119283746592019282",
+                  "decisionConfirmedDate": "2026-10-21T03:00:00.000Z",
+                  "feedbackSourceType": null,
+                  "feedbackSourceDetail": null,
+                  "feedbackReceivedDate": null,
+                  "rawEvidence": [],
+                  "source": {
+                    "guildId": "119283746592019280",
+                    "channelId": "119283746592019281",
+                    "channelName": "제품-논의",
+                    "triggerMessageId": "119283746592019283",
+                    "messageUrl": "https://discord.com/channels/119283746592019280/119283746592019281/119283746592019283",
+                    "participants": ["민수", "지은"],
+                    "rawMessages": [
+                      {
+                        "id": "119283746592019283",
+                        "author": "민수",
+                        "content": "초기에는 Discord 팀의 결정 기록에 집중하면 좋겠어요.",
+                        "createdAt": "2026-10-20T02:00:00.000Z"
+                      },
+                      {
+                        "id": "119283746592019284",
+                        "author": "지은",
+                        "content": "동의해요. 다음 인터뷰에서 기록을 찾기 어려웠던 사례를 확인하겠습니다.",
+                        "createdAt": "2026-10-20T02:01:00.000Z"
+                      }
+                    ]
+                  },
+                  "createdAt": "2026-10-20T02:02:00.000Z",
+                  "updatedAt": "2026-10-20T02:02:00.000Z",
+                  "governanceScore": 3,
+                  "governanceReason": "두 참여자가 근거를 제시하고 명시적으로 동의했습니다.",
+                  "governancePassed": true,
+                  "status": "CONFIRMED",
+                  "category": "타깃",
+                  "confirmedDate": "2026-10-21T03:00:00.000Z",
+                  "dates": {
+                    "createdDate": "2026-10-20T02:02:00.000Z",
+                    "confirmedDate": "2026-10-21T03:00:00.000Z",
+                    "feedbackDate": null
+                  }
+                },
+                "score": 0.89,
+                "excerpt": "인터뷰에서 팀의 결정 근거가 대화에 묻혀 다시 찾기 어렵다는 문제가 반복되었습니다.",
+                "sourceUrl": "https://discord.com/channels/119283746592019280/119283746592019281/119283746592019283"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "search.empty": {
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/search",
+        "query": {
+          "guildId": "119283746592019280",
+          "query": "없는 검색어",
+          "limit": "10"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "success": true,
+          "code": "OK",
+          "message": "Success",
+          "data": {
+            "items": []
+          }
+        }
+      }
+    },
+    "review.confirm": {
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/review-queue/mock-candidate-review/review",
+        "query": {
+          "guildId": "119283746592019280"
+        },
+        "body": {
+          "action": "confirm",
+          "expectedVersion": 1,
+          "resolution": "independent"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "success": true,
+          "code": "OK",
+          "message": "Success",
+          "data": {
+            "id": "mock-candidate-review",
+            "version": 2,
+            "topic": "검수 화면",
+            "decision": "확정 전에 결정 근거와 Discord 원문을 함께 보여줍니다.",
+            "title": "검수 화면",
+            "decisionContent": "확정 전에 결정 근거와 Discord 원문을 함께 보여줍니다.",
+            "rationale": "인터뷰에서 팀의 결정 근거가 대화에 묻혀 다시 찾기 어렵다는 문제가 반복되었습니다.",
+            "rationaleStatus": "stated",
+            "observation": "agreed",
+            "rationaleQuotes": [],
+            "alternatives": [],
+            "categoryTag": "기능",
+            "actionItems": [
+              {
+                "id": "mock-action-3",
+                "state": "open",
+                "task": "검수 화면 와이어프레임 작성"
+              }
+            ],
+            "state": "Decided",
+            "supersedesId": null,
+            "isPivot": false,
+            "approvedBy": "119283746592019282",
+            "decisionConfirmedDate": "2026-10-22T03:00:00.000Z",
+            "feedbackSourceType": null,
+            "feedbackSourceDetail": null,
+            "feedbackReceivedDate": null,
+            "rawEvidence": [],
+            "source": {
+              "guildId": "119283746592019280",
+              "channelId": "119283746592019281",
+              "channelName": "제품-논의",
+              "triggerMessageId": "119283746592019283",
+              "messageUrl": "https://discord.com/channels/119283746592019280/119283746592019281/119283746592019283",
+              "participants": ["민수", "지은"],
+              "rawMessages": [
+                {
+                  "id": "119283746592019283",
+                  "author": "민수",
+                  "content": "초기에는 Discord 팀의 결정 기록에 집중하면 좋겠어요.",
+                  "createdAt": "2026-10-20T02:00:00.000Z"
+                },
+                {
+                  "id": "119283746592019284",
+                  "author": "지은",
+                  "content": "동의해요. 다음 인터뷰에서 기록을 찾기 어려웠던 사례를 확인하겠습니다.",
+                  "createdAt": "2026-10-20T02:01:00.000Z"
+                }
+              ]
+            },
+            "createdAt": "2026-10-20T02:02:00.000Z",
+            "updatedAt": "2026-10-22T03:00:00.000Z",
+            "governanceScore": 3,
+            "governanceReason": "두 참여자가 근거를 제시하고 명시적으로 동의했습니다.",
+            "governancePassed": true,
+            "status": "CONFIRMED",
+            "category": "기능",
+            "confirmedDate": "2026-10-22T03:00:00.000Z",
+            "dates": {
+              "createdDate": "2026-10-20T02:02:00.000Z",
+              "confirmedDate": "2026-10-22T03:00:00.000Z",
+              "feedbackDate": null
+            }
+          }
+        }
+      }
+    },
+    "error.unauthorized": {
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/dashboard",
+        "query": {
+          "guildId": "119283746592019280"
+        }
+      },
+      "response": {
+        "status": 401,
+        "body": {
+          "success": false,
+          "code": "UNAUTHORIZED",
+          "message": "Authentication required",
+          "data": null
+        }
+      }
+    },
+    "error.forbidden": {
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/dashboard",
+        "query": {
+          "guildId": "119283746592019280"
+        }
+      },
+      "response": {
+        "status": 403,
+        "body": {
+          "success": false,
+          "code": "FORBIDDEN",
+          "message": "Guild access denied",
+          "data": null
+        }
+      }
+    },
+    "error.conflict": {
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/review-queue/mock-candidate-review/review",
+        "query": {
+          "guildId": "119283746592019280"
+        },
+        "body": {
+          "action": "confirm",
+          "expectedVersion": 1,
+          "resolution": "independent"
+        }
+      },
+      "response": {
+        "status": 409,
+        "body": {
+          "success": false,
+          "code": "CONFLICT",
+          "message": "Stale candidate version",
+          "data": null
+        }
+      }
+    },
+    "error.unavailable": {
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/dashboard",
+        "query": {
+          "guildId": "119283746592019280"
+        }
+      },
+      "response": {
+        "status": 503,
+        "body": {
+          "success": false,
+          "code": "SERVICE_UNAVAILABLE",
+          "message": "Internal Server Error",
+          "data": null
+        }
+      }
+    }
+  }
+}
