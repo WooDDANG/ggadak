@@ -6,6 +6,8 @@
     "apps/*"
   ],
   "scripts": {
+    "agents:codex": "codex --no-daemon",
+    "agents:resume": "codex resume --no-daemon",
     "dev:prepare": "npm run build --workspace=@ggaddak/shared && npm run db:generate --workspace=@ggaddak/be && npm run db:upgrade -- --apply",
     "predev": "npm run dev:prepare",
     "predev:all": "npm run dev:prepare",
