@@ -2270,6 +2270,68 @@
 				"type": "object",
 				"additionalProperties": false
 			},
+			"BotInstallationStatus": {
+				"type": "string",
+				"enum": [
+					"installed",
+					"not_installed",
+					"unknown"
+				]
+			},
+			"BotInstallationStatusDto": {
+				"properties": {
+					"guildId": {
+						"type": "string"
+					},
+					"status": {
+						"$ref": "#/components/schemas/BotInstallationStatus"
+					},
+					"canManage": {
+						"type": "boolean"
+					},
+					"installUrl": {
+						"type": "string",
+						"nullable": true
+					},
+					"checkedAt": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"guildId",
+					"status",
+					"canManage",
+					"installUrl",
+					"checkedAt"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"ApiResponse_BotInstallationStatusDto_": {
+				"description": "Shared v1 response contract. Domain payloads remain typed by each endpoint.",
+				"properties": {
+					"success": {
+						"type": "boolean"
+					},
+					"code": {
+						"type": "string"
+					},
+					"message": {
+						"type": "string"
+					},
+					"data": {
+						"$ref": "#/components/schemas/BotInstallationStatusDto"
+					}
+				},
+				"required": [
+					"success",
+					"code",
+					"message",
+					"data"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
 			"ApiResponse__url-string__": {
 				"description": "Shared v1 response contract. Domain payloads remain typed by each endpoint.",
 				"properties": {
@@ -4916,6 +4978,71 @@
 				"security": [
 					{
 						"service": []
+					}
+				],
+				"parameters": [
+					{
+						"in": "query",
+						"name": "guildId",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				]
+			}
+		},
+		"/api/v1/discord/bot-status": {
+			"get": {
+				"operationId": "GetBotStatus",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiResponse_BotInstallationStatusDto_"
+								}
+							}
+						}
+					},
+					"400": {
+						"description": "Invalid query",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiResponse_null_"
+								}
+							}
+						}
+					},
+					"401": {
+						"description": "Authentication required",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiResponse_null_"
+								}
+							}
+						}
+					},
+					"403": {
+						"description": "Guild access denied",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiResponse_null_"
+								}
+							}
+						}
+					}
+				},
+				"tags": [
+					"Discord"
+				],
+				"security": [
+					{
+						"jwt": []
 					}
 				],
 				"parameters": [

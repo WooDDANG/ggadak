@@ -1,8 +1,9 @@
 # 까닭 FE API 연동 문서
 
-작성 기준: 2026-10-14 · BE API 버전 `1.0.0` · OpenAPI `3.0.0`  
-원본: [swagger.json](../../apps/be/src/api/docs/swagger.json) · 스펙 SHA-256: `65e4cc17b5abefcfd0165fa0a7de428308822dae46131670d09d9c5016140956`  
+작성 기준: 2026-10-30 · BE API 버전 `1.0.0` · OpenAPI `3.0.0`
+원본: [swagger.json](../../apps/be/src/api/docs/swagger.json) · 스펙 SHA-256: `0c3546f15eeeba726672391e6e3daa2f919ef1f1bc6db47c64edd74e16da2c3f`
 Agentic 분석·추가 그래프 계약: [별도 명세](agentic-analysis.md)
+봇 설치 상태·설치 안내 계약: [별도 명세](bot-installation.md)
 
 설계 초안과의 차이: [초안 비교표](design-draft-comparison.md)
 
@@ -30,14 +31,19 @@ Agentic 분석·추가 그래프 계약: [별도 명세](agentic-analysis.md)
 | -------------- | ---------------------------------------------------------------- |
 | BE 기본 Origin | `http://localhost:3001`                                          |
 | Swagger UI     | `http://localhost:3001/api-docs/`                                |
-| 현재 Vite FE   | `http://localhost:3000`                                          |
+| FE Origin      | 실제 FE 배포·개발 설정값. 이 저장소 데모의 기본값은 `http://localhost:3002` |
 | FE 요청 경로   | `/api/v1/...` — Vite `/api` proxy 또는 동일 Origin reverse proxy |
 | 데이터 형식    | `Content-Type: application/json`                                 |
-| 인증           | `Authorization: Bearer <accessToken>`                            |
+| 사용자 API 인증 | `Authorization: Bearer <accessToken>`                           |
+| 브라우저 세션 복원·로그아웃 | HttpOnly 세션 쿠키 + 허용된 FE Origin (`credentials: 'include'`) |
 
 BE 시작은 루트에서 `npm run dev:be`입니다. `npm run swagger --workspace=@ggaddak/be`는 문서·라우트 생성이며 서버 실행은 아닙니다. BE 빌드에도 Swagger 생성이 포함됩니다.
 
-쿠키가 필요한 로그인 단계는 `credentials: 'include'`를 사용합니다. FE 콜백 URI는 BE의 설정과 Discord OAuth 등록값이 정확히 같아야 합니다. 현재 Vite 포트는 3000이며, 다른 포트를 쓰는 팀은 해당 콜백·CORS 설정을 맞춰야 합니다. 현재 쿠키 정책은 same-site 배치를 전제로 합니다.
+실제 FE는 별도로 개발되며 이 저장소의 FE는 데모입니다. FE는 자신의 Origin을 선택할 수 있습니다. 이 저장소 데모의 Vite 포트는 `FE_PORT`로 바꿀 수 있고 기본값은 3002입니다. FE의 정확한 콜백 URI는 BE의 `DISCORD_REDIRECT_URI` 및 Discord OAuth 등록값과 같아야 하며, 별도 Origin으로 BE를 호출하면 `CORS_ORIGINS`에도 실제 FE Origin을 등록합니다.
+
+쿠키가 필요한 authorize·login·session·logout 호출에는 `credentials: 'include'`를 사용합니다. 현재 쿠키 정책은 same-site 배치를 전제로 합니다. 로컬에서는 `/api` proxy, 배포에서는 같은 Origin의 reverse proxy를 우선 사용합니다. 서로 다른 site에 FE·BE를 배치하는 것은 현재 쿠키 정책으로 지원되지 않습니다.
+
+브라우저 시작·재접속·access JWT 만료 시 `POST /api/v1/auth/session`으로 HttpOnly 지속 쿠키에서 짧은 수명의 accessToken과 사용자·서버 목록을 복원합니다. JWT는 메모리에 보관하고 사용자 API에 Bearer로 전송합니다. 쿠키 원문이나 Discord 토큰을 JavaScript로 읽을 필요가 없습니다. 세션 복원의 401은 재로그인, 403은 FE Origin 설정 확인, 일시적인 5xx는 세션을 지우지 않고 재연결할 대상으로 처리합니다. 로그아웃은 쿠키와 일치하는 Origin으로 호출할 수 있으므로 만료된 JWT를 먼저 갱신할 필요가 없습니다.
 
 ### 1.2 성공·실패 응답
 
@@ -84,7 +90,14 @@ async function api<T>(path: string, token?: string, init: RequestInit = {}): Pro
   if (init.body !== undefined) headers.set('Content-Type', 'application/json');
   if (token) headers.set('Authorization', `Bearer ${token}`);
   const response = await fetch(path, { ...init, credentials: 'include', headers });
-  const body = await response.json();
+  let body;
+  try {
+    body = await response.json();
+  } catch {
+    throw Object.assign(new Error('API 응답을 읽을 수 없습니다.'), {
+      status: response.status,
+    });
+  }
   if (!response.ok || body.success !== true) {
     throw Object.assign(new Error(body.message ?? 'API 요청 실패'), {
       status: response.status,
@@ -96,7 +109,7 @@ async function api<T>(path: string, token?: string, init: RequestInit = {}): Pro
 }
 ```
 
-이 예제는 v1 API용입니다. 동일 Origin/proxy를 기준으로 하며, 별도 BE Origin을 쓰면 path 앞에 Origin을 붙입니다. query는 URLSearchParams, path ID는 encodeURIComponent로 인코딩합니다. 새 FE 프로젝트에서는 이 문서와 스펙을 함께 사용하거나 Orval 클라이언트를 생성할 수 있습니다. 기존 저장소의 `npm run api:sync`는 FE 생성 코드도 변경하는 명령입니다.
+이 예제는 v1 API용이며 세션 갱신·재시도 정책까지 포함한 완성 클라이언트는 아닙니다. 보호 API의 401에서는 `/auth/session` 복원을 한 번 공유한 뒤 새 JWT로 원 요청을 한 번 재시도합니다. 복원 요청 자체를 재귀적으로 재시도하거나, 다른 사용자로 로그인한 뒤 이전 사용자의 요청을 다시 보내지 않습니다. 동일 Origin/proxy를 기준으로 하며, 별도 BE Origin을 쓰면 path 앞에 Origin을 붙입니다. query는 URLSearchParams, path ID는 encodeURIComponent로 인코딩합니다. 새 FE 프로젝트에서는 이 문서와 스펙을 함께 사용하거나 Orval 클라이언트를 생성할 수 있습니다. 기존 저장소의 `npm run api:sync`는 FE 생성 코드도 변경하는 명령입니다.
 
 <a id="overview"></a>
 
@@ -104,8 +117,8 @@ async function api<T>(path: string, token?: string, init: RequestInit = {}): Pro
 
 | 화면         | 호출 순서·용도                                                                       |
 | ------------ | ------------------------------------------------------------------------------------ |
-| 랜딩·로그인  | authorize → Discord 이동 → login → me/guilds → 서버 선택                             |
-| Discord 설정 | channels 조회 → 전체 channelIds 저장                                                 |
+| 랜딩·로그인  | 시작 시 session 복원, 새 로그인은 authorize → Discord 이동 → login → session → 서버 선택 |
+| Discord 설정 | 선택 서버 bot-status 확인 → 필요 시 설치·재확인 → channels 조회 → 전체 channelIds 저장 |
 | Dashboard    | dashboard 조회 → sync-jobs 생성 → job 상태 polling → 요약·Review Queue 갱신          |
 | Review Queue | 대기/보류 목록 조회 → 버전 확인 → confirm/defer/reject → 관련 목록 갱신              |
 | 상세·편집    | 카드 조회 → expectedVersion 포함 전체 PUT → 반환 카드로 갱신                         |
@@ -118,10 +131,12 @@ async function api<T>(path: string, token?: string, init: RequestInit = {}): Pro
 | ------ | ----------------------------------------------- | ---- | ---------- |
 | `GET`  | `/api/v1/auth/authorize`                        | 200  | 없음       |
 | `POST` | `/api/v1/auth/login`                            | 200  | 없음       |
+| `POST` | `/api/v1/auth/session`                          | 200  | 세션 쿠키 + FE Origin |
 | `GET`  | `/api/v1/auth/me`                               | 200  | Bearer JWT |
 | `GET`  | `/api/v1/auth/guilds`                           | 200  | Bearer JWT |
 | `POST` | `/api/v1/auth/refresh`                          | 200  | Bearer JWT |
-| `POST` | `/api/v1/auth/logout`                           | 200  | Bearer JWT |
+| `POST` | `/api/v1/auth/logout`                           | 200  | 세션 쿠키 + FE Origin 또는 Bearer JWT |
+| `GET`  | `/api/v1/discord/bot-status`                    | 200  | Bearer JWT |
 | `GET`  | `/api/v1/discord/channels`                      | 200  | Bearer JWT |
 | `PUT`  | `/api/v1/discord/channels`                      | 200  | Bearer JWT |
 | `GET`  | `/api/v1/dashboard`                             | 200  | Bearer JWT |
@@ -320,6 +335,12 @@ body/query는 없습니다. 최초 로그인부터 고정 7일인 세션을 확�
 **타입:** `null`
 
 ### 3.2 Discord 연결 설정
+
+#### `GET /api/v1/discord/bot-status`
+
+선택한 서버의 Bot Installation Status와 현재 사용자의 관리 가능 여부를 반환합니다. 입력은 필수 query `guildId`이며 Bearer JWT와 해당 서버 membership이 필요합니다. `installed / not_installed / unknown`, 관리자 전용 `installUrl`, 확인 시각과 FE 설치 후 복귀 흐름은 [봇 설치 상태 명세](bot-installation.md)를 따릅니다.
+
+이 확인은 서버 선택 시 해당 서버에 대해서만 수행합니다. 설치 상태가 미설치·확인 불가여도 기존 결정의 조회·검수·검색은 해당 서버 권한으로 계속 이용합니다. 채널 접근 권한은 아래 채널 API에서 별도로 확인합니다.
 
 #### `GET /api/v1/discord/channels`
 

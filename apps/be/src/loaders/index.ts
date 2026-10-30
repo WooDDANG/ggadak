@@ -13,6 +13,9 @@ import { DashboardController } from '../api/controllers/dashboard.controller.js'
 import { SearchService, EmbeddingProvider } from '../services/search.service.js';
 import { SearchController } from '../api/controllers/search.controller.js';
 import { ChannelsService } from '../services/channels.service.js';
+import { HttpDiscordBotInstallationAdapter } from '../adapters/discord-bot-installation.adapter.js';
+import { BotInstallationService } from '../services/bot-installation.service.js';
+import { BotInstallationController } from '../api/controllers/bot-installation.controller.js';
 import {
   ChannelsController,
   InternalMonitoringController,
@@ -102,6 +105,18 @@ export async function initLoaders({
   container.set(ChannelsController, new ChannelsController(channelsService, authService));
   container.set(InternalMonitoringController, new InternalMonitoringController(channelsService));
   expressApp.locals.serviceToken = authOptions?.serviceToken ?? process.env.BOT_SERVICE_TOKEN;
+
+  const botInstallationAdapter =
+    authOptions?.botInstallationAdapter ?? new HttpDiscordBotInstallationAdapter();
+  const botInstallationService = new BotInstallationService(botInstallationAdapter, {
+    clientId: authOptions?.config?.clientId,
+    now: authOptions?.now,
+  });
+  container.set(BotInstallationService, botInstallationService);
+  container.set(
+    BotInstallationController,
+    new BotInstallationController(botInstallationService, authService),
+  );
 
   // 4. Service Layer Binding
   const core = new DecisionExtractorCore();

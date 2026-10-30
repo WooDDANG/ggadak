@@ -34,6 +34,7 @@ import type {
   ApiResponseAnalysisRetryCommandDtoArray,
   ApiResponseAnalysisStatus,
   ApiResponseAuthUserDto,
+  ApiResponseBotInstallationStatusDto,
   ApiResponseCandidateHistoryEntryArray,
   ApiResponseChannelIdsStringArray,
   ApiResponseChannelSettings,
@@ -64,6 +65,7 @@ import type {
   DecisionEditDto,
   EditV1DecisionParams,
   FeedbackListResponseDto,
+  GetBotStatusParams,
   GetDashboardParams,
   GetDecisionTimelineParams,
   GetMonitoredChannelsParams,
@@ -2674,6 +2676,137 @@ export function useGetMonitoredChannels<TData = Awaited<ReturnType<typeof getMon
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetMonitoredChannelsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export type getBotStatusResponse200 = {
+  data: ApiResponseBotInstallationStatusDto
+  status: 200
+}
+
+export type getBotStatusResponse400 = {
+  data: ApiResponseNull
+  status: 400
+}
+
+export type getBotStatusResponse401 = {
+  data: ApiResponseNull
+  status: 401
+}
+
+export type getBotStatusResponse403 = {
+  data: ApiResponseNull
+  status: 403
+}
+
+export type getBotStatusResponseSuccess = (getBotStatusResponse200) & {
+  headers: Headers;
+};
+export type getBotStatusResponseError = (getBotStatusResponse400 | getBotStatusResponse401 | getBotStatusResponse403) & {
+  headers: Headers;
+};
+
+export type getBotStatusResponse = (getBotStatusResponseSuccess | getBotStatusResponseError)
+
+export const getGetBotStatusUrl = (params: GetBotStatusParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/discord/bot-status?${stringifiedParams}` : `/api/v1/discord/bot-status`
+}
+
+export const getBotStatus = async (params: GetBotStatusParams, options?: Parameters<typeof authenticatedClient>[1]): Promise<getBotStatusResponse> => {
+
+  return authenticatedClient<getBotStatusResponse>(getGetBotStatusUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetBotStatusQueryKey = (params?: GetBotStatusParams,) => {
+    return [
+    `/api/v1/discord/bot-status`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetBotStatusQueryOptions = <TData = Awaited<ReturnType<typeof getBotStatus>>, TError = ApiResponseNull>(params: GetBotStatusParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getBotStatus>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetBotStatusQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getBotStatus>>> = ({ signal }) => getBotStatus(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getBotStatus>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetBotStatusQueryResult = NonNullable<Awaited<ReturnType<typeof getBotStatus>>>
+export type GetBotStatusQueryError = ApiResponseNull
+
+
+export function useGetBotStatus<TData = Awaited<ReturnType<typeof getBotStatus>>, TError = ApiResponseNull>(
+ params: GetBotStatusParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getBotStatus>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getBotStatus>>,
+          TError,
+          Awaited<ReturnType<typeof getBotStatus>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetBotStatus<TData = Awaited<ReturnType<typeof getBotStatus>>, TError = ApiResponseNull>(
+ params: GetBotStatusParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getBotStatus>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getBotStatus>>,
+          TError,
+          Awaited<ReturnType<typeof getBotStatus>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetBotStatus<TData = Awaited<ReturnType<typeof getBotStatus>>, TError = ApiResponseNull>(
+ params: GetBotStatusParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getBotStatus>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+
+export function useGetBotStatus<TData = Awaited<ReturnType<typeof getBotStatus>>, TError = ApiResponseNull>(
+ params: GetBotStatusParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getBotStatus>>, TError, TData>>, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetBotStatusQueryOptions(params,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 

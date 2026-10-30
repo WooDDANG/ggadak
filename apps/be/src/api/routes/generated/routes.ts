@@ -28,6 +28,8 @@ import { ChannelsController } from './../../controllers/channels.controller.js';
 // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
 import { InternalMonitoringController } from './../../controllers/channels.controller.js';
 // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+import { BotInstallationController } from './../../controllers/bot-installation.controller.js';
+// WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
 import { AuthController } from './../../controllers/auth.controller.js';
 // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
 import { AnalysisRequestController } from './../../controllers/analysis-request.controller.js';
@@ -721,6 +723,34 @@ const models: TsoaRoute.Models = {
             "code": {"dataType":"string","required":true},
             "message": {"dataType":"string","required":true},
             "data": {"dataType":"nestedObjectLiteral","nestedProperties":{"channelIds":{"dataType":"array","array":{"dataType":"string"},"required":true}},"required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "BotInstallationStatus": {
+        "dataType": "refAlias",
+        "type": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["installed"]},{"dataType":"enum","enums":["not_installed"]},{"dataType":"enum","enums":["unknown"]}],"validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "BotInstallationStatusDto": {
+        "dataType": "refObject",
+        "properties": {
+            "guildId": {"dataType":"string","required":true},
+            "status": {"ref":"BotInstallationStatus","required":true},
+            "canManage": {"dataType":"boolean","required":true},
+            "installUrl": {"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},
+            "checkedAt": {"dataType":"string","required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "ApiResponse_BotInstallationStatusDto_": {
+        "dataType": "refObject",
+        "properties": {
+            "success": {"dataType":"boolean","required":true},
+            "code": {"dataType":"string","required":true},
+            "message": {"dataType":"string","required":true},
+            "data": {"ref":"BotInstallationStatusDto","required":true},
         },
         "additionalProperties": false,
     },
@@ -2148,6 +2178,43 @@ export function RegisterRoutes(app: Router) {
 
               await templateService.apiHandler({
                 methodName: 'getMonitoredChannels',
+                controller,
+                response,
+                next,
+                validatedArgs,
+                successStatus: undefined,
+              });
+            } catch (err) {
+                return next(err);
+            }
+        });
+        // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+        const argsBotInstallationController_getBotStatus: Record<string, TsoaRoute.ParameterSchema> = {
+                guildId: {"in":"query","name":"guildId","required":true,"dataType":"string"},
+                request: {"in":"request","name":"request","required":true,"dataType":"object"},
+        };
+        app.get('/api/v1/discord/bot-status',
+            authenticateMiddleware([{"jwt":[]}]),
+            ...(fetchMiddlewares<RequestHandler>(BotInstallationController)),
+            ...(fetchMiddlewares<RequestHandler>(BotInstallationController.prototype.getBotStatus)),
+
+            async function BotInstallationController_getBotStatus(request: ExRequest, response: ExResponse, next: any) {
+
+            // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+
+            let validatedArgs: any[] = [];
+            try {
+                validatedArgs = templateService.getValidatedArgs({ args: argsBotInstallationController_getBotStatus, request, response });
+
+                const container: IocContainer = typeof iocContainer === 'function' ? (iocContainer as IocContainerFactory)(request) : iocContainer;
+
+                const controller: any = await container.get<BotInstallationController>(BotInstallationController);
+                if (typeof controller['setStatus'] === 'function') {
+                controller.setStatus(undefined);
+                }
+
+              await templateService.apiHandler({
+                methodName: 'getBotStatus',
                 controller,
                 response,
                 next,

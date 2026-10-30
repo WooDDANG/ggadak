@@ -103,6 +103,13 @@ before answering these covered approval dialogs.
 
 ### Verification
 
+Run code generation (including `npm run api:sync`), builds, tests, and type checks
+in the `verify` tab's `Tests · Build` pane through Herdr. Discover its live ID,
+inspect its foreground process and prompt, and serialize checks there. Workers
+ask Codex to schedule checks instead of using invisible command execution. The
+coordinator may inspect files and diffs through its own tools. Preserve each
+check's completion and exit status in the visible output or a captured log.
+
 - Read worker output and inspect the actual diff. Herdr `idle`/`done` is a signal
   to inspect results, not proof that the ticket passed. After a submission timeout
   or stalled prompt, inspect state and output before sending the task again.
