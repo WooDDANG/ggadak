@@ -1,3 +1,4 @@
+import 'reflect-metadata';
 import { config } from './config/index.js';
 import { appLogger } from './loaders/logger.js';
 import { createServer } from './server.js';

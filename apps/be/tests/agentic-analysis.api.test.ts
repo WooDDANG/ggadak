@@ -2,6 +2,7 @@ import { test, expect } from 'vitest';
 import { createServer } from '../src/server.js';
 import { isolatedRepository } from '../src/repositories/test-database.js';
 import { fakeAuthOptions, loginAsTestUser } from '../src/test-support/auth.js';
+import { AnalysisRequestRepository } from '../src/repositories/analysis-request.repository.js';
 import { AppError } from '../src/errors/AppError.js';
 import type { IAiAdapter } from '../src/adapters/ai.adapter.js';
 
@@ -492,9 +493,7 @@ test('final critic issues and failed attempt diagnostics survive terminal replay
     async (_base, send, _token, _restart, db) => {
       expect((await send('critic-diagnostics')).status).toBe(422);
       expect((await send('critic-diagnostics')).status).toBe(422);
-      const row = await db.client.analysisRequest.findUniqueOrThrow({
-        where: { id: 'critic-diagnostics' },
-      });
+      const row = (await new AnalysisRequestRepository(db.repo).get('critic-diagnostics'))!;
       const workflow = JSON.parse(row.workflowJson!);
       const session = workflow.sessions[0];
       expect(session.feedback).toEqual(['Rationale is outside the input']);

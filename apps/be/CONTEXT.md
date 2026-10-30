@@ -4,6 +4,12 @@ The backend REST API server managing persistent decision storage, Review Queue l
 
 ## Language
 
+**Bot Installation Status**:
+Whether the GGADDAK bot is installed in a selected Discord server: installed,
+not installed, or unknown when the available evidence cannot establish either.
+Channel access permissions are a separate concern.
+_Avoid_: Bot Online Status, Channel Accessibility
+
 **Analysis Queue**:
 The durable collection of received Discussion Contexts awaiting analysis, execution, or bounded retry. A received Scan Range becomes eligible only after the channel's declared scan coverage is fully received; receipt itself is distinct from completed analysis.
 

@@ -861,6 +861,34 @@ export interface ApiResponseChannelIdsStringArray {
   data: ApiResponseChannelIdsStringArrayData;
 }
 
+export type BotInstallationStatus = typeof BotInstallationStatus[keyof typeof BotInstallationStatus];
+
+
+export const BotInstallationStatus = {
+  installed: 'installed',
+  not_installed: 'not_installed',
+  unknown: 'unknown',
+} as const;
+
+export interface BotInstallationStatusDto {
+  guildId: string;
+  status: BotInstallationStatus;
+  canManage: boolean;
+  /** @nullable */
+  installUrl: string | null;
+  checkedAt: string;
+}
+
+/**
+ * Shared v1 response contract. Domain payloads remain typed by each endpoint.
+ */
+export interface ApiResponseBotInstallationStatusDto {
+  success: boolean;
+  code: string;
+  message: string;
+  data: BotInstallationStatusDto;
+}
+
 export type ApiResponseUrlStringData = {
   url: string;
 };
@@ -1108,6 +1136,7 @@ export type AnalysisStatusSessionsItem = {
   inputTokens: number;
   attempts: number;
   logicalCalls: number;
+  waitMs?: number;
   elapsedMs: number;
   repairs: number;
   phase: AnalysisPhase;
@@ -1528,6 +1557,10 @@ export type SaveDiscordChannelsBody = {
 };
 
 export type GetMonitoredChannelsParams = {
+guildId: string;
+};
+
+export type GetBotStatusParams = {
 guildId: string;
 };
 

@@ -1,0 +1,20 @@
+# 10: 서비스 전체 AI 호출 동시 실행 한도
+
+**What to build:** 여러 요청과 세션이 함께 실행돼도 실제 AGY 호출 수가 설정된 서비스 전체 상한을 넘지 않고, 호출 가능 슬롯이 없을 때 취소 가능한 대기를 제공한다.
+
+**Blocked by:** None (can start immediately).
+
+**Status:** resolved
+
+- [x] 동시 실행 한도는 2로 고정하지 않고 유효한 양의 정수로 설정하며 기본값 1을 제공한다. 요청별 worker 수와 실제 AI 호출 한도의 의미를 구분한다.
+- [x] 같은 DB를 공유하는 여러 BE 프로세스의 분석 생성 경로에 공통 한도를 적용한다. 단계별 AGY 호출이 permit을 사용하며 요청 바깥과 내부에서 같은 permit을 중복 획득해 교착하지 않는다.
+- [x] 같은 채널의 요청 중복 실행 방지와 처리 소유권을 보존한다. 다른 세션의 AI 응답을 기다리는 동안 전체 DB 트랜잭션을 열어두지 않는다.
+- [x] 슬롯 대기는 취소 가능하고 별도로 계측한다. 아직 실행하지 않은 대기가 AI 호출 횟수나 provider 실패 재시도 예산을 소비하지 않는다.
+- [x] 성공·실패·timeout·취소 시 실행 중인 CLI 프로세스 정리와 슬롯 반환 순서를 보장하고, BE 재시작 후 만료된 소유권을 복구한다.
+- [x] 복수 요청/BE 인스턴스의 경합과 취소·실패를 재현해 실제 동시 호출 상한, 슬롯 유실 방지, 공정한 진행을 외부 AI 없이 검증한다.
+
+## Answer
+
+AiCallScheduler/AiCallRepository가 동일 DB를 사용하는 BE와 평가 경로의 stage 호출을 FIFO lease로 제한한다. 슬롯 대기와 호출 timeout을 분리하고 취소/실패 시 release한다. 두 Prisma client 경합에서 global cap을 검증했다.
+
+검증과 제한: [구현 검증 기록](../implementation-verification.md).

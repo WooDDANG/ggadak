@@ -15,16 +15,20 @@ import {
   type DecisionGraph,
 } from '../domain/decision-graph.js';
 import { AppError } from '../errors/AppError.js';
+import type { AiCallScheduler } from './ai-call-scheduler.js';
 import { modelForStage } from '../domain/ai-call.js';
 
 /** Bounded session algorithm; checkpoint callback owns persistence and owner fencing. */
 export class GraphWorkflow {
-  constructor(private readonly ai: IAiAdapter) {}
+  constructor(
+    private readonly ai: IAiAdapter,
+    private readonly scheduler: AiCallScheduler,
+  ) {}
 
   async run(
     session: AnalysisSession,
     workflow: AnalysisWorkflow,
-    save: () => Promise<void>,
+    save: (session?: AnalysisSession) => Promise<void>,
     signal: AbortSignal,
     owner?: string,
   ): Promise<void> {
@@ -38,7 +42,7 @@ export class GraphWorkflow {
         Math.max(0, Date.now() - interrupted.startedAt),
       );
       delete session.active;
-      await save();
+      await save(session);
     }
     while (session.phase !== AnalysisPhase.Done) {
       if (signal.aborted) throw new AppError('Analysis ownership lost', 503);
@@ -54,7 +58,7 @@ export class GraphWorkflow {
           try {
             this.requestRepair(session, issues);
           } catch (error) {
-            await save();
+            await save(session);
             throw error;
           }
         } else {
@@ -62,113 +66,125 @@ export class GraphWorkflow {
           session.phase = session.repairs ? AnalysisPhase.Reverify : AnalysisPhase.Verify;
         }
         session.elapsedMs += Math.max(0, Date.now() - checkStarted);
-        await save();
+        await save(session);
         continue;
       }
-      const phase = session.phase;
-      if (!session.calls.includes(phase)) {
-        session.calls.push(phase);
-        if (phase === AnalysisPhase.Repair) session.repairs++;
-      }
-      if (
-        session.calls.length > GraphPolicy.maxLogicalCalls ||
-        session.repairs > GraphPolicy.maxRepairs
-      )
-        throw new AppError('Analysis call budget exhausted', 422);
-      const timeoutMs = Math.min(
-        GraphPolicy.callTimeoutMs,
-        GraphPolicy.sessionBudgetMs - session.elapsedMs,
-      );
-      const startedAt = Date.now();
-      const attempt: StageAttempt = {
-        phase,
-        provider: workflow.settings.provider,
-        model: modelForStage(
-          workflow.settings,
-          phase === AnalysisPhase.Extract
-            ? AnalysisPhase.Extract
-            : phase === AnalysisPhase.Repair
-              ? AnalysisPhase.Repair
-              : AnalysisPhase.Verify,
-        ),
-        owner,
-        startedAt,
-        timeoutMs,
-        deadline: startedAt + timeoutMs,
-      };
-      session.attempts.push(attempt);
-      session.active = session.attempts.length - 1;
-      await save();
-      const controller = new AbortController();
-      const abort = () => controller.abort(signal.reason);
-      signal.addEventListener('abort', abort, { once: true });
-      if (signal.aborted) abort();
-      let timer: ReturnType<typeof setTimeout> | undefined;
+      const permit = await this.scheduler.acquire(signal);
+      session.waitMs = (session.waitMs ?? 0) + permit.waitMs;
       try {
-        const context = { signal: controller.signal, settings: workflow.settings };
-        const operation =
-          phase === AnalysisPhase.Extract
-            ? this.ai.extractGraph(session.transcript, context)
-            : phase === AnalysisPhase.Repair
-              ? this.ai.repairGraph(session.transcript, session.value, session.feedback, context)
-              : this.ai.verifyGraph(session.transcript, session.value, context);
-        const interrupted = new Promise<never>((_, reject) => {
-          controller.signal.addEventListener(
-            'abort',
-            () =>
-              reject(
-                new AppError(signal.aborted ? 'Analysis ownership lost' : 'AI call timeout', 503),
-              ),
-            { once: true },
-          );
-          if (controller.signal.aborted) reject(new AppError('Analysis ownership lost', 503));
-          timer = setTimeout(() => controller.abort(), timeoutMs);
-        });
-        const result: AiResult = await Promise.race([operation, interrupted]);
-        if (signal.aborted) throw new AppError('Analysis ownership lost', 503);
-        Object.assign(attempt, {
-          outcome: 'completed',
-          inputTokens: result.usage?.inputTokens ?? 0,
-          outputTokens: result.usage?.outputTokens ?? 0,
-        });
-        if (phase === AnalysisPhase.Extract || phase === AnalysisPhase.Repair) {
-          session.value = result.value;
-          session.phase =
-            phase === AnalysisPhase.Extract ? AnalysisPhase.Check : AnalysisPhase.Recheck;
-        } else {
-          session.verification = result.value;
-          attempt.verification = result.value;
-          const verified = VerificationSchema.safeParse(result.value);
-          if (!verified.success) throw new AppError('Invalid AI verification response', 422);
-          if (!verified.data.valid)
-            this.requestRepair(
-              session,
-              verified.data.issues.map(issue => issue.message),
-            );
-          else {
-            const graph = GraphSchema.parse(session.value);
-            session.graph = this.link(graph, session);
-            session.phase = AnalysisPhase.Done;
-          }
+        const callSignal = permit.signal;
+        if (callSignal.aborted) throw new AppError('Analysis cancelled before AI call', 503);
+        const phase = session.phase;
+        if (!session.calls.includes(phase)) {
+          session.calls.push(phase);
+          if (phase === AnalysisPhase.Repair) session.repairs++;
         }
-      } catch (error) {
-        attempt.outcome = 'failed';
-        attempt.error = {
-          message: error instanceof Error ? error.message : 'Analysis stage failed',
-          status: error instanceof AppError ? error.statusCode : 500,
+        if (
+          session.calls.length > GraphPolicy.maxLogicalCalls ||
+          session.repairs > GraphPolicy.maxRepairs
+        )
+          throw new AppError('Analysis call budget exhausted', 422);
+        const timeoutMs = Math.min(
+          GraphPolicy.callTimeoutMs,
+          GraphPolicy.sessionBudgetMs - session.elapsedMs,
+        );
+        const startedAt = Date.now();
+        const attempt: StageAttempt = {
+          phase,
+          waitMs: permit.waitMs,
+          provider: workflow.settings.provider,
+          model: modelForStage(
+            workflow.settings,
+            phase === AnalysisPhase.Extract
+              ? AnalysisPhase.Extract
+              : phase === AnalysisPhase.Repair
+                ? AnalysisPhase.Repair
+                : AnalysisPhase.Verify,
+          ),
+          owner,
+          startedAt,
+          timeoutMs,
+          deadline: startedAt + timeoutMs,
         };
-        throw error;
+        session.attempts.push(attempt);
+        session.active = session.attempts.length - 1;
+        await save(session);
+        const controller = new AbortController();
+        const abort = () => controller.abort(callSignal.reason);
+        callSignal.addEventListener('abort', abort, { once: true });
+        if (callSignal.aborted) abort();
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        let operation: Promise<AiResult> | undefined;
+        try {
+          const context = { signal: controller.signal, settings: workflow.settings };
+          operation =
+            phase === AnalysisPhase.Extract
+              ? this.ai.extractGraph(session.transcript, context)
+              : phase === AnalysisPhase.Repair
+                ? this.ai.repairGraph(session.transcript, session.value, session.feedback, context)
+                : this.ai.verifyGraph(session.transcript, session.value, context);
+          const interrupted = new Promise<never>((_, reject) => {
+            controller.signal.addEventListener(
+              'abort',
+              () =>
+                reject(
+                  new AppError(signal.aborted ? 'Analysis ownership lost' : 'AI call timeout', 503),
+                ),
+              { once: true },
+            );
+            if (controller.signal.aborted) reject(new AppError('Analysis ownership lost', 503));
+            timer = setTimeout(() => controller.abort(), timeoutMs);
+          });
+          const result: AiResult = await Promise.race([operation, interrupted]);
+          if (signal.aborted) throw new AppError('Analysis ownership lost', 503);
+          Object.assign(attempt, {
+            outcome: 'completed',
+            inputTokens: result.usage?.inputTokens ?? 0,
+            outputTokens: result.usage?.outputTokens ?? 0,
+          });
+          if (phase === AnalysisPhase.Extract || phase === AnalysisPhase.Repair) {
+            session.value = result.value;
+            session.phase =
+              phase === AnalysisPhase.Extract ? AnalysisPhase.Check : AnalysisPhase.Recheck;
+          } else {
+            session.verification = result.value;
+            attempt.verification = result.value;
+            const verified = VerificationSchema.safeParse(result.value);
+            if (!verified.success) throw new AppError('Invalid AI verification response', 422);
+            if (!verified.data.valid)
+              this.requestRepair(
+                session,
+                verified.data.issues.map(issue => issue.message),
+              );
+            else {
+              const graph = GraphSchema.parse(session.value);
+              session.graph = this.link(graph, session);
+              session.phase = AnalysisPhase.Done;
+            }
+          }
+        } catch (error) {
+          attempt.outcome = 'failed';
+          attempt.error = {
+            message: error instanceof Error ? error.message : 'Analysis stage failed',
+            status: error instanceof AppError ? error.statusCode : 500,
+          };
+          throw error;
+        } finally {
+          controller.abort();
+          await operation?.catch(() => {});
+          if (timer) clearTimeout(timer);
+          callSignal.removeEventListener('abort', abort);
+          const elapsed = Math.max(0, Date.now() - attempt.startedAt);
+          session.elapsedMs += elapsed;
+          Object.assign(attempt, { endedAt: Date.now() });
+          delete session.active;
+          await save(session);
+        }
+        if (session.elapsedMs >= GraphPolicy.sessionBudgetMs)
+          throw new AppError('Analysis time budget exhausted', 422);
       } finally {
-        if (timer) clearTimeout(timer);
-        signal.removeEventListener('abort', abort);
-        const elapsed = Math.max(0, Date.now() - attempt.startedAt);
-        session.elapsedMs += elapsed;
-        Object.assign(attempt, { endedAt: Date.now() });
-        delete session.active;
-        await save();
+        await permit.release();
       }
-      if (session.elapsedMs >= GraphPolicy.sessionBudgetMs)
-        throw new AppError('Analysis time budget exhausted', 422);
     }
   }
 

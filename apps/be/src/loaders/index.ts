@@ -1,3 +1,10 @@
+import 'reflect-metadata';
+import { SyncJobService } from '../services/sync-job.service.js';
+import {
+  SyncJobsController,
+  InternalSyncJobsController,
+} from '../api/controllers/sync-jobs.controller.js';
+import { AnalysisQueryService } from '../services/analysis-query.service.js';
 import { DashboardService } from '../services/dashboard.service.js';
 import { AnalysisQueueService } from '../services/analysis-queue.service.js';
 import { AnalysisQueueController } from '../api/controllers/analysis-queue.controller.js';
@@ -6,6 +13,9 @@ import { DashboardController } from '../api/controllers/dashboard.controller.js'
 import { SearchService, EmbeddingProvider } from '../services/search.service.js';
 import { SearchController } from '../api/controllers/search.controller.js';
 import { ChannelsService } from '../services/channels.service.js';
+import { HttpDiscordBotInstallationAdapter } from '../adapters/discord-bot-installation.adapter.js';
+import { BotInstallationService } from '../services/bot-installation.service.js';
+import { BotInstallationController } from '../api/controllers/bot-installation.controller.js';
 import {
   ChannelsController,
   InternalMonitoringController,
@@ -14,7 +24,6 @@ import { AuthController } from '../api/controllers/auth.controller.js';
 import { V1DecisionController } from '../api/controllers/v1-decision.controller.js';
 import { randomUUID } from 'node:crypto';
 import { AuthService, AuthOptions } from '../services/auth.service.js';
-import 'reflect-metadata';
 import { Express } from 'express';
 import { Container } from 'typedi';
 import { DecisionRepository } from '../repositories/decision.repository.js';
@@ -32,6 +41,7 @@ import { DiscussionController } from '../api/controllers/discussion.controller.j
 import { initExpress } from './express.js';
 import { initPrisma } from './prisma.js';
 import { appLogger } from './logger.js';
+import { assertStorageReady } from '../repositories/storage-readiness.js';
 
 export interface LoaderOptions {
   expressApp: Express;
@@ -58,6 +68,7 @@ export async function initLoaders({
   // 1. Prisma Client Loader
   const prisma = customRepo?.prisma ?? initPrisma();
   await prisma.$connect();
+  await assertStorageReady(prisma);
   // Ensure migrated domain tables are queryable before routes become ready.
   await Promise.all([
     prisma.decision.findFirst(),
@@ -95,6 +106,18 @@ export async function initLoaders({
   container.set(InternalMonitoringController, new InternalMonitoringController(channelsService));
   expressApp.locals.serviceToken = authOptions?.serviceToken ?? process.env.BOT_SERVICE_TOKEN;
 
+  const botInstallationAdapter =
+    authOptions?.botInstallationAdapter ?? new HttpDiscordBotInstallationAdapter();
+  const botInstallationService = new BotInstallationService(botInstallationAdapter, {
+    clientId: authOptions?.config?.clientId,
+    now: authOptions?.now,
+  });
+  container.set(BotInstallationService, botInstallationService);
+  container.set(
+    BotInstallationController,
+    new BotInstallationController(botInstallationService, authService),
+  );
+
   // 4. Service Layer Binding
   const core = new DecisionExtractorCore();
   const policyService = new PolicyService();
@@ -102,6 +125,10 @@ export async function initLoaders({
   const feedbackService = new FeedbackService(repo);
   const decisionService = new DecisionService(repo);
   const discussionService = new DiscussionService(repo, aiAdapter as AiAdapter, core);
+  const syncJobs = new SyncJobService(repo);
+  container.set(SyncJobService, syncJobs);
+  container.set(SyncJobsController, new SyncJobsController(syncJobs, authService));
+  container.set(InternalSyncJobsController, new InternalSyncJobsController(syncJobs));
   const analysisQueue = new AnalysisQueueService(repo, discussionService);
   expressApp.locals.analysisQueue = analysisQueue;
   container.set(AnalysisQueueController, new AnalysisQueueController(analysisQueue));
@@ -114,7 +141,7 @@ export async function initLoaders({
   container.set(DiscussionService, discussionService);
   container.set(
     AnalysisRequestController,
-    new AnalysisRequestController(discussionService, authService),
+    new AnalysisRequestController(new AnalysisQueryService(repo), authService),
   );
 
   // 5. Controller Layer Binding for TSOA IoC Container

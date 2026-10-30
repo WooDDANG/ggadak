@@ -3,6 +3,7 @@ import type { AuthUserDto, AuthPrincipal } from '../dto/auth.dto.js';
 import { AuthError } from '../errors/AuthError.js';
 import { config, validateAuthConfig, type AuthConfig } from '../config/index.js';
 import type { DiscordChannelsAdapter } from '../adapters/discord-channels.adapter.js';
+import type { DiscordBotInstallationAdapter } from '../adapters/discord-bot-installation.adapter.js';
 import {
   createHmac,
   timingSafeEqual,
@@ -18,6 +19,7 @@ import { AppError, NotFoundError } from '../errors/AppError.js';
 import { DiscordAuthAdapter, HttpDiscordAuthAdapter } from '../adapters/discord-auth.adapter.js';
 export interface AuthOptions {
   channelAdapter?: DiscordChannelsAdapter;
+  botInstallationAdapter?: DiscordBotInstallationAdapter;
   serviceToken?: string;
   config?: AuthConfig;
   discordAdapter?: DiscordAuthAdapter;
@@ -216,7 +218,7 @@ export class AuthService {
       throw new AuthError();
     }
   }
-  async requireGuild(user: AuthPrincipal, guildId: string, manage = false): Promise<void> {
+  async checkGuildAccess(user: AuthPrincipal, guildId: string): Promise<{ canManage: boolean }> {
     const membership = await this.prisma.membership.findUnique({
       where: { userId_guildId: { userId: user.userId, guildId } },
     });
@@ -230,12 +232,14 @@ export class AuthService {
       membership.refreshedAt.getTime() + TTL <= this.now()
     )
       throw new AuthError('Guild access denied; refresh login', 403);
-    if (
-      manage &&
-      !membership.owner &&
-      (!/^\d+$/.test(membership.permissions) || (BigInt(membership.permissions) & 32n) === 0n)
-    )
-      throw new AuthError('Manage Server permission required', 403);
+    const canManage =
+      Boolean(membership.owner) ||
+      (/^\d+$/.test(membership.permissions) && (BigInt(membership.permissions) & 32n) !== 0n);
+    return { canManage };
+  }
+  async requireGuild(user: AuthPrincipal, guildId: string, manage = false): Promise<void> {
+    const { canManage } = await this.checkGuildAccess(user, guildId);
+    if (manage && !canManage) throw new AuthError('Manage Server permission required', 403);
   }
   async requireDecision(user: AuthPrincipal, id: string, guildId?: string) {
     const decision = await this.prisma.decision.findUnique({

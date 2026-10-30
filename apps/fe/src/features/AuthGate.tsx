@@ -39,18 +39,23 @@ export function AuthGate({ children }: { children: (guildId: string) => React.Re
   const restore = useCallback(
     async (code?: string, state?: string) => {
       const attempt = ++revision.current;
-      setPhase('loading');
+      const background = !code && currentUser.current !== '';
       setError('');
-      setAccessToken('');
-      await queryClient.cancelQueries();
+      if (!background) {
+        setPhase('loading');
+        setAccessToken('');
+        await queryClient.cancelQueries();
+      }
       try {
         const session =
           code && state ? await finishDiscordLogin(code, state) : await restoreBrowserLogin();
         if (attempt !== revision.current) return;
         if (currentUser.current !== session.user.id) {
           invalidateSession();
+          await queryClient.cancelQueries();
+          if (attempt !== revision.current) return;
+          queryClient.clear();
         }
-        queryClient.clear();
         const selected = chooseServer(
           session.user.id,
           session.guilds,

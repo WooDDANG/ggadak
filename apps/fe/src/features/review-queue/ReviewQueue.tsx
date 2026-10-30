@@ -4,6 +4,7 @@ import { ReviewHistory } from './ReviewHistory';
 import { CandidateHistory } from './CandidateHistory';
 import React, { useState } from 'react';
 import { ReviewResolution } from './ReviewResolution';
+import { ReviewReplacement } from './ReviewReplacement';
 
 import {
   Check,
@@ -140,13 +141,23 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({
 
               {/* Action Buttons */}
               <div className="flex items-center space-x-2">
-                <ReviewResolution
-                  key={`${dec.id}:${revision}`}
-                  candidate={dec}
-                  records={records}
-                  disabled={pending}
-                  onConfirm={action => review(dec.id, action)}
-                />
+                {guildId ? (
+                  <ReviewReplacement
+                    key={`${dec.id}:${revision}`}
+                    candidate={dec}
+                    guildId={guildId}
+                    disabled={pending}
+                    onConfirm={action => review(dec.id, action)}
+                  />
+                ) : (
+                  <ReviewResolution
+                    key={`${dec.id}:${revision}`}
+                    candidate={dec}
+                    records={records}
+                    disabled={pending}
+                    onConfirm={action => review(dec.id, action)}
+                  />
+                )}
                 <button
                   disabled={pending || dec.version === undefined}
                   onClick={() => {

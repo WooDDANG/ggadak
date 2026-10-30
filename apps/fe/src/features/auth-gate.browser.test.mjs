@@ -29,12 +29,12 @@ import { createRoot } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthGate } from '../../src/features/AuthGate';
 import { CandidateHistory } from '../../src/features/review-queue/CandidateHistory';
-let loginCalls=0, restoreCalls=0, outage=false;
+let loginCalls=0, restoreCalls=0, outage=false, blockRestore=false, releaseRestore;
 let historyCalls=0;
 window.fetch=async input=>{
  const path=String(input);
  if(path.includes('/history')){historyCalls++;return Response.json({success:true,data:[]});}
- if(path.includes('/auth/session')){restoreCalls++;if(outage)return Response.json({message:'offline'},{status:503});return Response.json({success:true,data:{accessToken:'fixture-token',user:{id:'fixture-user'},guilds:[{id:'a',name:'A'},{id:'b',name:'B'}]}});}
+ if(path.includes('/auth/session')){restoreCalls++;if(blockRestore)await new Promise(resolve=>{releaseRestore=resolve;});if(outage)return Response.json({message:'offline'},{status:503});return Response.json({success:true,data:{accessToken:'fixture-token',user:{id:'fixture-user'},guilds:[{id:'a',name:'A'},{id:'b',name:'B'}]}});}
  if(path.includes('/auth/login')){loginCalls++;return Response.json({success:true,data:{accessToken:'fixture-token'}});}
  if(path.includes('/auth/logout'))return Response.json({success:true,data:null});
  throw new Error('Unexpected API request');
@@ -43,11 +43,21 @@ localStorage.setItem('ggaddak:server:fixture-user','b');
 const wait=async check=>{for(let i=0;i<150;i++){if(check())return;await new Promise(resolve=>setTimeout(resolve,20));}throw new Error('UI did not reach expected state');};
 const protectedView=()=>document.getElementById('protected');
 const queryClient=new QueryClient({defaultOptions:{queries:{retry:false}}});
-createRoot(document.getElementById('root')!).render(<React.StrictMode><QueryClientProvider client={queryClient}><AuthGate>{id=><p id="protected">{id}</p>}</AuthGate></QueryClientProvider></React.StrictMode>);
+createRoot(document.getElementById('root')!).render(<React.StrictMode><QueryClientProvider client={queryClient}><AuthGate>{id=><div id="protected"><input id="draft" defaultValue="" /><span>{id}</span></div>}</AuthGate></QueryClientProvider></React.StrictMode>);
 (async()=>{
  try{
   await wait(protectedView);
   if(loginCalls!==1||restoreCalls!==1||protectedView()?.textContent!=='b')throw new Error('Callback replay or wrong remembered server');
+  const original=protectedView();
+  document.getElementById('draft').value='작업 중인 입력';
+  queryClient.setQueryData(['preserved-cache'],{value:'keep'});
+  blockRestore=true;window.dispatchEvent(new Event('focus'));
+  await wait(()=>restoreCalls===2);
+  if(protectedView()!==original)throw new Error('Background session check unmounted the screen');
+  blockRestore=false;releaseRestore();
+  await new Promise(resolve=>setTimeout(resolve,100));
+  if(protectedView()!==original||document.getElementById('draft')?.value!=='작업 중인 입력')throw new Error('Session success discarded screen state');
+  if(!queryClient.getQueryData(['preserved-cache']))throw new Error('Session success cleared unchanged user cache');
   outage=true;window.dispatchEvent(new Event('focus'));
   await wait(()=>document.body.textContent?.includes('다시 연결'));
   if(protectedView())throw new Error('Server data remained accessible during outage');

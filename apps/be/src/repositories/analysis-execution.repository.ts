@@ -1,7 +1,7 @@
 import { AnalysisPolicy } from '@ggaddak/shared';
 import { randomUUID } from 'node:crypto';
 import type { PrismaClient } from '@prisma/client';
-import { AppError } from '../errors/AppError.js';
+import { AnalysisBusyError } from '../errors/analysis-error.js';
 import { AnalysisRequestError } from './analysis-request.repository.js';
 
 /** Shared by synchronous compatibility callers and durable workers, across BE processes. */
@@ -22,7 +22,7 @@ export class AnalysisExecutionRepository {
         where: { leaseUntil: { gt: now }, owner: { not: null } },
       });
       if (active.length >= max || active.some(s => s.channelId === channelId))
-        throw new AppError('Analysis capacity busy', 503);
+        throw new AnalysisBusyError();
       const slot = Array.from({ length: max }, (_, i) => String(i)).find(
         id => !active.some(s => s.id === id),
       )!;

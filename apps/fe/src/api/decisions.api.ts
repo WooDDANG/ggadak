@@ -31,6 +31,21 @@ function asDecision(item: V1DecisionDto): Decision {
 }
 
 export const decisionsApi = {
+  reviewPage: async (
+    guildId: string,
+    status: 'IN_REVIEW' | 'ON_HOLD',
+    page = 1,
+    signal?: AbortSignal,
+  ) => {
+    const data = unwrapApiResponse(
+      await listV1ReviewQueue({ guildId, status, page, size: 20 }, { signal }),
+    );
+    return { items: data.items.map(asDecision), pageInfo: data.pageInfo };
+  },
+  recordPage: async (params: ListV1DecisionsParams, signal?: AbortSignal) => {
+    const data = unwrapApiResponse(await listV1Decisions({ ...params, size: 20 }, { signal }));
+    return { items: data.items.map(asDecision), pageInfo: data.pageInfo };
+  },
   history: async (id: string, guildId: string) =>
     unwrapApiResponse(await getV1DecisionHistory(id, { guildId })),
   getReviewQueue: async (

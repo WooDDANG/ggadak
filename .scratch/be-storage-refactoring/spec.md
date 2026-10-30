@@ -1,6 +1,6 @@
 # BE 저장 모델 정리와 세션 병렬 처리
 
-Status: proposed — 티켓 분할 승인 대기
+Status: implemented — 로컬 구현·검증 기준. 운영 DB 적용·복원 검증과 실제 AGY 측정에 따른 운영 N 선정은 미완료. 변경 근거·검증 결과·남은 조건은 [구현 검증 기록](implementation-verification.md) 참조
 
 ## 목적
 
@@ -38,17 +38,17 @@ Bot 전송 상태와 BE 수신·분석 상태는 책임이 다르므로 유지�
 
 ## 티켓 초안
 
-1. [DB 스키마 불일치 사전 점검과 마이그레이션 검증](ticket-drafts/01-schema-readiness.md) — 선행 없음.
-2. [미사용·쓰기 전용 메타데이터 정리](ticket-drafts/02-unused-metadata.md) — 선행 없음.
-3. [External Feedback의 채널 중심 저장 계약 정리](ticket-drafts/03-feedback-storage.md) — 선행 없음.
-4. [Decision 기준 저장 형식과 검색용 파생값 계약 확립](ticket-drafts/04-decision-storage-expand.md) — 선행 없음.
-5. [레거시 Decision 이관과 조회 경로 전환](ticket-drafts/05-decision-storage-migrate.md) — 04 필요.
-6. [Decision의 이전 저장 형식과 중복 컬럼 제거](ticket-drafts/06-decision-storage-contract.md) — 05 필요.
-7. [후보 이력 관계 조회와 그래프 버전 조회 개선](ticket-drafts/07-candidate-history-queries.md) — 선행 없음.
-8. [결정·분석 이력의 참조 무결성 보장](ticket-drafts/08-reference-integrity.md) — 03, 07 필요.
-9. [분석 원본과 실행 체크포인트 분리](ticket-drafts/09-analysis-checkpoints.md) — 선행 없음.
-10. [서비스 전체 AI 호출 동시 실행 한도](ticket-drafts/10-global-ai-concurrency.md) — 선행 없음.
-11. [설정 가능한 N개 세션 병렬 처리](ticket-drafts/11-parallel-analysis-sessions.md) — 09, 10 필요.
-12. [병렬 수 N의 측정과 운영값 선정](ticket-drafts/12-concurrency-calibration.md) — 11 필요.
+1. [DB 스키마 불일치 사전 점검과 마이그레이션 검증](issues/01-schema-readiness.md) — 선행 없음.
+2. [미사용·쓰기 전용 메타데이터 정리](issues/02-unused-metadata.md) — 선행 없음.
+3. [External Feedback의 채널 중심 저장 계약 정리](issues/03-feedback-storage.md) — 선행 없음.
+4. [Decision 기준 저장 형식과 검색용 파생값 계약 확립](issues/04-decision-storage-expand.md) — 선행 없음.
+5. [레거시 Decision 이관과 조회 경로 전환](issues/05-decision-storage-migrate.md) — 04 필요.
+6. [Decision의 이전 저장 형식과 중복 컬럼 제거](issues/06-decision-storage-contract.md) — 05 필요.
+7. [후보 이력 관계 조회와 그래프 버전 조회 개선](issues/07-candidate-history-queries.md) — 선행 없음.
+8. [결정·분석 이력의 참조 무결성 보장](issues/08-reference-integrity.md) — 03, 07 필요.
+9. [분석 원본과 실행 체크포인트 분리](issues/09-analysis-checkpoints.md) — 선행 없음.
+10. [서비스 전체 AI 호출 동시 실행 한도](issues/10-global-ai-concurrency.md) — 선행 없음.
+11. [설정 가능한 N개 세션 병렬 처리](issues/11-parallel-analysis-sessions.md) — 09, 10 필요.
+12. [병렬 수 N의 측정과 운영값 선정](issues/12-concurrency-calibration.md) — 11 필요.
 
 01은 적용 환경의 준비 작업이며 다른 티켓의 격리 DB 구현을 막지 않는다. 독립 티켓의 마이그레이션 순서는 통합 시 직렬화하되 같은 스키마를 수정한다는 이유만으로 기능 의존성을 만들지 않는다. 게시 전 티켓 크기·의존성·추가 분할 여부를 확인한다.
