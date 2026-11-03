@@ -129,12 +129,14 @@ describe('BE Server & Ingestion API', () => {
 
     const postRes = await fetch(`http://localhost:${port}/api/feedbacks`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer fixture-service' },
       body: JSON.stringify(feedbackPayload),
     });
     expect(postRes.status).toBe(201);
 
-    const getRes = await fetch(`http://localhost:${port}/api/feedbacks?channelId=chan-feedback-1`);
+    const getRes = await fetch(`http://localhost:${port}/api/feedbacks?channelId=chan-feedback-1`, {
+      headers: { Authorization: 'Bearer fixture-service' },
+    });
     expect(getRes.status).toBe(200);
     const getData = (await getRes.json()) as any;
     expect(getData.feedbacks.length).toBe(1);

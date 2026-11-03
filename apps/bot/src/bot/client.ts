@@ -6,7 +6,7 @@ import {
   HarvestingPolicyConfig,
   SyncJobPolicy,
 } from '@ggaddak/shared';
-import { BotPolicy } from '../config.js';
+import { BotPolicy, guildMembersIntentEnabled } from '../config.js';
 import { SyncJobWorker } from '../services/sync-job-worker.js';
 import 'reflect-metadata';
 import { GatewayIntentBits, Partials, Message, Events } from 'discord.js';
@@ -18,6 +18,8 @@ import { DecisionHarvestingEngine } from '../services/decision-harvesting-engine
 import { MessageHandler, CONSENSUS_REGEX } from '../handlers/message.handler.js';
 import { ReactionHandler } from '../handlers/reaction.handler.js';
 import { registerEvents } from '../events/index.js';
+import { registerGuildAccessEvents } from '../events/guild-access.events.js';
+import { GuildAccessPublisher } from '../services/guild-access-publisher.js';
 import '../commands/feedback.command.js';
 import '../commands/scan.command.js';
 
@@ -41,6 +43,7 @@ export class DecisionTrackerBot {
 
   constructor(config: BotConfig) {
     const triggerEmoji = config.triggerEmoji || '📌';
+    const membersIntent = guildMembersIntentEnabled();
     this.backendApi = new BackendApiService(config.backendUrl);
     this.analysisService = new DiscussionHarvester(this.backendApi);
     this.engine = new DecisionHarvestingEngine(this.backendApi, this.analysisService);
@@ -62,10 +65,21 @@ export class DecisionTrackerBot {
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.GuildMessageReactions,
         GatewayIntentBits.MessageContent,
+        ...(membersIntent ? [GatewayIntentBits.GuildMembers] : []),
       ],
       partials: [Partials.Message, Partials.Channel, Partials.Reaction],
       silent: false,
     });
+
+    registerGuildAccessEvents(
+      this.client,
+      new GuildAccessPublisher({
+        backendUrl: config.backendUrl,
+        token: process.env.BOT_SERVICE_TOKEN,
+        isGatewayReady: () => this.client.isReady(),
+      }),
+      membersIntent,
+    );
 
     this.backendApi.observeDeliveries(async (payload, result, error) => {
       if (!payload.channelId || !payload.triggerMessageId) return;

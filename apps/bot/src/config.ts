@@ -8,6 +8,9 @@ export const BotPolicy = {
 export function backendUrl(env: NodeJS.ProcessEnv = process.env): string {
   return env.BE_URL || ServiceDefaults.backendUrl;
 }
+export function guildMembersIntentEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  return env.DISCORD_GUILD_MEMBERS_INTENT === 'true';
+}
 export function reviewWebUrl(env: NodeJS.ProcessEnv = process.env): string {
   return env.REVIEW_WEB_URL || env.WEB_URL || ServiceDefaults.webUrl;
 }

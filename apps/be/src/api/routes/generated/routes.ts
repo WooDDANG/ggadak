@@ -16,6 +16,8 @@ import { SearchController } from './../../controllers/search.controller.js';
 // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
 import { PolicyController } from './../../controllers/policy.controller.js';
 // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+import { GuildAccessController } from './../../controllers/guild-access.controller.js';
+// WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
 import { FeedbackController } from './../../controllers/feedback.controller.js';
 // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
 import { DiscussionController } from './../../controllers/discussion.controller.js';
@@ -552,6 +554,33 @@ const models: TsoaRoute.Models = {
         "additionalProperties": false,
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "ApiResponse__sequence-number--resetRequired_63_-boolean__": {
+        "dataType": "refObject",
+        "properties": {
+            "success": {"dataType":"boolean","required":true},
+            "code": {"dataType":"string","required":true},
+            "message": {"dataType":"string","required":true},
+            "data": {"dataType":"nestedObjectLiteral","nestedProperties":{"resetRequired":{"dataType":"boolean"},"sequence":{"dataType":"double","required":true}},"required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "GuildAccessEvent": {
+        "dataType": "refObject",
+        "properties": {
+            "streamId": {"dataType":"string","required":true},
+            "sequence": {"dataType":"double","required":true},
+            "kind": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["reset"]},{"dataType":"enum","enums":["heartbeat"]},{"dataType":"enum","enums":["disconnect"]},{"dataType":"enum","enums":["member_remove"]},{"dataType":"enum","enums":["member_change"]},{"dataType":"enum","enums":["member_join"]},{"dataType":"enum","enums":["guild_change"]},{"dataType":"enum","enums":["guild_available"]},{"dataType":"enum","enums":["guild_remove"]},{"dataType":"enum","enums":["guild_unavailable"]}],"required":true},
+            "guildId": {"dataType":"string"},
+            "userId": {"dataType":"string"},
+            "guildIds": {"dataType":"array","array":{"dataType":"string"}},
+            "unavailableGuildIds": {"dataType":"array","array":{"dataType":"string"}},
+            "membersIntent": {"dataType":"boolean"},
+            "connected": {"dataType":"boolean"},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "FeedbackSourceType": {
         "dataType": "refAlias",
         "type": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["교수"]},{"dataType":"enum","enums":["심사위원"]},{"dataType":"enum","enums":["팀원"]},{"dataType":"enum","enums":["인터뷰이"]}],"validators":{}},
@@ -819,6 +848,17 @@ const models: TsoaRoute.Models = {
             "code": {"dataType":"string","required":true},
             "message": {"dataType":"string","required":true},
             "data": {"ref":"AuthUserDto","required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "ApiResponse__accessToken-string--tokenType-string--expiresAt-string--userId-string__": {
+        "dataType": "refObject",
+        "properties": {
+            "success": {"dataType":"boolean","required":true},
+            "code": {"dataType":"string","required":true},
+            "message": {"dataType":"string","required":true},
+            "data": {"dataType":"nestedObjectLiteral","nestedProperties":{"userId":{"dataType":"string","required":true},"expiresAt":{"dataType":"string","required":true},"tokenType":{"dataType":"string","required":true},"accessToken":{"dataType":"string","required":true}},"required":true},
         },
         "additionalProperties": false,
     },
@@ -1824,11 +1864,48 @@ export function RegisterRoutes(app: Router) {
             }
         });
         // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+        const argsGuildAccessController_observe: Record<string, TsoaRoute.ParameterSchema> = {
+                body: {"in":"body","name":"body","required":true,"ref":"GuildAccessEvent"},
+        };
+        app.post('/api/v1/internal/guild-access/events',
+            authenticateMiddleware([{"service":[]}]),
+            ...(fetchMiddlewares<RequestHandler>(GuildAccessController)),
+            ...(fetchMiddlewares<RequestHandler>(GuildAccessController.prototype.observe)),
+
+            async function GuildAccessController_observe(request: ExRequest, response: ExResponse, next: any) {
+
+            // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+
+            let validatedArgs: any[] = [];
+            try {
+                validatedArgs = templateService.getValidatedArgs({ args: argsGuildAccessController_observe, request, response });
+
+                const container: IocContainer = typeof iocContainer === 'function' ? (iocContainer as IocContainerFactory)(request) : iocContainer;
+
+                const controller: any = await container.get<GuildAccessController>(GuildAccessController);
+                if (typeof controller['setStatus'] === 'function') {
+                controller.setStatus(undefined);
+                }
+
+              await templateService.apiHandler({
+                methodName: 'observe',
+                controller,
+                response,
+                next,
+                validatedArgs,
+                successStatus: undefined,
+              });
+            } catch (err) {
+                return next(err);
+            }
+        });
+        // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
         const argsFeedbackController_listFeedbacks: Record<string, TsoaRoute.ParameterSchema> = {
                 channelId: {"in":"query","name":"channelId","dataType":"string"},
                 limit: {"in":"query","name":"limit","dataType":"double"},
         };
         app.get('/api/feedbacks',
+            authenticateMiddleware([{"service":[]}]),
             ...(fetchMiddlewares<RequestHandler>(FeedbackController)),
             ...(fetchMiddlewares<RequestHandler>(FeedbackController.prototype.listFeedbacks)),
 
@@ -1864,6 +1941,7 @@ export function RegisterRoutes(app: Router) {
                 body: {"in":"body","name":"body","required":true,"ref":"CreateFeedbackDto"},
         };
         app.post('/api/feedbacks',
+            authenticateMiddleware([{"service":[]}]),
             ...(fetchMiddlewares<RequestHandler>(FeedbackController)),
             ...(fetchMiddlewares<RequestHandler>(FeedbackController.prototype.createFeedback)),
 
@@ -2356,6 +2434,41 @@ export function RegisterRoutes(app: Router) {
 
               await templateService.apiHandler({
                 methodName: 'getCurrentUser',
+                controller,
+                response,
+                next,
+                validatedArgs,
+                successStatus: undefined,
+              });
+            } catch (err) {
+                return next(err);
+            }
+        });
+        // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+        const argsAuthController_renewBrowserToken: Record<string, TsoaRoute.ParameterSchema> = {
+                request: {"in":"request","name":"request","required":true,"dataType":"object"},
+        };
+        app.post('/api/v1/auth/token',
+            ...(fetchMiddlewares<RequestHandler>(AuthController)),
+            ...(fetchMiddlewares<RequestHandler>(AuthController.prototype.renewBrowserToken)),
+
+            async function AuthController_renewBrowserToken(request: ExRequest, response: ExResponse, next: any) {
+
+            // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+
+            let validatedArgs: any[] = [];
+            try {
+                validatedArgs = templateService.getValidatedArgs({ args: argsAuthController_renewBrowserToken, request, response });
+
+                const container: IocContainer = typeof iocContainer === 'function' ? (iocContainer as IocContainerFactory)(request) : iocContainer;
+
+                const controller: any = await container.get<AuthController>(AuthController);
+                if (typeof controller['setStatus'] === 'function') {
+                controller.setStatus(undefined);
+                }
+
+              await templateService.apiHandler({
+                methodName: 'renewBrowserToken',
                 controller,
                 response,
                 next,

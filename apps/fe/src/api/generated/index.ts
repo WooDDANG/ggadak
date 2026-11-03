@@ -29,6 +29,7 @@ import type {
   ApiResponseAccessTokenStringTokenTypeStringExpiresAtString,
   ApiResponseAccessTokenStringTokenTypeStringExpiresAtStringUserAuthUserDto,
   ApiResponseAccessTokenStringTokenTypeStringExpiresAtStringUserAuthUserDtoGuildsDiscordGuildArray,
+  ApiResponseAccessTokenStringTokenTypeStringExpiresAtStringUserIdString,
   ApiResponseAnalysisDeliveryQueueDto,
   ApiResponseAnalysisRetryCommandDto,
   ApiResponseAnalysisRetryCommandDtoArray,
@@ -50,6 +51,7 @@ import type {
   ApiResponseScanSealDto,
   ApiResponseScanStatusDto,
   ApiResponseSearchResponse,
+  ApiResponseSequenceNumberResetRequired63Boolean,
   ApiResponseSyncJobClaimDtoOrNull,
   ApiResponseSyncJobView,
   ApiResponseUrlString,
@@ -73,6 +75,7 @@ import type {
   GetV1DecisionHistoryParams,
   GetV1DecisionParams,
   GraphParams,
+  GuildAccessEvent,
   HarvestingPolicyDto,
   ListAnalysisDeliveriesParams,
   ListDiscordChannelsParams,
@@ -1632,6 +1635,100 @@ export function useGet2<TData = Awaited<ReturnType<typeof get2>>, TError = unkno
 
 
 
+
+export type observeResponse200 = {
+  data: ApiResponseSequenceNumberResetRequired63Boolean
+  status: 200
+}
+
+export type observeResponseSuccess = (observeResponse200) & {
+  headers: Headers;
+};
+;
+
+export type observeResponse = (observeResponseSuccess)
+
+export const getObserveUrl = () => {
+
+
+
+
+  return `/api/v1/internal/guild-access/events`
+}
+
+export const observe = async (guildAccessEvent: GuildAccessEvent, options?: Parameters<typeof authenticatedClient>[1]): Promise<observeResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return authenticatedClient<observeResponse>(getObserveUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(guildAccessEvent)
+  }
+);}
+
+
+
+
+
+export const getObserveMutationKey = () => ['observe'] as const;
+
+export const getObserveMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof observe>>, TError,ObserveMutationVariables, TContext>, request?: SecondParameter<typeof authenticatedClient>}
+): UseMutationOptions<Awaited<ReturnType<typeof observe>>, TError,ObserveMutationVariables, TContext> => {
+
+const mutationKey = getObserveMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof observe>>, ObserveMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  observe(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ObserveMutationResult = NonNullable<Awaited<ReturnType<typeof observe>>>
+    export type ObserveMutationBody = GuildAccessEvent
+    export type ObserveMutationError = unknown
+    export type ObserveMutationVariables = {data: GuildAccessEvent}
+
+    export const useObserve = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof observe>>, TError,ObserveMutationVariables, TContext>, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof observe>>,
+        TError,
+        ObserveMutationVariables,
+        TContext
+      > => {
+      return useMutation(getObserveMutationOptions(options), queryClient);
+    }
 
 export type listFeedbacksResponse200 = {
   data: FeedbackListResponseDto
@@ -3206,6 +3303,86 @@ export function useGetCurrentUser<TData = Awaited<ReturnType<typeof getCurrentUs
 
 
 
+
+export type renewBrowserTokenResponse200 = {
+  data: ApiResponseAccessTokenStringTokenTypeStringExpiresAtStringUserIdString
+  status: 200
+}
+
+export type renewBrowserTokenResponseSuccess = (renewBrowserTokenResponse200) & {
+  headers: Headers;
+};
+;
+
+export type renewBrowserTokenResponse = (renewBrowserTokenResponseSuccess)
+
+export const getRenewBrowserTokenUrl = () => {
+
+
+
+
+  return `/api/v1/auth/token`
+}
+
+export const renewBrowserToken = async ( options?: Parameters<typeof authenticatedClient>[1]): Promise<renewBrowserTokenResponse> => {
+
+  return authenticatedClient<renewBrowserTokenResponse>(getRenewBrowserTokenUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getRenewBrowserTokenMutationKey = () => ['renewBrowserToken'] as const;
+
+export const getRenewBrowserTokenMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof renewBrowserToken>>, TError,void, TContext>, request?: SecondParameter<typeof authenticatedClient>}
+): UseMutationOptions<Awaited<ReturnType<typeof renewBrowserToken>>, TError,void, TContext> => {
+
+const mutationKey = getRenewBrowserTokenMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof renewBrowserToken>>, void> = () => {
+
+
+          return  renewBrowserToken(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RenewBrowserTokenMutationResult = NonNullable<Awaited<ReturnType<typeof renewBrowserToken>>>
+
+    export type RenewBrowserTokenMutationError = unknown
+
+
+    export const useRenewBrowserToken = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof renewBrowserToken>>, TError,void, TContext>, request?: SecondParameter<typeof authenticatedClient>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof renewBrowserToken>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getRenewBrowserTokenMutationOptions(options), queryClient);
+    }
 
 export type listAuthGuildsResponse200 = {
   data: ApiResponseGuildsDiscordGuildArray

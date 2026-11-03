@@ -1,10 +1,13 @@
-import { restoreBrowserSession, loginDiscord } from './generated';
+import { restoreBrowserSession, loginDiscord, renewBrowserToken } from './generated';
 import { unwrapApiResponse } from './api-response';
 import { ApiHttpError } from './transport';
 import { getSessionEpoch } from './session';
 import type { DiscordGuild } from './generated/model';
 
 let restoring: { epoch: number; promise: ReturnType<typeof restore> } | undefined;
+export async function renewBrowserAccessToken() {
+  return unwrapApiResponse(await renewBrowserToken());
+}
 async function restore() {
   return unwrapApiResponse(await restoreBrowserSession());
 }

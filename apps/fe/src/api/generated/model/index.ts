@@ -691,6 +691,49 @@ export interface HarvestingPolicyDto {
   lookbackDays: number;
 }
 
+export type ApiResponseSequenceNumberResetRequired63BooleanData = {
+  resetRequired?: boolean;
+  sequence: number;
+};
+
+/**
+ * Shared v1 response contract. Domain payloads remain typed by each endpoint.
+ */
+export interface ApiResponseSequenceNumberResetRequired63Boolean {
+  success: boolean;
+  code: string;
+  message: string;
+  data: ApiResponseSequenceNumberResetRequired63BooleanData;
+}
+
+export type GuildAccessEventKind = typeof GuildAccessEventKind[keyof typeof GuildAccessEventKind];
+
+
+export const GuildAccessEventKind = {
+  reset: 'reset',
+  heartbeat: 'heartbeat',
+  disconnect: 'disconnect',
+  member_remove: 'member_remove',
+  member_change: 'member_change',
+  member_join: 'member_join',
+  guild_change: 'guild_change',
+  guild_available: 'guild_available',
+  guild_remove: 'guild_remove',
+  guild_unavailable: 'guild_unavailable',
+} as const;
+
+export interface GuildAccessEvent {
+  streamId: string;
+  sequence: number;
+  kind: GuildAccessEventKind;
+  guildId?: string;
+  userId?: string;
+  guildIds?: string[];
+  unavailableGuildIds?: string[];
+  membersIntent?: boolean;
+  connected?: boolean;
+}
+
 export type FeedbackSourceType = typeof FeedbackSourceType[keyof typeof FeedbackSourceType];
 
 
@@ -965,6 +1008,23 @@ export interface ApiResponseAuthUserDto {
   code: string;
   message: string;
   data: AuthUserDto;
+}
+
+export type ApiResponseAccessTokenStringTokenTypeStringExpiresAtStringUserIdStringData = {
+  userId: string;
+  expiresAt: string;
+  tokenType: string;
+  accessToken: string;
+};
+
+/**
+ * Shared v1 response contract. Domain payloads remain typed by each endpoint.
+ */
+export interface ApiResponseAccessTokenStringTokenTypeStringExpiresAtStringUserIdString {
+  success: boolean;
+  code: string;
+  message: string;
+  data: ApiResponseAccessTokenStringTokenTypeStringExpiresAtStringUserIdStringData;
 }
 
 export type ApiResponseGuildsDiscordGuildArrayData = {
@@ -1596,3 +1656,4 @@ export type RetryAnalysisRequestBody = {
 export type SynchronizeBody = {
   requests: AnalysisDeliveryStatusDto[];
 };
+

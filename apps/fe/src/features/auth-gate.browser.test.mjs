@@ -29,14 +29,32 @@ import { createRoot } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthGate } from '../../src/features/AuthGate';
 import { CandidateHistory } from '../../src/features/review-queue/CandidateHistory';
+import { authorizedFetch } from '../../src/api/transport';
 let loginCalls=0, restoreCalls=0, outage=false, blockRestore=false, releaseRestore;
-let historyCalls=0;
-window.fetch=async input=>{
+let historyCalls=0,tokenCalls=0,dataCalls=0,mutationCalls=0,expireNext=false,permissionOutage=false;
+let sessionUser='fixture-user',availableGuilds=[{id:'a',name:'A'},{id:'b',name:'B'}];
+const intervalCallbacks=new Map<number,{callback:()=>void,delay:number,next:number}>();
+let fakeNow=0,nextInterval=100000;
+const realSetInterval=window.setInterval.bind(window),realClearInterval=window.clearInterval.bind(window);
+window.setInterval=((callback:()=>void,delay:number,...args:unknown[])=>{
+ if(delay<60000)return realSetInterval(callback,delay,...args);
+ const id=nextInterval++;intervalCallbacks.set(id,{callback,delay,next:fakeNow+delay});return id;
+}) as typeof window.setInterval;
+window.clearInterval=(id:number)=>{intervalCallbacks.delete(id);realClearInterval(id);};
+const advanceIdleTime=(duration:number)=>{
+ const end=fakeNow+duration;
+ for(const timer of intervalCallbacks.values())while(timer.next<=end){timer.callback();timer.next+=timer.delay;}
+ fakeNow=end;
+};
+window.fetch=async (input,options)=>{
  const path=String(input);
  if(path.includes('/history')){historyCalls++;return Response.json({success:true,data:[]});}
- if(path.includes('/auth/session')){restoreCalls++;if(blockRestore)await new Promise(resolve=>{releaseRestore=resolve;});if(outage)return Response.json({message:'offline'},{status:503});return Response.json({success:true,data:{accessToken:'fixture-token',user:{id:'fixture-user'},guilds:[{id:'a',name:'A'},{id:'b',name:'B'}]}});}
+ if(path.includes('/auth/token')){tokenCalls++;return Response.json({success:true,data:{accessToken:'renewed-token',userId:sessionUser,tokenType:'Bearer',expiresAt:'2026-11-03T12:00:00Z'}});}
+ if(path.includes('/auth/session')){restoreCalls++;if(blockRestore)await new Promise(resolve=>{releaseRestore=resolve;});if(outage)return Response.json({message:'offline'},{status:503});return Response.json({success:true,data:{accessToken:'fixture-token',user:{id:sessionUser},guilds:availableGuilds}});}
  if(path.includes('/auth/login')){loginCalls++;return Response.json({success:true,data:{accessToken:'fixture-token'}});}
  if(path.includes('/auth/logout'))return Response.json({success:true,data:null});
+ if(path.includes('/decisions/DEC-1')){mutationCalls++;return Response.json({code:'GUILD_ACCESS_DENIED',message:'Guild access denied'},{status:403});}
+ if(path.includes('/decisions?')){dataCalls++;if(permissionOutage)return Response.json({code:'GUILD_ACCESS_UNAVAILABLE',message:'Permission provider unavailable'},{status:502});if(expireNext){expireNext=false;return Response.json({message:'expired'},{status:401});}return Response.json({success:true,data:[]});}
  throw new Error('Unexpected API request');
 };
 localStorage.setItem('ggaddak:server:fixture-user','b');
@@ -48,6 +66,13 @@ createRoot(document.getElementById('root')!).render(<React.StrictMode><QueryClie
  try{
   await wait(protectedView);
   if(loginCalls!==1||restoreCalls!==1||protectedView()?.textContent!=='b')throw new Error('Callback replay or wrong remembered server');
+  await new Promise(resolve=>setTimeout(resolve,20));
+  advanceIdleTime(30*60*1000);
+  await new Promise(resolve=>setTimeout(resolve,50));
+  if(restoreCalls!==1)throw new Error('Idle app refreshed Discord permissions on a fixed interval');
+  expireNext=true;
+  if((await authorizedFetch('/api/v1/decisions?guildId=b')).status!==200)throw new Error('Expired JWT was not recovered');
+  if(tokenCalls!==1||restoreCalls!==1||dataCalls!==2)throw new Error('JWT recovery refreshed guild permissions');
   const original=protectedView();
   document.getElementById('draft').value='작업 중인 입력';
   queryClient.setQueryData(['preserved-cache'],{value:'keep'});
@@ -58,10 +83,29 @@ createRoot(document.getElementById('root')!).render(<React.StrictMode><QueryClie
   await new Promise(resolve=>setTimeout(resolve,100));
   if(protectedView()!==original||document.getElementById('draft')?.value!=='작업 중인 입력')throw new Error('Session success discarded screen state');
   if(!queryClient.getQueryData(['preserved-cache']))throw new Error('Session success cleared unchanged user cache');
-  outage=true;window.dispatchEvent(new Event('focus'));
+  queryClient.setQueryData(['decisions','b'],['private-server-b']);
+  availableGuilds=[{id:'a',name:'A'}];blockRestore=true;
+  const denied=authorizedFetch('/api/v1/decisions/DEC-1?guildId=b',{method:'PUT',body:JSON.stringify({expectedVersion:1,title:'Denied edit'})});
+  await wait(()=>restoreCalls===3);
+  await wait(()=>!protectedView());
+  if(queryClient.getQueryData(['decisions','b']))throw new Error('Denied server cache survived permission recovery');
+  blockRestore=false;releaseRestore();
+  if((await denied).status!==403)throw new Error('Original denied mutation lost its result');
+  await wait(()=>protectedView()?.textContent==='a');
+  if(mutationCalls!==1)throw new Error('Denied mutation was replayed');
+  queryClient.setQueryData(['old-user-cache'],['private-user-data']);
+  sessionUser='other-user';expireNext=true;
+  const beforeSwitchCalls=dataCalls;
+  let switched=false;
+  try{await authorizedFetch('/api/v1/decisions?guildId=a');}catch(error){switched=(error as {status:number}).status===409;}
+  if(!switched||dataCalls!==beforeSwitchCalls+1)throw new Error('Old request was replayed under changed cookie identity');
+  await wait(protectedView);
+  if(queryClient.getQueryData(['old-user-cache']))throw new Error('Changed cookie identity retained previous user cache');
+  outage=true;permissionOutage=true;
+  try{await authorizedFetch('/api/v1/decisions?guildId=a');throw new Error('Permission outage was ignored');}catch(error){if((error as {status:number}).status!==503)throw error;}
   await wait(()=>document.body.textContent?.includes('다시 연결'));
   if(protectedView())throw new Error('Server data remained accessible during outage');
-  outage=false;Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='다시 연결')!.click();
+  outage=false;permissionOutage=false;Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='다시 연결')!.click();
   await wait(protectedView);
   window.dispatchEvent(new StorageEvent('storage',{key:'ggaddak:auth-event',newValue:JSON.stringify({action:'logout'})}));
   await wait(()=>document.body.textContent?.includes('Discord로 로그인'));

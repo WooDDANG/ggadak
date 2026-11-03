@@ -2,7 +2,12 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { authorizeDiscord, logoutSession } from '../api/generated';
 import type { DiscordGuild } from '../api/generated/model';
-import { setAccessToken, setSessionRecovery, invalidateSession } from '../api/session';
+import {
+  setAccessToken,
+  setSessionRecovery,
+  setPermissionRecovery,
+  invalidateSession,
+} from '../api/session';
 import {
   broadcastSessionChange,
   chooseServer,
@@ -11,6 +16,7 @@ import {
   observeSessionChanges,
   rememberServer,
   restoreBrowserLogin,
+  renewBrowserAccessToken,
 } from '../api/browser-session';
 
 type Phase = 'loading' | 'signed-out' | 'ready' | 'reconnecting';
@@ -24,10 +30,12 @@ export function AuthGate({ children }: { children: (guildId: string) => React.Re
   const revision = useRef(0);
   const currentUser = useRef('');
   const currentGuild = useRef('');
+  const currentPermissions = useRef('');
   const clear = useCallback(() => {
     revision.current++;
     currentUser.current = '';
     currentGuild.current = '';
+    currentPermissions.current = '';
     invalidateSession();
     setGuilds([]);
     setGuildId('');
@@ -37,20 +45,27 @@ export function AuthGate({ children }: { children: (guildId: string) => React.Re
     queryClient.clear();
   }, [queryClient]);
   const restore = useCallback(
-    async (code?: string, state?: string) => {
+    async (code?: string, state?: string, permissionsChanged = false) => {
       const attempt = ++revision.current;
-      const background = !code && currentUser.current !== '';
+      const background = !code && currentUser.current !== '' && !permissionsChanged;
       setError('');
       if (!background) {
+        if (permissionsChanged) invalidateSession();
         setPhase('loading');
         setAccessToken('');
         await queryClient.cancelQueries();
+        if (permissionsChanged) queryClient.clear();
       }
       try {
         const session =
           code && state ? await finishDiscordLogin(code, state) : await restoreBrowserLogin();
         if (attempt !== revision.current) return;
-        if (currentUser.current !== session.user.id) {
+        const permissions = JSON.stringify(
+          session.guilds
+            .map(guild => [guild.id, guild.owner, guild.permissions])
+            .sort((left, right) => String(left[0]).localeCompare(String(right[0]))),
+        );
+        if (currentUser.current !== session.user.id || currentPermissions.current !== permissions) {
           invalidateSession();
           await queryClient.cancelQueries();
           if (attempt !== revision.current) return;
@@ -63,6 +78,7 @@ export function AuthGate({ children }: { children: (guildId: string) => React.Re
         );
         currentUser.current = session.user.id;
         currentGuild.current = selected;
+        currentPermissions.current = permissions;
         setAccessToken(session.accessToken);
         setUserId(session.user.id);
         setGuilds(session.guilds);
@@ -74,8 +90,10 @@ export function AuthGate({ children }: { children: (guildId: string) => React.Re
         if (attempt !== revision.current) return;
         if (isExpiredSession(failure)) clear();
         else {
-          setAccessToken('');
+          invalidateSession();
           setPhase('reconnecting');
+          void queryClient.cancelQueries();
+          queryClient.clear();
         }
         setError(
           isExpiredSession(failure) && !code
@@ -114,28 +132,48 @@ export function AuthGate({ children }: { children: (guildId: string) => React.Re
         void restore().catch(() => {});
       }
     });
-    setSessionRecovery(() => restore());
+    setSessionRecovery(async () => {
+      const attempt = revision.current;
+      try {
+        const token = await renewBrowserAccessToken();
+        if (attempt !== revision.current) return;
+        if (token.userId !== currentUser.current) {
+          clear();
+          await restore();
+          return;
+        }
+        setAccessToken(token.accessToken);
+      } catch (failure) {
+        if (attempt !== revision.current) return;
+        if (isExpiredSession(failure)) clear();
+        else {
+          invalidateSession();
+          setPhase('reconnecting');
+          void queryClient.cancelQueries();
+          queryClient.clear();
+          setError(
+            failure instanceof Error ? failure.message : '로그인 상태를 확인하지 못했습니다.',
+          );
+        }
+        throw failure;
+      }
+    });
+    setPermissionRecovery(() => restore(undefined, undefined, true));
     return () => {
       revision.current++;
       setSessionRecovery();
+      setPermissionRecovery();
       stop();
       window.removeEventListener('ggaddak:logout', onLogout);
     };
-  }, [clear, restore]);
+  }, [clear, queryClient, restore]);
   useEffect(() => {
     if (phase !== 'ready') return;
-    const timer = window.setInterval(
-      () => {
-        void restore().catch(() => {});
-      },
-      10 * 60 * 1000,
-    );
     const onFocus = () => {
       void restore().catch(() => {});
     };
     window.addEventListener('focus', onFocus);
     return () => {
-      window.clearInterval(timer);
       window.removeEventListener('focus', onFocus);
     };
   }, [phase, restore]);

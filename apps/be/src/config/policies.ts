@@ -1,6 +1,7 @@
 import { DurationMs } from '@ggaddak/shared';
 
 export const AuthPolicy = {
+  accessTokenTtlMs: 15 * DurationMs.Minute,
   oauthStateTtlMs: 5 * DurationMs.Minute,
   refreshWaitMs: 35_000,
   refreshLeaseMs: 45_000,

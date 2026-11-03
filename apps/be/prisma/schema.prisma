@@ -163,6 +163,7 @@ model CandidateAnalysis {
 }
 
 model User {
+  guildsDirty Boolean       @default(false)
   id          String        @id
   username    String
   avatar      String?
@@ -180,13 +181,14 @@ model Guild {
 }
 
 model Membership {
-  userId      String
-  guildId     String
-  owner       Boolean  @default(false)
-  permissions String   @default("0")
-  refreshedAt DateTime
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  guild       Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  guildRevision Int      @default(-1)
+  userId        String
+  guildId       String
+  owner         Boolean  @default(false)
+  permissions   String   @default("0")
+  refreshedAt   DateTime
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  guild         Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
 
   @@id([userId, guildId])
 }
@@ -209,6 +211,30 @@ model AuthSession {
 model OAuthState {
   nonce     String   @id
   expiresAt DateTime
+}
+
+model GuildAccessControl {
+  id            String    @id
+  revision      Int       @default(0)
+  streamId      String?
+  lastSequence  Int       @default(0)
+  connected     Boolean   @default(false)
+  membersIntent Boolean   @default(false)
+  leaseUntil    DateTime?
+}
+
+model GuildAccessObservation {
+  guildId   String  @id
+  revision  Int     @default(0)
+  installed String  @default("unknown")
+  available Boolean @default(false)
+}
+
+model GuildAccessRemoval {
+  guildId String
+  userId  String
+
+  @@id([guildId, userId])
 }
 
 model DecisionEdit {

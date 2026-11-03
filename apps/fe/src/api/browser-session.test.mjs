@@ -202,3 +202,132 @@ test('a request started by a previous login is not replayed under a new user', a
     globalThis.fetch = previousFetch;
   }
 });
+
+test('an expired API JWT is renewed with the browser cookie without refreshing guild permissions', async () => {
+  const browser = await import(browserUrl),
+    session = await import(sessionUrl),
+    transport = await import(transportUrl);
+  const previousFetch = globalThis.fetch;
+  const requests = [];
+  session.setAccessToken('expired');
+  session.setSessionRecovery(async () => {
+    const renewed = await browser.renewBrowserAccessToken();
+    session.setAccessToken(renewed.accessToken);
+  });
+  globalThis.fetch = async (url, options) => {
+    requests.push({ url, options });
+    if (url === '/api/v1/auth/token') {
+      assert.equal(options.method, 'POST');
+      assert.equal(options.credentials, 'include');
+      return Response.json({
+        success: true,
+        data: { accessToken: 'renewed-without-discord', userId: 'fixture-user', tokenType: 'Bearer', expiresAt: '2026-11-03T12:00:00Z' },
+      });
+    }
+    assert.equal(url, '/api/v1/decisions?guildId=a');
+    if (requests.length === 1) return Response.json({ message: 'expired' }, { status: 401 });
+    assert.equal(options.headers.get('Authorization'), 'Bearer renewed-without-discord');
+    return Response.json({ success: true, data: [] });
+  };
+  try {
+    assert.equal((await transport.authorizedFetch('/api/v1/decisions?guildId=a')).status, 200);
+    assert.deepEqual(requests.map(request => request.url), [
+      '/api/v1/decisions?guildId=a',
+      '/api/v1/auth/token',
+      '/api/v1/decisions?guildId=a',
+    ]);
+  } finally {
+    session.setSessionRecovery();
+    session.setAccessToken('');
+    globalThis.fetch = previousFetch;
+  }
+});
+
+test('a rejected server mutation restores permissions without replaying the mutation or logging out', async () => {
+  const session = await import(sessionUrl),
+    transport = await import(transportUrl);
+  const previousFetch = globalThis.fetch,
+    previousWindow = globalThis.window;
+  const requests = [], events = [];
+  let recoveries = 0;
+  session.setAccessToken('valid-jwt');
+  session.setPermissionRecovery(async () => {
+    recoveries++;
+  });
+  globalThis.window = { dispatchEvent: event => events.push(event.type) };
+  globalThis.fetch = async (url, options) => {
+    requests.push({ url, options });
+    return Response.json({ code: 'GUILD_ACCESS_DENIED', message: 'Guild access denied' }, { status: 403 });
+  };
+  try {
+    const response = await transport.authorizedFetch('/api/v1/decisions/DEC-1?guildId=a', {
+      method: 'PUT',
+      body: JSON.stringify({ expectedVersion: 1, title: 'Changed title' }),
+    });
+    assert.equal(response.status, 403);
+    assert.equal(requests.length, 1);
+    assert.equal(recoveries, 1);
+    assert.deepEqual(events, []);
+    assert.equal(session.getAccessToken(), 'valid-jwt');
+  } finally {
+    session.setPermissionRecovery();
+    session.setAccessToken('');
+    globalThis.fetch = previousFetch;
+    globalThis.window = previousWindow;
+  }
+});
+
+test('a permission restoration outage does not recursively restore or broadcast logout', async () => {
+  const browser = await import(browserUrl),
+    session = await import(sessionUrl),
+    transport = await import(transportUrl);
+  const previousFetch = globalThis.fetch,
+    previousWindow = globalThis.window;
+  const requests = [], events = [];
+  session.setAccessToken('valid-jwt');
+  session.setPermissionRecovery(async () => {
+    await browser.restoreBrowserLogin();
+  });
+  globalThis.window = { dispatchEvent: event => events.push(event.type) };
+  globalThis.fetch = async url => {
+    requests.push(url);
+    return Response.json({ code: 'GUILD_ACCESS_UNAVAILABLE', message: 'Permission verification unavailable' }, { status: 502 });
+  };
+  try {
+    await assert.rejects(
+      transport.authorizedFetch('/api/v1/search?guildId=a&query=database'),
+      error => error.status === 502,
+    );
+    assert.deepEqual(requests, [
+      '/api/v1/search?guildId=a&query=database',
+      '/api/v1/auth/session',
+    ]);
+    assert.deepEqual(events, []);
+  } finally {
+    session.setPermissionRecovery();
+    session.setAccessToken('');
+    globalThis.fetch = previousFetch;
+    globalThis.window = previousWindow;
+  }
+});
+
+test('an unrelated search provider failure does not refresh permissions or remount the server view', async () => {
+  const session = await import(sessionUrl),
+    transport = await import(transportUrl);
+  const previousFetch = globalThis.fetch;
+  let recoveries = 0;
+  session.setPermissionRecovery(async () => {
+    recoveries++;
+  });
+  globalThis.fetch = async () => Response.json(
+    { code: 'SERVICE_UNAVAILABLE', message: 'Embedding provider unavailable' },
+    { status: 503 },
+  );
+  try {
+    assert.equal((await transport.authorizedFetch('/api/v1/search?guildId=a&query=database')).status, 503);
+    assert.equal(recoveries, 0);
+  } finally {
+    session.setPermissionRecovery();
+    globalThis.fetch = previousFetch;
+  }
+});

@@ -28,14 +28,14 @@ export class FakeDiscordAuth implements DiscordAuthAdapter {
 export function fakeAuthOptions(adapter = new FakeDiscordAuth(), now?: () => number): AuthOptions {
   return { config: testAuthConfig, discordAdapter: adapter, now };
 }
-export async function loginAsTestUser(baseUrl: string) {
+export async function loginAsTestUser(baseUrl: string, code = 'valid-code') {
   const start = await fetch(`${baseUrl}/api/v1/auth/authorize`);
   const cookie = start.headers.get('set-cookie')!.split(';')[0];
   const state = new URL(((await start.json()) as any).data.url).searchParams.get('state');
   const response = await fetch(`${baseUrl}/api/v1/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Cookie: cookie },
-    body: JSON.stringify({ code: 'valid-code', state }),
+    body: JSON.stringify({ code, state }),
   });
   if (response.status !== 200) throw new Error(`Test login failed: ${response.status}`);
   return { token: ((await response.json()) as any).data.accessToken as string, cookie, state };

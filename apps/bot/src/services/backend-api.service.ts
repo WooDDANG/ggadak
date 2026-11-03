@@ -1123,8 +1123,12 @@ export class BackendApiService {
   }): Promise<boolean> {
     const res = await this.transport(`${this.backendUrl}/api/feedbacks`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(this.serviceToken ? { Authorization: `Bearer ${this.serviceToken}` } : {}),
+      },
       body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(DeliveryPolicy.serviceTimeoutMs),
     });
     return res.ok;
   }

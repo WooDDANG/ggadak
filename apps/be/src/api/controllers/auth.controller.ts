@@ -42,9 +42,7 @@ export class AuthController extends Controller {
     return apiSuccess(result);
   }
   @Post('session')
-  async restoreBrowserSession(
-    @Request() request: ExpressRequest,
-  ): Promise<
+  async restoreBrowserSession(@Request() request: ExpressRequest): Promise<
     ApiResponse<{
       accessToken: string;
       tokenType: string;
@@ -61,6 +59,16 @@ export class AuthController extends Controller {
   @Get('me')
   async getCurrentUser(@Request() request: ExpressRequest): Promise<ApiResponse<AuthUserDto>> {
     return apiSuccess(await this.auth.me(requirePrincipal(request)));
+  }
+  @Post('token')
+  async renewBrowserToken(
+    @Request() request: ExpressRequest,
+  ): Promise<
+    ApiResponse<{ accessToken: string; tokenType: string; expiresAt: string; userId: string }>
+  > {
+    this.setHeader('Cache-Control', 'no-store');
+    this.auth.requireBrowserOrigin(request.headers.origin);
+    return apiSuccess(await this.auth.renewBrowser(request.headers.cookie));
   }
   @Security('jwt')
   @Get('guilds')

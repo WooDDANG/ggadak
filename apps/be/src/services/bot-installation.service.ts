@@ -1,10 +1,12 @@
 import { Service } from 'typedi';
 import { DiscordBotInstallationAdapter } from '../adapters/discord-bot-installation.adapter.js';
 import { BotInstallationStatusDto } from '../dto/bot-installation.dto.js';
+import type { GuildAccessService } from './guild-access.service.js';
 
 export interface BotInstallationServiceOptions {
   clientId?: string;
   now?: () => number;
+  guildAccess?: GuildAccessService;
 }
 
 @Service()
@@ -16,7 +18,9 @@ export class BotInstallationService {
 
   async getStatus(guildId: string, canManage: boolean): Promise<BotInstallationStatusDto> {
     const checkedAt = new Date((this.options.now ?? Date.now)()).toISOString();
-    const status = await this.adapter.observeBotMembership(guildId);
+    const status =
+      (await this.options.guildAccess?.installation(guildId)) ??
+      (await this.adapter.observeBotMembership(guildId));
 
     let installUrl: string | null = null;
     if (status === 'not_installed' && canManage) {

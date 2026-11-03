@@ -1,10 +1,11 @@
-import { Controller, Route, Tags, Get, Post, Body, Query, SuccessResponse } from 'tsoa';
+import { Controller, Route, Tags, Get, Post, Body, Query, Security, SuccessResponse } from 'tsoa';
 import { Service } from 'typedi';
 import { FeedbackService } from '../../services/feedback.service.js';
 import { CreateFeedbackDto, FeedbackListResponseDto } from '../../dto/feedback.dto.js';
 
 @Tags('Feedbacks')
 @Route('api/feedbacks')
+@Security('service')
 @Service()
 export class FeedbackController extends Controller {
   constructor(private service: FeedbackService) {

@@ -42,6 +42,8 @@ import { initExpress } from './express.js';
 import { initPrisma } from './prisma.js';
 import { appLogger } from './logger.js';
 import { assertStorageReady } from '../repositories/storage-readiness.js';
+import { GuildAccessService } from '../services/guild-access.service.js';
+import { GuildAccessController } from '../api/controllers/guild-access.controller.js';
 
 export interface LoaderOptions {
   expressApp: Express;
@@ -88,7 +90,11 @@ export async function initLoaders({
   const aiAdapter = customAiAdapter || Container.get(AiAdapter);
   container.set(AiAdapter, aiAdapter);
 
-  const authService = new AuthService(prisma, authOptions);
+  const guildAccess = new GuildAccessService(prisma, authOptions?.now);
+  await guildAccess.initialize();
+  container.set(GuildAccessService, guildAccess);
+  container.set(GuildAccessController, new GuildAccessController(guildAccess));
+  const authService = new AuthService(prisma, { ...authOptions, guildAccess });
   container.set(AuthService, authService);
   container.set(
     DashboardController,
@@ -111,6 +117,7 @@ export async function initLoaders({
   const botInstallationService = new BotInstallationService(botInstallationAdapter, {
     clientId: authOptions?.config?.clientId,
     now: authOptions?.now,
+    guildAccess,
   });
   container.set(BotInstallationService, botInstallationService);
   container.set(

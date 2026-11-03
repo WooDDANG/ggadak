@@ -11,3 +11,4 @@ export * from './sync-jobs.js';
 export * from './analysis-queue.js';
 export * from './domain-values.js';
 export * from './runtime-policy.js';
+export * from './guild-access.js';

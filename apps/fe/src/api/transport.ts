@@ -6,7 +6,13 @@ export class ApiHttpError extends Error {
     super(message);
   }
 }
-import { getAccessToken, setAccessToken, recoverAccessToken, getSessionEpoch } from './session';
+import {
+  getAccessToken,
+  setAccessToken,
+  recoverAccessToken,
+  recoverGuildPermissions,
+  getSessionEpoch,
+} from './session';
 export async function authorizedFetch(url: string, options: RequestInit = {}) {
   const requestEpoch = getSessionEpoch();
   const assertCurrentSession = () => {
@@ -18,7 +24,9 @@ export async function authorizedFetch(url: string, options: RequestInit = {}) {
   const origin = (import.meta as any).env?.VITE_API_ORIGIN ?? '';
   let response = await fetch(`${origin}${url}`, { ...options, credentials: 'include', headers });
   assertCurrentSession();
-  const authRequest = /^\/api\/v1\/auth\/(authorize|login|session|logout)$/.test(url.split('?')[0]);
+  const authRequest = /^\/api\/v1\/auth\/(authorize|login|session|token|logout)$/.test(
+    url.split('?')[0],
+  );
   if (response.status === 401 && !authRequest) {
     const pending = recoverAccessToken();
     if (pending) {
@@ -31,6 +39,22 @@ export async function authorizedFetch(url: string, options: RequestInit = {}) {
     }
   }
   assertCurrentSession();
+  const serverRequest = url.startsWith('/api/v1/') && !url.startsWith('/api/v1/auth/');
+  if (serverRequest && [403, 502, 503].includes(response.status)) {
+    const failure = await response
+      .clone()
+      .json()
+      .catch(() => null);
+    assertCurrentSession();
+    if (failure?.code === 'GUILD_ACCESS_DENIED' || failure?.code === 'GUILD_ACCESS_UNAVAILABLE') {
+      const pending = recoverGuildPermissions();
+      if (pending) {
+        await pending;
+        // Restore the visible scope, but let callers handle the original failed operation.
+        return response;
+      }
+    }
+  }
   if (response.status === 401 && !authRequest) {
     setAccessToken('');
     window.dispatchEvent(new Event('ggaddak:logout'));

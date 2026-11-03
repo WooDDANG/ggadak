@@ -17,6 +17,8 @@ import { Service } from 'typedi';
 import { PrismaClient } from '@prisma/client';
 import { AppError, NotFoundError } from '../errors/AppError.js';
 import { DiscordAuthAdapter, HttpDiscordAuthAdapter } from '../adapters/discord-auth.adapter.js';
+import { GuildAccessService } from './guild-access.service.js';
+import { GuildAccessError } from '../errors/GuildAccessError.js';
 export interface AuthOptions {
   channelAdapter?: DiscordChannelsAdapter;
   botInstallationAdapter?: DiscordBotInstallationAdapter;
@@ -24,13 +26,15 @@ export interface AuthOptions {
   config?: AuthConfig;
   discordAdapter?: DiscordAuthAdapter;
   now?: () => number;
+  guildAccess?: GuildAccessService;
 }
-const TTL = 15 * 60 * 1000;
 @Service()
 export class AuthService {
   private config: AuthConfig;
   private discord: DiscordAuthAdapter;
   private now: () => number;
+  private access: GuildAccessService;
+  private verifications = new Map<string, Promise<void>>();
   constructor(
     private prisma: PrismaClient,
     options: AuthOptions = {},
@@ -40,6 +44,7 @@ export class AuthService {
       options.discordAdapter ??
       new HttpDiscordAuthAdapter(this.config.clientId, this.config.clientSecret);
     this.now = options.now ?? Date.now;
+    this.access = options.guildAccess ?? new GuildAccessService(prisma, this.now);
   }
   private configured() {
     validateAuthConfig(this.config);
@@ -117,6 +122,7 @@ export class AuthService {
       where: { nonce, expiresAt: { gt: new Date(this.now()) } },
     });
     if (consumed.count !== 1) throw new AuthError('Expired or previously used OAuth state');
+    const revision = await this.access.revision();
     const tokens = await this.discord.exchange(code, this.config.redirectUri);
     const [user, guilds] = await Promise.all([
       this.discord.identity(tokens.access_token),
@@ -131,23 +137,7 @@ export class AuthService {
         create: { id: user.id, username: user.username, avatar: user.avatar },
         update: { username: user.username, avatar: user.avatar },
       });
-      await tx.membership.deleteMany({ where: { userId: user.id } });
-      for (const guild of guilds) {
-        await tx.guild.upsert({
-          where: { id: guild.id },
-          create: { id: guild.id, name: guild.name, icon: guild.icon },
-          update: { name: guild.name, icon: guild.icon },
-        });
-        await tx.membership.create({
-          data: {
-            userId: user.id,
-            guildId: guild.id,
-            owner: guild.owner,
-            permissions: guild.permissions,
-            refreshedAt: new Date(this.now()),
-          },
-        });
-      }
+      await this.access.replaceMemberships(tx, user.id, guilds, revision);
       await tx.authSession.create({
         data: {
           id: sessionId,
@@ -166,7 +156,9 @@ export class AuthService {
     };
   }
   private token(user: AuthPrincipal, sessionExpiry = Infinity) {
-    const expiresAt = new Date(Math.min(this.now() + TTL, sessionExpiry)).toISOString();
+    const expiresAt = new Date(
+      Math.min(this.now() + AuthPolicy.accessTokenTtlMs, sessionExpiry),
+    ).toISOString();
     const head = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
     const payload = Buffer.from(
       JSON.stringify({
@@ -219,19 +211,27 @@ export class AuthService {
     }
   }
   async checkGuildAccess(user: AuthPrincipal, guildId: string): Promise<{ canManage: boolean }> {
-    const membership = await this.prisma.membership.findUnique({
+    const revision = await this.access.revision();
+    let membership = await this.prisma.membership.findUnique({
       where: { userId_guildId: { userId: user.userId, guildId } },
     });
     const session = await this.prisma.authSession.findUnique({ where: { id: user.sessionId } });
-    if (
-      !membership ||
-      !session ||
-      session.userId !== user.userId ||
-      session.expiresAt.getTime() <= this.now() ||
-      session.refreshedAt.getTime() + TTL <= this.now() ||
-      membership.refreshedAt.getTime() + TTL <= this.now()
-    )
+    if (!session || session.userId !== user.userId || session.expiresAt.getTime() <= this.now())
       throw new AuthError('Guild access denied; refresh login', 403);
+    if (await this.access.removed(user.userId, guildId)) throw new GuildAccessError();
+    if (!membership || !(await this.access.trusted(membership))) {
+      await this.verifyGuilds(user);
+      membership = await this.prisma.membership.findUnique({
+        where: { userId_guildId: { userId: user.userId, guildId } },
+      });
+    }
+    if (!membership || (await this.access.removed(user.userId, guildId)))
+      throw new GuildAccessError();
+    if ((await this.access.revision()) !== revision)
+      throw new GuildAccessError(
+        'Discord permissions changed during authorization; retry shortly',
+        503,
+      );
     const canManage =
       Boolean(membership.owner) ||
       (/^\d+$/.test(membership.permissions) && (BigInt(membership.permissions) & 32n) !== 0n);
@@ -239,7 +239,7 @@ export class AuthService {
   }
   async requireGuild(user: AuthPrincipal, guildId: string, manage = false): Promise<void> {
     const { canManage } = await this.checkGuildAccess(user, guildId);
-    if (manage && !canManage) throw new AuthError('Manage Server permission required', 403);
+    if (manage && !canManage) throw new GuildAccessError('Manage Server permission required');
   }
   async requireDecision(user: AuthPrincipal, id: string, guildId?: string) {
     const decision = await this.prisma.decision.findUnique({
@@ -269,8 +269,19 @@ export class AuthService {
     );
   }
   async guilds(user: AuthPrincipal) {
+    const revision = await this.access.revision();
+    if (!(await this.access.snapshotTrusted(user.userId))) await this.verifyGuilds(user);
+    const guilds = await this.cachedGuilds(user);
+    if ((await this.access.revision()) !== revision)
+      throw new GuildAccessError(
+        'Discord permissions changed during authorization; retry shortly',
+        503,
+      );
+    return guilds;
+  }
+  private async cachedGuilds(user: AuthPrincipal) {
     const membership = await this.prisma.membership.findMany({
-      where: { userId: user.userId, refreshedAt: { gt: new Date(this.now() - TTL) } },
+      where: { userId: user.userId },
       include: { guild: true },
     });
     return membership.map(m => ({ ...m.guild, owner: m.owner, permissions: m.permissions }));
@@ -309,10 +320,38 @@ export class AuthService {
   }
   async restore(cookie?: string) {
     const principal = await this.browserPrincipal(cookie);
-    const token = await this.refresh(principal);
-    return { ...token, user: await this.me(principal), guilds: await this.guilds(principal) };
+    const guilds = await this.guilds(principal);
+    return { ...(await this.refresh(principal)), user: await this.me(principal), guilds };
   }
   async refresh(user: AuthPrincipal) {
+    const session = await this.prisma.authSession.findUnique({ where: { id: user.sessionId } });
+    if (!session || session.userId !== user.userId || session.expiresAt.getTime() <= this.now())
+      throw new AuthError();
+    return this.token(user, session.expiresAt.getTime());
+  }
+  async renewBrowser(cookie?: string) {
+    const principal = await this.browserPrincipal(cookie);
+    return { ...(await this.refresh(principal)), userId: principal.userId };
+  }
+  private verifyGuilds(user: AuthPrincipal): Promise<void> {
+    const existing = this.verifications.get(user.userId);
+    if (existing) return existing;
+    const promise = this.revalidate(user)
+      .catch(error => {
+        if (error instanceof AppError && [502, 503].includes(error.statusCode))
+          throw new GuildAccessError(
+            'Discord permissions could not be verified; retry shortly',
+            error.statusCode,
+          );
+        throw error;
+      })
+      .finally(() => {
+        if (this.verifications.get(user.userId) === promise) this.verifications.delete(user.userId);
+      });
+    this.verifications.set(user.userId, promise);
+    return promise;
+  }
+  private async revalidate(user: AuthPrincipal): Promise<void> {
     const initial = await this.prisma.authSession.findUnique({ where: { id: user.sessionId } });
     if (!initial || initial.userId !== user.userId || initial.expiresAt.getTime() <= this.now())
       throw new AuthError();
@@ -322,8 +361,7 @@ export class AuthService {
       const current = await this.prisma.authSession.findUnique({ where: { id: user.sessionId } });
       if (!current || current.userId !== user.userId || current.expiresAt.getTime() <= this.now())
         throw new AuthError();
-      if (current.refreshVersion > initial.refreshVersion)
-        return this.token(user, current.expiresAt.getTime());
+      if (current.refreshVersion > initial.refreshVersion) return;
       const acquired = await this.prisma.authSession.updateMany({
         where: {
           id: user.sessionId,
@@ -349,6 +387,7 @@ export class AuthService {
       } catch {
         throw new AuthError('Session credential is no longer valid');
       }
+      const revision = await this.access.revision();
       const tokens = await this.discord.refresh(secret);
       // Persist rotation before the guild request: an outage there must not lose the new credential.
       const rotated = await this.prisma.authSession.updateMany({
@@ -367,25 +406,8 @@ export class AuthService {
           data: { refreshedAt: new Date(this.now()), refreshVersion: { increment: 1 } },
         });
         if (!saved.count) throw new AuthError();
-        await tx.membership.deleteMany({ where: { userId: user.userId } });
-        for (const guild of guilds) {
-          await tx.guild.upsert({
-            where: { id: guild.id },
-            create: { id: guild.id, name: guild.name, icon: guild.icon },
-            update: { name: guild.name, icon: guild.icon },
-          });
-          await tx.membership.create({
-            data: {
-              userId: user.userId,
-              guildId: guild.id,
-              owner: guild.owner,
-              permissions: guild.permissions,
-              refreshedAt: new Date(this.now()),
-            },
-          });
-        }
+        await this.access.replaceMemberships(tx, user.userId, guilds, revision);
       });
-      return this.token(user, initial.expiresAt.getTime());
     } catch (error) {
       if (error instanceof AuthError && error.statusCode === 401) await this.logout(user);
       throw error;
