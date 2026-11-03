@@ -1,5 +1,7 @@
 # 까닭 API 설계 초안 ↔ 현재 Swagger 비교
 
+[API 문서 안내](README.md) · **초안 이관 참고용**. 실제 요청 계약은 [FE API 문서](frontend-api.md)를 우선합니다. 현재 구현 반영 기준: 2026-11-03.
+
 비교 기준: 2026-10-13에 전달받은 화면 기반 API 설계 초안과 [현재 swagger.json](../../apps/be/src/api/docs/swagger.json). 실제 FE 연동 계약은 [FE API 문서](frontend-api.md)에 정리했습니다.
 
 이 비교는 API 구현을 초안에 맞게 변경하는 작업이 아니라, 현재 구현과 초안의 차이 및 FE 연동 시 필요한 변경을 기록합니다. 초안의 “🟢 완료”를 실제 API 경로·FE 화면·외부 서비스 연결 검증 완료로 해석하지 않습니다.
@@ -55,16 +57,16 @@ OpenAPI 응답 모델 중 일부 inherited nullable 필드의 표기가 실제 �
 | user.id 숫자             | Discord 사용자 문자열 ID                               |
 | user.email 문자열        | 현재 scope는 identify/guilds, email=null               |
 | 토큰 만료 정보 없음      | expiresAt 제공, JWT 15분                               |
-| 세션 관리 미정           | me/guilds/refresh/logout API 제공                      |
+| 세션 관리 미정           | 브라우저 쿠키 session 복원, me/guilds/refresh/logout 제공 |
 
-FE는 authorize 응답의 URL로 이동한 후 callback query의 code/state로 login을 호출합니다. credentials: include로 쿠키를 유지하고 토큰을 메모리에 보관합니다. 만료 전 refresh를 수행하며, 유효하지 않은 세션은 로그인부터 다시 시작합니다. 서버 선택은 auth/guilds 응답으로 구성합니다.
+FE는 authorize 응답의 URL로 이동한 후 callback query의 code/state로 login을 호출합니다. credentials: include로 쿠키를 유지하고 JWT는 메모리에 보관합니다. 브라우저 시작·재접속에는 `POST /api/v1/auth/session`으로 accessToken/user/guilds를 복원합니다. 복원 401은 재로그인, 일시 장애는 세션을 지우지 않고 재연결합니다. 기존 Bearer refresh도 제공되지만 만료된 JWT는 별도 token 경로로 갱신하며, 이 갱신은 Discord 권한 조회를 하지 않습니다.
 
 ### 3.2 Discord 설정
 
 | 초안 응답·요청               | 현재 계약·대응                                                  |
 | ---------------------------- | --------------------------------------------------------------- |
 | data.guildId, guildName      | 채널 응답에 서버 메타데이터 없음; 서버 목록의 id/name 사용      |
-| data.botInstalled            | 직접적인 Boolean 필드 없음                                      |
+| data.botInstalled            | 별도 bot-status API의 installed / not_installed / unknown 사용 |
 | channels[].channelId         | channels[].id                                                   |
 | channels[].channelName       | channels[].name                                                 |
 | channels[].channelType=TEXT  | channels[].type=0 — 일반 텍스트 채널                            |
@@ -74,7 +76,7 @@ FE는 authorize 응답의 URL로 이동한 후 callback query의 code/state로 l
 
 저장은 선택 전체를 교체하고 빈 배열로 모두 해제할 수 있습니다. owner 또는 Manage Server 권한이 필요합니다. 같은 서버에서 Bot이 읽을 수 있는 채널만 새로 선택합니다. 이전에 선택한 채널이 inaccessible이어도 제거할 수 있도록 UI에 현재 선택과 접근 상태를 구분합니다.
 
-botInstalled 자체가 화면의 필수 요구라면 설치 상태를 반환하는 BE 계약이 추가로 필요합니다. 채널 조회 실패를 무조건 “Bot 미설치”로 해석하면 인증·권한·외부 장애와 구별되지 않습니다.
+`GET /api/v1/discord/bot-status?guildId=...`는 설치 상태·canManage·관리자용 installUrl·확인 시각을 반환합니다. 설치 후 재확인과 일반 멤버 안내는 [봇 설치 계약](bot-installation.md)을 따릅니다. 채널 조회 실패를 무조건 “Bot 미설치”로 해석하지 않습니다.
 
 ### 3.3 Dashboard·동기화
 
@@ -167,12 +169,18 @@ month/topic/channel/category 그룹을 지원합니다. timezone은 UTC 기본�
 | GET    | /api/v1/auth/authorize                        | 브라우저 state 쿠키와 OAuth URL   |
 | GET    | /api/v1/auth/me                               | 사용자 정보                       |
 | GET    | /api/v1/auth/guilds                           | 서버 선택·권한 표시               |
-| POST   | /api/v1/auth/refresh                          | JWT 갱신·서버 권한 새로고침       |
+| POST   | /api/v1/auth/session                          | 쿠키로 브라우저 세션·JWT·서버 목록 복원 |
+| POST   | /api/v1/auth/token | 쿠키로 JWT만 재발급, userId 확인 |
+| POST   | /api/v1/auth/refresh                          | JWT만 갱신, Discord 조회 없음       |
 | POST   | /api/v1/auth/logout                           | 세션 종료                         |
 | GET    | /api/v1/sync-jobs/{jobId}                     | 실제 동기화 진행·완료·실패        |
+| POST   | /api/v1/sync-jobs/{jobId}/channels/{channelId}/resume | 실패한 채널 전달 재개 |
+| GET    | /api/v1/discord/bot-status                    | 선택 서버의 설치 상태와 관리자용 설치 링크 |
 | GET    | /api/v1/decisions/{id}/history                | Analysis Request·재분석 관계 이력 |
-| GET    | /api/v1/analysis-deliveries                   | retained failure 및 Bot 연결 상태 |
+| GET    | /api/v1/analysis-deliveries                   | Bot 전달·BE 분석 상태와 보관된 실패 |
 | POST   | /api/v1/analysis-deliveries/{requestId}/retry | 보존된 실패의 재시도 요청         |
+| GET    | /api/v1/analysis-requests/{requestId}           | 분석 단계·실패·재시도 가능 여부 |
+| GET    | /api/v1/analysis-requests/{requestId}/graph     | 완료된 논리 그래프 snapshot |
 
 FE는 Bot 전용 Discussion Context 분석·Checkpoints·internal API 대신 위 사용자 API로 연결합니다.
 
@@ -188,9 +196,9 @@ FE는 Bot 전용 Discussion Context 분석·Checkpoints·internal API 대신 위
 - expectedVersion 및 교체 시 predecessor/Action Item disposition UI.
 - HTTP 상태와 현재 공통 code로 오류 처리.
 
-### 5.2 BE 계약 합의·추가 구현이 필요한 항목
+### 5.2 이번 반영과 별도 합의가 필요한 후속 항목
 
-- 명시적인 botInstalled 상태가 필요하면 설치 상태 API/응답 설계.
+서버별 봇 설치 상태·설치 안내는 별도 `bot-status` 계약으로 구현됐습니다. 응답은 Boolean이 아니라 세 가지 상태를 사용합니다. 아래는 이번 범위에 포함하지 않은 후속 후보입니다.
 - 별도 External Feedback의 guild 인증형 등록·조회·통합 검색이 필요하면 신규 계약 설계.
 - 세분화된 AUTH_4010·SYNC_4091 등의 오류 코드가 필수라면 공통 오류 계약 변경.
 - 숫자 ID, 자유 카테고리, 초안 URI 별칭 등이 필수라면 호환·이력 보존을 포함한 API 변경 설계.
@@ -205,4 +213,4 @@ FE는 Bot 전용 Discussion Context 분석·Checkpoints·internal API 대신 위
 - strict 편집 입력을 additionalProperties 표기에 반영하기.
 - source와 Sync Job status를 가능한 범위에서 구체적인 모델로 선언하기.
 
-이 작업에서는 API 코드나 FE 소스를 변경하지 않았습니다. 위 보완 대상은 현재 FE 연동 문서에 주의사항으로 반영했습니다.
+이 비교표는 초안에서 현재 계약으로 옮기기 위한 참고 자료입니다. 위 보완 대상은 [FE 스펙 주의사항](frontend-api.md#caveats)에 유지하며, API 제공과 실제 FE·외부 서비스 연결 검증은 구분합니다.

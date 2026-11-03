@@ -10,6 +10,10 @@ GGADDAK은 디스코드(Discord) 협업 채널에서 휘발되기 쉬운 중요�
 
 봇 데몬이 채널 대화 맥락(Discussion Context)을 감지하면 AI 엔진이 다중 의사결정과 액션 아이템, 거버넌스 점수를 추출합니다. 추출된 후보는 백엔드의 검토 대기열(Review Queue)을 거쳐 최종 의사결정(Decision Record)으로 승인되며, 프론트엔드 타임라인과 Swagger(OpenAPI v3) 명세를 통해 팀 전체에 투명하게 공유됩니다.
 
+개발 진행과 발표 흐름은 [발표 자료](docs/presentation.md)를 참고하세요.
+
+FE·BE API 연동은 [API 문서 안내](docs/api/README.md)에서 시작하세요. 현재 계약, 봇 설치 안내, 분석 상태·그래프, Bot 내부 API와 초안 비교를 읽는 순서대로 정리했습니다.
+
 ---
 
 ## 2. 주요 기능

@@ -87,3 +87,9 @@ These fixture tests do not verify the separately developed FE or live integratio
 
 All three implementation tickets are resolved. See [verification.md](verification.md)
 for results and the remaining external FE/live Discord handoff checklist.
+
+## Documentation follow-up
+
+[04 — API documentation organization and agy review](issues/04-api-documentation.md)
+tracks the later user request. Codex owns writing; agy reviews against Swagger
+and BE source. No API behavior change is part of this follow-up.

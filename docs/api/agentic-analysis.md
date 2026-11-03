@@ -1,6 +1,6 @@
 # Agentic 분석·논리 그래프 API
 
-2026-10-14. 공통 인증·응답은 [FE 연동 문서](frontend-api.md)를 따른다. FE 화면 작업은 포함하지 않는다.
+정리 기준: 2026-10-30. [API 문서 안내](README.md) · 공통 인증·응답은 [FE 연동 문서](frontend-api.md)를 따른다. FE 화면 작업은 포함하지 않는다.
 
 전체 기능 현황과 Mermaid 흐름도는 [의사결정 기능과 AI 분석 흐름](../decision-features.md)을 참고한다.
 
@@ -8,11 +8,13 @@
 
 기존 Bot `POST /api/discussions/analyze`는 서비스 인증으로 입력 대화를 전달한다. 추출 → 구조 검사 → AI 의미 검증 → 필요 시 한 번 수정 → 재검증 후 요청 전체를 공개한다. 응답은 기존 found/summary/decisions에 requestId/graphId/graphAvailable을 추가한다. found는 실제 반환 후보 존재이며 합의 존재가 아니다. 후보는 사람의 검수 전까지 Draft다.
 
+비동기 전달에서는 Bot이 `POST /api/v1/internal/analysis-queue/receipts`의 202로 영속 수신을 확인하고 결과를 따로 조회한다. 수신 완료와 분석 완료를 구분하며, FE는 아래 사용자 상태·그래프 API를 사용한다. Bot의 수신·결과·확인 API 목록은 [내부 API](internal-api.md)를 따른다.
+
 `GET /api/v1/analysis-requests/{requestId}?guildId=...`는 Bearer JWT와 실제 요청의 서버 접근 권한으로 조회한다. data는 requestId/state/graphAvailable/retryable/error/sessions다.
 
 - state: pending/processing/completed/terminal.
 - phase: extract/check/verify/repair/recheck/reverify/done.
-- sessions: sessionId/phase/repairs/elapsedMs/logicalCalls/attempts/inputTokens/outputTokens.
+- sessions: sessionId/phase/repairs/elapsedMs/waitMs/logicalCalls/attempts/inputTokens/outputTokens.
 - error: null 또는 category/message/status/retryable. credential·stack·owner는 노출하지 않는다.
 
 수정은 세션당 한 번, 논리 호출 최대 4회, 호출당 45초, 누적 활성 실행 180초다. 통신 재시도 대기는 제외하고 재시작으로 예산을 초기화하지 않는다. 통신 장애는 503으로 저장 단계에서 재개하며 최종 검증/예산 실패는 422로 보존한다. 같은 terminal 요청 재전송으로 AI를 다시 실행하지 않는다.
@@ -46,6 +48,6 @@ edge는 id/type/sourceId/targetId다. contains/has_alternative/supports/opposes/
 
 카드 rationale은 미언급 시 빈 문자열이고 rationaleStatus=not_stated다. 편집은 rationale 필드를 보내되 빈 값이 가능하며 대안 reason도 미언급 시 빈 값이다. title/decision/name은 비어 있을 수 없다. 사람의 근거 수정은 현재 카드 상태에만 반영하며 원본 AI graph는 보존한다.
 
-delivery 조회의 requiresNewAnalysis=true 또는 errorCategory=analysis-terminal은 새 수동 분석이 필요한 실패다. 기존 retry는 동일 요청의 전달 재시도이며 terminal에서는 409로 거절한다. 새 재분석은 기존 Discord 수동 트리거/스캔 경로에서 새 ID로 생성한다.
+delivery 조회의 requiresNewAnalysis=true 또는 errorCategory=analysis-terminal은 새 수동 분석이 필요한 실패다. retry는 동일 요청을 재시도하며, Bot 관리 항목은 전달 재시도, BE 관리 항목은 보존된 입력의 분석 재시도다. 관리 주체별 조건과 확인 응답은 [분석 복구 계약](frontend-api.md#recovery)을 따른다. terminal에서는 같은 요청 retry를 409로 거절한다. 새 재분석은 기존 Discord 수동 트리거/스캔 경로에서 새 ID로 생성한다.
 
 Bot 시작·새 서버 초대는 과거 스캔을 자동 생성하지 않는다. 명시적 스캔/Sync Job만 과거 검사를 시작하며 보관 요청 복구와 새 대화 추적은 유지한다.

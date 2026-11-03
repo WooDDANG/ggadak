@@ -1,7 +1,9 @@
 # 까닭 FE API 연동 문서
 
-작성 기준: 2026-10-30 · BE API 버전 `1.0.0` · OpenAPI `3.0.0`
-원본: [swagger.json](../../apps/be/src/api/docs/swagger.json) · 스펙 SHA-256: `0c3546f15eeeba726672391e6e3daa2f919ef1f1bc6db47c64edd74e16da2c3f`
+[API 문서 안내](README.md) · [봇 설치 안내](bot-installation.md) · [분석·그래프](agentic-analysis.md) · [Bot·내부 API](internal-api.md)
+
+작성 기준: 2026-11-03 · BE API 버전 `1.0.0` · OpenAPI `3.0.0`
+원본: [swagger.json](../../apps/be/src/api/docs/swagger.json) · 스펙 SHA-256: `b786ef92bb1e0f57b23c121ced1025c002631ebd97c1238e6d4a3450a42e1967`
 Agentic 분석·추가 그래프 계약: [별도 명세](agentic-analysis.md)
 봇 설치 상태·설치 안내 계약: [별도 명세](bot-installation.md)
 
@@ -43,7 +45,7 @@ BE 시작은 루트에서 `npm run dev:be`입니다. `npm run swagger --workspac
 
 쿠키가 필요한 authorize·login·session·logout 호출에는 `credentials: 'include'`를 사용합니다. 현재 쿠키 정책은 same-site 배치를 전제로 합니다. 로컬에서는 `/api` proxy, 배포에서는 같은 Origin의 reverse proxy를 우선 사용합니다. 서로 다른 site에 FE·BE를 배치하는 것은 현재 쿠키 정책으로 지원되지 않습니다.
 
-브라우저 시작·재접속·access JWT 만료 시 `POST /api/v1/auth/session`으로 HttpOnly 지속 쿠키에서 짧은 수명의 accessToken과 사용자·서버 목록을 복원합니다. JWT는 메모리에 보관하고 사용자 API에 Bearer로 전송합니다. 쿠키 원문이나 Discord 토큰을 JavaScript로 읽을 필요가 없습니다. 세션 복원의 401은 재로그인, 403은 FE Origin 설정 확인, 일시적인 5xx는 세션을 지우지 않고 재연결할 대상으로 처리합니다. 로그아웃은 쿠키와 일치하는 Origin으로 호출할 수 있으므로 만료된 JWT를 먼저 갱신할 필요가 없습니다.
+브라우저 시작·재접속 시 `POST /api/v1/auth/session`으로 HttpOnly 지속 쿠키에서 짧은 수명의 accessToken과 사용자·서버 목록을 복원합니다. JWT는 메모리에 보관하고 사용자 API에 Bearer로 전송합니다. 쿠키 원문이나 Discord 토큰을 JavaScript로 읽을 필요가 없습니다. 세션 복원의 401은 재로그인, 403은 FE Origin 설정 확인, 일시적인 5xx는 세션을 지우지 않고 재연결할 대상으로 처리합니다. 로그아웃은 쿠키와 일치하는 Origin으로 호출할 수 있으므로 만료된 JWT를 먼저 갱신할 필요가 없습니다.
 
 ### 1.2 성공·실패 응답
 
@@ -72,7 +74,7 @@ BE 시작은 루트에서 `npm run dev:be`입니다. `npm run swagger --workspac
 ### 1.3 ID·날짜·페이지
 
 - user/guild/channel/decision/ticket/job/request/alternative/Action Item ID는 문자열입니다. Discord snowflake나 permissions를 JavaScript Number로 변환하지 않습니다.
-- 기록된 날짜는 ISO 8601 문자열입니다. 확인 날짜 등이 기록되지 않았으면 null이고 FE에서 임의 날짜를 생성하지 않습니다.
+- 일반 날짜 필드는 ISO 8601 문자열입니다. 확인 날짜 등이 기록되지 않았으면 null이고 FE에서 임의 날짜를 생성하지 않습니다. 예외로 분석 전달 목록의 `nextAttemptAt`은 Unix epoch milliseconds이며 0은 일정 없음입니다.
 - 목록 page는 1부터 시작합니다. 기본 size=20, 구현상 page는 양의 정수이고 size는 1–100 정수입니다.
 - `pageInfo`는 `currentPage`, `pageSize`, `totalElements`, `totalPages`입니다. 빈 목록의 totalPages는 0일 수 있습니다.
 - optional은 필드 생략 가능, nullable은 null 가능을 뜻합니다. 중첩 객체의 “부모 제공 시 필수”는 해당 객체/배열 원소를 보낼 때의 필수 필드입니다.
@@ -109,7 +111,7 @@ async function api<T>(path: string, token?: string, init: RequestInit = {}): Pro
 }
 ```
 
-이 예제는 v1 API용이며 세션 갱신·재시도 정책까지 포함한 완성 클라이언트는 아닙니다. 보호 API의 401에서는 `/auth/session` 복원을 한 번 공유한 뒤 새 JWT로 원 요청을 한 번 재시도합니다. 복원 요청 자체를 재귀적으로 재시도하거나, 다른 사용자로 로그인한 뒤 이전 사용자의 요청을 다시 보내지 않습니다. 동일 Origin/proxy를 기준으로 하며, 별도 BE Origin을 쓰면 path 앞에 Origin을 붙입니다. query는 URLSearchParams, path ID는 encodeURIComponent로 인코딩합니다. 새 FE 프로젝트에서는 이 문서와 스펙을 함께 사용하거나 Orval 클라이언트를 생성할 수 있습니다. 기존 저장소의 `npm run api:sync`는 FE 생성 코드도 변경하는 명령입니다.
+이 예제는 v1 API용이며 세션 갱신·재시도 정책까지 포함한 완성 클라이언트는 아닙니다. 보호 API의 401에서는 `/auth/token` 갱신을 한 번 공유한 뒤 새 JWT로 원 요청을 한 번 재시도합니다. 복원 요청 자체를 재귀적으로 재시도하거나, 다른 사용자로 로그인한 뒤 이전 사용자의 요청을 다시 보내지 않습니다. 동일 Origin/proxy를 기준으로 하며, 별도 BE Origin을 쓰면 path 앞에 Origin을 붙입니다. query는 URLSearchParams, path ID는 encodeURIComponent로 인코딩합니다. 새 FE 프로젝트에서는 이 문서와 스펙을 함께 사용하거나 Orval 클라이언트를 생성할 수 있습니다. 기존 저장소의 `npm run api:sync`는 FE 생성 코드도 변경하는 명령입니다.
 
 <a id="overview"></a>
 
@@ -134,6 +136,7 @@ async function api<T>(path: string, token?: string, init: RequestInit = {}): Pro
 | `POST` | `/api/v1/auth/session`                          | 200  | 세션 쿠키 + FE Origin |
 | `GET`  | `/api/v1/auth/me`                               | 200  | Bearer JWT |
 | `GET`  | `/api/v1/auth/guilds`                           | 200  | Bearer JWT |
+| `POST` | `/api/v1/auth/token` | 200 | 브라우저 세션 쿠키 + Origin |
 | `POST` | `/api/v1/auth/refresh`                          | 200  | Bearer JWT |
 | `POST` | `/api/v1/auth/logout`                           | 200  | 세션 쿠키 + FE Origin 또는 Bearer JWT |
 | `GET`  | `/api/v1/discord/bot-status`                    | 200  | Bearer JWT |
@@ -142,6 +145,7 @@ async function api<T>(path: string, token?: string, init: RequestInit = {}): Pro
 | `GET`  | `/api/v1/dashboard`                             | 200  | Bearer JWT |
 | `POST` | `/api/v1/sync-jobs`                             | 202  | Bearer JWT |
 | `GET`  | `/api/v1/sync-jobs/{jobId}`                     | 200  | Bearer JWT |
+| `POST` | `/api/v1/sync-jobs/{jobId}/channels/{channelId}/resume` | 200 | Bearer JWT + Manage Server |
 | `GET`  | `/api/v1/review-queue`                          | 200  | Bearer JWT |
 | `POST` | `/api/v1/review-queue/{ticketId}/review`        | 200  | Bearer JWT |
 | `GET`  | `/api/v1/decisions/{id}`                        | 200  | Bearer JWT |
@@ -161,7 +165,7 @@ async function api<T>(path: string, token?: string, init: RequestInit = {}): Pro
 
 ### 3.1 랜딩·Discord 로그인
 
-로그인 순서는 authorize 응답 URL로 브라우저 이동 → FE 콜백의 code/state 수신 → login 요청입니다. HttpOnly state 쿠키를 JavaScript로 직접 읽을 필요가 없습니다. state는 브라우저에 묶인 일회성 값이라 로그인 실패 시 authorize부터 다시 시작합니다. 로그인 성공 시 HttpOnly 지속 쿠키도 설정합니다. FE 시작·재접속·access JWT 만료 시 POST `/api/v1/auth/session`으로 7일 서버 세션을 복원합니다. 최초 7일 만료나 실제 세션 폐기 뒤에는 다시 로그인합니다.
+로그인 순서는 authorize 응답 URL로 브라우저 이동 → FE 콜백의 code/state 수신 → login 요청입니다. HttpOnly state 쿠키를 JavaScript로 직접 읽을 필요가 없습니다. state는 브라우저에 묶인 일회성 값이라 로그인 실패 시 authorize부터 다시 시작합니다. 로그인 성공 시 HttpOnly 지속 쿠키도 설정합니다. FE 시작·재접속 시 POST `/api/v1/auth/session`으로 7일 서버 세션을 복원합니다. 최초 7일 만료나 실제 세션 폐기 뒤에는 다시 로그인합니다.
 
 #### `GET /api/v1/auth/authorize`
 
@@ -196,7 +200,7 @@ async function api<T>(path: string, token?: string, init: RequestInit = {}): Pro
 
 **operationId:** `LoginDiscord` · **인증:** 없음
 
-**구현 보완:** Discord가 FE 콜백에 전달한 code와 state를 그대로 보냅니다. authorize에서 받은 쿠키가 필요합니다. provider·redirectUri는 요청 필드가 아니며 콜백 URI는 BE 설정에서 결정합니다. 응답 accessToken은 15분 유효하고 expiresAt 전에 갱신해야 합니다.
+**구현 보완:** Discord가 FE 콜백에 전달한 code와 state를 그대로 보냅니다. authorize에서 받은 쿠키가 필요합니다. provider·redirectUri는 요청 필드가 아니며 콜백 URI는 BE 설정에서 결정합니다. 응답 accessToken은 최대 15분 유효합니다. 실제 요청에서 만료되면 브라우저 token 경로로 갱신합니다.
 
 **Path/query 입력:** 없음.
 
@@ -300,13 +304,19 @@ async function api<T>(path: string, token?: string, init: RequestInit = {}): Pro
 
 **operationId:** `RestoreBrowserSession` · **인증:** HttpOnly 브라우저 세션 쿠키 + 설정된 FE Origin.
 
-body/query는 없습니다. 최초 로그인부터 고정 7일인 세션을 확인하고 Discord 권한을 갱신한 뒤 accessToken/tokenType/expiresAt/user/guilds를 반환합니다. 새로고침·브라우저 재시작·JWT 만료 후에도 사용할 수 있습니다. 응답은 no-store이며 cookie 원문은 포함하지 않습니다. 401은 재로그인, 403은 Origin 확인, 일시적인 5xx는 세션을 삭제하지 않고 재연결합니다. 쿠키를 쓰는 브라우저 POST의 Origin은 callback과 일치해야 합니다.
+body/query는 없습니다. 최초 로그인부터 고정 7일인 세션을 확인하고, 이벤트 관측을 신뢰할 수 없거나 무효화된 권한을 필요에 따라 재검증한 뒤 accessToken/tokenType/expiresAt/user/guilds를 반환합니다. 새로고침·브라우저 재시작에 사용합니다. JWT만 만료된 실제 요청은 token 경로로 복구합니다. 응답은 no-store이며 cookie 원문은 포함하지 않습니다. 401은 재로그인, 403은 Origin 확인, 일시적인 5xx는 세션을 삭제하지 않고 재연결합니다. 쿠키를 쓰는 브라우저 POST의 Origin은 callback과 일치해야 합니다.
+
+#### `POST /api/v1/auth/token`
+
+**operationId:** `RenewBrowserToken` · **인증:** HttpOnly 브라우저 세션 쿠키 + 설정된 FE Origin.
+
+body/query는 없습니다. `accessToken/tokenType/expiresAt/userId`를 반환하며 Discord에 권한을 조회하지 않습니다. 실제 사용자 API의 JWT 만료 시 한 번 공유해 호출합니다. 반환 `userId`가 현재 사용자와 다르면 이전 요청을 새 사용자로 재전송하지 않고 캐시와 사용자 상태를 복원합니다. 고정 7일 세션 만료를 연장하지 않습니다.
 
 #### `POST /api/v1/auth/refresh`
 
 **operationId:** `RefreshSession` · **인증:** Bearer JWT
 
-**구현 보완:** 유효한 Bearer JWT가 필요합니다. refreshToken을 보내는 API가 아닙니다. 새 accessToken과 expiresAt으로 교체하고 서버 목록을 갱신합니다. 이미 만료된 JWT는 이 legacy endpoint 대신 `/api/v1/auth/session`으로 복원합니다.
+**구현 보완:** 유효한 Bearer JWT가 필요합니다. refreshToken을 보내는 API가 아닙니다. JWT만 재발급하고 Discord 권한을 조회하지 않습니다. 이미 만료된 JWT는 `/api/v1/auth/token`으로 복구합니다.
 
 **Path/query 입력:** 없음.
 
@@ -337,6 +347,8 @@ body/query는 없습니다. 최초 로그인부터 고정 7일인 세션을 확�
 ### 3.2 Discord 연결 설정
 
 #### `GET /api/v1/discord/bot-status`
+
+**operationId:** `GetBotStatus` · **인증:** Bearer JWT와 해당 서버 membership.
 
 선택한 서버의 Bot Installation Status와 현재 사용자의 관리 가능 여부를 반환합니다. 입력은 필수 query `guildId`이며 Bearer JWT와 해당 서버 membership이 필요합니다. `installed / not_installed / unknown`, 관리자 전용 `installUrl`, 확인 시각과 FE 설치 후 복귀 흐름은 [봇 설치 상태 명세](bot-installation.md)를 따릅니다.
 
@@ -507,6 +519,16 @@ jobId로 진행을 조회합니다. status는 구현상 QUEUED / PROCESSING / CO
 **Request Body:** 없음.
 
 **Response:** HTTP 200, `ApiResponse<SyncJobView>`
+
+#### `POST /api/v1/sync-jobs/{jobId}/channels/{channelId}/resume`
+
+**operationId:** `ResumeChannel` · **인증:** Bearer JWT와 서버 owner 또는 Manage Server 권한.
+
+필수 path는 `jobId`, `channelId`, 필수 query는 `guildId`입니다. body는 없습니다.
+HTTP 200의 `data`는 갱신된 `SyncJobView`이며, 완료가 아니라 실패한 채널 전달의 재개를 뜻합니다.
+같은 서버의 실패한 채널 전달만 재개할 수 있고, 해당 조건에 맞지 않으면 409입니다.
+이후 기존 Job 조회로 진행 상태를 확인합니다. 분석 자체의 실패는 [분석 복구 API](#recovery)와
+[분석 상태·재분석 설명](agentic-analysis.md)을 따릅니다.
 
 ### 3.4 Review Queue
 
@@ -918,13 +940,15 @@ query가 자연어 질문이며 q가 아닙니다. data.items의 각 항목은 d
 
 월 그룹 key는 `2026-10` 같은 값입니다. FE가 “2026년 10월”로 표시합니다. timezone 변경은 월 경계에 영향을 줍니다. from/to가 있으면 유효한 ISO 8601 timestamp여야 하며 from < to입니다. 확인 날짜가 없는 이전 Decision은 일반 목록에서 조회하고 Timeline에는 나오지 않습니다.
 
+<a id="recovery"></a>
+
 ### 3.9 분석 실패·재시도
 
 #### `GET /api/v1/analysis-deliveries`
 
 **operationId:** `ListAnalysisDeliveries` · **인증:** Bearer JWT
 
-Bot이 동기화한 Analysis Request 상태입니다. available=false일 때 실시간 제어가 가능한 것처럼 표시하지 않고 마지막 동기화 시각을 보여줍니다. **구현 보완:** heartbeat와 요청 상태의 유효성 기준은 15초입니다.
+Bot이 동기화한 전달 상태와 BE가 영속 수신한 Analysis Queue 상태를 합쳐 반환합니다. `managedBy="backend"`인 항목은 BE 소유이며, 같은 requestId의 기존 Bot 상태보다 우선합니다. `available`과 `lastSynchronizedAt`은 Bot heartbeat의 상태이며 BE 분석 워커의 가용성을 뜻하지 않습니다. **구현 보완:** Bot heartbeat의 freshness 기준은 15초입니다. `available=false`이면 Bot 관리 항목의 재시도를 보류하지만, BE 관리 실패의 재시도 가능 여부는 입력 보존·phase·terminal 여부로 판단합니다.
 
 | 위치  | 이름      | 필수 | 타입·허용값 | 기본값 |
 | ----- | --------- | ---- | ----------- | ------ |
@@ -965,7 +989,11 @@ Bot이 동기화한 Analysis Request 상태입니다. available=false일 때 실
 
 **operationId:** `RetryAnalysisRequest` · **인증:** Bearer JWT
 
-**구현 보완:** owner 또는 Manage Server 권한이 필요합니다. 최신 상태의 retained-failure만 재시도할 수 있습니다. commandId는 새 명령에 새 UUID를 사용하고, 같은 명령의 HTTP 재전송에는 같은 값을 유지합니다. 202와 acknowledgedAt은 접수·Bot 수신을 뜻하며 AI 분석 완료는 별도 queue 상태로 확인합니다. requiresNewAnalysis=true인 terminal 분석은 같은 요청 retry가 거절되므로 새 수동 분석을 요청합니다.
+**구현 보완:** owner 또는 Manage Server 권한이 필요합니다. commandId는 새 명령에 새 UUID를 사용하고, 같은 명령의 HTTP 재전송에는 같은 값을 유지합니다. 재시도 조건은 관리 주체에 따라 다릅니다.
+
+- Bot 관리: 최신 heartbeat와 `retained-failure`가 필요합니다. 202 이후 `acknowledgedAt`은 Bot이 재시도 명령을 수신했음을 뜻합니다.
+- BE 관리(`managedBy="backend"`): 실패 상태이며 입력이 보존돼 있어야 합니다. Bot heartbeat와 무관하게 재시도를 접수하고 `acknowledgedAt`을 바로 반환할 수 있습니다.
+- 두 경우 모두 접수·확인이 AI 분석 완료를 뜻하지 않습니다. 실제 queue/Analysis Request 결과를 조회합니다. `requiresNewAnalysis=true`인 terminal 분석은 같은 요청 retry가 거절되므로 새 수동 분석을 요청합니다.
 
 | 위치  | 이름        | 필수 | 타입·허용값 | 기본값 |
 | ----- | ----------- | ---- | ----------- | ------ |
@@ -1225,8 +1253,17 @@ Bot이 동기화한 Analysis Request 상태입니다. available=false일 때 실
 | `scanRange.startMessageId` | `string`                                                                                                       | 부모 제공 시 필수 | —    |
 | `scanRange.afterMessageId` | `string`                                                                                                       | 부모 제공 시 필수 | —    |
 | `synchronizedAt`           | `string`                                                                                                       | 예                | —    |
+| `managedBy`                | `"bot" \| "backend"` | 아니오 | BE 소유는 backend; 생략된 기존 항목은 Bot 전달 상태 |
+| `phase`                    | `string` | 아니오 | BE Analysis Queue 상태 |
+| `inputRetained`            | `boolean` | 아니오 | 재실행 입력 보존 여부 |
+| `receivedAt`               | `string` | 아니오 | BE 영속 수신 시각 |
+| `startedAt`                | `string \| null` | 아니오 | 분석 시작 시각 |
+| `completedAt`              | `string \| null` | 아니오 | 처리 완료 시각 |
+| `requiresNewAnalysis`      | `boolean` | 아니오 | 같은 요청 재시도 대신 새 수동 분석이 필요한지 |
 
 nextAttemptAt은 구현상 Unix epoch milliseconds입니다. 재시도 일정이 없는 경우 0일 수 있으므로 항상 날짜로 표시하지 않습니다. pending=대기, retry-pending=자동 재시도 대기, retained-failure=사용자 개입 필요, completed-with-candidates=후보 저장 완료, completed-no-decision=후보 없는 정상 완료입니다.
+
+**BE 관리 항목의 호환 표시 주의:** 현재 receipt의 완료 상태는 후보 수와 관계없이 `completed-no-decision`으로 매핑됩니다. `managedBy="backend"`인 경우 이 문자열만으로 후보가 없다고 판단하지 말고 Analysis Request 결과와 카드 목록을 확인합니다. 또한 이 항목의 `synchronizedAt`은 수신 생성 시각이며, Bot heartbeat 시각과 구분합니다.
 
 ### AnalysisRetryCommandDto
 
@@ -1247,14 +1284,20 @@ Swagger에는 대부분 성공 응답만 선언되어 있어 아래 내용은 �
 | HTTP | code                              | 대표 상황                                                             | FE 처리                                         |
 | ---- | --------------------------------- | --------------------------------------------------------------------- | ----------------------------------------------- |
 | 400  | VALIDATION_ERROR 또는 BAD_REQUEST | 필수 값·enum·형식·범위 오류                                           | 입력 오류 표시; 가능하면 data의 필드 오류 사용  |
-| 401  | UNAUTHORIZED                      | 토큰 누락·만료·삭제된 세션, 잘못된 OAuth state                        | 토큰 제거 후 로그인 흐름 재시작                 |
+| 401  | UNAUTHORIZED                      | 토큰 누락·만료·삭제된 세션, 잘못된 OAuth state                        | 보호 API는 token 갱신 후 한 번 재시도; 복원 401은 재로그인 |
 | 403  | FORBIDDEN                         | guild 접근 없음, Manage Server 권한 부족, 다른 서버의 카드            | 선택 서버·권한 안내, 다른 서버 데이터 표시 금지 |
 | 404  | NOT_FOUND                         | Decision / Candidate / Job / Analysis Request 없음                    | 해당 항목 미존재 표시                           |
 | 409  | CONFLICT                          | stale version, 이미 처리된 후보, 중복 동기화, stale queue·재시도 불가 | 상황별 재조회·대기·다시 검수                    |
-| 429  | RATE_LIMITED                      | 요청 제한                                                             | 즉시 반복 요청 중단, 이후 다시 시도             |
-| 5xx  | INTERNAL_ERROR                    | DB·외부 공급자·미처리 오류                                            | 실패 상태 표시, 사용자 재시도 제공              |
+| 422  | VALIDATION_ERROR                  | 분석 최종 검증·예산 실패 등으로 그래프를 제공할 수 없음                | 같은 terminal 요청을 반복하지 않고 새 수동 분석 안내 |
+| 429  | RATE_LIMITED                      | 요청 제한                                                             | 즉시 반복 요청 중단; Retry-After가 있으면 초 단위 대기 후 재시도 |
+| 503  | SERVICE_UNAVAILABLE               | 외부 공급자·분석 서비스의 일시적 사용 불가                             | 실패 상태 표시, backoff 후 재시도 |
+| 그 외 5xx | INTERNAL_ERROR                | DB·외부 공급자·미처리 오류                                            | 실패 상태 표시, 사용자 재시도 제공 |
+
+권한 확인의 403은 `GUILD_ACCESS_DENIED`, 재검증 불가의 502/503은 `GUILD_ACCESS_UNAVAILABLE`을 반환할 수 있습니다. 이 코드에서만 서버 목록·선택·캐시를 복구하고 거절된 쓰기는 자동 재전송하지 않습니다. 일반 검색 공급자의 503을 권한 복구로 반복 처리하지 않습니다. 고정 주기 권한 조회는 없으며, 이벤트 수신이 불가능한 서버는 실제 접근 시 재검증합니다.
 
 검수·편집의 409는 자동으로 최신 버전을 대입해 같은 승인을 반복하지 않습니다. candidate와 predecessor를 다시 읽고 사용자가 변경 내용을 재확인해야 합니다. 동기화의 409는 새 Job을 계속 만들지 않고 기존 진행 상태를 확인합니다. retry API의 202를 받은 뒤에도 분석이 완료됐다는 안내는 queue의 실제 완료 상태 이후에 합니다.
+
+`Retry-After`는 재시도 대기가 있는 오류에서 제공될 수 있습니다. 숫자 값은 초 단위이며, 헤더가 없는 실패는 FE의 backoff 정책을 적용합니다. `VALIDATION_ERROR`의 400 입력 오류와 422 분석 실패는 HTTP 상태로 구분합니다.
 
 <a id="refresh"></a>
 
@@ -1263,6 +1306,7 @@ Swagger에는 대부분 성공 응답만 선언되어 있어 아래 내용은 �
 | 이벤트            | 다시 조회할 데이터                                              |
 | ----------------- | --------------------------------------------------------------- |
 | 서버 변경         | 서버별 목록·Review Queue·Dashboard·Timeline·채널 설정·실패 목록 |
+| 설치 후 포커스 복귀·수동 확인 | 선택 서버 bot-status, 설치 확인 후 channels |
 | 검수 성공         | Review Queue, Decision 목록·상세, Dashboard, Timeline           |
 | 카드 편집 성공    | 카드 상세·목록, Dashboard, Timeline, 필요 시 검색 결과          |
 | 채널 설정 저장    | channels의 monitoredChannelIds                                  |
@@ -1270,7 +1314,7 @@ Swagger에는 대부분 성공 응답만 선언되어 있어 아래 내용은 �
 | Sync Job terminal | Dashboard, Review Queue, Decision 목록·Timeline                 |
 | 재시도 명령 접수  | AnalysisDeliveryQueue와 해당 requestId의 상태                   |
 
-Job polling은 진행 중에만 수행하고 terminal에서 중단합니다. interval은 화면 요구에 맞게 정하되 HTTP 429와 연결 실패 시 backoff를 둡니다. available=false의 queue를 빈 상태·분석 성공으로 해석하지 않습니다.
+Job polling은 진행 중에만 수행하고 terminal에서 중단합니다. interval은 화면 요구에 맞게 정하되 HTTP 429와 연결 실패 시 backoff를 둡니다. available=false의 queue를 빈 상태·분석 성공으로 해석하지 않습니다. Bot heartbeat 상태와 BE 관리 항목의 재시도 조건은 [분석 복구](#recovery)에서 구분합니다.
 
 <a id="caveats"></a>
 
@@ -1282,7 +1326,7 @@ Job polling은 진행 중에만 수행하고 terminal에서 중단합니다. int
 4. DecisionEditDto의 additionalProperties는 Swagger에서 열려 있지만 실제 편집 검증은 strict입니다. 문서에 없는 status/state/summary 등을 보내면 400입니다.
 5. groupBy 기본값은 현재 Swagger에 명시되지 않았지만 구현은 month입니다. 명시적으로 전달하면 클라이언트 의도가 분명해집니다.
 6. source는 자유 객체이고 SyncJobView.status는 string입니다. 현재 구현의 필드·상태를 사용하되 앱에서 알려지지 않은 값의 fallback을 준비합니다.
-7. Why 검색은 별도의 OpenAI 임베딩 설정을 사용합니다. 추출 provider=Gemini가 설정됐다는 사실만으로 검색이 동작한다고 보장하지 않습니다. 검색 공급자 오류는 FE에서 처리해야 합니다.
+7. Why 검색은 별도의 OpenAI 임베딩 설정을 사용합니다. 추출 provider=agy가 설정됐다는 사실만으로 검색이 동작한다고 보장하지 않습니다. 검색 공급자 오류는 FE에서 처리해야 합니다.
 
 <a id="appendix"></a>
 
@@ -1290,29 +1334,15 @@ Job polling은 진행 중에만 수행하고 terminal에서 중단합니다. int
 
 ### 8.1 Bot·내부 API
 
-아래 9개는 service Bearer 인증이 필요합니다. FE는 대응하는 v1 사용자 API를 사용합니다. 현재 Swagger의 service scheme 정의 누락은 스펙 보완 대상입니다.
-
-| Method | 경로                                                    | 용도                                      | 성공 |
-| ------ | ------------------------------------------------------- | ----------------------------------------- | ---- |
-| `POST` | `/api/v1/internal/sync-jobs/claim`                      | Bot Job 획득                              | 200  |
-| `PUT`  | `/api/v1/internal/sync-jobs/{jobId}`                    | owner·채널 결과·임대 갱신                 | 200  |
-| `GET`  | `/api/discussions/history/{decisionId}`                 | 분석 이력                                 | 200  |
-| `POST` | `/api/discussions/analyze`                              | Discussion Context AI 분석                | 200  |
-| `GET`  | `/api/channels/{channelId}/checkpoint`                  | Scan Range 연속 완료 Checkpoint 조회·저장 | 200  |
-| `POST` | `/api/channels/{channelId}/checkpoint`                  | Scan Range 연속 완료 Checkpoint 조회·저장 | 200  |
-| `GET`  | `/api/v1/internal/monitoring`                           | 읽기 가능한 모니터링 채널                 | 200  |
-| `POST` | `/api/v1/internal/analysis-deliveries/sync`             | queue 상태·heartbeat 동기화               | 200  |
-| `POST` | `/api/v1/internal/analysis-deliveries/retries/{id}/ack` | 재시도 명령 수신 확인                     | 200  |
+서비스 인증을 사용하는 전체 경로는 [Bot·내부 API 목록](internal-api.md#service)에서 관리합니다.
+비동기 분석 수신·결과 확인·스캔 API도 그 목록에 포함합니다. FE는 해당 내부 경로 대신
+이 문서의 사용자 v1 API로 연결하며 서비스 토큰을 브라우저에 전달하지 않습니다.
 
 ### 8.2 정책·기존 피드백 API
 
-| Method | 경로                 | 입력                                                    | 성공 응답                                          |
-| ------ | -------------------- | ------------------------------------------------------- | -------------------------------------------------- |
-| GET    | `/api/config/policy` | 없음                                                    | HTTP 200, HarvestingPolicyDto 직접 반환            |
-| GET    | `/api/feedbacks`     | channelId?, limit? query                                | HTTP 200, `{feedbacks: ExternalFeedbackItemDto[]}` |
-| POST   | `/api/feedbacks`     | id/source/content/channelId/createdAt 필수, detail 선택 | HTTP 201, `{id, status}`                           |
-
-Swagger에는 위 3개가 공개로 선언되어 있습니다. 현재 피드백 API는 guild 범위 인증형 v1 계약이 아니고 FE의 서버별 Feedback Board 호출은 준비 중입니다. 원본 피드백 검색이나 서버별 피드백 등록이 필요하면 별도 BE 계약을 합의해야 합니다. 목록에 있다는 이유만으로 v1 사용자 흐름에 그대로 연결하지 않습니다.
+응답 형태·인증 범위·후속 기능 구분은 [정책·기존 피드백](internal-api.md#legacy)을 따릅니다.
+현재 `/api/feedbacks`는 guild 인증형 v1 계약이 아니므로 실제 FE의 서버별 피드백 기능에
+바로 연결하지 않습니다.
 
 ## 9. 문서 갱신과 근거
 
