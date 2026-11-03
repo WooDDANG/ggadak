@@ -43,6 +43,7 @@ import { initPrisma } from './prisma.js';
 import { appLogger } from './logger.js';
 import { assertStorageReady } from '../repositories/storage-readiness.js';
 import { GuildAccessService } from '../services/guild-access.service.js';
+import { GuildAccessRepository } from '../repositories/guild-access.repository.js';
 import { GuildAccessController } from '../api/controllers/guild-access.controller.js';
 
 export interface LoaderOptions {
@@ -90,7 +91,7 @@ export async function initLoaders({
   const aiAdapter = customAiAdapter || Container.get(AiAdapter);
   container.set(AiAdapter, aiAdapter);
 
-  const guildAccess = new GuildAccessService(prisma, authOptions?.now);
+  const guildAccess = new GuildAccessService(new GuildAccessRepository(prisma), authOptions?.now);
   await guildAccess.initialize();
   container.set(GuildAccessService, guildAccess);
   container.set(GuildAccessController, new GuildAccessController(guildAccess));

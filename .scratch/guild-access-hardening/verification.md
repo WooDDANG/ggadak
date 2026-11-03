@@ -15,7 +15,7 @@
 - `npm run api:sync`: 통과. TSOA와 Orval 계약 갱신.
 - 변경 파일 Prettier와 Prisma schema format: 완료.
 - `npm run lint && npm run typecheck && npm test`: 통과. 전체 workspace build와 E2E 포함.
-- 전체 run에서 BE 175, Bot 50, FE 21, E2E 9개 통과를 확인했다. Shared도 root의 전체 workspace 테스트 명령에 포함돼 통과했다.
+- 전체 run에서 BE 175, Bot 53, FE 21, E2E 9개 통과를 확인했다. Shared도 root의 전체 workspace 테스트 명령에 포함돼 통과했다.
 
 ## 배포 전제조건
 
@@ -27,8 +27,10 @@
 
 ## Standards
 
-리뷰 진행 중.
+초기 리뷰 1건: 새 권한 서비스가 Prisma를 직접 사용해 ADR-0021의 저장소 계층을 우회했다. 권한·순서 판정은 서비스에 유지하고 조회·원자적 저장 작업을 BaseRepository 기반 GuildAccessRepository로 분리했다. 기존 HTTP 회귀 13개와 타입 검사가 통과했다. 수정 후 Standards 재리뷰에서 남은 지적 0건을 확인했다.
 
 ## Spec
 
-리뷰 진행 중.
+초기 리뷰 3건: SDK가 캐시되지 않은 멤버의 탈퇴와 Resume 중 멤버 이벤트를 상위 이벤트로 전달하지 않을 수 있었고, unavailable 서버 복구는 GuildCreate 대신 GuildAvailable을 발생시켰다. 실제 설치된 SDK의 Dispatch 처리 경계에서 회귀를 추가하고 raw Gateway 이벤트 수신으로 보완했다. 수정 후 Spec 재리뷰에서 남은 지적 0건을 확인했다. SDK/전달 경계 11개와 실제 Bot→BE 통합 회귀가 통과했다.
+
+최종 재실행: 복구된 GGADDAK 경로를 명시해 Herdr verify에서 SDK 회귀, Bot→BE 통합, lint, typecheck, npm test를 모두 통과했다. lint는 오류 0건이며 기존 Shared logger 테스트의 경고 1건이 남아 있다.

@@ -18,6 +18,7 @@ import { PrismaClient } from '@prisma/client';
 import { AppError, NotFoundError } from '../errors/AppError.js';
 import { DiscordAuthAdapter, HttpDiscordAuthAdapter } from '../adapters/discord-auth.adapter.js';
 import { GuildAccessService } from './guild-access.service.js';
+import { GuildAccessRepository } from '../repositories/guild-access.repository.js';
 import { GuildAccessError } from '../errors/GuildAccessError.js';
 export interface AuthOptions {
   channelAdapter?: DiscordChannelsAdapter;
@@ -44,7 +45,8 @@ export class AuthService {
       options.discordAdapter ??
       new HttpDiscordAuthAdapter(this.config.clientId, this.config.clientSecret);
     this.now = options.now ?? Date.now;
-    this.access = options.guildAccess ?? new GuildAccessService(prisma, this.now);
+    this.access =
+      options.guildAccess ?? new GuildAccessService(new GuildAccessRepository(prisma), this.now);
   }
   private configured() {
     validateAuthConfig(this.config);

@@ -4,127 +4,95 @@ import type {
   GuildAccessObservation,
   Membership,
   Prisma,
-  PrismaClient,
 } from '@prisma/client';
 import { AppError } from '../errors/AppError.js';
 import type { DiscordGuild } from '../adapters/discord-auth.adapter.js';
-
-const CONTROL_ID = 'discord';
-type Store = Prisma.TransactionClient;
+import {
+  GuildAccessRepository,
+  type VerifiedMembership,
+} from '../repositories/guild-access.repository.js';
 
 /** Gateway observations revoke cached proofs; OAuth remains the authority for grants. */
 export class GuildAccessService {
   constructor(
-    private prisma: PrismaClient,
+    private repo: GuildAccessRepository,
     private now: () => number = Date.now,
   ) {}
 
-  async initialize() {
-    // A receiver restart cannot assume that the previous Gateway delivery is still continuous.
-    await this.prisma.$transaction(async tx => {
-      await tx.guildAccessControl.upsert({
-        where: { id: CONTROL_ID },
-        create: { id: CONTROL_ID },
-        update: {
-          streamId: null,
-          lastSequence: 0,
-          connected: false,
-          leaseUntil: null,
-          revision: { increment: 1 },
-        },
-      });
-      await tx.guildAccessObservation.updateMany({
-        data: { revision: { increment: 1 }, available: false },
-      });
-    });
+  initialize() {
+    return this.repo.initialize();
   }
 
-  live(control: GuildAccessControl | null) {
+  private live(control: GuildAccessControl) {
     return Boolean(
-      control?.connected && control.leaseUntil && control.leaseUntil.getTime() > this.now(),
+      control.connected && control.leaseUntil && control.leaseUntil.getTime() > this.now(),
     );
   }
 
-  private covered(control: GuildAccessControl | null, observation: GuildAccessObservation | null) {
+  private covered(control: GuildAccessControl, observation: GuildAccessObservation | null) {
     return (
       this.live(control) &&
       Boolean(
-        control?.membersIntent && observation?.available && observation.installed === 'installed',
+        control.membersIntent && observation?.available && observation.installed === 'installed',
       )
     );
   }
 
   async revision() {
-    return (await this.prisma.guildAccessControl.findUniqueOrThrow({ where: { id: CONTROL_ID } }))
-      .revision;
+    return (await this.repo.control()).revision;
   }
 
   async trusted(membership: Membership) {
     const [control, observation] = await Promise.all([
-      this.prisma.guildAccessControl.findUnique({ where: { id: CONTROL_ID } }),
-      this.prisma.guildAccessObservation.findUnique({ where: { guildId: membership.guildId } }),
+      this.repo.control(),
+      this.repo.observation(membership.guildId),
     ]);
     return this.covered(control, observation) && membership.guildRevision === observation?.revision;
   }
 
   async removed(userId: string, guildId: string) {
     const [removal, control, observation] = await Promise.all([
-      this.prisma.guildAccessRemoval.findUnique({ where: { guildId_userId: { guildId, userId } } }),
-      this.prisma.guildAccessControl.findUnique({ where: { id: CONTROL_ID } }),
-      this.prisma.guildAccessObservation.findUnique({ where: { guildId } }),
+      this.repo.removal(userId, guildId),
+      this.repo.control(),
+      this.repo.observation(guildId),
     ]);
     return Boolean(removal && this.covered(control, observation));
   }
 
   async snapshotTrusted(userId: string) {
-    const [user, memberships] = await Promise.all([
-      this.prisma.user.findUnique({ where: { id: userId } }),
-      this.prisma.membership.findMany({ where: { userId } }),
-    ]);
+    const { user, memberships } = await this.repo.userSnapshot(userId);
     if (!user || user.guildsDirty || !memberships.length) return false;
     return (await Promise.all(memberships.map(m => this.trusted(m)))).every(Boolean);
   }
 
-  async replaceMemberships(tx: Store, userId: string, guilds: DiscordGuild[], revision: number) {
-    const control = await tx.guildAccessControl.findUniqueOrThrow({ where: { id: CONTROL_ID } });
+  async replaceMemberships(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    guilds: DiscordGuild[],
+    revision: number,
+  ) {
+    const control = await this.repo.control(tx);
     if (control.revision !== revision)
       throw new AppError('Discord permissions changed during verification; retry shortly', 503);
-    await tx.membership.deleteMany({ where: { userId } });
+    const memberships: VerifiedMembership[] = [];
     for (const guild of guilds) {
-      const observation = await tx.guildAccessObservation.findUnique({
-        where: { guildId: guild.id },
-      });
-      const removal = await tx.guildAccessRemoval.findUnique({
-        where: { guildId_userId: { guildId: guild.id, userId } },
-      });
+      const observation = await this.repo.observation(guild.id, tx);
+      const removal = await this.repo.removal(userId, guild.id, tx);
       if (removal && this.covered(control, observation)) continue;
-      await tx.guild.upsert({
-        where: { id: guild.id },
-        create: { id: guild.id, name: guild.name, icon: guild.icon },
-        update: { name: guild.name, icon: guild.icon },
+      memberships.push({
+        guild: { id: guild.id, name: guild.name, icon: guild.icon },
+        owner: guild.owner,
+        permissions: guild.permissions,
+        guildRevision: observation?.revision ?? -1,
       });
-      await tx.membership.create({
-        data: {
-          userId,
-          guildId: guild.id,
-          owner: guild.owner,
-          permissions: guild.permissions,
-          refreshedAt: new Date(this.now()),
-          guildRevision: observation?.revision ?? -1,
-        },
-      });
-      if (removal)
-        await tx.guildAccessRemoval.delete({
-          where: { guildId_userId: { guildId: guild.id, userId } },
-        });
     }
-    await tx.user.update({ where: { id: userId }, data: { guildsDirty: false } });
+    await this.repo.replaceMemberships(userId, memberships, new Date(this.now()), tx);
   }
 
   async observe(event: GuildAccessEvent) {
-    const now = new Date(this.now());
-    return this.prisma.$transaction(async tx => {
-      const control = await tx.guildAccessControl.findUniqueOrThrow({ where: { id: CONTROL_ID } });
+    const leaseUntil = new Date(this.now() + GuildAccessPolicy.leaseMs);
+    return this.repo.withTransaction(async tx => {
+      const control = await this.repo.control(tx);
       if (event.kind === 'reset') {
         if (
           event.sequence !== 0 ||
@@ -138,74 +106,59 @@ export class GuildAccessService {
           );
         if (control.streamId === event.streamId) {
           if (control.lastSequence !== 0) throw new AppError('Stream reset is stale', 409);
-          // Reset retries must not invalidate again or grant coverage after an expired lease.
           return { sequence: 0 };
         }
         if (control.streamId && this.live(control))
           throw new AppError('Another Gateway stream is active', 409);
-        await tx.guildAccessObservation.updateMany({
-          data: { installed: 'not_installed', available: false, revision: { increment: 1 } },
-        });
-        for (const guildId of new Set(event.guildIds)) {
-          const unavailable = event.unavailableGuildIds?.includes(guildId) ?? false;
-          await tx.guildAccessObservation.upsert({
-            where: { guildId },
-            create: {
+        await this.repo.resetObservations(
+          [...new Set(event.guildIds)].map(guildId => {
+            const unavailable = event.unavailableGuildIds?.includes(guildId) ?? false;
+            return {
               guildId,
-              revision: 1,
-              installed: unavailable ? 'unknown' : 'installed',
+              installed: unavailable ? ('unknown' as const) : ('installed' as const),
               available: !unavailable,
-            },
-            update: { installed: unavailable ? 'unknown' : 'installed', available: !unavailable },
-          });
-        }
-        // All previous proofs were invalidated, so old epoch tombstones can be compacted.
-        await tx.guildAccessRemoval.deleteMany();
-        await tx.guildAccessControl.update({
-          where: { id: CONTROL_ID },
-          data: {
+            };
+          }),
+          tx,
+        );
+        await this.repo.updateControl(
+          {
             streamId: event.streamId,
             lastSequence: 0,
             connected: true,
             membersIntent: event.membersIntent,
-            leaseUntil: new Date(now.getTime() + GuildAccessPolicy.leaseMs),
-            revision: { increment: 1 },
+            leaseUntil,
+            advanceRevision: true,
           },
-        });
+          tx,
+        );
         return { sequence: 0 };
       }
       if (control.streamId !== event.streamId)
         throw new AppError('Gateway stream must reset before delivering events', 409);
       if (event.kind === 'heartbeat') {
         if (event.sequence !== control.lastSequence) {
-          await tx.guildAccessControl.update({
-            where: { id: CONTROL_ID },
-            data: {
-              streamId: null,
-              connected: false,
-              leaseUntil: null,
-              revision: { increment: 1 },
-            },
-          });
+          await this.repo.updateControl(
+            { streamId: null, connected: false, leaseUntil: null, advanceRevision: true },
+            tx,
+          );
           return { sequence: control.lastSequence, resetRequired: true };
         }
-        await tx.guildAccessControl.update({
-          where: { id: CONTROL_ID },
-          data: {
+        await this.repo.updateControl(
+          {
             connected: event.connected === true,
-            leaseUntil:
-              event.connected === true ? new Date(now.getTime() + GuildAccessPolicy.leaseMs) : null,
+            leaseUntil: event.connected === true ? leaseUntil : null,
           },
-        });
+          tx,
+        );
         return { sequence: control.lastSequence };
       }
       if (event.sequence <= control.lastSequence) return { sequence: control.lastSequence };
       if (event.sequence !== control.lastSequence + 1) {
-        // Do not trust a stream whose invalidations were lost or reordered.
-        await tx.guildAccessControl.update({
-          where: { id: CONTROL_ID },
-          data: { streamId: null, connected: false, leaseUntil: null, revision: { increment: 1 } },
-        });
+        await this.repo.updateControl(
+          { streamId: null, connected: false, leaseUntil: null, advanceRevision: true },
+          tx,
+        );
         return { sequence: control.lastSequence, resetRequired: true };
       }
       if (event.kind !== 'disconnect' && !event.guildId)
@@ -213,33 +166,19 @@ export class GuildAccessService {
       if (event.kind.startsWith('member_') && !event.userId)
         throw new AppError('User ID is required', 400);
       if (event.kind === 'disconnect') {
-        await tx.guildAccessControl.update({
-          where: { id: CONTROL_ID },
-          data: { connected: false, leaseUntil: null },
-        });
+        await this.repo.updateControl({ connected: false, leaseUntil: null }, tx);
       } else if (event.kind === 'member_remove') {
-        await tx.guildAccessRemoval.upsert({
-          where: { guildId_userId: { guildId: event.guildId!, userId: event.userId! } },
-          create: { guildId: event.guildId!, userId: event.userId! },
-          update: {},
-        });
-        await tx.membership.deleteMany({ where: { userId: event.userId, guildId: event.guildId } });
+        await this.repo.removeMember(event.userId!, event.guildId!, tx);
       } else if (event.kind === 'member_change' || event.kind === 'member_join') {
-        await tx.membership.updateMany({
-          where: { userId: event.userId, guildId: event.guildId },
-          data: { guildRevision: -1 },
-        });
+        await this.repo.invalidateMember(event.userId!, event.guildId!, tx);
         if (event.kind === 'member_join') {
-          await tx.guildAccessRemoval.deleteMany({
-            where: { guildId: event.guildId, userId: event.userId },
-          });
-          await tx.user.updateMany({ where: { id: event.userId }, data: { guildsDirty: true } });
+          await this.repo.clearRemovals(event.guildId!, event.userId, tx);
+          await this.repo.markGuildsDirty(event.userId!, tx);
         }
       } else {
         if (event.kind === 'guild_available') {
-          // A period without guild visibility may have hidden a legitimate rejoin.
-          // The new guild revision still requires OAuth before any access grant.
-          await tx.guildAccessRemoval.deleteMany({ where: { guildId: event.guildId } });
+          // Visibility gaps may hide rejoins; the new revision still requires OAuth before grants.
+          await this.repo.clearRemovals(event.guildId!, undefined, tx);
         }
         const installed =
           event.kind === 'guild_remove'
@@ -255,33 +194,17 @@ export class GuildAccessService {
             : ['guild_remove', 'guild_unavailable'].includes(event.kind)
               ? false
               : undefined;
-        await tx.guildAccessObservation.upsert({
-          where: { guildId: event.guildId! },
-          create: {
-            guildId: event.guildId!,
-            revision: 1,
-            ...(installed ? { installed } : {}),
-            ...(available !== undefined ? { available } : {}),
-          },
-          update: {
-            revision: { increment: 1 },
-            ...(installed ? { installed } : {}),
-            ...(available !== undefined ? { available } : {}),
-          },
-        });
+        await this.repo.invalidateGuild(event.guildId!, installed, available, tx);
       }
-      await tx.guildAccessControl.update({
-        where: { id: CONTROL_ID },
-        data: { lastSequence: event.sequence, revision: { increment: 1 } },
-      });
+      await this.repo.updateControl({ lastSequence: event.sequence, advanceRevision: true }, tx);
       return { sequence: event.sequence };
     });
   }
 
   async installation(guildId: string) {
     const [control, observation] = await Promise.all([
-      this.prisma.guildAccessControl.findUnique({ where: { id: CONTROL_ID } }),
-      this.prisma.guildAccessObservation.findUnique({ where: { guildId } }),
+      this.repo.control(),
+      this.repo.observation(guildId),
     ]);
     return this.live(control) && observation
       ? (observation.installed as 'installed' | 'not_installed' | 'unknown')

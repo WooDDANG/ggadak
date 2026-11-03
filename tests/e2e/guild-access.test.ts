@@ -48,7 +48,12 @@ test('Discord removal crosses the Bot journal and authenticated HTTP API to revo
         })
       ).status,
     ).toBe(200);
-    client.emit(Events.GuildMemberRemove, { id: 'user-1', guild: { id: 'guild-1' } });
+    client.emit(Events.Raw, {
+      op: 0,
+      t: 'GUILD_MEMBER_REMOVE',
+      s: 1,
+      d: { guild_id: 'guild-1', user: { id: 'user-1' } },
+    });
     await publisher.flush();
     for (const token of [first.token, second.token]) {
       const headers = { Authorization: `Bearer ${token}` };

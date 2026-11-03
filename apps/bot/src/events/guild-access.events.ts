@@ -8,7 +8,21 @@ import type {
 
 const logger = createLogger('GUILD-ACCESS-EVENTS');
 
-/** Discord cache observations only: these listeners never query Discord's REST API. */
+interface GuildDispatch {
+  op: number;
+  t?: string;
+  d?: {
+    id?: string;
+    guild_id?: string;
+    unavailable?: boolean;
+    owner_id?: string;
+    user?: { id: string };
+    roles?: string[];
+    role?: { id: string; permissions?: string };
+  };
+}
+
+/** Raw Gateway dispatches precede SDK cache filtering and include Resume replay. No Discord REST. */
 export function registerGuildAccessEvents(
   client: Client,
   publisher: GuildAccessPublisher,
@@ -63,48 +77,68 @@ export function registerGuildAccessEvents(
     requiresReset = false;
     report(publisher.ready(snapshot()));
   });
-  client.on(Events.GuildMemberRemove, member => {
-    if (membersIntent)
-      report(
-        publisher.publish({ kind: 'member_remove', guildId: member.guild.id, userId: member.id }),
-      );
-  });
-  client.on(Events.GuildMemberAdd, member => {
-    if (membersIntent)
-      report(
-        publisher.publish({ kind: 'member_join', guildId: member.guild.id, userId: member.id }),
-      );
-  });
-  client.on(Events.GuildMemberUpdate, (previous, current) => {
-    if (!membersIntent) return;
-    if (
-      previous.partial ||
-      previous.roles.cache.size !== current.roles.cache.size ||
-      previous.roles.cache.some(role => !current.roles.cache.has(role.id))
-    ) {
-      report(
-        publisher.publish({ kind: 'member_change', guildId: current.guild.id, userId: current.id }),
-      );
+  // High-level member events are absent for uncached members and suppressed during Resume.
+  // Listening only here also avoids double-processing the SDK's derived high-level events.
+  client.on(Events.Raw, (packet: GuildDispatch) => {
+    if (packet.op !== 0 || !packet.d) return;
+    const data = packet.d;
+    const guildId = data.guild_id ?? data.id;
+    if (!guildId) return;
+    const guild = client.guilds.cache.get(guildId);
+    switch (packet.t) {
+      case 'GUILD_MEMBER_REMOVE':
+      case 'GUILD_MEMBER_ADD':
+        if (membersIntent && data.user?.id)
+          report(
+            publisher.publish({
+              kind: packet.t === 'GUILD_MEMBER_REMOVE' ? 'member_remove' : 'member_join',
+              guildId,
+              userId: data.user.id,
+            }),
+          );
+        return;
+      case 'GUILD_MEMBER_UPDATE': {
+        if (!membersIntent || !data.user?.id || !data.roles) return;
+        const member = guild?.members?.cache.get(data.user.id);
+        const previous = member && [...member.roles.cache.keys()].filter(id => id !== guildId);
+        if (
+          !previous ||
+          previous.length !== data.roles.length ||
+          data.roles.some(id => !previous.includes(id))
+        )
+          report(publisher.publish({ kind: 'member_change', guildId, userId: data.user.id }));
+        return;
+      }
+      case 'GUILD_ROLE_UPDATE': {
+        const previous = data.role && guild?.roles?.cache.get(data.role.id);
+        if (!previous || previous.permissions.bitfield.toString() !== data.role?.permissions)
+          report(publisher.publish({ kind: 'guild_change', guildId }));
+        return;
+      }
+      case 'GUILD_ROLE_CREATE':
+      case 'GUILD_ROLE_DELETE':
+        report(publisher.publish({ kind: 'guild_change', guildId }));
+        return;
+      case 'GUILD_UPDATE':
+        if (data.owner_id && guild?.ownerId !== data.owner_id)
+          report(publisher.publish({ kind: 'guild_change', guildId }));
+        return;
+      case 'GUILD_CREATE':
+        report(
+          publisher.publish({
+            kind: data.unavailable ? 'guild_unavailable' : 'guild_available',
+            guildId,
+          }),
+        );
+        return;
+      case 'GUILD_DELETE':
+        report(
+          publisher.publish({
+            kind: data.unavailable ? 'guild_unavailable' : 'guild_remove',
+            guildId,
+          }),
+        );
+        return;
     }
   });
-  client.on(Events.GuildRoleUpdate, (previous, current) => {
-    if (previous.permissions.bitfield !== current.permissions.bitfield)
-      report(publisher.publish({ kind: 'guild_change', guildId: current.guild.id }));
-  });
-  client.on(Events.GuildRoleDelete, role =>
-    report(publisher.publish({ kind: 'guild_change', guildId: role.guild.id })),
-  );
-  client.on(Events.GuildUpdate, (previous, current) => {
-    if (previous.ownerId !== current.ownerId)
-      report(publisher.publish({ kind: 'guild_change', guildId: current.id }));
-  });
-  client.on(Events.GuildCreate, guild =>
-    report(publisher.publish({ kind: 'guild_available', guildId: guild.id })),
-  );
-  client.on(Events.GuildDelete, guild =>
-    report(publisher.publish({ kind: 'guild_remove', guildId: guild.id })),
-  );
-  client.on(Events.GuildUnavailable, guild =>
-    report(publisher.publish({ kind: 'guild_unavailable', guildId: guild.id })),
-  );
 }
