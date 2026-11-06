@@ -4,7 +4,7 @@
 
 - [Bot](./apps/bot/CONTEXT.md) — Discord bot daemon harvesting discussion windows, managing debouncing and channel locks, and dispatching discussion context to the BE
 - [BE](./apps/be/CONTEXT.md) — Backend API server and database providing centralized preprocessing, AI decision extraction, Review Queue lifecycle, and REST APIs for the FE
-- [FE](./apps/fe/CONTEXT.md) — Frontend web dashboard providing decision timelines, full-text search, and team analytics
+- [FE](./apps/frontend-main/README.md) — Independently maintained frontend Git submodule providing decision review, timelines, search, and settings
 - [Shared](./packages/shared/CONTEXT.md) — Shared domain entities, Zod validation schemas, preprocessors, and API contract types
 
 ## Relationships

@@ -1,0 +1,4 @@
+[submodule "apps/frontend-main"]
+	path = apps/frontend-main
+	url = https://github.com/likelion-kkadak/frontend.git
+	branch = main

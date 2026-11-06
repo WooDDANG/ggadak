@@ -21,3 +21,7 @@ When the user assigns implementation tickets or requests multi-agent coordinatio
 The user delegates agy's approval prompts for assigned repository file reads, owned-file creation/edits, tests, and type checks to the coordinating agent. Inspect each prompt and approve matching actions without asking again; see the approval boundaries in `docs/agents/orchestration.md`.
 
 Run code generation, builds, tests, and type checks in the Herdr `verify` tab's `Tests · Build` pane so the user can see their output. Coordinate this shared pane before dispatching checks.
+
+### Frontend repository
+
+For changes to the `apps/frontend-main` Git submodule, follow [the frontend PR workflow](docs/agents/frontend.md).
