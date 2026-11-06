@@ -2489,51 +2489,6 @@
 				"type": "object",
 				"additionalProperties": false
 			},
-			"ApiResponse__accessToken-string--tokenType-string--expiresAt-string--user-AuthUserDto__": {
-				"description": "Shared v1 response contract. Domain payloads remain typed by each endpoint.",
-				"properties": {
-					"success": {
-						"type": "boolean"
-					},
-					"code": {
-						"type": "string"
-					},
-					"message": {
-						"type": "string"
-					},
-					"data": {
-						"properties": {
-							"user": {
-								"$ref": "#/components/schemas/AuthUserDto"
-							},
-							"expiresAt": {
-								"type": "string"
-							},
-							"tokenType": {
-								"type": "string"
-							},
-							"accessToken": {
-								"type": "string"
-							}
-						},
-						"required": [
-							"user",
-							"expiresAt",
-							"tokenType",
-							"accessToken"
-						],
-						"type": "object"
-					}
-				},
-				"required": [
-					"success",
-					"code",
-					"message",
-					"data"
-				],
-				"type": "object",
-				"additionalProperties": false
-			},
 			"DiscordGuild": {
 				"properties": {
 					"id": {
@@ -2563,7 +2518,28 @@
 				"type": "object",
 				"additionalProperties": false
 			},
-			"ApiResponse__accessToken-string--tokenType-string--expiresAt-string--user-AuthUserDto--guilds-DiscordGuild-Array__": {
+			"GuildSelectionDto": {
+				"properties": {
+					"status": {
+						"type": "string",
+						"enum": [
+							"ready",
+							"unavailable"
+						]
+					},
+					"checkedAt": {
+						"type": "string",
+						"nullable": true
+					}
+				},
+				"required": [
+					"status",
+					"checkedAt"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"ApiResponse__accessToken-string--tokenType-string--expiresAt-string--user-AuthUserDto--guilds-DiscordGuild-Array--guildSelection-GuildSelectionDto__": {
 				"description": "Shared v1 response contract. Domain payloads remain typed by each endpoint.",
 				"properties": {
 					"success": {
@@ -2577,6 +2553,9 @@
 					},
 					"data": {
 						"properties": {
+							"guildSelection": {
+								"$ref": "#/components/schemas/GuildSelectionDto"
+							},
 							"guilds": {
 								"items": {
 									"$ref": "#/components/schemas/DiscordGuild"
@@ -2597,6 +2576,7 @@
 							}
 						},
 						"required": [
+							"guildSelection",
 							"guilds",
 							"user",
 							"expiresAt",
@@ -2685,7 +2665,7 @@
 				"type": "object",
 				"additionalProperties": false
 			},
-			"ApiResponse__guilds-DiscordGuild-Array__": {
+			"ApiResponse__guilds-DiscordGuild-Array--guildSelection-GuildSelectionDto__": {
 				"description": "Shared v1 response contract. Domain payloads remain typed by each endpoint.",
 				"properties": {
 					"success": {
@@ -2699,6 +2679,9 @@
 					},
 					"data": {
 						"properties": {
+							"guildSelection": {
+								"$ref": "#/components/schemas/GuildSelectionDto"
+							},
 							"guilds": {
 								"items": {
 									"$ref": "#/components/schemas/DiscordGuild"
@@ -2707,6 +2690,7 @@
 							}
 						},
 						"required": [
+							"guildSelection",
 							"guilds"
 						],
 						"type": "object"
@@ -5271,7 +5255,7 @@
 						"content": {
 							"application/json": {
 								"schema": {
-									"$ref": "#/components/schemas/ApiResponse__accessToken-string--tokenType-string--expiresAt-string--user-AuthUserDto__"
+									"$ref": "#/components/schemas/ApiResponse__accessToken-string--tokenType-string--expiresAt-string--user-AuthUserDto--guilds-DiscordGuild-Array--guildSelection-GuildSelectionDto__"
 								}
 							}
 						}
@@ -5315,7 +5299,7 @@
 						"content": {
 							"application/json": {
 								"schema": {
-									"$ref": "#/components/schemas/ApiResponse__accessToken-string--tokenType-string--expiresAt-string--user-AuthUserDto--guilds-DiscordGuild-Array__"
+									"$ref": "#/components/schemas/ApiResponse__accessToken-string--tokenType-string--expiresAt-string--user-AuthUserDto--guilds-DiscordGuild-Array--guildSelection-GuildSelectionDto__"
 								}
 							}
 						}
@@ -5385,7 +5369,7 @@
 						"content": {
 							"application/json": {
 								"schema": {
-									"$ref": "#/components/schemas/ApiResponse__guilds-DiscordGuild-Array__"
+									"$ref": "#/components/schemas/ApiResponse__guilds-DiscordGuild-Array--guildSelection-GuildSelectionDto__"
 								}
 							}
 						}

@@ -42,6 +42,20 @@ export class GuildAccessService {
     return (await this.repo.control()).revision;
   }
 
+  async installationInventory() {
+    const before = await this.repo.control();
+    if (!this.live(before)) return null;
+    const observations = await this.repo.observations();
+    const after = await this.repo.control();
+    if (
+      !this.live(after) ||
+      before.revision !== after.revision ||
+      before.streamId !== after.streamId
+    )
+      return null;
+    return new Map(observations.map(observation => [observation.guildId, observation.installed]));
+  }
+
   async trusted(membership: Membership) {
     const [control, observation] = await Promise.all([
       this.repo.control(),

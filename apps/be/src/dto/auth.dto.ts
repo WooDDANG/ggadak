@@ -9,3 +9,8 @@ export interface AuthPrincipal {
   userId: string;
   sessionId: string;
 }
+
+export interface GuildSelectionDto {
+  status: 'ready' | 'unavailable';
+  checkedAt: string | null;
+}

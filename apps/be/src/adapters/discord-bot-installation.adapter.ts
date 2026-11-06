@@ -3,12 +3,18 @@ import { BotInstallationStatus } from '../dto/bot-installation.dto.js';
 
 export type BotMembershipObservation = BotInstallationStatus;
 
+export interface DiscordGuildInventoryAdapter {
+  listInstalledGuilds(): Promise<string[] | null>;
+}
+
 export interface DiscordBotInstallationAdapter {
   observeBotMembership(guildId: string): Promise<BotMembershipObservation>;
   getApplicationId(): Promise<string | null>;
 }
 
-export class HttpDiscordBotInstallationAdapter implements DiscordBotInstallationAdapter {
+export class HttpDiscordBotInstallationAdapter
+  implements DiscordBotInstallationAdapter, DiscordGuildInventoryAdapter
+{
   constructor(
     private botToken: string = process.env.DISCORD_BOT_TOKEN ?? '',
     private transport: typeof fetch = fetch,
@@ -29,6 +35,38 @@ export class HttpDiscordBotInstallationAdapter implements DiscordBotInstallation
     } catch {
       return null;
     }
+  }
+
+  async listInstalledGuilds(): Promise<string[] | null> {
+    const identityResponse = await this.fetchDiscord('/users/@me');
+    const identity = identityResponse?.ok ? await identityResponse.json().catch(() => null) : null;
+    if (identity?.bot !== true || typeof identity.id !== 'string' || !/^\d+$/.test(identity.id))
+      return null;
+    const ids = new Set<string>();
+    let after = '';
+    // A partial or looping inventory is never a complete installed-server list.
+    for (let page = 0; page < 1000; page++) {
+      const response = await this.fetchDiscord(
+        `/users/@me/guilds?limit=200${after ? `&after=${encodeURIComponent(after)}` : ''}`,
+      );
+      const guilds = response?.ok ? await response.json().catch(() => null) : null;
+      if (
+        !Array.isArray(guilds) ||
+        guilds.length > 200 ||
+        guilds.some(g => typeof g?.id !== 'string' || !/^\d+$/.test(g.id))
+      )
+        return null;
+      for (const guild of guilds) ids.add(guild.id);
+      if (guilds.length < 200) return [...ids];
+      if (after && guilds.some(g => BigInt(g.id) <= BigInt(after))) return null;
+      const next = guilds.reduce(
+        (max, guild) => (BigInt(guild.id) > BigInt(max) ? guild.id : max),
+        '0',
+      ) as string;
+      if (BigInt(next) <= BigInt(after || '0')) return null;
+      after = next;
+    }
+    return null;
   }
 
   async observeBotMembership(guildId: string): Promise<BotMembershipObservation> {

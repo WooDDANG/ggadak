@@ -1,6 +1,6 @@
 import { AuthError } from '../../errors/AuthError.js';
 import { requirePrincipal } from '../guards/authorization.js';
-import type { AuthUserDto } from '../../dto/auth.dto.js';
+import type { AuthUserDto, GuildSelectionDto } from '../../dto/auth.dto.js';
 import { Controller, Route, Tags, Get, Post, Request, Body, Security } from 'tsoa';
 import type { Request as ExpressRequest } from 'express';
 import { Service } from 'typedi';
@@ -26,7 +26,14 @@ export class AuthController extends Controller {
     @Body() body: { code: string; state: string },
     @Request() request: ExpressRequest,
   ): Promise<
-    ApiResponse<{ accessToken: string; tokenType: string; expiresAt: string; user: AuthUserDto }>
+    ApiResponse<{
+      accessToken: string;
+      tokenType: string;
+      expiresAt: string;
+      user: AuthUserDto;
+      guilds: DiscordGuild[];
+      guildSelection: GuildSelectionDto;
+    }>
   > {
     if (request.headers.origin) this.auth.requireBrowserOrigin(request.headers.origin);
     const { sessionCookie, ...result } = await this.auth.login(
@@ -49,6 +56,7 @@ export class AuthController extends Controller {
       expiresAt: string;
       user: AuthUserDto;
       guilds: DiscordGuild[];
+      guildSelection: GuildSelectionDto;
     }>
   > {
     this.setHeader('Cache-Control', 'no-store');
@@ -74,8 +82,9 @@ export class AuthController extends Controller {
   @Get('guilds')
   async listAuthGuilds(
     @Request() request: ExpressRequest,
-  ): Promise<ApiResponse<{ guilds: DiscordGuild[] }>> {
-    return apiSuccess({ guilds: await this.auth.guilds(requirePrincipal(request)) });
+  ): Promise<ApiResponse<{ guilds: DiscordGuild[]; guildSelection: GuildSelectionDto }>> {
+    this.setHeader('Cache-Control', 'no-store');
+    return apiSuccess(await this.auth.selectableGuilds(requirePrincipal(request)));
   }
   @Security('jwt')
   @Post('refresh')

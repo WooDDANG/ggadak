@@ -20,6 +20,11 @@ import { DiscordAuthAdapter, HttpDiscordAuthAdapter } from '../adapters/discord-
 import { GuildAccessService } from './guild-access.service.js';
 import { GuildAccessRepository } from '../repositories/guild-access.repository.js';
 import { GuildAccessError } from '../errors/GuildAccessError.js';
+import { InstalledGuildsService } from './installed-guilds.service.js';
+import {
+  HttpDiscordBotInstallationAdapter,
+  type DiscordGuildInventoryAdapter,
+} from '../adapters/discord-bot-installation.adapter.js';
 export interface AuthOptions {
   channelAdapter?: DiscordChannelsAdapter;
   botInstallationAdapter?: DiscordBotInstallationAdapter;
@@ -28,6 +33,7 @@ export interface AuthOptions {
   discordAdapter?: DiscordAuthAdapter;
   now?: () => number;
   guildAccess?: GuildAccessService;
+  guildInventoryAdapter?: DiscordGuildInventoryAdapter;
 }
 @Service()
 export class AuthService {
@@ -35,6 +41,7 @@ export class AuthService {
   private discord: DiscordAuthAdapter;
   private now: () => number;
   private access: GuildAccessService;
+  private installed: InstalledGuildsService;
   private verifications = new Map<string, Promise<void>>();
   constructor(
     private prisma: PrismaClient,
@@ -47,6 +54,11 @@ export class AuthService {
     this.now = options.now ?? Date.now;
     this.access =
       options.guildAccess ?? new GuildAccessService(new GuildAccessRepository(prisma), this.now);
+    this.installed = new InstalledGuildsService(
+      this.access,
+      options.guildInventoryAdapter ?? new HttpDiscordBotInstallationAdapter(),
+      this.now,
+    );
   }
   private configured() {
     validateAuthConfig(this.config);
@@ -154,6 +166,10 @@ export class AuthService {
     return {
       ...this.token({ userId: user.id, sessionId }, expiresAt.getTime()),
       user: this.publicUser(user),
+      ...(await this.installed.select(
+        await this.cachedGuilds({ userId: user.id, sessionId }),
+        revision,
+      )),
       sessionCookie: this.browserCookie(browserToken, expiresAt),
     };
   }
@@ -271,6 +287,9 @@ export class AuthService {
     );
   }
   async guilds(user: AuthPrincipal) {
+    return (await this.selectableGuilds(user)).guilds;
+  }
+  async selectableGuilds(user: AuthPrincipal) {
     const revision = await this.access.revision();
     if (!(await this.access.snapshotTrusted(user.userId))) await this.verifyGuilds(user);
     const guilds = await this.cachedGuilds(user);
@@ -279,7 +298,7 @@ export class AuthService {
         'Discord permissions changed during authorization; retry shortly',
         503,
       );
-    return guilds;
+    return this.installed.select(guilds, revision);
   }
   private async cachedGuilds(user: AuthPrincipal) {
     const membership = await this.prisma.membership.findMany({
@@ -322,8 +341,8 @@ export class AuthService {
   }
   async restore(cookie?: string) {
     const principal = await this.browserPrincipal(cookie);
-    const guilds = await this.guilds(principal);
-    return { ...(await this.refresh(principal)), user: await this.me(principal), guilds };
+    const selection = await this.selectableGuilds(principal);
+    return { ...(await this.refresh(principal)), user: await this.me(principal), ...selection };
   }
   async refresh(user: AuthPrincipal) {
     const session = await this.prisma.authSession.findUnique({ where: { id: user.sessionId } });

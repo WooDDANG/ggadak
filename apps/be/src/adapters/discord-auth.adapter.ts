@@ -1,5 +1,7 @@
 import { AuthError } from '../errors/AuthError.js';
 import { AppError } from '../errors/AppError.js';
+import { createLogger } from '@ggaddak/shared';
+const logger = createLogger('DISCORD-AUTH');
 export interface DiscordIdentity {
   id: string;
   username: string;
@@ -36,6 +38,11 @@ export class HttpDiscordAuthAdapter implements DiscordAuthAdapter {
       });
       if (!response.ok) {
         const body = (await response.json().catch(() => ({}))) as { error?: string };
+        logger.warn('Discord authentication request rejected', {
+          operation: path === '/oauth2/token' ? 'token' : 'user',
+          status: response.status,
+          errorCode: typeof body.error === 'string' ? body.error.slice(0, 80) : undefined,
+        });
         if (
           (path !== '/oauth2/token' && response.status === 401) ||
           (path === '/oauth2/token' && response.status === 400 && body.error === 'invalid_grant')
