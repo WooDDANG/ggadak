@@ -31,7 +31,8 @@
     "format": "prettier --write \"**/*.{ts,js,json,html}\"",
     "format:check": "prettier --check \"**/*.{ts,js,json,html}\"",
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
-    "typecheck": "npm run typecheck --workspace=@ggaddak/be && tsc -p tsconfig.test.json"
+    "typecheck": "npm run typecheck --workspace=@ggaddak/be && tsc -p tsconfig.test.json",
+    "prepare": "husky"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
@@ -40,6 +41,8 @@
     "concurrently": "^10.0.5",
     "eslint": "^10.11.0",
     "eslint-config-prettier": "^10.1.8",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.6.0",
     "prettier": "^3.9.9",
     "typescript": "^5.4.5",
     "vitest": "^2.1.9"
