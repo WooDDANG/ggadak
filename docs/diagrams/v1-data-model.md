@@ -1,5 +1,8 @@
 # v1 data model
 
+> [!NOTE]
+> 최신 전체 데이터베이스 스키마 및 다이어그램(총 26개 모델 명세)은 [Database Architecture & Schema Specification](database-schema.md) 문서를 참고하세요.
+
 ```mermaid
 erDiagram
   Decision ||--o| DecisionEmbedding : indexes
