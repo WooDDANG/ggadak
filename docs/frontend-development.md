@@ -51,4 +51,8 @@ git commit -m "chore: update frontend submodule"
 - 서버 목록은 가입 서버와 봇 설치 확인된 서버의 교집합입니다. 정상 빈 목록과 확인 불가를 구분하며, 확인 불가 시 로그인을 유지하고 재확인합니다.
 - 브라우저 시작 시 HttpOnly 쿠키로 세션을 복원합니다. 포커스 복귀·온라인 복귀·수동 요청으로 서버 목록을 갱신하고 JWT 갱신은 목록 조회와 분리합니다.
 - FE·BE·Bot은 Herdr dev 탭의 전용 pane에서 실행합니다. 빌드·회귀 검증은 verify 탭에서 진행합니다.
-- 부모 저장소는 검증한 FE 커밋 `e45aa8b`를 기록합니다. [FE PR #3](https://github.com/likelion-kkadak/frontend/pull/3)의 검토·병합 대기 커밋이며 자동 merge하지 않았습니다.
+- 부모 저장소는 검증한 FE 커밋 `18e5b43`를 기록합니다. [FE PR #4](https://github.com/likelion-kkadak/frontend/pull/4)의 검토·병합 대기 커밋이며 자동 merge하지 않았습니다.
+
+리뷰 후속 개선의 실제 FE→BE 검증 범위와 실행 명령은 [브라우저 인증 회귀 검증](frontend-review-verification.md)을 참고합니다.
+
+리뷰 후속 수정은 `fix/auth-review-followups`의 별도 PR #4로 분리했습니다. 기존 PR #3의 브랜치는 `e45aa8b`에 유지합니다.
