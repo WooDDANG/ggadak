@@ -24,6 +24,9 @@ scrape_configs:
             stage: stage
             provider: provider
             success: success
+      - timestamp:
+          source: timestamp
+          format: RFC3339Nano
       - labels:
           stage:
           provider:

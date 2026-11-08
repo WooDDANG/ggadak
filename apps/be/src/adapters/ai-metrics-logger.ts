@@ -32,16 +32,25 @@ export interface AiMetricRecord {
 }
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
-const logDir = path.resolve(currentDir, '../../logs');
-const logFilePath = path.join(logDir, 'ai-metrics.log');
+const defaultLogDir = path.resolve(currentDir, '../../logs');
+const defaultLogFilePath = path.join(defaultLogDir, 'ai-metrics.log');
 
 const consoleLogger = createLogger('AI-METRIC');
 
 export function recordAiMetric(metric: AiMetricRecord): void {
   try {
-    if (process.env.NODE_ENV !== 'test') {
-      if (!fs.existsSync(logDir)) {
-        fs.mkdirSync(logDir, { recursive: true });
+    const isExplicitTestPath = Boolean(process.env.AI_METRICS_LOG_PATH);
+    const isTestRunner =
+      (process.env.NODE_ENV === 'test' || process.env.VITEST === 'true') && !isExplicitTestPath;
+    const isMock = metric.provider === 'mock';
+    const isPreflightValidationOnly = metric.failureKind === 'configuration';
+
+    // 대시보드(ai-metrics.log)에는 실제 외부 AI 제공자로 전송된 호출만 기록
+    if (!isTestRunner && !isMock && !isPreflightValidationOnly) {
+      const targetFilePath = process.env.AI_METRICS_LOG_PATH || defaultLogFilePath;
+      const targetDir = path.dirname(targetFilePath);
+      if (!fs.existsSync(targetDir)) {
+        fs.mkdirSync(targetDir, { recursive: true });
       }
       const line =
         JSON.stringify({
@@ -50,7 +59,7 @@ export function recordAiMetric(metric: AiMetricRecord): void {
           service: 'AI-METRIC',
           env: process.env.NODE_ENV || 'development',
         }) + '\n';
-      fs.appendFileSync(logFilePath, line, 'utf8');
+      fs.appendFileSync(targetFilePath, line, 'utf8');
     }
   } catch (err) {
     consoleLogger.warn('Failed to append AI metric log', { error: String(err) });

@@ -4,9 +4,15 @@ import { fileURLToPath } from 'node:url';
 import { test, expect } from 'vitest';
 import { recordAiMetric } from '../../src/adapters/ai-metrics-logger.js';
 
-test('recordAiMetric appends a valid JSON-line to ai-metrics.log', () => {
+test('recordAiMetric appends a valid JSON-line to ai-metrics.log when path is configured', () => {
   const currentDir = path.dirname(fileURLToPath(import.meta.url));
-  const logFilePath = path.resolve(currentDir, '../../logs/ai-metrics.log');
+  const testLogFilePath = path.resolve(currentDir, '../../logs/ai-metrics.test.log');
+
+  if (fs.existsSync(testLogFilePath)) {
+    fs.unlinkSync(testLogFilePath);
+  }
+
+  process.env.AI_METRICS_LOG_PATH = testLogFilePath;
 
   const testRecord = {
     timestamp: '2026-11-08T13:30:00.000Z',
@@ -20,10 +26,17 @@ test('recordAiMetric appends a valid JSON-line to ai-metrics.log', () => {
     success: true,
   };
 
-  recordAiMetric(testRecord);
+  try {
+    recordAiMetric(testRecord);
 
-  expect(fs.existsSync(logFilePath)).toBe(true);
-  const content = fs.readFileSync(logFilePath, 'utf8');
-  expect(content).toContain('"model":"nvidia/nemotron-test"');
-  expect(content).toContain('"durationMs":1250');
+    expect(fs.existsSync(testLogFilePath)).toBe(true);
+    const content = fs.readFileSync(testLogFilePath, 'utf8');
+    expect(content).toContain('"model":"nvidia/nemotron-test"');
+    expect(content).toContain('"durationMs":1250');
+  } finally {
+    delete process.env.AI_METRICS_LOG_PATH;
+    if (fs.existsSync(testLogFilePath)) {
+      fs.unlinkSync(testLogFilePath);
+    }
+  }
 });
