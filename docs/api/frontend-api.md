@@ -9,6 +9,8 @@ Agentic 분석·추가 그래프 계약: [별도 명세](agentic-analysis.md)
 
 설계 초안과의 차이: [초안 비교표](design-draft-comparison.md)
 
+FE 화면 테스트용 합성 데이터: [목 데이터 사용법](mocks/README.md) · [25개 요청·응답 fixture](mocks/fixtures.json)
+
 이 문서는 FE가 현재 BE에 연결할 때 사용하는 계약입니다. 경로·필드·필수 여부·성공 상태는 Swagger를 기준으로 정리했고, 스펙에 빠진 인증 흐름·권한·조건부 검증은 **구현 보완**으로 표시했습니다. 예제 값은 합성 데이터입니다. “스펙 존재”는 실제 FE 화면 구현이나 외부 Discord/AI 연결 검증 완료를 뜻하지 않습니다.
 
 ## 목차
