@@ -22,7 +22,7 @@ export const AiDefaults = {
   provider: 'nvidia',
   agyExecutable: 'agy',
   nvidiaBaseUrl: 'https://integrate.api.nvidia.com/v1',
-  nvidiaEnableThinking: true,
+  nvidiaEnableThinking: false,
   maxOutputTokens: 16384,
   models: {
     agy: 'gemini-3.8-flash-low',
