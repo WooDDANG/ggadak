@@ -67,7 +67,7 @@ test('NvidiaProvider streams chunks, aggregates reasoning/content, and returns p
     usage: { inputTokens: 42, outputTokens: 15 },
   });
   expect(capturedBody.model).toBe('nvidia/nemotron-3.5-super-vl-120b-a12b');
-  expect(capturedBody.chat_template_kwargs).toEqual({ enable_thinking: true });
+  expect(capturedBody.chat_template_kwargs).toEqual({ enable_thinking: false });
   expect(capturedBody.stream).toBe(true);
   expect(capturedOptions.signal).toBe(signal);
 });
@@ -170,7 +170,7 @@ test('NvidiaProvider logs reasoning_content, respects thinking toggle, and maps 
     signal: new AbortController().signal,
   });
 
-  expect(capturedBody.chat_template_kwargs).toBeUndefined();
+  expect(capturedBody.chat_template_kwargs).toEqual({ enable_thinking: false });
   expect(loggedMessages.some(m => m.includes('Step 1: parse DB decision'))).toBe(true);
 
   // Test timeout abort error classification

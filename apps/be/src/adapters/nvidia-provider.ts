@@ -81,10 +81,8 @@ export class NvidiaProvider implements AiProvider {
           top_p: 0.95,
           max_tokens: request.maxOutputTokens,
           seed: 42,
-          // chat_template_kwargs passes enable_thinking for reasoning models when enabled
-          ...(this.enableThinking
-            ? ({ chat_template_kwargs: { enable_thinking: true } } as any)
-            : {}),
+          // chat_template_kwargs passes enable_thinking explicitly to override model default
+          ...({ chat_template_kwargs: { enable_thinking: this.enableThinking } } as any),
           stream: true,
           stream_options: { include_usage: true },
         },

@@ -22,6 +22,7 @@ function createDefaultProvider(options: AppConfig['ai']): AiProvider {
     return new NvidiaProvider({
       apiKey: options.nvidiaApiKey,
       baseURL: options.nvidiaBaseUrl,
+      enableThinking: options.nvidiaEnableThinking,
     });
   }
   return new AgyProvider({
