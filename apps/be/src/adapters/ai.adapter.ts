@@ -13,6 +13,7 @@ import type { AiSettings, AiCallContext, AiResult } from '../domain/ai-call.js';
 import { modelForStage } from '../domain/ai-call.js';
 import { AgyProvider } from './agy-provider.js';
 import { NvidiaProvider } from './nvidia-provider.js';
+import { recordAiMetric, type AiMetricRecord } from './ai-metrics-logger.js';
 import type { AiProvider } from './ai-provider.js';
 export type { AiSettings, AiCallContext, AiResult } from '../domain/ai-call.js';
 
@@ -48,6 +49,7 @@ export class AiAdapter implements IAiAdapter {
     private readonly options: AppConfig['ai'] = config.ai,
     private readonly environment = config.nodeEnv,
     private readonly provider: AiProvider = createDefaultProvider(options),
+    private readonly metricRecorder: (metric: AiMetricRecord) => void = recordAiMetric,
   ) {
     this.settings = {
       provider: options.provider,
@@ -128,13 +130,40 @@ export class AiAdapter implements IAiAdapter {
     const serializedInput = JSON.stringify(input);
     if (maxInputChars > 0 && serializedInput.length > maxInputChars)
       throw new AppError('AI input limit exceeded', 422);
-    return this.provider.generate({
-      model,
-      system,
-      input: serializedInput,
-      outputSchema: stage === AiStage.Verify ? VerificationSchema : GraphSchema,
-      maxOutputTokens,
-      signal: context.signal,
-    });
+    const startTime = performance.now();
+    try {
+      const result = await this.provider.generate({
+        model,
+        system,
+        input: serializedInput,
+        outputSchema: stage === AiStage.Verify ? VerificationSchema : GraphSchema,
+        maxOutputTokens,
+        signal: context.signal,
+      });
+      const durationMs = Math.round(performance.now() - startTime);
+      this.metricRecorder({
+        timestamp: new Date().toISOString(),
+        stage,
+        model,
+        provider,
+        durationMs,
+        inputTokens: result.usage?.inputTokens,
+        outputTokens: result.usage?.outputTokens,
+        success: true,
+      });
+      return result;
+    } catch (error) {
+      const durationMs = Math.round(performance.now() - startTime);
+      this.metricRecorder({
+        timestamp: new Date().toISOString(),
+        stage,
+        model,
+        provider,
+        durationMs,
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   }
 }

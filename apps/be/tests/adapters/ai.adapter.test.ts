@@ -63,6 +63,52 @@ test('AiAdapter rejects unsupported providers and unsupported exact input-token 
   expect(nvidia.settings.model).toBe('nvidia/nemotron-3.5-super-vl-120b-a12b');
 });
 
+test('AiAdapter records latency and telemetry metrics on success and failure', async () => {
+  const recordedMetrics: any[] = [];
+  const mockProvider: AiProvider = {
+    generate: async request => {
+      if (request.model === 'fail') throw new Error('Provider exploded');
+      return { value: graph, usage: { inputTokens: 100, outputTokens: 50 } };
+    },
+  };
+  const adapter = new AiAdapter(
+    { provider: 'nvidia', model: 'success-model' },
+    'production',
+    mockProvider,
+    metric => recordedMetrics.push(metric),
+  );
+
+  await adapter.extractGraph('대화 내용', context(adapter));
+  expect(recordedMetrics.length).toBe(1);
+  expect(recordedMetrics[0]).toMatchObject({
+    stage: 'extract',
+    model: 'success-model',
+    provider: 'nvidia',
+    inputTokens: 100,
+    outputTokens: 50,
+    success: true,
+  });
+  expect(typeof recordedMetrics[0].durationMs).toBe('number');
+
+  const failingAdapter = new AiAdapter(
+    { provider: 'nvidia', model: 'fail' },
+    'production',
+    mockProvider,
+    metric => recordedMetrics.push(metric),
+  );
+  await expect(failingAdapter.extractGraph('대화 내용', context(failingAdapter))).rejects.toThrow(
+    'Provider exploded',
+  );
+  expect(recordedMetrics.length).toBe(2);
+  expect(recordedMetrics[1]).toMatchObject({
+    stage: 'extract',
+    model: 'fail',
+    provider: 'nvidia',
+    success: false,
+    error: 'Provider exploded',
+  });
+});
+
 test('AiAdapter enforces character limits and keeps mock output limited to development and tests', async () => {
   const provider: AiProvider = {
     generate: async () => {
