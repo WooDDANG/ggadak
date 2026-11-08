@@ -155,7 +155,15 @@ export class GraphWorkflow {
             if (!verified.data.valid)
               this.requestRepair(
                 session,
-                verified.data.issues.map(issue => issue.message),
+                verified.data.issues.map(issue =>
+                  [
+                    issue.message,
+                    issue.nodeIds.length ? `nodes: ${issue.nodeIds.join(', ')}` : '',
+                    issue.edgeIds.length ? `edges: ${issue.edgeIds.join(', ')}` : '',
+                  ]
+                    .filter(Boolean)
+                    .join(' | '),
+                ),
               );
             else {
               const graph = GraphSchema.parse(session.value);

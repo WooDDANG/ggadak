@@ -8,6 +8,8 @@ import {
   GRAPH_SYSTEM_PROMPT,
   VERIFICATION_PROMPT,
   GRAPH_PROMPT_VERSION,
+  LEGACY_GRAPH_SYSTEM_PROMPT,
+  LEGACY_VERIFICATION_PROMPT,
 } from '../extractor/graph-prompt.js';
 import type { AiSettings, AiCallContext, AiResult } from '../domain/ai-call.js';
 import { modelForStage } from '../domain/ai-call.js';
@@ -46,17 +48,34 @@ export class AiAdapter implements IAiAdapter {
   }
 
   extractGraph(transcript: string, context: AiCallContext) {
-    return this.call(AiStage.Extract, GRAPH_SYSTEM_PROMPT, { transcript }, context);
+    return this.call(
+      AiStage.Extract,
+      context.settings.promptVersion === 'agentic-1'
+        ? LEGACY_GRAPH_SYSTEM_PROMPT
+        : GRAPH_SYSTEM_PROMPT,
+      { transcript },
+      context,
+    );
   }
 
   verifyGraph(transcript: string, graph: unknown, context: AiCallContext) {
-    return this.call(AiStage.Verify, VERIFICATION_PROMPT, { transcript, graph }, context);
+    return this.call(
+      AiStage.Verify,
+      context.settings.promptVersion === 'agentic-1'
+        ? LEGACY_VERIFICATION_PROMPT
+        : VERIFICATION_PROMPT,
+      { transcript, graph },
+      context,
+    );
   }
 
   repairGraph(transcript: string, graph: unknown, issues: string[], context: AiCallContext) {
     return this.call(
       AiStage.Repair,
-      GRAPH_SYSTEM_PROMPT + '\nCorrect only reported errors; preserve IDs of existing elements.',
+      (context.settings.promptVersion === 'agentic-1'
+        ? LEGACY_GRAPH_SYSTEM_PROMPT
+        : GRAPH_SYSTEM_PROMPT) +
+        '\nCorrect only reported errors; preserve IDs of existing elements.',
       { transcript, graph, issues },
       context,
     );
@@ -73,7 +92,7 @@ export class AiAdapter implements IAiAdapter {
     const model = modelForStage(context.settings, stage);
     if (typeof model !== 'string' || !model.trim())
       throw new AppError('Invalid AI model selection', 422);
-    if (promptVersion !== GRAPH_PROMPT_VERSION)
+    if (promptVersion !== GRAPH_PROMPT_VERSION && promptVersion !== 'agentic-1')
       throw new AppError('Unsupported saved prompt version', 422);
     if (
       !Number.isSafeInteger(maxOutputTokens) ||

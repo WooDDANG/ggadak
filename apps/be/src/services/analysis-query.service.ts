@@ -1,9 +1,44 @@
-import type { AnalysisStatus, AnalysisWorkflow } from '../domain/analysis-workflow.js';
+import type {
+  AnalysisSession,
+  AnalysisStatus,
+  AnalysisWorkflow,
+} from '../domain/analysis-workflow.js';
+import type { StageAttempt } from '../domain/analysis-workflow.js';
 import type { GraphSnapshot } from '../domain/decision-graph.js';
 import { AppError, NotFoundError, ConflictError } from '../errors/AppError.js';
 import { AuthError } from '../errors/AuthError.js';
 import { DecisionRepository } from '../repositories/decision.repository.js';
 import { AnalysisRequestRepository } from '../repositories/analysis-request.repository.js';
+
+function visibleFailure(
+  attempt: StageAttempt,
+): NonNullable<AnalysisStatus['sessions'][number]['failure']> {
+  const message = attempt.error?.message ?? '';
+  const kind = /timeout|timed out/i.test(message)
+    ? 'timeout'
+    : /provider does not match|prompt version|AI model selection|AI limits/i.test(message)
+      ? 'configuration'
+      : attempt.error?.status === 422
+        ? 'validation'
+        : 'provider';
+  return {
+    stage: attempt.phase,
+    kind,
+    action: kind === 'timeout' || kind === 'provider' ? 'retry' : 'new-analysis',
+    summary: {
+      timeout: 'AI 응답 시간이 초과되었습니다.',
+      configuration: '저장된 분석 설정을 현재 환경에서 사용할 수 없습니다.',
+      validation: 'AI 결과가 분석 검증을 통과하지 못했습니다.',
+      provider: 'AI 서비스 호출에 실패했습니다.',
+    }[kind],
+  };
+}
+
+function sessionFailure(session: AnalysisSession) {
+  if (session.phase === 'done') return undefined;
+  const failed = [...session.attempts].reverse().find(attempt => attempt.outcome === 'failed');
+  return failed ? visibleFailure(failed) : undefined;
+}
 
 /** Guild-scoped reads, independent of AI generation and execution leases. */
 export class AnalysisQueryService {
@@ -46,6 +81,7 @@ export class AnalysisQueryService {
           attempts: s.attempts.length,
           inputTokens: s.attempts.reduce((n, a) => n + (a.inputTokens ?? 0), 0),
           outputTokens: s.attempts.reduce((n, a) => n + (a.outputTokens ?? 0), 0),
+          ...(sessionFailure(s) ? { failure: sessionFailure(s) } : {}),
         })) ?? [],
     };
   }

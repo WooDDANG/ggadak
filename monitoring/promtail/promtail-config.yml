@@ -34,3 +34,41 @@ scrape_configs:
           model:
           provider:
           success:
+  - job_name: ggaddak-backend
+    static_configs:
+      - targets: [localhost]
+        labels:
+          job: ggaddak-app
+          app: backend
+          __path__: /var/log/be/be.log
+    pipeline_stages:
+      - multiline:
+          firstline: '^\[\d{4}-\d{2}-\d{2} '
+      - regex:
+          expression: '^\[(?P<time>[^]]+)\] \[(?P<level>[^]]+)\] \[(?P<service>[^]]+)\]: (?P<message>.*)'
+      - timestamp:
+          source: time
+          format: '2006-01-02 15:04:05'
+          location: Asia/Seoul
+      - labels:
+          level:
+          service:
+  - job_name: ggaddak-bot
+    static_configs:
+      - targets: [localhost]
+        labels:
+          job: ggaddak-app
+          app: bot
+          __path__: /var/log/bot/bot.log
+    pipeline_stages:
+      - multiline:
+          firstline: '^\[\d{4}-\d{2}-\d{2} '
+      - regex:
+          expression: '^\[(?P<time>[^]]+)\] \[(?P<level>[^]]+)\] \[(?P<service>[^]]+)\]: (?P<message>.*)'
+      - timestamp:
+          source: time
+          format: '2006-01-02 15:04:05'
+          location: Asia/Seoul
+      - labels:
+          level:
+          service:

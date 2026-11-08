@@ -496,7 +496,9 @@ test('final critic issues and failed attempt diagnostics survive terminal replay
       const row = (await new AnalysisRequestRepository(db.repo).get('critic-diagnostics'))!;
       const workflow = JSON.parse(row.workflowJson!);
       const session = workflow.sessions[0];
-      expect(session.feedback).toEqual(['Rationale is outside the input']);
+      expect(session.feedback).toEqual([
+        'Rationale is outside the input | nodes: candidate | edges: e2',
+      ]);
       const attempt = session.attempts.at(-1);
       expect(attempt).toMatchObject({
         phase: 'reverify',

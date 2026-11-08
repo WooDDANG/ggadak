@@ -81,5 +81,11 @@ export interface AnalysisStatus {
     attempts: number;
     inputTokens: number;
     outputTokens: number;
+    failure?: {
+      stage: AnalysisPhase;
+      kind: 'timeout' | 'configuration' | 'validation' | 'provider';
+      action: 'retry' | 'new-analysis';
+      summary: string;
+    };
   }[];
 }

@@ -23,11 +23,13 @@ const consoleLogger = createLogger('AI-METRIC');
 
 export function recordAiMetric(metric: AiMetricRecord): void {
   try {
-    if (!fs.existsSync(logDir)) {
-      fs.mkdirSync(logDir, { recursive: true });
+    if (process.env.NODE_ENV !== 'test') {
+      if (!fs.existsSync(logDir)) {
+        fs.mkdirSync(logDir, { recursive: true });
+      }
+      const line = JSON.stringify(metric) + '\n';
+      fs.appendFileSync(logFilePath, line, 'utf8');
     }
-    const line = JSON.stringify(metric) + '\n';
-    fs.appendFileSync(logFilePath, line, 'utf8');
   } catch (err) {
     consoleLogger.warn('Failed to append AI metric log', { error: String(err) });
   }

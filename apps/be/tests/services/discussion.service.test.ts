@@ -116,6 +116,11 @@ test('resuming an analysis with a different configured provider fails without ca
     const status = await service.getStatus(input.requestId, input.guildId);
     expect(status.state).toBe('terminal');
     expect(status.sessions[0].attempts).toBe(2);
+    expect(status.sessions[0].failure).toMatchObject({
+      kind: 'configuration',
+      stage: 'extract',
+      action: 'new-analysis',
+    });
   } finally {
     await restarted?.$disconnect();
     await db.cleanup();

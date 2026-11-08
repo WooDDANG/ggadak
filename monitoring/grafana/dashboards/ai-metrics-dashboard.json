@@ -175,6 +175,72 @@
         "wrapLogMessage": true,
         "enableLogDetails": true
       }
+    },
+    {
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 22 },
+      "id": 7,
+      "title": "Backend and Bot errors",
+      "type": "logs",
+      "datasource": { "type": "loki", "uid": "Loki" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "Loki" },
+          "editorMode": "code",
+          "expr": "{job=\"ggaddak-app\", level=\"ERROR\"}",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "options": { "showLabels": true, "wrapLogMessage": true, "enableLogDetails": true }
+    },
+    {
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 22 },
+      "id": 8,
+      "title": "Analysis failure and retry logs",
+      "type": "logs",
+      "datasource": { "type": "loki", "uid": "Loki" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "Loki" },
+          "editorMode": "code",
+          "expr": "{job=\"ggaddak-app\"} |~ \"(?i)analysis|AI call timeout|validation failed\"",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "options": { "showLabels": true, "wrapLogMessage": true, "enableLogDetails": true }
+    },
+    {
+      "gridPos": { "h": 4, "w": 12, "x": 0, "y": 30 },
+      "id": 9,
+      "title": "Completed analysis requests",
+      "type": "stat",
+      "datasource": { "type": "loki", "uid": "Loki" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "Loki" },
+          "editorMode": "code",
+          "expr": "sum(count_over_time({job=\"ggaddak-app\", app=\"backend\", service=\"BE-ANALYSIS-RUNNER\"} |= \"analysis.completed\" [$__range]))",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "gridPos": { "h": 4, "w": 12, "x": 12, "y": 30 },
+      "id": 10,
+      "title": "Failed analysis attempts",
+      "type": "stat",
+      "datasource": { "type": "loki", "uid": "Loki" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "Loki" },
+          "editorMode": "code",
+          "expr": "sum(count_over_time({job=\"ggaddak-app\", app=\"backend\", service=\"BE-ANALYSIS-RUNNER\"} |= \"analysis.failed\" [$__range]))",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ]
     }
   ],
   "refresh": "5s",

@@ -10,6 +10,39 @@ const context = (adapter: AiAdapter) => ({
   settings: adapter.settings,
 });
 
+test('graph generation requests specify references and candidate history constraints', async () => {
+  const requests: AiProviderRequest[] = [];
+  const adapter = new AiAdapter({ provider: 'agy' }, 'production', {
+    async generate(request) {
+      requests.push(request);
+      return { value: graph };
+    },
+  });
+  await adapter.extractGraph('input', context(adapter));
+  await adapter.repairGraph('input', graph, ['Invalid endpoints: e1'], context(adapter));
+  for (const request of requests) {
+    expect(request.system).toContain(
+      'Every edge sourceId and targetId must reference existing nodes',
+    );
+    expect(request.system).toContain(
+      'Candidate history observations use proposed/agreed/withdrawn/unclear',
+    );
+  }
+  await adapter.extractGraph('input', {
+    ...context(adapter),
+    settings: { ...adapter.settings, promptVersion: 'agentic-1' },
+  });
+  expect(requests[2].system).not.toContain(
+    'Every edge sourceId and targetId must reference existing nodes',
+  );
+  await expect(
+    adapter.extractGraph('input', {
+      ...context(adapter),
+      settings: { ...adapter.settings, promptVersion: 'unknown' },
+    }),
+  ).rejects.toMatchObject({ statusCode: 422, message: 'Unsupported saved prompt version' });
+});
+
 test('a saved analysis cannot run through a different configured provider', async () => {
   let calls = 0;
   const adapter = new AiAdapter({ provider: 'nvidia' }, 'production', {

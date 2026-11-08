@@ -154,7 +154,7 @@ export function createLogger(serviceName: string, options?: LoggerOptions): wins
     }),
   ];
 
-  if (fs.existsSync(logDir)) {
+  if (fs.existsSync(logDir) && (process.env.NODE_ENV !== 'test' || options?.appDir)) {
     // 1. Common Error log
     transports.push(
       new winston.transports.File({
