@@ -2,7 +2,8 @@ import { includesValue } from '@ggaddak/shared';
 import { AnalysisPhase } from '../domain/analysis-workflow.js';
 import { GraphPolicy } from '../config/policies.js';
 import { randomUUID } from 'node:crypto';
-import type { IAiAdapter, AiResult } from '../adapters/ai.adapter.js';
+import type { IAiAdapter } from '../domain/ai-analysis.js';
+import type { AiResult } from '../domain/ai-call.js';
 import type {
   AnalysisWorkflow,
   AnalysisSession,

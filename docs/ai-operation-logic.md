@@ -152,6 +152,8 @@ flowchart TD
 
 GGADDAK 백엔드는 `AI_PROVIDER` 설정에 따라 NVIDIA NIM API 및 Antigravity CLI(`agy`)를 지원하는 멀티 프로바이더 어댑터를 탑재하고 있습니다:
 
+저장된 분석의 Provider와 현재 설정이 다르면 다른 Provider로 전환하지 않고 분석을 실패 처리합니다. 두 Provider 모두 정확한 입력 토큰 사전 검사를 지원하지 않으므로 `AI_MAX_INPUT_TOKENS`를 설정하면 호출 전에 오류가 발생합니다. 입력 길이는 `AI_MAX_INPUT_CHARS`로 제한할 수 있습니다.
+
 1. **NVIDIA NIM HTTP Provider (`nvidia`, 기본값)**:
    - OpenAI 호환 SDK(`openai`)를 통해 `https://integrate.api.nvidia.com/v1` 엔드포인트와 통신합니다.
    - 기본 모델은 `nvidia/nemotron-3.5-super-vl-120b-a12b`이며, 16,384 토큰 및 20초 타임아웃 기본 정책을 가집니다.

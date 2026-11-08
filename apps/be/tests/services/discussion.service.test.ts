@@ -80,6 +80,48 @@ test('stage model selection is frozen at analysis start and survives restart wit
   }
 });
 
+test('resuming an analysis with a different configured provider fails without calling it', async () => {
+  const db = await isolatedRepository();
+  let restarted: PrismaClient | undefined;
+  let replacementCalls = 0;
+  const original = new AiAdapter({ provider: 'agy' }, 'production', {
+    async generate() {
+      throw new AppError('temporary', 503);
+    },
+  });
+  try {
+    await expect(
+      new DiscussionService(db.repo, original, new DecisionExtractorCore()).analyzeDiscussion(
+        input,
+      ),
+    ).rejects.toMatchObject({ statusCode: 503 });
+    await db.client.$disconnect();
+    restarted = new PrismaClient({ datasources: { db: { url: db.url } } });
+    const replacement = new AiAdapter({ provider: 'nvidia' }, 'production', {
+      async generate() {
+        replacementCalls++;
+        return { value: {} };
+      },
+    });
+    const service = new DiscussionService(
+      new DecisionRepository(restarted),
+      replacement,
+      new DecisionExtractorCore(),
+    );
+    await expect(service.analyzeDiscussion(input)).rejects.toMatchObject({
+      statusCode: 422,
+      message: expect.stringContaining('provider'),
+    });
+    expect(replacementCalls).toBe(0);
+    const status = await service.getStatus(input.requestId, input.guildId);
+    expect(status.state).toBe('terminal');
+    expect(status.sessions[0].attempts).toBe(2);
+  } finally {
+    await restarted?.$disconnect();
+    await db.cleanup();
+  }
+});
+
 test('lost-response retry survives restart and does not repeat paid extraction, including no-decision', async () => {
   const db = await isolatedRepository();
   let calls = 0;

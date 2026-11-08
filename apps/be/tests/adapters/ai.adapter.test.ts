@@ -10,6 +10,23 @@ const context = (adapter: AiAdapter) => ({
   settings: adapter.settings,
 });
 
+test('a saved analysis cannot run through a different configured provider', async () => {
+  let calls = 0;
+  const adapter = new AiAdapter({ provider: 'nvidia' }, 'production', {
+    async generate() {
+      calls++;
+      return { value: graph };
+    },
+  });
+  await expect(
+    adapter.extractGraph('input', {
+      ...context(adapter),
+      settings: { ...adapter.settings, provider: 'agy' },
+    }),
+  ).rejects.toMatchObject({ statusCode: 422 });
+  expect(calls).toBe(0);
+});
+
 test('AiAdapter chooses the stage model and schema, then delegates a normalized request', async () => {
   const requests: AiProviderRequest[] = [];
   const provider: AiProvider = {
@@ -59,6 +76,12 @@ test('AiAdapter rejects unsupported providers and unsupported exact input-token 
 
   const nvidia = new AiAdapter({ provider: 'nvidia' }, 'production', provider);
   await expect(nvidia.extractGraph('input', context(nvidia))).resolves.toEqual({ value: graph });
+  await expect(
+    nvidia.extractGraph('input', {
+      ...context(nvidia),
+      settings: { ...nvidia.settings, maxInputTokens: 100 },
+    }),
+  ).rejects.toMatchObject({ statusCode: 422, message: expect.stringContaining('preflight') });
   expect(nvidia.settings.maxOutputTokens).toBe(16384);
   expect(nvidia.settings.model).toBe('nvidia/nemotron-3.5-super-vl-120b-a12b');
 });

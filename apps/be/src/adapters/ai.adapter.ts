@@ -11,40 +11,17 @@ import {
 } from '../extractor/graph-prompt.js';
 import type { AiSettings, AiCallContext, AiResult } from '../domain/ai-call.js';
 import { modelForStage } from '../domain/ai-call.js';
-import { AgyProvider } from './agy-provider.js';
-import { NvidiaProvider } from './nvidia-provider.js';
+import { createDefaultProvider } from './ai-provider-factory.js';
 import { recordAiMetric, type AiMetricRecord } from './ai-metrics-logger.js';
 import type { AiProvider } from './ai-provider.js';
+import type { IAiAdapter } from '../domain/ai-analysis.js';
+export type { IAiAdapter } from '../domain/ai-analysis.js';
 export type { AiSettings, AiCallContext, AiResult } from '../domain/ai-call.js';
-
-function createDefaultProvider(options: AppConfig['ai']): AiProvider {
-  if (options.provider === 'nvidia') {
-    return new NvidiaProvider({
-      apiKey: options.nvidiaApiKey,
-      baseURL: options.nvidiaBaseUrl,
-      enableThinking: options.nvidiaEnableThinking,
-    });
-  }
-  return new AgyProvider({
-    executable: options.agyExecutable,
-  });
-}
-
-export interface IAiAdapter {
-  readonly settings?: AiSettings;
-  extractGraph(transcript: string, context: AiCallContext): Promise<AiResult>;
-  verifyGraph(transcript: string, graph: unknown, context: AiCallContext): Promise<AiResult>;
-  repairGraph(
-    transcript: string,
-    graph: unknown,
-    issues: string[],
-    context: AiCallContext,
-  ): Promise<AiResult>;
-}
 
 @Service({ factory: () => new AiAdapter() })
 export class AiAdapter implements IAiAdapter {
   readonly settings: AiSettings;
+  private readonly configuredProvider: string;
 
   constructor(
     private readonly options: AppConfig['ai'] = config.ai,
@@ -52,6 +29,7 @@ export class AiAdapter implements IAiAdapter {
     private readonly provider: AiProvider = createDefaultProvider(options),
     private readonly metricRecorder: (metric: AiMetricRecord) => void = recordAiMetric,
   ) {
+    this.configuredProvider = options.provider;
     this.settings = {
       provider: options.provider,
       model:
@@ -106,6 +84,8 @@ export class AiAdapter implements IAiAdapter {
         (!Number.isSafeInteger(maxInputTokens) || maxInputTokens <= 0))
     )
       throw new AppError('Invalid AI limits', 422);
+    if (provider !== this.configuredProvider)
+      throw new AppError('Saved AI provider does not match configured provider', 422);
     if (provider === 'mock') {
       if (!['development', 'test'].includes(this.environment))
         throw new AppError('Mock AI requires development or test environment', 422);
@@ -128,6 +108,8 @@ export class AiAdapter implements IAiAdapter {
         'AGY does not support exact input-token preflight; remove AI_MAX_INPUT_TOKENS for CLI mode',
         422,
       );
+    if (provider === 'nvidia' && maxInputTokens !== undefined)
+      throw new AppError('NVIDIA does not support exact input-token preflight', 422);
     const serializedInput = JSON.stringify(input);
     if (maxInputChars > 0 && serializedInput.length > maxInputChars)
       throw new AppError('AI input limit exceeded', 422);
