@@ -62,10 +62,11 @@ test('NvidiaProvider streams chunks, aggregates reasoning/content, and returns p
     signal,
   });
 
-  expect(result).toEqual({
+  expect(result).toMatchObject({
     value: graph,
     usage: { inputTokens: 42, outputTokens: 15 },
   });
+  expect(result.ttftMs).toBeGreaterThanOrEqual(0);
   expect(capturedBody.model).toBe('nvidia/nemotron-3.5-super-vl-120b-a12b');
   expect(capturedBody.chat_template_kwargs).toEqual({ enable_thinking: false });
   expect(capturedBody.stream).toBe(true);
@@ -133,12 +134,7 @@ test('NvidiaProvider enforces max output tokens and handles empty responses', as
   });
 });
 
-test('NvidiaProvider logs reasoning_content, respects thinking toggle, and maps timeout to 503', async () => {
-  const loggedMessages: string[] = [];
-  const mockLogger = {
-    debug: (msg: string) => loggedMessages.push(msg),
-  };
-
+test('NvidiaProvider does not log reasoning content, respects thinking toggle, and maps timeout to 503', async () => {
   let capturedBody: any;
   const mockClient: any = {
     chat: {
@@ -158,7 +154,6 @@ test('NvidiaProvider logs reasoning_content, respects thinking toggle, and maps 
   const providerThinkingDisabled = new NvidiaProvider({
     client: mockClient,
     enableThinking: false,
-    logger: mockLogger,
   });
 
   await providerThinkingDisabled.generate({
@@ -171,7 +166,6 @@ test('NvidiaProvider logs reasoning_content, respects thinking toggle, and maps 
   });
 
   expect(capturedBody.chat_template_kwargs).toEqual({ enable_thinking: false });
-  expect(loggedMessages.some(m => m.includes('Step 1: parse DB decision'))).toBe(true);
 
   // Test timeout abort error classification
   const abortController = new AbortController();

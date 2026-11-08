@@ -16,8 +16,12 @@ import {
   type DecisionGraph,
 } from '../domain/decision-graph.js';
 import { AppError } from '../errors/AppError.js';
+import { classifyAiFailure, providerResponseFrom } from '../errors/ai-diagnostics.js';
+import { createLogger } from '@ggaddak/shared';
 import type { AiCallScheduler } from './ai-call-scheduler.js';
 import { modelForStage } from '../domain/ai-call.js';
+
+const logger = createLogger('BE-GRAPH-WORKFLOW');
 
 /** Bounded session algorithm; checkpoint callback owns persistence and owner fencing. */
 export class GraphWorkflow {
@@ -32,6 +36,7 @@ export class GraphWorkflow {
     save: (session?: AnalysisSession) => Promise<void>,
     signal: AbortSignal,
     owner?: string,
+    identity?: { requestId: string; traceId?: string; guildId?: string; channelId?: string },
   ): Promise<void> {
     if (session.active !== undefined) {
       const interrupted = session.attempts[session.active];
@@ -57,8 +62,18 @@ export class GraphWorkflow {
           : checked.error.issues.map(issue => `${issue.path.join('.')}: ${issue.message}`);
         if (issues.length) {
           try {
-            this.requestRepair(session, issues);
+            this.requestRepair(session, issues, 'graph-structure');
           } catch (error) {
+            logger.warn('analysis.validation.failed', {
+              ...identity,
+              callId: session.attempts.at(-1)?.callId,
+              failureStage: session.phase,
+              failureKind: 'graph-structure',
+              errorSummary: 'AI graph structure was invalid',
+              issuesCount: issues.length,
+              status: 422,
+              retryable: false,
+            });
             await save(session);
             throw error;
           }
@@ -91,6 +106,7 @@ export class GraphWorkflow {
         );
         const startedAt = Date.now();
         const attempt: StageAttempt = {
+          callId: randomUUID(),
           phase,
           waitMs: permit.waitMs,
           provider: workflow.settings.provider,
@@ -117,7 +133,14 @@ export class GraphWorkflow {
         let timer: ReturnType<typeof setTimeout> | undefined;
         let operation: Promise<AiResult> | undefined;
         try {
-          const context = { signal: controller.signal, settings: workflow.settings };
+          const context = {
+            signal: controller.signal,
+            settings: workflow.settings,
+            ...identity,
+            callId: attempt.callId,
+            retryCount: session.attempts.filter(item => item.phase === phase).length - 1,
+            issuesCount: phase === AnalysisPhase.Repair ? session.feedback.length : 0,
+          };
           operation =
             phase === AnalysisPhase.Extract
               ? this.ai.extractGraph(session.transcript, context)
@@ -172,11 +195,21 @@ export class GraphWorkflow {
             }
           }
         } catch (error) {
+          const diagnostic = classifyAiFailure(error, phase);
           attempt.outcome = 'failed';
           attempt.error = {
             message: error instanceof Error ? error.message : 'Analysis stage failed',
-            status: error instanceof AppError ? error.statusCode : 500,
+            status: diagnostic.status,
+            failureKind: diagnostic.failureKind,
+            retryable: diagnostic.retryable,
+            providerResponse: providerResponseFrom(error),
           };
+          logger.warn('analysis.attempt.failed', {
+            ...identity,
+            callId: attempt.callId,
+            failureStage: phase,
+            ...diagnostic,
+          });
           throw error;
         } finally {
           controller.abort();
@@ -197,10 +230,14 @@ export class GraphWorkflow {
     }
   }
 
-  private requestRepair(session: AnalysisSession, feedback: string[]): void {
+  private requestRepair(
+    session: AnalysisSession,
+    feedback: string[],
+    failureKind: 'graph-structure' | 'semantic-verification' = 'semantic-verification',
+  ): void {
     session.feedback = feedback;
     if (session.repairs || session.calls.includes(AnalysisPhase.Repair))
-      throw new AppError('Analysis validation failed after repair', 422);
+      throw new AppError('Analysis validation failed after repair', 422, { failureKind });
     session.phase = AnalysisPhase.Repair;
   }
 

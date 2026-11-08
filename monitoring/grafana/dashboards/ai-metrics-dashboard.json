@@ -13,7 +13,7 @@
       "collapsed": false,
       "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
       "id": 1,
-      "title": "Total AI Calls",
+      "title": "AI Call Attempts",
       "type": "stat",
       "datasource": { "type": "loki", "uid": "Loki" },
       "targets": [
@@ -40,27 +40,27 @@
       "collapsed": false,
       "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
       "id": 2,
-      "title": "Average Duration (ms)",
+      "title": "Slow AI Calls (18s+)",
       "type": "stat",
       "datasource": { "type": "loki", "uid": "Loki" },
       "targets": [
         {
           "datasource": { "type": "loki", "uid": "Loki" },
           "editorMode": "code",
-          "expr": "avg_over_time({job=\"ggaddak-ai\"} | json | unwrap durationMs [$__range])",
+          "expr": "sum(count_over_time({job=\"ggaddak-ai\"} | json | durationMs >= 18000 [$__range]))",
           "queryType": "range",
           "refId": "A"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "ms",
+          "unit": "short",
           "thresholds": {
             "mode": "absolute",
             "steps": [
               { "color": "green", "value": null },
-              { "color": "yellow", "value": 10000 },
-              { "color": "red", "value": 18000 }
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 5 }
             ]
           }
         }
@@ -70,7 +70,7 @@
       "collapsed": false,
       "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
       "id": 3,
-      "title": "Success Rate",
+      "title": "AI Call Success Rate",
       "type": "stat",
       "datasource": { "type": "loki", "uid": "Loki" },
       "targets": [
@@ -89,7 +89,7 @@
             "mode": "absolute",
             "steps": [
               { "color": "red", "value": null },
-              { "color": "yellow", "value": 90 },
+              { "color": "yellow", "value": 80 },
               { "color": "green", "value": 99 }
             ]
           }
@@ -117,25 +117,17 @@
       "collapsed": false,
       "gridPos": { "h": 8, "w": 24, "x": 0, "y": 4 },
       "id": 5,
-      "title": "AI Execution Latency Timeline (with 20s Timeout Threshold)",
+      "title": "Mean AI Call Duration by Provider and Stage",
       "type": "timeseries",
       "datasource": { "type": "loki", "uid": "Loki" },
       "targets": [
         {
           "datasource": { "type": "loki", "uid": "Loki" },
           "editorMode": "code",
-          "expr": "quantile_over_time(0.95, {job=\"ggaddak-ai\"} | json | unwrap durationMs [1m])",
-          "legendFormat": "p95 Latency",
+          "expr": "sum by (provider, stage) (sum_over_time({job=\"ggaddak-ai\"} | json | unwrap durationMs [1m])) / sum by (provider, stage) (count_over_time({job=\"ggaddak-ai\"} | json | durationMs >= 0 [1m]))",
+          "legendFormat": "{{provider}} {{stage}}",
           "queryType": "range",
           "refId": "A"
-        },
-        {
-          "datasource": { "type": "loki", "uid": "Loki" },
-          "editorMode": "code",
-          "expr": "avg_over_time({job=\"ggaddak-ai\"} | json | unwrap durationMs [1m])",
-          "legendFormat": "Average Latency",
-          "queryType": "range",
-          "refId": "B"
         }
       ],
       "fieldConfig": {
@@ -165,7 +157,7 @@
         {
           "datasource": { "type": "loki", "uid": "Loki" },
           "editorMode": "code",
-          "expr": "{job=\"ggaddak-ai\"} | json",
+          "expr": "{job=\"ggaddak-ai\"} | keep provider, stage, success",
           "queryType": "range",
           "refId": "A"
         }
@@ -203,7 +195,7 @@
         {
           "datasource": { "type": "loki", "uid": "Loki" },
           "editorMode": "code",
-          "expr": "{job=\"ggaddak-app\"} |~ \"(?i)analysis|AI call timeout|validation failed\"",
+          "expr": "{job=\"ggaddak-app\"} |~ \"analysis[.](attempt[.]failed|validation[.]failed|failed)\"",
           "queryType": "range",
           "refId": "A"
         }
@@ -229,7 +221,7 @@
     {
       "gridPos": { "h": 4, "w": 12, "x": 12, "y": 30 },
       "id": 10,
-      "title": "Failed analysis attempts",
+      "title": "Failed Analysis Runs",
       "type": "stat",
       "datasource": { "type": "loki", "uid": "Loki" },
       "targets": [
@@ -237,6 +229,113 @@
           "datasource": { "type": "loki", "uid": "Loki" },
           "editorMode": "code",
           "expr": "sum(count_over_time({job=\"ggaddak-app\", app=\"backend\", service=\"BE-ANALYSIS-RUNNER\"} |= \"analysis.failed\" [$__range]))",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 34 },
+      "id": 11,
+      "title": "Failed AI Calls by Kind",
+      "type": "piechart",
+      "datasource": { "type": "loki", "uid": "Loki" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "Loki" },
+          "editorMode": "code",
+          "expr": "sum by (failureKind) (count_over_time({job=\"ggaddak-ai\", success=\"false\"} | json | failureKind != \"\" [$__range]))",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 34 },
+      "id": 12,
+      "title": "Failed AI Calls by Channel (Top 5)",
+      "type": "piechart",
+      "datasource": { "type": "loki", "uid": "Loki" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "Loki" },
+          "editorMode": "code",
+          "expr": "topk(5, sum by (channelId) (count_over_time({job=\"ggaddak-ai\", success=\"false\"} | json | channelId != \"\" [$__range])))",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 41 },
+      "id": 13,
+      "title": "Repair Calls per Extract Call",
+      "type": "stat",
+      "datasource": { "type": "loki", "uid": "Loki" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "Loki" },
+          "editorMode": "code",
+          "expr": "sum(count_over_time({job=\"ggaddak-ai\", stage=\"repair\"}[$__range])) / sum(count_over_time({job=\"ggaddak-ai\", stage=\"extract\"}[$__range])) * 100",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "percent" } }
+    },
+    {
+      "gridPos": { "h": 7, "w": 18, "x": 6, "y": 41 },
+      "id": 14,
+      "title": "AI Call Throughput (per minute)",
+      "type": "timeseries",
+      "datasource": { "type": "loki", "uid": "Loki" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "Loki" },
+          "editorMode": "code",
+          "expr": "sum(count_over_time({job=\"ggaddak-ai\"}[1m]))",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 48 },
+      "id": 15,
+      "title": "AI Token Consumption (per 5 minutes)",
+      "type": "timeseries",
+      "datasource": { "type": "loki", "uid": "Loki" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "Loki" },
+          "editorMode": "code",
+          "expr": "sum by (provider) (sum_over_time({job=\"ggaddak-ai\"} | json | unwrap inputTokens [5m]))",
+          "legendFormat": "{{provider}} input",
+          "queryType": "range",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "loki", "uid": "Loki" },
+          "editorMode": "code",
+          "expr": "sum by (provider) (sum_over_time({job=\"ggaddak-ai\"} | json | unwrap outputTokens [5m]))",
+          "legendFormat": "{{provider}} output",
+          "queryType": "range",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" } }
+    },
+    {
+      "gridPos": { "h": 7, "w": 24, "x": 0, "y": 56 },
+      "id": 16,
+      "title": "Analysis Stage Failures by Kind",
+      "type": "piechart",
+      "datasource": { "type": "loki", "uid": "Loki" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "Loki" },
+          "editorMode": "code",
+          "expr": "sum by (failureKind) (count_over_time({job=\"ggaddak-app\", app=\"backend\"} | json | message =~ \"analysis[.](attempt[.]failed|validation[.]failed)\" | failureKind != \"\" [$__range]))",
           "queryType": "range",
           "refId": "A"
         }

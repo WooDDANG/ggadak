@@ -74,7 +74,12 @@ export class DiscussionService {
             while (!workerSignal.aborted && cursor < workflow.sessions.length) {
               const session = workflow.sessions[cursor++];
               try {
-                await algorithm.run(session, workflow, save, workerSignal, owner);
+                await algorithm.run(session, workflow, save, workerSignal, owner, {
+                  requestId: params.requestId,
+                  traceId: params.traceId,
+                  guildId: params.guildId,
+                  channelId: params.channelId,
+                });
               } catch (error) {
                 if (!failed) {
                   failed = true;

@@ -127,19 +127,21 @@ export function createLogger(serviceName: string, options?: LoggerOptions): wins
     },
   );
 
-  // Standard File Log Format
+  // One JSON object per file line; console output remains readable.
   const fileFormat = winston.format.printf(
     ({ timestamp, level, message, label, stack, stage, traceId, durationMs, ...meta }) => {
       const tagLabel = label || sName;
-      const metaPayload = {
-        service: tagLabel,
-        traceId,
-        stage,
-        durationMs,
+      return JSON.stringify({
         ...meta,
-      };
-      const logMessage = stack || message;
-      return `[${timestamp}] [${level.toUpperCase()}] [${tagLabel}]: ${logMessage} ${JSON.stringify(metaPayload)}`;
+        timestamp,
+        level: level.toUpperCase(),
+        service: tagLabel,
+        env: process.env.NODE_ENV || 'development',
+        traceId: traceId ?? null,
+        durationMs: durationMs ?? null,
+        stage: stage ?? null,
+        message: stack || message,
+      });
     },
   );
 
@@ -162,7 +164,7 @@ export function createLogger(serviceName: string, options?: LoggerOptions): wins
         level: 'error',
         format: winston.format.combine(
           winston.format.label({ label: sName }),
-          winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
+          winston.format.timestamp(),
           fileFormat,
         ),
       }),
@@ -175,7 +177,7 @@ export function createLogger(serviceName: string, options?: LoggerOptions): wins
           filename: path.join(logDir, 'bot.log'),
           format: winston.format.combine(
             winston.format.label({ label: sName }),
-            winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
+            winston.format.timestamp(),
             fileFormat,
           ),
         }),
@@ -187,7 +189,7 @@ export function createLogger(serviceName: string, options?: LoggerOptions): wins
           filename: path.join(logDir, 'be.log'),
           format: winston.format.combine(
             winston.format.label({ label: sName }),
-            winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
+            winston.format.timestamp(),
             fileFormat,
           ),
         }),
@@ -195,7 +197,7 @@ export function createLogger(serviceName: string, options?: LoggerOptions): wins
           filename: path.join(logDir, 'preprocessing.log'),
           format: winston.format.combine(
             winston.format.label({ label: sName }),
-            winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
+            winston.format.timestamp(),
             fileFormat,
           ),
         }),

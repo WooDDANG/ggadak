@@ -10,6 +10,7 @@ test('recordAiMetric appends a valid JSON-line to ai-metrics.log', () => {
 
   const testRecord = {
     timestamp: '2026-11-08T13:30:00.000Z',
+    callId: 'call-1',
     stage: 'extract',
     model: 'nvidia/nemotron-test',
     provider: 'nvidia',

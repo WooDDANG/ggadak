@@ -42,6 +42,7 @@ function cliError(result: { status?: string; error?: string }): AppError {
         ? 'AGY quota exhausted; retry later'
         : 'AGY analysis failed or unavailable',
     auth ? 422 : 503,
+    { providerResponse: result.error },
   );
 }
 

@@ -1,4 +1,5 @@
 import { AiStage } from '../domain/ai-call.js';
+import { randomUUID } from 'node:crypto';
 import { AiDefaults } from '../config/policies.js';
 import { Service } from 'typedi';
 import { AppError } from '../errors/AppError.js';
@@ -11,10 +12,11 @@ import {
   LEGACY_GRAPH_SYSTEM_PROMPT,
   LEGACY_VERIFICATION_PROMPT,
 } from '../extractor/graph-prompt.js';
-import type { AiSettings, AiCallContext, AiResult } from '../domain/ai-call.js';
+import type { AiSettings, AiCallContext } from '../domain/ai-call.js';
 import { modelForStage } from '../domain/ai-call.js';
 import { createDefaultProvider } from './ai-provider-factory.js';
 import { recordAiMetric, type AiMetricRecord } from './ai-metrics-logger.js';
+import { classifyAiFailure } from '../errors/ai-diagnostics.js';
 import type { AiProvider } from './ai-provider.js';
 import type { IAiAdapter } from '../domain/ai-analysis.js';
 export type { IAiAdapter } from '../domain/ai-analysis.js';
@@ -90,50 +92,69 @@ export class AiAdapter implements IAiAdapter {
     const { provider, maxOutputTokens, maxInputChars, promptVersion, maxInputTokens } =
       context.settings;
     const model = modelForStage(context.settings, stage);
-    if (typeof model !== 'string' || !model.trim())
-      throw new AppError('Invalid AI model selection', 422);
-    if (promptVersion !== GRAPH_PROMPT_VERSION && promptVersion !== 'agentic-1')
-      throw new AppError('Unsupported saved prompt version', 422);
-    if (
-      !Number.isSafeInteger(maxOutputTokens) ||
-      maxOutputTokens <= 0 ||
-      !Number.isSafeInteger(maxInputChars) ||
-      maxInputChars < 0 ||
-      (maxInputTokens !== undefined &&
-        (!Number.isSafeInteger(maxInputTokens) || maxInputTokens <= 0))
-    )
-      throw new AppError('Invalid AI limits', 422);
-    if (provider !== this.configuredProvider)
-      throw new AppError('Saved AI provider does not match configured provider', 422);
-    if (provider === 'mock') {
-      if (!['development', 'test'].includes(this.environment))
-        throw new AppError('Mock AI requires development or test environment', 422);
-      return {
-        value:
-          stage === AiStage.Verify
-            ? { valid: true, issues: [] }
-            : {
-                summary: 'Development fixture; no inferred candidates',
-                nodes: [],
-                edges: [],
-                discussionProblems: [],
-              },
-      };
-    }
-    if (provider !== 'agy' && provider !== 'nvidia')
-      throw new AppError('Unsupported AI_PROVIDER; expected agy or nvidia', 422);
-    if (provider === 'agy' && maxInputTokens !== undefined)
-      throw new AppError(
-        'AGY does not support exact input-token preflight; remove AI_MAX_INPUT_TOKENS for CLI mode',
-        422,
-      );
-    if (provider === 'nvidia' && maxInputTokens !== undefined)
-      throw new AppError('NVIDIA does not support exact input-token preflight', 422);
-    const serializedInput = JSON.stringify(input);
-    if (maxInputChars > 0 && serializedInput.length > maxInputChars)
-      throw new AppError('AI input limit exceeded', 422);
     const startTime = performance.now();
+    const callId = context.callId ?? randomUUID();
+    const identity = {
+      requestId: context.requestId,
+      callId,
+      traceId: context.traceId,
+      guildId: context.guildId,
+      channelId: context.channelId,
+      stage,
+      model,
+      provider,
+      promptVersion,
+      retryCount: context.retryCount ?? 0,
+      repairTriggered: stage === AiStage.Repair,
+      issuesCount: context.issuesCount ?? 0,
+      enableThinking:
+        provider === 'nvidia'
+          ? (this.options.nvidiaEnableThinking ?? AiDefaults.nvidiaEnableThinking)
+          : undefined,
+    };
     try {
+      if (typeof model !== 'string' || !model.trim())
+        throw new AppError('Invalid AI model selection', 422);
+      if (promptVersion !== GRAPH_PROMPT_VERSION && promptVersion !== 'agentic-1')
+        throw new AppError('Unsupported saved prompt version', 422);
+      if (
+        !Number.isSafeInteger(maxOutputTokens) ||
+        maxOutputTokens <= 0 ||
+        !Number.isSafeInteger(maxInputChars) ||
+        maxInputChars < 0 ||
+        (maxInputTokens !== undefined &&
+          (!Number.isSafeInteger(maxInputTokens) || maxInputTokens <= 0))
+      )
+        throw new AppError('Invalid AI limits', 422);
+      if (provider !== this.configuredProvider)
+        throw new AppError('Saved AI provider does not match configured provider', 422);
+      if (provider === 'mock') {
+        if (!['development', 'test'].includes(this.environment))
+          throw new AppError('Mock AI requires development or test environment', 422);
+        return {
+          value:
+            stage === AiStage.Verify
+              ? { valid: true, issues: [] }
+              : {
+                  summary: 'Development fixture; no inferred candidates',
+                  nodes: [],
+                  edges: [],
+                  discussionProblems: [],
+                },
+        };
+      }
+      if (provider !== 'agy' && provider !== 'nvidia')
+        throw new AppError('Unsupported AI_PROVIDER; expected agy or nvidia', 422);
+      if (provider === 'agy' && maxInputTokens !== undefined)
+        throw new AppError(
+          'AGY does not support exact input-token preflight; remove AI_MAX_INPUT_TOKENS for CLI mode',
+          422,
+        );
+      if (provider === 'nvidia' && maxInputTokens !== undefined)
+        throw new AppError('NVIDIA does not support exact input-token preflight', 422);
+      const serializedInput = JSON.stringify(input);
+      if (maxInputChars > 0 && serializedInput.length > maxInputChars)
+        throw new AppError('AI input limit exceeded', 422);
       const result = await this.provider.generate({
         model,
         system,
@@ -145,12 +166,15 @@ export class AiAdapter implements IAiAdapter {
       const durationMs = Math.round(performance.now() - startTime);
       this.metricRecorder({
         timestamp: new Date().toISOString(),
-        stage,
-        model,
-        provider,
+        ...identity,
         durationMs,
+        ttftMs: result.ttftMs,
         inputTokens: result.usage?.inputTokens,
         outputTokens: result.usage?.outputTokens,
+        totalTokens:
+          result.usage === undefined
+            ? undefined
+            : result.usage.inputTokens + result.usage.outputTokens,
         success: true,
       });
       return result;
@@ -158,12 +182,11 @@ export class AiAdapter implements IAiAdapter {
       const durationMs = Math.round(performance.now() - startTime);
       this.metricRecorder({
         timestamp: new Date().toISOString(),
-        stage,
-        model,
-        provider,
+        ...identity,
         durationMs,
         success: false,
-        error: error instanceof Error ? error.message : String(error),
+        failureStage: stage,
+        ...classifyAiFailure(error, stage),
       });
       throw error;
     }

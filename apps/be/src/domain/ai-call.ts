@@ -17,8 +17,16 @@ export function modelForStage(settings: AiSettings, stage: AiStage | 'baseline')
 export interface AiCallContext {
   signal: AbortSignal;
   settings: AiSettings;
+  requestId?: string;
+  callId?: string;
+  traceId?: string;
+  guildId?: string;
+  channelId?: string;
+  retryCount?: number;
+  issuesCount?: number;
 }
 export interface AiResult {
   value: unknown;
   usage?: { inputTokens: number; outputTokens: number };
+  ttftMs?: number;
 }

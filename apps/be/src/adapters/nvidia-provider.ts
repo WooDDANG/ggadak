@@ -1,6 +1,5 @@
 import OpenAI from 'openai';
 import { zodToJsonSchema } from 'zod-to-json-schema';
-import { createLogger } from '@ggaddak/shared';
 import { AiDefaults } from '../config/policies.js';
 import config from '../config/index.js';
 import { AppError } from '../errors/AppError.js';
@@ -12,7 +11,6 @@ export interface NvidiaProviderOptions {
   baseURL?: string;
   client?: OpenAI;
   enableThinking?: boolean;
-  logger?: { debug: (msg: string, ...args: any[]) => void };
 }
 
 export function extractAndParseJson(text: string): unknown {
@@ -44,7 +42,6 @@ export function extractAndParseJson(text: string): unknown {
 export class NvidiaProvider implements AiProvider {
   private readonly client: OpenAI;
   private readonly enableThinking: boolean;
-  private readonly logger: { debug: (msg: string, ...args: any[]) => void };
 
   constructor(options: NvidiaProviderOptions = {}) {
     this.client =
@@ -55,7 +52,6 @@ export class NvidiaProvider implements AiProvider {
       });
     this.enableThinking =
       options.enableThinking ?? config.ai.nvidiaEnableThinking ?? AiDefaults.nvidiaEnableThinking;
-    this.logger = options.logger ?? createLogger('NVIDIA-PROVIDER');
   }
 
   async generate(request: AiProviderRequest): Promise<AiResult> {
@@ -67,6 +63,9 @@ export class NvidiaProvider implements AiProvider {
     );
     const prompt = `${request.system}\n\nExpected JSON Schema:\n${schemaJson}\n\nSupplied conversation data:\n${request.input}\n\nRespond ONLY with valid JSON conforming strictly to the expected schema without any markdown formatting.`;
 
+    let content = '';
+    const startedAt = performance.now();
+    let ttftMs: number | undefined;
     try {
       const stream = (await this.client.chat.completions.create(
         {
@@ -91,14 +90,12 @@ export class NvidiaProvider implements AiProvider {
         },
       )) as unknown as AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>;
 
-      let content = '';
       let usage: { inputTokens: number; outputTokens: number } | undefined;
 
       for await (const chunk of stream) {
         const delta = chunk.choices[0]?.delta as any;
-        if (delta?.reasoning_content) {
-          this.logger.debug(`[NVIDIA Thinking] ${delta.reasoning_content}`);
-        }
+        if (ttftMs === undefined && (delta?.content || delta?.reasoning_content))
+          ttftMs = Math.round(performance.now() - startedAt);
         if (delta?.content) {
           content += delta.content;
         }
@@ -111,15 +108,17 @@ export class NvidiaProvider implements AiProvider {
       }
 
       if (!content.trim()) {
-        throw new AppError('AI returned no content', 422);
+        throw new AppError('AI returned no content', 422, { providerResponse: content });
       }
 
       if (usage && usage.outputTokens > request.maxOutputTokens) {
-        throw new AppError('NVIDIA AI output exceeds application token limit', 422);
+        throw new AppError('NVIDIA AI output exceeds application token limit', 422, {
+          providerResponse: content,
+        });
       }
 
       const parsedValue = extractAndParseJson(content);
-      return { value: parsedValue, usage };
+      return { value: parsedValue, usage, ttftMs };
     } catch (error) {
       if (
         request.signal.aborted ||
@@ -128,12 +127,17 @@ export class NvidiaProvider implements AiProvider {
           'name' in error &&
           (error as any).name === 'AbortError')
       ) {
-        throw new AppError('AI call timed out after configured deadline', 503);
+        throw new AppError('AI call timed out after configured deadline', 503, {
+          providerResponse: content,
+        });
       }
       if (error instanceof AppError) throw error;
-      if (error instanceof SyntaxError) throw new AppError('AI returned invalid JSON', 422);
-      const message = error instanceof Error ? error.message : String(error);
-      throw new AppError(`NVIDIA AI analysis failed: ${message}`, 503);
+      if (error instanceof SyntaxError)
+        throw new AppError('AI returned invalid JSON', 422, { providerResponse: content });
+      const providerError = error as { status?: number; error?: unknown; message?: string };
+      throw new AppError('NVIDIA AI analysis failed', providerError.status ?? 503, {
+        providerResponse: providerError.error ?? providerError.message ?? String(error),
+      });
     }
   }
 }

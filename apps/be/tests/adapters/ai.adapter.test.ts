@@ -134,7 +134,14 @@ test('AiAdapter records latency and telemetry metrics on success and failure', a
     metric => recordedMetrics.push(metric),
   );
 
-  await adapter.extractGraph('대화 내용', context(adapter));
+  await adapter.extractGraph('대화 내용', {
+    ...context(adapter),
+    requestId: 'request-1',
+    callId: 'call-1',
+    traceId: 'trace-1',
+    guildId: 'guild-1',
+    channelId: 'channel-1',
+  });
   expect(recordedMetrics.length).toBe(1);
   expect(recordedMetrics[0]).toMatchObject({
     stage: 'extract',
@@ -143,6 +150,13 @@ test('AiAdapter records latency and telemetry metrics on success and failure', a
     inputTokens: 100,
     outputTokens: 50,
     success: true,
+    requestId: 'request-1',
+    callId: 'call-1',
+    traceId: 'trace-1',
+    guildId: 'guild-1',
+    channelId: 'channel-1',
+    promptVersion: adapter.settings.promptVersion,
+    totalTokens: 150,
   });
   expect(typeof recordedMetrics[0].durationMs).toBe('number');
 
@@ -152,17 +166,26 @@ test('AiAdapter records latency and telemetry metrics on success and failure', a
     mockProvider,
     metric => recordedMetrics.push(metric),
   );
-  await expect(failingAdapter.extractGraph('대화 내용', context(failingAdapter))).rejects.toThrow(
-    'Provider exploded',
-  );
+  await expect(
+    failingAdapter.extractGraph('대화 내용', {
+      ...context(failingAdapter),
+      requestId: 'request-1',
+      callId: 'call-2',
+    }),
+  ).rejects.toThrow('Provider exploded');
   expect(recordedMetrics.length).toBe(2);
   expect(recordedMetrics[1]).toMatchObject({
     stage: 'extract',
     model: 'fail',
     provider: 'nvidia',
     success: false,
-    error: 'Provider exploded',
+    requestId: 'request-1',
+    callId: 'call-2',
+    failureKind: 'provider',
+    failureStage: 'extract',
+    errorSummary: 'AI provider failed',
   });
+  expect(recordedMetrics[1]).not.toHaveProperty('error');
 });
 
 test('AiAdapter enforces character limits and keeps mock output limited to development and tests', async () => {
@@ -171,13 +194,21 @@ test('AiAdapter enforces character limits and keeps mock output limited to devel
       throw new Error('Provider must not run for invalid input');
     },
   };
-  const adapter = new AiAdapter({ provider: 'agy' }, 'production', provider);
+  const metrics: any[] = [];
+  const adapter = new AiAdapter({ provider: 'agy' }, 'production', provider, metric =>
+    metrics.push(metric),
+  );
   await expect(
     adapter.extractGraph('too long', {
       ...context(adapter),
       settings: { ...adapter.settings, maxInputChars: 1 },
     }),
   ).rejects.toMatchObject({ statusCode: 422, message: 'AI input limit exceeded' });
+  expect(metrics[0]).toMatchObject({
+    success: false,
+    failureKind: 'configuration',
+    status: 422,
+  });
 
   const fixture = new AiAdapter({ provider: 'mock' }, 'test', provider);
   expect((await fixture.extractGraph('SQLite로 가자', context(fixture))).value).toMatchObject({

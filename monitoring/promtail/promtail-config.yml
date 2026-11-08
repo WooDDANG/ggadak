@@ -22,16 +22,10 @@ scrape_configs:
           expressions:
             timestamp: timestamp
             stage: stage
-            model: model
             provider: provider
-            durationMs: durationMs
-            inputTokens: inputTokens
-            outputTokens: outputTokens
             success: success
-            error: error
       - labels:
           stage:
-          model:
           provider:
           success:
   - job_name: ggaddak-backend
@@ -43,7 +37,15 @@ scrape_configs:
           __path__: /var/log/be/be.log
     pipeline_stages:
       - multiline:
-          firstline: '^\[\d{4}-\d{2}-\d{2} '
+          firstline: '^(\{|\[\d{4}-\d{2}-\d{2} )'
+      - json:
+          expressions:
+            timestamp: timestamp
+            level: level
+            service: service
+      - timestamp:
+          source: timestamp
+          format: RFC3339Nano
       - regex:
           expression: '^\[(?P<time>[^]]+)\] \[(?P<level>[^]]+)\] \[(?P<service>[^]]+)\]: (?P<message>.*)'
       - timestamp:
@@ -62,7 +64,15 @@ scrape_configs:
           __path__: /var/log/bot/bot.log
     pipeline_stages:
       - multiline:
-          firstline: '^\[\d{4}-\d{2}-\d{2} '
+          firstline: '^(\{|\[\d{4}-\d{2}-\d{2} )'
+      - json:
+          expressions:
+            timestamp: timestamp
+            level: level
+            service: service
+      - timestamp:
+          source: timestamp
+          format: RFC3339Nano
       - regex:
           expression: '^\[(?P<time>[^]]+)\] \[(?P<level>[^]]+)\] \[(?P<service>[^]]+)\]: (?P<message>.*)'
       - timestamp:

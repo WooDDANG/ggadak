@@ -49,16 +49,14 @@ describe('Shared Logger - Winston Labeling & App-Scoped Log Isolation', () => {
     const botContent = fs.readFileSync(botLogPath, 'utf-8');
     const errContent = fs.readFileSync(errorLogPath, 'utf-8');
 
-    // Verify official Winston label and content
-    assert.ok(
-      botContent.includes('[BOT-MESSAGE-HANDLER]'),
-      'bot.log should include label [BOT-MESSAGE-HANDLER]',
-    );
-    assert.ok(botContent.includes('trc-bot-1234'), 'bot.log should contain traceId');
-    assert.ok(
-      errContent.includes('Test bot unexpected error occurred'),
-      'error.log should record error',
-    );
+    const botEvent = JSON.parse(botContent.trim().split('\n')[0]);
+    const errorEvent = JSON.parse(errContent.trim().split('\n')[0]);
+    assert.strictEqual(botEvent.service, 'BOT-MESSAGE-HANDLER');
+    assert.strictEqual(botEvent.traceId, 'trc-bot-1234');
+    assert.strictEqual(botEvent.rawCount, 5);
+    assert.match(botEvent.timestamp, /^\d{4}-\d{2}-\d{2}T/);
+    assert.strictEqual(errorEvent.level, 'ERROR');
+    assert.strictEqual(errorEvent.message, 'Test bot unexpected error occurred');
   });
 
   it('routes backend service logs to apps/be/logs directory with be.log and preprocessing.log', async t => {
@@ -92,14 +90,11 @@ describe('Shared Logger - Winston Labeling & App-Scoped Log Isolation', () => {
     const beContent = fs.readFileSync(beLogPath, 'utf-8');
     const prepContent = fs.readFileSync(prepLogPath, 'utf-8');
 
-    assert.ok(
-      beContent.includes('[BE-EXTRACTOR-CORE]'),
-      'be.log should include label [BE-EXTRACTOR-CORE]',
-    );
-    assert.ok(
-      prepContent.includes('TIER1-FILTER'),
-      'preprocessing.log should include stage TIER1-FILTER',
-    );
-    assert.ok(prepContent.includes('trc-be-5678'), 'preprocessing.log should include traceId');
+    const beEvent = JSON.parse(beContent.trim());
+    const prepEvent = JSON.parse(prepContent.trim());
+    assert.strictEqual(beEvent.service, 'BE-EXTRACTOR-CORE');
+    assert.strictEqual(beEvent.stage, 'TIER1-FILTER');
+    assert.strictEqual(beEvent.durationMs, 3.2);
+    assert.strictEqual(prepEvent.traceId, 'trc-be-5678');
   });
 });

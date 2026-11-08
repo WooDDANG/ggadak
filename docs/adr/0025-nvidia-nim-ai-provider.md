@@ -17,7 +17,7 @@ GGADDAK previously used an Antigravity CLI (`agy`) subprocess as its sole genera
    - Timeout aborts are classified strictly as `503 Service Unavailable`, allowing the durable queue to track and handle retries transparently. Hidden retries with thinking disabled are explicitly rejected.
 5. **Thinking & Logging**:
    - `NVIDIA_ENABLE_THINKING` (default `true`) passes `chat_template_kwargs: { enable_thinking: true }`.
-   - Streaming chunks containing `reasoning_content` are logged to the backend logger at `debug` level with `[NVIDIA Thinking]` prefix.
+   - Streaming `reasoning_content` is consumed without writing it to backend logs. The raw-evidence logging boundary is defined in [ADR-0027](0027-ai-observability-labels-and-raw-evidence.md).
 6. **Schema Enforcement & Scope**:
    - Model outputs are normalized through `extractAndParseJson` to handle markdown code fences. Schema violations delegate directly to the domain agentic workflow (`repairGraph`) rather than an opaque adapter retry.
    - Multimodal image processing of Discord attachments is deferred to a separate milestone; text transcripts remain the primary input boundary.

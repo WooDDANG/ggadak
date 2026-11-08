@@ -5,14 +5,30 @@ import { createLogger } from '@ggaddak/shared';
 
 export interface AiMetricRecord {
   timestamp: string;
+  requestId?: string;
+  callId: string;
+  traceId?: string;
+  guildId?: string;
+  channelId?: string;
   stage: string;
   model: string;
   provider: string;
+  promptVersion?: string;
   durationMs: number;
+  ttftMs?: number;
   inputTokens?: number;
   outputTokens?: number;
+  totalTokens?: number;
+  repairTriggered?: boolean;
+  retryCount?: number;
+  issuesCount?: number;
+  enableThinking?: boolean;
   success: boolean;
-  error?: string;
+  failureKind?: string;
+  failureStage?: string;
+  errorSummary?: string;
+  status?: number;
+  retryable?: boolean;
 }
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
@@ -27,7 +43,13 @@ export function recordAiMetric(metric: AiMetricRecord): void {
       if (!fs.existsSync(logDir)) {
         fs.mkdirSync(logDir, { recursive: true });
       }
-      const line = JSON.stringify(metric) + '\n';
+      const line =
+        JSON.stringify({
+          ...metric,
+          level: metric.success ? 'INFO' : 'WARN',
+          service: 'AI-METRIC',
+          env: process.env.NODE_ENV || 'development',
+        }) + '\n';
       fs.appendFileSync(logFilePath, line, 'utf8');
     }
   } catch (err) {
@@ -36,13 +58,13 @@ export function recordAiMetric(metric: AiMetricRecord): void {
 
   // Console summary
   const durationSec = (metric.durationMs / 1000).toFixed(1);
-  const statusStr = metric.success ? 'SUCCESS' : `FAILED (${metric.error || 'unknown'})`;
+  const statusStr = metric.success ? 'SUCCESS' : `FAILED (${metric.failureKind || 'unknown'})`;
   const tokenStr =
     metric.inputTokens !== undefined
       ? ` | in: ${metric.inputTokens} / out: ${metric.outputTokens ?? 0} tokens`
       : '';
 
-  consoleLogger.info(
-    `[${metric.stage.toUpperCase()}] ${durationSec}s | ${metric.model}${tokenStr} | ${statusStr}`,
-  );
+  const summary = `[${metric.stage.toUpperCase()}] ${durationSec}s | ${metric.model}${tokenStr} | ${statusStr}`;
+  if (metric.success) consoleLogger.info(summary);
+  else consoleLogger.warn(summary);
 }
