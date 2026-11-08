@@ -43,7 +43,7 @@ test('AiAdapter rejects unsupported providers and unsupported exact input-token 
   const unsupported = new AiAdapter({ provider: 'gemini' }, 'production', provider);
   await expect(unsupported.extractGraph('input', context(unsupported))).rejects.toMatchObject({
     statusCode: 422,
-    message: 'Unsupported AI_PROVIDER; expected agy',
+    message: 'Unsupported AI_PROVIDER; expected agy or nvidia',
   });
 
   const agy = new AiAdapter({ provider: 'agy' }, 'production', provider);
@@ -56,6 +56,11 @@ test('AiAdapter rejects unsupported providers and unsupported exact input-token 
     statusCode: 422,
     message: expect.stringContaining('does not support'),
   });
+
+  const nvidia = new AiAdapter({ provider: 'nvidia' }, 'production', provider);
+  await expect(nvidia.extractGraph('input', context(nvidia))).resolves.toEqual({ value: graph });
+  expect(nvidia.settings.maxOutputTokens).toBe(16384);
+  expect(nvidia.settings.model).toBe('nvidia/nemotron-3.5-super-vl-120b-a12b');
 });
 
 test('AiAdapter enforces character limits and keeps mock output limited to development and tests', async () => {

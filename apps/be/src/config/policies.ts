@@ -14,15 +14,20 @@ export const GraphPolicy = {
   maxProblems: 500,
   maxVerificationIssues: 500,
   sessionBudgetMs: 180_000,
-  callTimeoutMs: 45_000,
+  callTimeoutMs: 20_000,
   maxLogicalCalls: 4,
   maxRepairs: 1,
 } as const;
 export const AiDefaults = {
-  provider: 'agy',
+  provider: 'nvidia',
   agyExecutable: 'agy',
-  maxOutputTokens: 8192,
-  models: { agy: 'gemini-3.8-flash-low' },
+  nvidiaBaseUrl: 'https://integrate.api.nvidia.com/v1',
+  nvidiaEnableThinking: true,
+  maxOutputTokens: 16384,
+  models: {
+    agy: 'gemini-3.8-flash-low',
+    nvidia: 'nvidia/nemotron-3.5-super-vl-120b-a12b',
+  },
   embeddingProvider: 'openai',
   embeddingModel: 'text-embedding-3-small',
 } as const;

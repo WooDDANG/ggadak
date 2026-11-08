@@ -12,8 +12,21 @@ import {
 import type { AiSettings, AiCallContext, AiResult } from '../domain/ai-call.js';
 import { modelForStage } from '../domain/ai-call.js';
 import { AgyProvider } from './agy-provider.js';
+import { NvidiaProvider } from './nvidia-provider.js';
 import type { AiProvider } from './ai-provider.js';
 export type { AiSettings, AiCallContext, AiResult } from '../domain/ai-call.js';
+
+function createDefaultProvider(options: AppConfig['ai']): AiProvider {
+  if (options.provider === 'nvidia') {
+    return new NvidiaProvider({
+      apiKey: options.nvidiaApiKey,
+      baseURL: options.nvidiaBaseUrl,
+    });
+  }
+  return new AgyProvider({
+    executable: options.agyExecutable,
+  });
+}
 
 export interface IAiAdapter {
   readonly settings?: AiSettings;
@@ -34,13 +47,13 @@ export class AiAdapter implements IAiAdapter {
   constructor(
     private readonly options: AppConfig['ai'] = config.ai,
     private readonly environment = config.nodeEnv,
-    private readonly provider: AiProvider = new AgyProvider({
-      executable: options.agyExecutable,
-    }),
+    private readonly provider: AiProvider = createDefaultProvider(options),
   ) {
     this.settings = {
       provider: options.provider,
-      model: options.model || AiDefaults.models.agy,
+      model:
+        options.model ||
+        (options.provider === 'nvidia' ? AiDefaults.models.nvidia : AiDefaults.models.agy),
       promptVersion: GRAPH_PROMPT_VERSION,
       maxOutputTokens: Number(process.env.AI_MAX_OUTPUT_TOKENS || AiDefaults.maxOutputTokens),
       maxInputChars: Number(process.env.AI_MAX_INPUT_CHARS ?? 0),
@@ -105,8 +118,9 @@ export class AiAdapter implements IAiAdapter {
               },
       };
     }
-    if (provider !== 'agy') throw new AppError('Unsupported AI_PROVIDER; expected agy', 422);
-    if (maxInputTokens !== undefined)
+    if (provider !== 'agy' && provider !== 'nvidia')
+      throw new AppError('Unsupported AI_PROVIDER; expected agy or nvidia', 422);
+    if (provider === 'agy' && maxInputTokens !== undefined)
       throw new AppError(
         'AGY does not support exact input-token preflight; remove AI_MAX_INPUT_TOKENS for CLI mode',
         422,

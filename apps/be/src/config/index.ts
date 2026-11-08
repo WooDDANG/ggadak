@@ -1,4 +1,4 @@
-import { AiDefaults } from './policies.js';
+import { AiDefaults, GraphPolicy } from './policies.js';
 import {
   DEFAULT_HARVESTING_POLICY,
   getHarvestingPolicyFromEnv,
@@ -65,6 +65,10 @@ export interface AppConfig {
     model?: string;
     stageModels?: Partial<Record<AiStage, string>>;
     agyExecutable?: string;
+    nvidiaApiKey?: string;
+    nvidiaBaseUrl?: string;
+    nvidiaEnableThinking?: boolean;
+    callTimeoutMs?: number;
   };
 }
 
@@ -93,6 +97,13 @@ export const config: AppConfig = {
           .filter(([, model]) => model),
       ),
       agyExecutable: process.env.AGY_EXECUTABLE || AiDefaults.agyExecutable,
+      nvidiaApiKey: process.env.NVIDIA_API_KEY,
+      nvidiaBaseUrl: process.env.NVIDIA_BASE_URL || AiDefaults.nvidiaBaseUrl,
+      nvidiaEnableThinking:
+        process.env.NVIDIA_ENABLE_THINKING !== undefined
+          ? process.env.NVIDIA_ENABLE_THINKING !== 'false'
+          : AiDefaults.nvidiaEnableThinking,
+      callTimeoutMs: Number(process.env.AI_CALL_TIMEOUT_MS || GraphPolicy.callTimeoutMs),
     };
   },
 };
