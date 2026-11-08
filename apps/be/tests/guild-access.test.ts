@@ -14,10 +14,18 @@ import { DecisionSchema, GuildAccessPolicy } from '@ggaddak/shared';
 class ObservableDiscord extends FakeDiscordAuth {
   guildCalls = 0;
   unavailable = false;
+  rateLimit?: { retryAfterSeconds?: number; global?: boolean };
   pending?: { started: () => void; released: Promise<void> };
   override async guilds() {
     this.guildCalls++;
     if (this.unavailable) throw new AppError('Discord is unavailable', 502);
+    if (this.rateLimit) {
+      throw new AppError('Discord rate limit reached', 429, {
+        retryAfterMs: (this.rateLimit.retryAfterSeconds ?? 30) * 1000,
+        retryAfterSeconds: this.rateLimit.retryAfterSeconds,
+        global: this.rateLimit.global,
+      });
+    }
     const result = [...this.availableGuilds];
     if (this.pending) {
       this.pending.started();
@@ -29,6 +37,7 @@ class ObservableDiscord extends FakeDiscordAuth {
 }
 
 class TwoUsersDiscord extends ObservableDiscord {
+  rateLimitUser?: string;
   override async exchange(code = 'alice') {
     return { access_token: code, refresh_token: code, expires_in: 3600 };
   }
@@ -40,6 +49,13 @@ class TwoUsersDiscord extends ObservableDiscord {
   }
   override async guilds(token = 'alice') {
     this.guildCalls++;
+    if (this.rateLimitUser === token && this.rateLimit) {
+      throw new AppError('Discord rate limit reached', 429, {
+        retryAfterMs: (this.rateLimit.retryAfterSeconds ?? 30) * 1000,
+        retryAfterSeconds: this.rateLimit.retryAfterSeconds,
+        global: this.rateLimit.global,
+      });
+    }
     return [this.availableGuilds[token === 'alice' ? 0 : 1]];
   }
 }
@@ -92,6 +108,28 @@ async function fixture(discord = new ObservableDiscord()) {
     },
   };
 }
+
+test('selection trusts installed guild coverage without refreshing noninstalled memberships', async () => {
+  const { base, event, discord } = await fixture();
+  await event({
+    kind: 'reset',
+    sequence: 0,
+    guildIds: ['guild-1'],
+    membersIntent: true,
+    connected: true,
+  });
+  const { token } = await loginAsTestUser(base);
+  const calls = discord.guildCalls;
+  discord.unavailable = true;
+  const response = await fetch(`${base}/api/v1/auth/guilds`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  expect(response.status).toBe(200);
+  expect((await response.json()).data.guilds.map((guild: { id: string }) => guild.id)).toEqual([
+    'guild-1',
+  ]);
+  expect(discord.guildCalls).toBe(calls);
+});
 
 test('member removal immediately denies existing sessions without changing another guild', async () => {
   const { base, event } = await fixture();
@@ -457,4 +495,222 @@ test('receiver restart requires new coverage and a temporary unavailable snapsho
   expect((await denied.json()).code).toBe('GUILD_ACCESS_UNAVAILABLE');
   discord.unavailable = false;
   expect((await fetch(`${next}/decisions?guildId=guild-1`, { headers })).status).toBe(200);
+});
+
+test('rate limited verification persists across restart, shares cooldown, and isolates other users', async () => {
+  const discord = new TwoUsersDiscord();
+  let fakeNow = Date.now();
+  const db = await isolatedRepository();
+  cleanups.push(db.cleanup);
+  const server = await createServer(
+    db.repo,
+    undefined,
+    {
+      ...fakeAuthOptions(discord, () => fakeNow),
+      serviceToken: 'event-service',
+      channelAdapter: {
+        list: async guildId => [
+          { id: 'channel', guildId, name: 'general', type: 0, accessible: true },
+        ],
+      },
+      botInstallationAdapter: {
+        observeBotMembership: async () => 'installed',
+        getApplicationId: async () => null,
+      },
+    },
+    { model: 'fixture', embed: async () => [1, 0] },
+  );
+  await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+  cleanups.push(() => new Promise<void>(resolve => server.close(() => resolve())));
+  const base = `http://127.0.0.1:${(server.address() as import('node:net').AddressInfo).port}`;
+  const streamId = randomUUID();
+  const event = (body: Record<string, unknown>) =>
+    fetch(`${base}/api/v1/internal/guild-access/events`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer event-service' },
+      body: JSON.stringify({ streamId, ...body }),
+    });
+
+  await event({
+    kind: 'reset',
+    sequence: 0,
+    guildIds: ['guild-1', 'guild-2'],
+    membersIntent: true,
+    connected: true,
+  });
+
+  const alice = await loginAsTestUser(base, 'alice');
+  const bob = await loginAsTestUser(base, 'bob');
+
+  expect(
+    (
+      await fetch(`${base}/api/v1/decisions?guildId=guild-1`, {
+        headers: { Authorization: `Bearer ${alice.token}` },
+      })
+    ).status,
+  ).toBe(200);
+  expect(
+    (
+      await fetch(`${base}/api/v1/decisions?guildId=guild-2`, {
+        headers: { Authorization: `Bearer ${bob.token}` },
+      })
+    ).status,
+  ).toBe(200);
+
+  // Disconnect Gateway -> forces revalidation on next check
+  const disconnectRes = await event({
+    kind: 'disconnect',
+    sequence: 1,
+  });
+  expect(disconnectRes.status).toBe(200);
+
+  discord.rateLimitUser = 'alice';
+  discord.rateLimit = { retryAfterSeconds: 45 };
+  const callsBeforeAlice = discord.guildCalls;
+
+  const aliceRes = await fetch(`${base}/api/v1/decisions?guildId=guild-1`, {
+    headers: { Authorization: `Bearer ${alice.token}` },
+  });
+  expect(aliceRes.status).toBe(429);
+  expect(aliceRes.headers.get('Retry-After')).toBe('45');
+
+  const aliceGuildsRes = await fetch(`${base}/api/v1/auth/guilds`, {
+    headers: { Authorization: `Bearer ${alice.token}` },
+  });
+  expect(aliceGuildsRes.status).toBe(200);
+  const aliceGuildsData = await aliceGuildsRes.json();
+  expect(aliceGuildsData.data.guildVerification.status).toBe('rate_limited');
+  expect(aliceGuildsData.data.guildVerification.retryAt).toBeTruthy();
+  expect(discord.guildCalls).toBe(callsBeforeAlice + 1);
+
+  // Bob is isolated from Alice's rate limit
+  const bobRes = await fetch(`${base}/api/v1/decisions?guildId=guild-2`, {
+    headers: { Authorization: `Bearer ${bob.token}` },
+  });
+  expect(bobRes.status).toBe(200);
+
+  // Server restart preserves cooldown
+  await new Promise<void>(resolve => server.close(() => resolve()));
+  const restarted = await createServer(db.repo, undefined, {
+    ...fakeAuthOptions(discord, () => fakeNow),
+    serviceToken: 'event-service',
+  });
+  await new Promise<void>(resolve => restarted.listen(0, '127.0.0.1', resolve));
+  cleanups.push(() => new Promise<void>(resolve => restarted.close(() => resolve())));
+  const nextBase = `http://127.0.0.1:${(restarted.address() as import('node:net').AddressInfo).port}/api/v1`;
+
+  const callsAfterRestart = discord.guildCalls;
+  const aliceRestartGuilds = await fetch(`${nextBase}/auth/guilds`, {
+    headers: { Authorization: `Bearer ${alice.token}` },
+  });
+  expect(aliceRestartGuilds.status).toBe(200);
+  const restartData = await aliceRestartGuilds.json();
+  expect(restartData.data.guildVerification.status).toBe('rate_limited');
+  expect(discord.guildCalls).toBe(callsAfterRestart);
+
+  // Advance time past cooldown
+  fakeNow += 46000;
+  discord.rateLimit = undefined;
+
+  const recoveredGuilds = await fetch(`${nextBase}/auth/guilds`, {
+    headers: { Authorization: `Bearer ${alice.token}` },
+  });
+  expect(recoveredGuilds.status).toBe(200);
+  const recoveredData = await recoveredGuilds.json();
+  expect(recoveredData.data.guildVerification.status).toBe('ready');
+  expect(recoveredData.data.guilds.length).toBeGreaterThan(0);
+});
+
+test('rate limited revalidation preserves rotated refresh token and restores on manual retry after expiry', async () => {
+  let fakeNow = Date.now();
+  class RotatedTokenDiscord extends ObservableDiscord {
+    refreshCalls = 0;
+    override async refresh(secret = 'alice') {
+      this.refreshCalls++;
+      return {
+        access_token: `access-for-${secret}-${this.refreshCalls}`,
+        refresh_token: `rotated-refresh-${this.refreshCalls}`,
+        expires_in: 3600,
+      };
+    }
+  }
+  const discord = new RotatedTokenDiscord();
+  const db = await isolatedRepository();
+  cleanups.push(db.cleanup);
+  const server = await createServer(
+    db.repo,
+    undefined,
+    {
+      ...fakeAuthOptions(discord, () => fakeNow),
+      serviceToken: 'event-service',
+      channelAdapter: {
+        list: async guildId => [
+          { id: 'channel', guildId, name: 'general', type: 0, accessible: true },
+        ],
+      },
+      botInstallationAdapter: {
+        observeBotMembership: async () => 'installed',
+        getApplicationId: async () => null,
+      },
+    },
+    { model: 'fixture', embed: async () => [1, 0] },
+  );
+  await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+  cleanups.push(() => new Promise<void>(resolve => server.close(() => resolve())));
+  const base = `http://127.0.0.1:${(server.address() as import('node:net').AddressInfo).port}`;
+  const streamId = randomUUID();
+  const event = (body: Record<string, unknown>) =>
+    fetch(`${base}/api/v1/internal/guild-access/events`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer event-service' },
+      body: JSON.stringify({ streamId, ...body }),
+    });
+
+  await event({
+    kind: 'reset',
+    sequence: 0,
+    guildIds: ['guild-1'],
+    membersIntent: true,
+    connected: true,
+  });
+
+  const { token } = await loginAsTestUser(base);
+
+  // Disconnect Gateway -> triggers revalidation on next check
+  const disconnectRes = await event({
+    kind: 'disconnect',
+    sequence: 1,
+  });
+  expect(disconnectRes.status).toBe(200);
+
+  // Next revalidation will succeed token refresh, but fail guilds fetch with 429
+  discord.rateLimit = { retryAfterSeconds: 30 };
+
+  const rateLimitedRes = await fetch(`${base}/api/v1/decisions?guildId=guild-1`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  expect(rateLimitedRes.status).toBe(429);
+  expect(discord.refreshCalls).toBe(1);
+
+  // Verify that the rotated refresh token was persisted in the DB session
+  const session = await db.repo.prisma.authSession.findFirstOrThrow();
+  expect(session.refreshToken).toBeTruthy();
+
+  // Next request during cooldown does NOT call refresh again
+  const duringCooldown = await fetch(`${base}/api/v1/decisions?guildId=guild-1`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  expect(duringCooldown.status).toBe(429);
+  expect(discord.refreshCalls).toBe(1);
+
+  // Advance time past cooldown (30 seconds)
+  fakeNow += 31000;
+  discord.rateLimit = undefined;
+
+  // Manual retry recovers access using the persisted rotated credential
+  const recovered = await fetch(`${base}/api/v1/decisions?guildId=guild-1`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  expect(recovered.status).toBe(200);
+  expect(discord.refreshCalls).toBe(2);
 });

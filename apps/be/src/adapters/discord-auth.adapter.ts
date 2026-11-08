@@ -48,6 +48,16 @@ export class HttpDiscordAuthAdapter implements DiscordAuthAdapter {
           (path === '/oauth2/token' && response.status === 400 && body.error === 'invalid_grant')
         )
           throw new AuthError('Discord authorization expired; sign in again');
+        if (response.status === 429) {
+          const header = response.headers.get('Retry-After');
+          const seconds = Number((body as { retry_after?: number }).retry_after ?? header);
+          const retryAfterMs =
+            (Number.isFinite(seconds) && seconds > 0 ? Math.ceil(seconds) : 30) * 1000;
+          throw new AppError('Discord rate limited guild verification; retry shortly', 429, {
+            retryAfterMs,
+            global: Boolean((body as { global?: boolean }).global),
+          });
+        }
         throw new AppError('Discord authentication unavailable; retry shortly', 502);
       }
       return (await response.json()) as T;

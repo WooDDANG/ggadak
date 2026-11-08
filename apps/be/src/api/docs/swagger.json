@@ -2539,7 +2539,40 @@
 				"type": "object",
 				"additionalProperties": false
 			},
-			"ApiResponse__accessToken-string--tokenType-string--expiresAt-string--user-AuthUserDto--guilds-DiscordGuild-Array--guildSelection-GuildSelectionDto__": {
+			"GuildVerificationDto": {
+				"properties": {
+					"status": {
+						"type": "string",
+						"enum": [
+							"ready",
+							"unavailable",
+							"rate_limited"
+						]
+					},
+					"retryAt": {
+						"type": "string",
+						"nullable": true
+					},
+					"eventCoverage": {
+						"type": "string",
+						"enum": [
+							"trusted",
+							"members_intent_disabled",
+							"disconnected",
+							"expired",
+							"unknown"
+						]
+					}
+				},
+				"required": [
+					"status",
+					"retryAt",
+					"eventCoverage"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"ApiResponse__accessToken-string--tokenType-string--expiresAt-string--user-AuthUserDto--guilds-DiscordGuild-Array--guildSelection-GuildSelectionDto--guildVerification-GuildVerificationDto__": {
 				"description": "Shared v1 response contract. Domain payloads remain typed by each endpoint.",
 				"properties": {
 					"success": {
@@ -2553,6 +2586,9 @@
 					},
 					"data": {
 						"properties": {
+							"guildVerification": {
+								"$ref": "#/components/schemas/GuildVerificationDto"
+							},
 							"guildSelection": {
 								"$ref": "#/components/schemas/GuildSelectionDto"
 							},
@@ -2576,6 +2612,7 @@
 							}
 						},
 						"required": [
+							"guildVerification",
 							"guildSelection",
 							"guilds",
 							"user",
@@ -2665,7 +2702,7 @@
 				"type": "object",
 				"additionalProperties": false
 			},
-			"ApiResponse__guilds-DiscordGuild-Array--guildSelection-GuildSelectionDto__": {
+			"ApiResponse__guilds-DiscordGuild-Array--guildSelection-GuildSelectionDto--guildVerification-GuildVerificationDto__": {
 				"description": "Shared v1 response contract. Domain payloads remain typed by each endpoint.",
 				"properties": {
 					"success": {
@@ -2679,6 +2716,9 @@
 					},
 					"data": {
 						"properties": {
+							"guildVerification": {
+								"$ref": "#/components/schemas/GuildVerificationDto"
+							},
 							"guildSelection": {
 								"$ref": "#/components/schemas/GuildSelectionDto"
 							},
@@ -2690,6 +2730,7 @@
 							}
 						},
 						"required": [
+							"guildVerification",
 							"guildSelection",
 							"guilds"
 						],
@@ -5255,7 +5296,7 @@
 						"content": {
 							"application/json": {
 								"schema": {
-									"$ref": "#/components/schemas/ApiResponse__accessToken-string--tokenType-string--expiresAt-string--user-AuthUserDto--guilds-DiscordGuild-Array--guildSelection-GuildSelectionDto__"
+									"$ref": "#/components/schemas/ApiResponse__accessToken-string--tokenType-string--expiresAt-string--user-AuthUserDto--guilds-DiscordGuild-Array--guildSelection-GuildSelectionDto--guildVerification-GuildVerificationDto__"
 								}
 							}
 						}
@@ -5299,7 +5340,7 @@
 						"content": {
 							"application/json": {
 								"schema": {
-									"$ref": "#/components/schemas/ApiResponse__accessToken-string--tokenType-string--expiresAt-string--user-AuthUserDto--guilds-DiscordGuild-Array--guildSelection-GuildSelectionDto__"
+									"$ref": "#/components/schemas/ApiResponse__accessToken-string--tokenType-string--expiresAt-string--user-AuthUserDto--guilds-DiscordGuild-Array--guildSelection-GuildSelectionDto--guildVerification-GuildVerificationDto__"
 								}
 							}
 						}
@@ -5369,7 +5410,7 @@
 						"content": {
 							"application/json": {
 								"schema": {
-									"$ref": "#/components/schemas/ApiResponse__guilds-DiscordGuild-Array--guildSelection-GuildSelectionDto__"
+									"$ref": "#/components/schemas/ApiResponse__guilds-DiscordGuild-Array--guildSelection-GuildSelectionDto--guildVerification-GuildVerificationDto__"
 								}
 							}
 						}

@@ -14,3 +14,9 @@ export interface GuildSelectionDto {
   status: 'ready' | 'unavailable';
   checkedAt: string | null;
 }
+
+export interface GuildVerificationDto {
+  status: 'ready' | 'unavailable' | 'rate_limited';
+  retryAt: string | null;
+  eventCoverage: 'trusted' | 'members_intent_disabled' | 'disconnected' | 'expired' | 'unknown';
+}

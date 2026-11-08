@@ -1,6 +1,6 @@
 import { AuthError } from '../../errors/AuthError.js';
 import { requirePrincipal } from '../guards/authorization.js';
-import type { AuthUserDto, GuildSelectionDto } from '../../dto/auth.dto.js';
+import type { AuthUserDto, GuildSelectionDto, GuildVerificationDto } from '../../dto/auth.dto.js';
 import { Controller, Route, Tags, Get, Post, Request, Body, Security } from 'tsoa';
 import type { Request as ExpressRequest } from 'express';
 import { Service } from 'typedi';
@@ -33,6 +33,7 @@ export class AuthController extends Controller {
       user: AuthUserDto;
       guilds: DiscordGuild[];
       guildSelection: GuildSelectionDto;
+      guildVerification: GuildVerificationDto;
     }>
   > {
     if (request.headers.origin) this.auth.requireBrowserOrigin(request.headers.origin);
@@ -57,6 +58,7 @@ export class AuthController extends Controller {
       user: AuthUserDto;
       guilds: DiscordGuild[];
       guildSelection: GuildSelectionDto;
+      guildVerification: GuildVerificationDto;
     }>
   > {
     this.setHeader('Cache-Control', 'no-store');
@@ -80,9 +82,13 @@ export class AuthController extends Controller {
   }
   @Security('jwt')
   @Get('guilds')
-  async listAuthGuilds(
-    @Request() request: ExpressRequest,
-  ): Promise<ApiResponse<{ guilds: DiscordGuild[]; guildSelection: GuildSelectionDto }>> {
+  async listAuthGuilds(@Request() request: ExpressRequest): Promise<
+    ApiResponse<{
+      guilds: DiscordGuild[];
+      guildSelection: GuildSelectionDto;
+      guildVerification: GuildVerificationDto;
+    }>
+  > {
     this.setHeader('Cache-Control', 'no-store');
     return apiSuccess(await this.auth.selectableGuilds(requirePrincipal(request)));
   }
