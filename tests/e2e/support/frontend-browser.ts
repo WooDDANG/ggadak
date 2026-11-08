@@ -13,6 +13,7 @@ import type {
   DiscordGuild,
 } from '../../../apps/be/src/adapters/discord-auth.adapter.js';
 import { testAuthConfig } from '../../../apps/be/src/test-support/auth.js';
+import { AppError } from '../../../apps/be/src/errors/AppError.js';
 
 export const chrome = [
   process.env.CHROME_EXECUTABLE,
@@ -26,6 +27,8 @@ export const chrome = [
 export class BrowserDiscord implements DiscordAuthAdapter {
   installed: string[] | null = ['guild-1', 'foreign-installed'];
   canManage = false;
+  verificationRateLimited = false;
+  private verificationAttempts = 0;
   calls = { guilds: 0, inventory: 0 };
   async exchange(code: string) {
     return { access_token: code, refresh_token: code, expires_in: 3600 };
@@ -38,6 +41,12 @@ export class BrowserDiscord implements DiscordAuthAdapter {
   }
   async guilds(token: string): Promise<DiscordGuild[]> {
     this.calls.guilds++;
+    // External observation fixture: intermittent Discord 429 followed by a successful list.
+    if (this.verificationRateLimited) {
+      await new Promise(resolve => setTimeout(resolve, 30));
+      if (this.verificationAttempts++ % 2 === 0)
+        throw new AppError('Discord guild verification rate limited (429)', 502);
+    }
     const guilds = [
       {
         id: 'guild-1',
@@ -80,6 +89,7 @@ export async function runFrontendJourney(
   let timer: ReturnType<typeof setTimeout> | undefined;
   const delayedRequests = new Set<ReturnType<typeof setTimeout>>();
   try {
+    profile = await mkdtemp(join(tmpdir(), 'ggaddak-real-be-browser-'));
     const discord = new BrowserDiscord();
     if (options.withDecision) {
       discord.installed = ['guild-1', 'guild-2'];
@@ -152,6 +162,7 @@ export async function runFrontendJourney(
     const streamId = randomUUID();
     frontend = await createViteServer({
       root: resolve('apps/frontend-main'),
+      cacheDir: join(profile, 'vite-cache'),
       configFile: false,
       appType: 'custom',
       plugins: [
@@ -174,6 +185,8 @@ export async function runFrontendJourney(
                   const command = JSON.parse(body) as Control;
                   if (command.action === 'inventory')
                     discord.installed = command.value as string[] | null;
+                  else if (command.action === 'verificationRateLimited')
+                    discord.verificationRateLimited = command.value === true;
                   else if (command.action === 'manage') discord.canManage = command.value === true;
                   else if (command.action === 'advance') clock += Number(command.value);
                   else if (command.action === 'event') {
@@ -235,7 +248,6 @@ export async function runFrontendJourney(
         proxy: { '/api': { target: backend, changeOrigin: true } },
       },
     });
-    profile = await mkdtemp(join(tmpdir(), 'ggaddak-real-be-browser-'));
     await frontend.listen();
     const origin = `http://127.0.0.1:${(frontend.httpServer!.address() as AddressInfo).port}`;
     authConfig.redirectUri = `${origin}/`;
