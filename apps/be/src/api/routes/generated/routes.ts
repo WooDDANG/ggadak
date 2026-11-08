@@ -807,17 +807,6 @@ const models: TsoaRoute.Models = {
         "additionalProperties": false,
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
-    "ApiResponse__accessToken-string--tokenType-string--expiresAt-string--user-AuthUserDto__": {
-        "dataType": "refObject",
-        "properties": {
-            "success": {"dataType":"boolean","required":true},
-            "code": {"dataType":"string","required":true},
-            "message": {"dataType":"string","required":true},
-            "data": {"dataType":"nestedObjectLiteral","nestedProperties":{"user":{"ref":"AuthUserDto","required":true},"expiresAt":{"dataType":"string","required":true},"tokenType":{"dataType":"string","required":true},"accessToken":{"dataType":"string","required":true}},"required":true},
-        },
-        "additionalProperties": false,
-    },
-    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "DiscordGuild": {
         "dataType": "refObject",
         "properties": {
@@ -830,13 +819,32 @@ const models: TsoaRoute.Models = {
         "additionalProperties": false,
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
-    "ApiResponse__accessToken-string--tokenType-string--expiresAt-string--user-AuthUserDto--guilds-DiscordGuild-Array__": {
+    "GuildSelectionDto": {
+        "dataType": "refObject",
+        "properties": {
+            "status": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["ready"]},{"dataType":"enum","enums":["unavailable"]}],"required":true},
+            "checkedAt": {"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "GuildVerificationDto": {
+        "dataType": "refObject",
+        "properties": {
+            "status": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["ready"]},{"dataType":"enum","enums":["unavailable"]},{"dataType":"enum","enums":["rate_limited"]}],"required":true},
+            "retryAt": {"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},
+            "eventCoverage": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["trusted"]},{"dataType":"enum","enums":["members_intent_disabled"]},{"dataType":"enum","enums":["disconnected"]},{"dataType":"enum","enums":["expired"]},{"dataType":"enum","enums":["unknown"]}],"required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "ApiResponse__accessToken-string--tokenType-string--expiresAt-string--user-AuthUserDto--guilds-DiscordGuild-Array--guildSelection-GuildSelectionDto--guildVerification-GuildVerificationDto__": {
         "dataType": "refObject",
         "properties": {
             "success": {"dataType":"boolean","required":true},
             "code": {"dataType":"string","required":true},
             "message": {"dataType":"string","required":true},
-            "data": {"dataType":"nestedObjectLiteral","nestedProperties":{"guilds":{"dataType":"array","array":{"dataType":"refObject","ref":"DiscordGuild"},"required":true},"user":{"ref":"AuthUserDto","required":true},"expiresAt":{"dataType":"string","required":true},"tokenType":{"dataType":"string","required":true},"accessToken":{"dataType":"string","required":true}},"required":true},
+            "data": {"dataType":"nestedObjectLiteral","nestedProperties":{"guildVerification":{"ref":"GuildVerificationDto","required":true},"guildSelection":{"ref":"GuildSelectionDto","required":true},"guilds":{"dataType":"array","array":{"dataType":"refObject","ref":"DiscordGuild"},"required":true},"user":{"ref":"AuthUserDto","required":true},"expiresAt":{"dataType":"string","required":true},"tokenType":{"dataType":"string","required":true},"accessToken":{"dataType":"string","required":true}},"required":true},
         },
         "additionalProperties": false,
     },
@@ -863,13 +871,13 @@ const models: TsoaRoute.Models = {
         "additionalProperties": false,
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
-    "ApiResponse__guilds-DiscordGuild-Array__": {
+    "ApiResponse__guilds-DiscordGuild-Array--guildSelection-GuildSelectionDto--guildVerification-GuildVerificationDto__": {
         "dataType": "refObject",
         "properties": {
             "success": {"dataType":"boolean","required":true},
             "code": {"dataType":"string","required":true},
             "message": {"dataType":"string","required":true},
-            "data": {"dataType":"nestedObjectLiteral","nestedProperties":{"guilds":{"dataType":"array","array":{"dataType":"refObject","ref":"DiscordGuild"},"required":true}},"required":true},
+            "data": {"dataType":"nestedObjectLiteral","nestedProperties":{"guildVerification":{"ref":"GuildVerificationDto","required":true},"guildSelection":{"ref":"GuildSelectionDto","required":true},"guilds":{"dataType":"array","array":{"dataType":"refObject","ref":"DiscordGuild"},"required":true}},"required":true},
         },
         "additionalProperties": false,
     },

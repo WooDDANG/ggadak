@@ -42,6 +42,30 @@ export class GuildAccessService {
     return (await this.repo.control()).revision;
   }
 
+  async eventCoverage(): Promise<
+    'trusted' | 'members_intent_disabled' | 'disconnected' | 'expired' | 'unknown'
+  > {
+    const control = await this.repo.control();
+    if (!control.connected || control.streamId === null) return 'disconnected';
+    if (control.leaseUntil === null || control.leaseUntil.getTime() <= this.now()) return 'expired';
+    if (!control.membersIntent) return 'members_intent_disabled';
+    return 'trusted';
+  }
+
+  async installationInventory() {
+    const before = await this.repo.control();
+    if (!this.live(before)) return null;
+    const observations = await this.repo.observations();
+    const after = await this.repo.control();
+    if (
+      !this.live(after) ||
+      before.revision !== after.revision ||
+      before.streamId !== after.streamId
+    )
+      return null;
+    return new Map(observations.map(observation => [observation.guildId, observation.installed]));
+  }
+
   async trusted(membership: Membership) {
     const [control, observation] = await Promise.all([
       this.repo.control(),
@@ -62,7 +86,16 @@ export class GuildAccessService {
   async snapshotTrusted(userId: string) {
     const { user, memberships } = await this.repo.userSnapshot(userId);
     if (!user || user.guildsDirty || !memberships.length) return false;
-    return (await Promise.all(memberships.map(m => this.trusted(m)))).every(Boolean);
+    const control = await this.repo.control();
+    if (!this.live(control) || !control.membersIntent) return false;
+    const checks = await Promise.all(
+      memberships.map(async m => {
+        const observation = await this.repo.observation(m.guildId);
+        if (observation?.installed !== 'installed') return true;
+        return this.covered(control, observation) && m.guildRevision === observation.revision;
+      }),
+    );
+    return checks.every(Boolean);
   }
 
   async replaceMemberships(

@@ -1,5 +1,7 @@
 import { AuthError } from '../errors/AuthError.js';
 import { AppError } from '../errors/AppError.js';
+import { createLogger } from '@ggaddak/shared';
+const logger = createLogger('DISCORD-AUTH');
 export interface DiscordIdentity {
   id: string;
   username: string;
@@ -36,11 +38,26 @@ export class HttpDiscordAuthAdapter implements DiscordAuthAdapter {
       });
       if (!response.ok) {
         const body = (await response.json().catch(() => ({}))) as { error?: string };
+        logger.warn('Discord authentication request rejected', {
+          operation: path === '/oauth2/token' ? 'token' : 'user',
+          status: response.status,
+          errorCode: typeof body.error === 'string' ? body.error.slice(0, 80) : undefined,
+        });
         if (
           (path !== '/oauth2/token' && response.status === 401) ||
           (path === '/oauth2/token' && response.status === 400 && body.error === 'invalid_grant')
         )
           throw new AuthError('Discord authorization expired; sign in again');
+        if (response.status === 429) {
+          const header = response.headers.get('Retry-After');
+          const seconds = Number((body as { retry_after?: number }).retry_after ?? header);
+          const retryAfterMs =
+            (Number.isFinite(seconds) && seconds > 0 ? Math.ceil(seconds) : 30) * 1000;
+          throw new AppError('Discord rate limited guild verification; retry shortly', 429, {
+            retryAfterMs,
+            global: Boolean((body as { global?: boolean }).global),
+          });
+        }
         throw new AppError('Discord authentication unavailable; retry shortly', 502);
       }
       return (await response.json()) as T;

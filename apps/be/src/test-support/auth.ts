@@ -26,7 +26,12 @@ export class FakeDiscordAuth implements DiscordAuthAdapter {
   }
 }
 export function fakeAuthOptions(adapter = new FakeDiscordAuth(), now?: () => number): AuthOptions {
-  return { config: testAuthConfig, discordAdapter: adapter, now };
+  return {
+    config: testAuthConfig,
+    discordAdapter: adapter,
+    now,
+    guildInventoryAdapter: { listInstalledGuilds: async () => ['guild-1', 'guild-2'] },
+  };
 }
 export async function loginAsTestUser(baseUrl: string, code = 'valid-code') {
   const start = await fetch(`${baseUrl}/api/v1/auth/authorize`);

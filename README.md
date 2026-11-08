@@ -43,10 +43,10 @@ FE·BE API 연동은 [API 문서 안내](docs/api/README.md)에서 시작하세�
 - **Discord Client**: Discord.js v14
 - **Reliability**: fsync 파일 journal 기반 Egress Queue (장애 복구 전송 큐)
 
-### Frontend (`apps/fe`)
-- **Core**: React v18, Vite v5, TypeScript v5
-- **State & Server Cache**: TanStack React Query v5
-- **Styling & UI**: Tailwind CSS v3, Lucide React
+### Frontend (`apps/frontend-main`)
+- **Core**: React, Vite, JavaScript, Axios
+- **Repository**: `likelion-kkadak/frontend` Git submodule, 작업 브랜치와 PR로 변경
+- **연결 및 실행**: [FE 개발 안내](docs/frontend-development.md)
 
 ### Shared Package (`packages/shared`)
 - 도메인 검증 스키마(Zod), 공통 TypeScript 인터페이스, 시맨틱 거버넌스 스코어러, 통합 Winston 로거
@@ -180,9 +180,9 @@ GGADDAK/
 - [x] 백엔드 Vercel AI SDK 다중 결정 추출 및 거버넌스 스코어러 구현 완료
 - [x] Prisma SQLite 기반 의사결정/피드백 CRUD 영속화 완료
 - [x] TSOA 기반 Swagger UI (`/api-docs`) 서빙 파이프라인 구축 완료
-- [x] **FE API 클라이언트 자동 생성 (Orval Codegen)**: BE `swagger.json` 기반 React Query v5 훅 및 모델 자동 생성 연동 완료 (`apps/fe/src/api/generated/`)
-- [x] **모노레포 API 동기화 체인 구축**: `npm run api:sync` 단일 명령어로 BE 명세 추출 및 FE 클라이언트 자동 생성 체인화 완료
-- [x] React 웹 대시보드 데모 화면(타임라인, 대기열) 구성 완료
+- [x] **FE 저장소 연결**: 기존 데모를 `apps/frontend-main` Git submodule로 교체
+- [x] **API 명세 생성**: `npm run api:sync`로 BE Swagger·라우트 생성. 실제 FE는 Axios 계약으로 연동
+- [x] 로그인·세션 복원·서버 선택에서 봇이 설치된 가입 서버만 제공
 
 ### 향후 로드맵
 - [ ] **FE 웹 대시보드 정식 React 포팅 및 UI 고도화**: 자동 생성된 React Query 훅(`useGetDecisions` 등)을 전면 적용한 신규 대시보드 구현

@@ -267,7 +267,11 @@ async function api<T>(path: string, token?: string, init: RequestInit = {}): Pro
 
 **operationId:** `ListAuthGuilds` · **인증:** Bearer JWT
 
-접근 가능한 서버 선택 목록입니다. 서버명·아이콘·owner·permissions는 이 응답에서 사용합니다. permissions는 큰 정수의 문자열이며 Number 변환을 피합니다.
+사용자가 가입했고 GGADDAK 봇 설치가 확인된 서버의 교집합입니다. 일반 멤버이거나 카드·모니터링 채널이 없어도 포함됩니다. 서버명·아이콘·owner·permissions는 이 응답에서 사용합니다. permissions는 큰 정수의 문자열이며 Number 변환을 피합니다. 로그인과 브라우저 세션 복원도 같은 `guilds`와 `guildSelection`을 반환합니다.
+
+`guildSelection.status`가 `ready`이고 `guilds`가 비어 있으면 “봇이 설치된 가입 서버가 없습니다”를 표시합니다. `unavailable`이면 설치 정보를 확인하지 못한 상태이므로 세션을 유지하고 서버 화면을 숨긴 뒤 다시 확인할 수 있게 합니다. `checkedAt`은 정상 확인 시 ISO 문자열, 확인 불가 시 null입니다. 두 상태 모두 HTTP 200이며 응답은 no-store입니다.
+
+완전하고 유효한 Gateway 설치 관측을 우선 사용하며, 연결 관측이 없거나 불확실할 때는 Discord 봇의 전체 서버 목록을 모든 페이지까지 확인합니다. 부분 실패는 빈 목록으로 확정하지 않습니다. 동시 확인은 공유하며 고정 주기의 전체 목록 조회는 없습니다.
 
 **Path/query 입력:** 없음.
 
@@ -278,6 +282,7 @@ async function api<T>(path: string, token?: string, init: RequestInit = {}): Pro
 | 필드     | 타입                  | 필수 | 설명 |
 | -------- | --------------------- | ---- | ---- |
 | `guilds` | `Array<DiscordGuild>` | 예   | —    |
+| `guildSelection` | `{ status: "ready" \| "unavailable", checkedAt: string \| null }` | 예 | 설치 목록 확인 상태 |
 
 **응답 예제**
 
@@ -295,7 +300,8 @@ async function api<T>(path: string, token?: string, init: RequestInit = {}): Pro
         "owner": true,
         "permissions": "32"
       }
-    ]
+    ],
+    "guildSelection": { "status": "ready", "checkedAt": "2026-11-07T01:00:00.000Z" }
   }
 }
 ```
@@ -1306,7 +1312,7 @@ Swagger에는 대부분 성공 응답만 선언되어 있어 아래 내용은 �
 | 이벤트            | 다시 조회할 데이터                                              |
 | ----------------- | --------------------------------------------------------------- |
 | 서버 변경         | 서버별 목록·Review Queue·Dashboard·Timeline·채널 설정·실패 목록 |
-| 설치 후 포커스 복귀·수동 확인 | 선택 서버 bot-status, 설치 확인 후 channels |
+| 설치 후 포커스 복귀·수동 확인 | auth/guilds로 적격 서버·현재 선택 갱신, 선택 서버 bot-status와 channels |
 | 검수 성공         | Review Queue, Decision 목록·상세, Dashboard, Timeline           |
 | 카드 편집 성공    | 카드 상세·목록, Dashboard, Timeline, 필요 시 검색 결과          |
 | 채널 설정 저장    | channels의 monitoredChannelIds                                  |

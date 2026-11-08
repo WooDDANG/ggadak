@@ -50,6 +50,10 @@ export class GuildAccessRepository extends BaseRepository {
     return tx.guildAccessObservation.findUnique({ where: { guildId } });
   }
 
+  observations() {
+    return this.prisma.guildAccessObservation.findMany();
+  }
+
   removal(userId: string, guildId: string, tx: Store = this.prisma) {
     return tx.guildAccessRemoval.findUnique({ where: { guildId_userId: { guildId, userId } } });
   }
