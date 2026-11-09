@@ -37,7 +37,9 @@ export class AgyProvider implements AiProvider {
       return result;
     } catch (error) {
       if (error instanceof AppError) throw error;
-      throw new AppError('AGY analysis failed or unavailable', 503);
+      throw new AppError('AGY analysis failed or unavailable', 503, {
+        providerResponse: error instanceof Error ? error.message : String(error),
+      });
     }
   }
 }

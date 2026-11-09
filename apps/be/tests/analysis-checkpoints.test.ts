@@ -5,6 +5,8 @@ import { prepareAnalysis } from '../src/services/discussion-preprocessing.js';
 import { AiAdapter } from '../src/adapters/ai.adapter.js';
 import { DiscussionService } from '../src/services/discussion.service.js';
 import { DecisionExtractorCore } from '../src/engine/extractor-core.js';
+import { AppError } from '../src/errors/AppError.js';
+import type { AiMetricRecord } from '../src/adapters/ai-metrics-logger.js';
 
 test('session checkpoints preserve immutable input and independent sibling state', async () => {
   const db = await isolatedRepository();
@@ -74,6 +76,58 @@ test('a checkpoint restore failure immediately frees capacity for another discus
     await expect(
       service.analyzeDiscussion({ ...input, requestId: 'next-discussion' }),
     ).resolves.toMatchObject({ found: false, graphAvailable: true });
+  } finally {
+    await db.cleanup();
+  }
+});
+
+test('a failed call keeps raw diagnostics in the request checkpoint and only a stable code in metrics', async () => {
+  const db = await isolatedRepository();
+  const metrics: AiMetricRecord[] = [];
+  const ai = new AiAdapter(
+    { provider: 'nvidia' },
+    'production',
+    {
+      async generate() {
+        throw new AppError('NVIDIA AI analysis failed', 429, {
+          providerResponse: 'Bearer secret-token provider said quota exceeded',
+        });
+      },
+    },
+    metric => metrics.push(metric),
+  );
+  const input = {
+    requestId: 'diagnostic-request',
+    traceId: 'trace-1',
+    guildId: 'g',
+    channelId: 'c',
+    isManualOverride: true,
+    rawMessages: [{ id: '1', author: 'Lee', content: 'DB를 선택해야 합니다' }],
+  };
+  try {
+    const service = new DiscussionService(db.repo, ai, new DecisionExtractorCore());
+    await expect(service.analyzeDiscussion(input)).rejects.toMatchObject({ statusCode: 429 });
+    expect(metrics).toHaveLength(1);
+    expect(metrics[0]).toMatchObject({
+      requestId: input.requestId,
+      traceId: input.traceId,
+      guildId: input.guildId,
+      channelId: input.channelId,
+      success: false,
+      failureKind: 'rate-limit',
+      status: 429,
+      retryable: true,
+    });
+    expect(JSON.stringify(metrics[0])).not.toContain('secret-token');
+    expect(JSON.stringify(metrics[0])).not.toContain('DB를 선택해야');
+    const state = await db.client.analysisSessionState.findFirstOrThrow({
+      where: { requestId: input.requestId },
+    });
+    const attempt = JSON.parse(state.stateJson).attempts[0];
+    expect(attempt.callId).toBe(metrics[0].callId);
+    expect(attempt.error.providerResponse).toContain('Bearer [REDACTED]');
+    expect(attempt.error.providerResponse).not.toContain('secret-token');
+    expect(state.inputJson).toContain('DB를 선택해야');
   } finally {
     await db.cleanup();
   }

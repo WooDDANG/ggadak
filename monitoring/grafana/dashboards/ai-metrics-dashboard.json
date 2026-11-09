@@ -1,0 +1,410 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "liveNow": true,
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "id": 1,
+      "title": "AI Call Attempts",
+      "type": "stat",
+      "datasource": { "type": "loki", "uid": "Loki" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "Loki" },
+          "editorMode": "code",
+          "expr": "sum(count_over_time({job=\"ggaddak-ai\"} | json | durationMs > 0 | model !~ \"fixture.*\" [$__range]))",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "green", "value": null }]
+          }
+        }
+      }
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "id": 2,
+      "title": "Slow AI Calls (10s / 18s / 20s)",
+      "type": "stat",
+      "datasource": { "type": "loki", "uid": "Loki" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "Loki" },
+          "editorMode": "code",
+          "expr": "sum by (tier) (count_over_time({job=\"ggaddak-ai\"} | json | label_format tier=\"10s-18s (Slow)\" | durationMs >= 10000 | durationMs < 18000 | model !~ \".*fixture.*\" | model !~ \".*test.*\" [$__range]))",
+          "legendFormat": "{{tier}}",
+          "queryType": "range",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "loki", "uid": "Loki" },
+          "editorMode": "code",
+          "expr": "sum by (tier) (count_over_time({job=\"ggaddak-ai\"} | json | label_format tier=\"18s-20s (Critical)\" | durationMs >= 18000 | durationMs < 20000 | model !~ \".*fixture.*\" | model !~ \".*test.*\" [$__range]))",
+          "legendFormat": "{{tier}}",
+          "queryType": "range",
+          "refId": "B"
+        },
+        {
+          "datasource": { "type": "loki", "uid": "Loki" },
+          "editorMode": "code",
+          "expr": "sum by (tier) (count_over_time({job=\"ggaddak-ai\"} | json | label_format tier=\"20s+ (Timeout)\" | durationMs >= 20000 | model !~ \".*fixture.*\" | model !~ \".*test.*\" [$__range]))",
+          "legendFormat": "{{tier}}",
+          "queryType": "range",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 5 }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "10s-18s (Slow)" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "yellow", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "18s-20s (Critical)" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "20s+ (Timeout)" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }]
+          }
+        ]
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      }
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "id": 3,
+      "title": "AI Call Success Rate",
+      "type": "stat",
+      "datasource": { "type": "loki", "uid": "Loki" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "Loki" },
+          "editorMode": "code",
+          "expr": "sum(count_over_time({job=\"ggaddak-ai\", success=\"true\"} | json | durationMs > 0 | model !~ \".*fixture.*\" | model !~ \".*test.*\" [$__range])) / sum(count_over_time({job=\"ggaddak-ai\"} | json | durationMs > 0 | model !~ \".*fixture.*\" | model !~ \".*test.*\" [$__range])) * 100",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 80 },
+              { "color": "green", "value": 99 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "id": 4,
+      "title": "Stage Distribution",
+      "type": "piechart",
+      "datasource": { "type": "loki", "uid": "Loki" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "Loki" },
+          "editorMode": "code",
+          "expr": "sum by (stage) (count_over_time({job=\"ggaddak-ai\"} | json | durationMs > 0 | model !~ \"fixture.*\" [$__range]))",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 4 },
+      "id": 5,
+      "title": "AI Call Duration by Call (Points)",
+      "type": "timeseries",
+      "datasource": { "type": "loki", "uid": "Loki" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "Loki" },
+          "editorMode": "code",
+          "expr": "max by (provider, stage) (max_over_time({job=\"ggaddak-ai\"} | json | unwrap durationMs [$__auto]))",
+          "legendFormat": "{{provider}} {{stage}}",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "min": 0,
+          "max": null,
+          "custom": {
+            "drawStyle": "points",
+            "pointSize": 6,
+            "lineInterpolation": "linear",
+            "showPoints": "always",
+            "fillOpacity": 0,
+            "lineWidth": 0,
+            "spanNulls": false,
+            "thresholdsStyle": { "mode": "off" },
+            "axisPlacement": "auto",
+            "axisSoftMax": null,
+            "axisSoftMin": 0
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 10000 },
+              { "color": "orange", "value": 18000 },
+              { "color": "red", "value": 20000 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 12 },
+      "id": 6,
+      "title": "Real-time AI Metrics Stream",
+      "type": "logs",
+      "datasource": { "type": "loki", "uid": "Loki" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "Loki" },
+          "editorMode": "code",
+          "expr": "{job=\"ggaddak-ai\"} | keep provider, stage, success",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "showLabels": true,
+        "wrapLogMessage": true,
+        "enableLogDetails": true
+      }
+    },
+    {
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 22 },
+      "id": 7,
+      "title": "Backend and Bot errors",
+      "type": "logs",
+      "datasource": { "type": "loki", "uid": "Loki" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "Loki" },
+          "editorMode": "code",
+          "expr": "{job=\"ggaddak-app\", level=\"ERROR\"}",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "options": { "showLabels": true, "wrapLogMessage": true, "enableLogDetails": true }
+    },
+    {
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 22 },
+      "id": 8,
+      "title": "Analysis failure and retry logs",
+      "type": "logs",
+      "datasource": { "type": "loki", "uid": "Loki" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "Loki" },
+          "editorMode": "code",
+          "expr": "{job=\"ggaddak-app\"} |~ \"analysis[.](attempt[.]failed|validation[.]failed|failed)\"",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "options": { "showLabels": true, "wrapLogMessage": true, "enableLogDetails": true }
+    },
+    {
+      "gridPos": { "h": 4, "w": 12, "x": 0, "y": 30 },
+      "id": 9,
+      "title": "Completed analysis requests",
+      "type": "stat",
+      "datasource": { "type": "loki", "uid": "Loki" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "Loki" },
+          "editorMode": "code",
+          "expr": "sum(count_over_time({job=\"ggaddak-app\", app=\"backend\", service=\"BE-ANALYSIS-RUNNER\"} |= \"analysis.completed\" [$__range]))",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "gridPos": { "h": 4, "w": 12, "x": 12, "y": 30 },
+      "id": 10,
+      "title": "Failed Analysis Runs",
+      "type": "stat",
+      "datasource": { "type": "loki", "uid": "Loki" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "Loki" },
+          "editorMode": "code",
+          "expr": "sum(count_over_time({job=\"ggaddak-app\", app=\"backend\", service=\"BE-ANALYSIS-RUNNER\"} |= \"analysis.failed\" [$__range]))",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 34 },
+      "id": 11,
+      "title": "Failed AI Calls by Kind",
+      "type": "piechart",
+      "datasource": { "type": "loki", "uid": "Loki" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "Loki" },
+          "editorMode": "code",
+          "expr": "sum by (failureKind) (count_over_time({job=\"ggaddak-ai\", success=\"false\"} | json | failureKind != \"\" [$__range]))",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 34 },
+      "id": 12,
+      "title": "Failed AI Calls by Channel (Top 5)",
+      "type": "piechart",
+      "datasource": { "type": "loki", "uid": "Loki" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "Loki" },
+          "editorMode": "code",
+          "expr": "topk(5, sum by (channelId) (count_over_time({job=\"ggaddak-ai\", success=\"false\"} | json | channelId != \"\" [$__range])))",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 41 },
+      "id": 13,
+      "title": "Repair Calls per Extract Call",
+      "type": "stat",
+      "datasource": { "type": "loki", "uid": "Loki" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "Loki" },
+          "editorMode": "code",
+          "expr": "sum(count_over_time({job=\"ggaddak-ai\", stage=\"repair\"} | json | durationMs > 0 | model !~ \"fixture.*\" [$__range])) / sum(count_over_time({job=\"ggaddak-ai\", stage=\"extract\"} | json | durationMs > 0 | model !~ \"fixture.*\" [$__range])) * 100",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "percent" } }
+    },
+    {
+      "gridPos": { "h": 7, "w": 18, "x": 6, "y": 41 },
+      "id": 14,
+      "title": "AI Call Throughput",
+      "type": "timeseries",
+      "datasource": { "type": "loki", "uid": "Loki" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "Loki" },
+          "editorMode": "code",
+          "expr": "sum(count_over_time({job=\"ggaddak-ai\"} | json | durationMs > 0 | model !~ \"fixture.*\" [$__interval]))",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 48 },
+      "id": 15,
+      "title": "AI Token Consumption",
+      "type": "timeseries",
+      "datasource": { "type": "loki", "uid": "Loki" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "Loki" },
+          "editorMode": "code",
+          "expr": "sum by (provider) (sum_over_time({job=\"ggaddak-ai\"} | json | unwrap inputTokens [$__interval]))",
+          "legendFormat": "{{provider}} input",
+          "queryType": "range",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "loki", "uid": "Loki" },
+          "editorMode": "code",
+          "expr": "sum by (provider) (sum_over_time({job=\"ggaddak-ai\"} | json | unwrap outputTokens [$__interval]))",
+          "legendFormat": "{{provider}} output",
+          "queryType": "range",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" } }
+    },
+    {
+      "gridPos": { "h": 7, "w": 24, "x": 0, "y": 56 },
+      "id": 16,
+      "title": "Analysis Stage Failures by Kind",
+      "type": "piechart",
+      "datasource": { "type": "loki", "uid": "Loki" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "Loki" },
+          "editorMode": "code",
+          "expr": "sum by (failureKind) (count_over_time({job=\"ggaddak-app\", app=\"backend\"} | json | message =~ \"analysis[.](attempt[.]failed|validation[.]failed)\" | failureKind != \"\" [$__range]))",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ]
+    }
+  ],
+  "refresh": "5s",
+  "schemaVersion": 39,
+  "tags": ["ai", "ggaddak", "nvidia"],
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": { "refresh_intervals": ["5s", "10s", "30s", "1m"] },
+  "timezone": "browser",
+  "title": "GGADDAK AI Execution Dashboard",
+  "uid": "ggaddak-ai-metrics"
+}

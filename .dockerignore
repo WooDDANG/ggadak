@@ -1,0 +1,14 @@
+.git
+.scratch
+node_modules
+**/node_modules
+**/dist
+**/logs
+apps/frontend-main/.git
+apps/frontend-main/node_modules
+coverage
+*.sqlite
+*.sqlite-*
+.env
+.env.*
+!.env.example

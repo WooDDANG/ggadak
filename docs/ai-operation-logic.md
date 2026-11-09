@@ -146,19 +146,24 @@ flowchart TD
 
 ---
 
-### 3.4. [4단계] 샌드박스형 AI 실행 어댑터 (AGY Provider)
+### 3.4. [4단계] AI 실행 어댑터 (NVIDIA Provider & AGY Provider)
 
-- **관련 코드**: [agy-provider.ts](file:///Users/wooddang-mac/Desktop/code/5.%20toy/GGADDAK/apps/be/src/adapters/agy-provider.ts), [agy-cli.ts](file:///Users/wooddang-mac/Desktop/code/5.%20toy/GGADDAK/apps/be/src/adapters/agy-cli.ts)
+- **관련 코드**: [nvidia-provider.ts](file:///Users/wooddang-mac/Desktop/code/5.%20toy/GGADDAK/apps/be/src/adapters/nvidia-provider.ts), [agy-provider.ts](file:///Users/wooddang-mac/Desktop/code/5.%20toy/GGADDAK/apps/be/src/adapters/agy-provider.ts), [ai.adapter.ts](file:///Users/wooddang-mac/Desktop/code/5.%20toy/GGADDAK/apps/be/src/adapters/ai.adapter.ts)
 
-GGADDAK 백엔드는 Antigravity CLI(`agy`)를 안전하게 격리 구동하기 위한 전용 어댑터를 탑재하고 있습니다:
+GGADDAK 백엔드는 `AI_PROVIDER` 설정에 따라 NVIDIA NIM API 및 Antigravity CLI(`agy`)를 지원하는 멀티 프로바이더 어댑터를 탑재하고 있습니다:
 
-1. **에이전트 샌드박스 (`ggaddak-analysis.md`)**:
+저장된 분석의 Provider와 현재 설정이 다르면 다른 Provider로 전환하지 않고 분석을 실패 처리합니다. 두 Provider 모두 정확한 입력 토큰 사전 검사를 지원하지 않으므로 `AI_MAX_INPUT_TOKENS`를 설정하면 호출 전에 오류가 발생합니다. 입력 길이는 `AI_MAX_INPUT_CHARS`로 제한할 수 있습니다.
+
+1. **NVIDIA NIM HTTP Provider (`nvidia`, 기본값)**:
+   - OpenAI 호환 SDK(`openai`)를 통해 `https://integrate.api.nvidia.com/v1` 엔드포인트와 통신합니다.
+   - 기본 모델은 `nvidia/nemotron-3.5-super-vl-120b-a12b`이며, 16,384 토큰 및 20초 타임아웃 기본 정책을 가집니다.
+   - `NVIDIA_ENABLE_THINKING` 옵션(기본값 `true`)을 통해 사고 과정(`reasoning_content`)을 수집하고 디버그 로그에 기록합니다.
+   - 20초 타임아웃 초과 시 숨겨진 폴백 없이 `503 Service Unavailable`로 전파하여 상위 큐에서 투명하게 재시도를 관리합니다.
+2. **에이전트 샌드박스 (`agy`)**:
    - 매 호출마다 임시 디렉토리(`mkdtemp`)를 생성하고, 파일 읽기/쓰기, 셸 명령, 웹 브라우징, 도구 호출 권한을 일체 박탈한 단일 기능 에이전트 매니페스트를 동적 생성합니다.
    - 오직 구조화된 JSON 결과 반환 종료 도구(`tools: [finish]`)만 허용됩니다.
-2. **엄격한 Zod 스키마 강제**:
-   - `GraphSchema`와 `VerificationSchema`를 JSON Schema로 변환하여 CLI에 전달함으로써, 100% 규격에 부합하는 정형 JSON 결과만을 수신합니다.
-3. **환경 변수 격리**:
-   - 부모 프로세스의 민감한 환경 변수를 배제하고 실행에 필수적인 기본 변수(`PATH`, `HOME`, `USER`, `LANG`, `TMPDIR`)만 전달합니다.
+3. **엄격한 Zod 스키마 강제**:
+   - `GraphSchema`와 `VerificationSchema`를 JSON Schema로 변환하여 공급자에 전달하며, 정규화 파서(`extractAndParseJson`)를 통해 마크다운 코드블록 제거 후 정형 JSON 결과를 확정합니다.
 
 ---
 

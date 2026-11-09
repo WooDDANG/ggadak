@@ -1,9 +1,12 @@
-import { AnalysisPolicy } from '@ggaddak/shared';
+import { AnalysisPolicy, createLogger } from '@ggaddak/shared';
 import type { AnalyzeDiscussionParams, AnalyzeDiscussionResult } from '../domain/analysis.js';
 import { AppError } from '../errors/AppError.js';
 import { analysisFailure, classifyAnalysisError } from '../errors/analysis-error.js';
+import { classifyAiFailure } from '../errors/ai-diagnostics.js';
 import { AnalysisExecutionRepository } from '../repositories/analysis-execution.repository.js';
 import { AnalysisRequestRepository } from '../repositories/analysis-request.repository.js';
+
+const logger = createLogger('BE-ANALYSIS-RUNNER');
 
 /** Owns every acquired lease through restore, execution, publication and cleanup. */
 export class AnalysisRunner {
@@ -46,9 +49,33 @@ export class AnalysisRunner {
       }, AnalysisPolicy.leaseHeartbeatMs);
       heartbeat.unref();
       if (controller.signal.aborted) throw new AppError('Analysis cancelled', 503);
-      return await work(claim.owner, controller.signal, () => this.execution.renew(lease));
+      const result = await work(claim.owner, controller.signal, () => this.execution.renew(lease));
+      logger.info('analysis.completed', {
+        requestId: params.requestId,
+        traceId: params.traceId,
+        guildId: params.guildId,
+        channelId: params.channelId,
+        outcome: result.found ? 'candidates' : 'no-candidates',
+      });
+      return result;
     } catch (error) {
-      if (!classifyAnalysisError(error).busy)
+      const classification = classifyAnalysisError(error);
+      const aiFailure =
+        error instanceof AppError &&
+        (error.details?.providerResponse !== undefined || error.details?.failureKind !== undefined)
+          ? classifyAiFailure(error, 'analysis')
+          : undefined;
+      logger.warn('analysis.failed', {
+        requestId: params.requestId,
+        traceId: params.traceId,
+        guildId: params.guildId,
+        channelId: params.channelId,
+        category: classification.category,
+        failureKind: aiFailure?.failureKind,
+        retryable: classification.retryable,
+        status: classification.status,
+      });
+      if (!classification.busy)
         await this.requests.fail(params.requestId, claim.owner, analysisFailure(error));
       throw error;
     } finally {

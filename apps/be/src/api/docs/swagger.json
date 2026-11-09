@@ -3138,6 +3138,39 @@
 					"sessions": {
 						"items": {
 							"properties": {
+								"failure": {
+									"properties": {
+										"summary": {
+											"type": "string"
+										},
+										"action": {
+											"type": "string",
+											"enum": [
+												"retry",
+												"new-analysis"
+											]
+										},
+										"kind": {
+											"type": "string",
+											"enum": [
+												"timeout",
+												"configuration",
+												"validation",
+												"provider"
+											]
+										},
+										"stage": {
+											"$ref": "#/components/schemas/AnalysisPhase"
+										}
+									},
+									"required": [
+										"summary",
+										"action",
+										"kind",
+										"stage"
+									],
+									"type": "object"
+								},
 								"outputTokens": {
 									"type": "number",
 									"format": "double"

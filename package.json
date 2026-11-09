@@ -25,6 +25,8 @@
     "db:backfill": "npm run db:backfill --workspace=@ggaddak/be --",
     "db:audit": "npm run db:audit --workspace=@ggaddak/be --",
     "ai:benchmark": "npm run ai:benchmark --workspace=@ggaddak/be --",
+    "monitoring:up": "docker compose -f docker-compose.monitoring.yml up -d",
+    "monitoring:down": "docker compose -f docker-compose.monitoring.yml down",
     "test": "npm run build && npm run test --workspaces --if-present && npm run test:e2e",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",

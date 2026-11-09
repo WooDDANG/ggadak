@@ -21,13 +21,20 @@ export const AnalysisPhase = {
 } as const;
 export type AnalysisPhase = (typeof AnalysisPhase)[keyof typeof AnalysisPhase];
 export interface StageAttempt {
+  callId?: string;
   phase: AnalysisPhase;
   provider?: string;
   model?: string;
   owner?: string;
   deadline?: number;
   verification?: unknown;
-  error?: { message: string; status: number };
+  error?: {
+    message: string;
+    status: number;
+    failureKind?: string;
+    retryable?: boolean;
+    providerResponse?: string;
+  };
   startedAt: number;
   timeoutMs: number;
   waitMs?: number;
@@ -81,5 +88,11 @@ export interface AnalysisStatus {
     attempts: number;
     inputTokens: number;
     outputTokens: number;
+    failure?: {
+      stage: AnalysisPhase;
+      kind: 'timeout' | 'configuration' | 'validation' | 'provider';
+      action: 'retry' | 'new-analysis';
+      summary: string;
+    };
   }[];
 }

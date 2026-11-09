@@ -13,6 +13,14 @@ _Avoid_: Bot Online Status, Channel Accessibility
 **Analysis Queue**:
 The durable collection of received Discussion Contexts awaiting analysis, execution, or bounded retry. A received Scan Range becomes eligible only after the channel's declared scan coverage is fully received; receipt itself is distinct from completed analysis.
 
+**Analysis Request**:
+A persisted request to analyze one received Discussion Context, tracked through retries to a final outcome.
+_Avoid_: AI Call, Analysis Attempt
+
+**AI Call**:
+One invocation of an AI provider during an Analysis Request. A request can contain multiple AI Calls, and an individual call's result does not determine the request's final outcome.
+_Avoid_: Analysis Request
+
 **Durable Receipt**:
 The backend's confirmation that both an input and its processing intent have been persisted. It transfers analysis responsibility from the Bot to the BE without claiming that analysis succeeded.
 
