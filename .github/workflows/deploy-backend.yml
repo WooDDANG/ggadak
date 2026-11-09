@@ -1,0 +1,41 @@
+name: Deploy backend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/be/**'
+      - 'packages/shared/**'
+      - 'Dockerfile'
+      - 'docker/**'
+      - 'fly.toml'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/deploy-backend.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: flyio-backend-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run db:generate --workspace=@ggaddak/be
+      - run: npm run typecheck --workspace=@ggaddak/be
+      - run: npm run build --workspace=@ggaddak/shared
+      - run: npm run build --workspace=@ggaddak/be
+      - run: npm test --workspace=@ggaddak/be
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - run: flyctl deploy --remote-only
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
