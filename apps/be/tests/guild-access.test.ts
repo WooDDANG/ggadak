@@ -22,7 +22,6 @@ class ObservableDiscord extends FakeDiscordAuth {
     if (this.rateLimit) {
       throw new AppError('Discord rate limit reached', 429, {
         retryAfterMs: (this.rateLimit.retryAfterSeconds ?? 30) * 1000,
-        retryAfterSeconds: this.rateLimit.retryAfterSeconds,
         global: this.rateLimit.global,
       });
     }
@@ -52,7 +51,6 @@ class TwoUsersDiscord extends ObservableDiscord {
     if (this.rateLimitUser === token && this.rateLimit) {
       throw new AppError('Discord rate limit reached', 429, {
         retryAfterMs: (this.rateLimit.retryAfterSeconds ?? 30) * 1000,
-        retryAfterSeconds: this.rateLimit.retryAfterSeconds,
         global: this.rateLimit.global,
       });
     }

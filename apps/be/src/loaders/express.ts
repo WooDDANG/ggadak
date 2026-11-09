@@ -30,7 +30,10 @@ export function initExpress({ app }: { app: Express }): void {
   app.use(express.json({ limit: '10mb' }));
 
   // 4. Rate Limiter
-  app.use('/api', apiLimiter);
+  app.use('/api', (req, res, next) => {
+    if (req.path === '/health') return next();
+    return apiLimiter(req, res, next);
+  });
 
   // 5. Morgan Logging
   morgan.token('safePath', req => req.url?.split('?')[0] ?? '');
@@ -55,8 +58,14 @@ export function initExpress({ app }: { app: Express }): void {
   }
 
   // 7. Health & Status Check
-  app.get('/health', (_req, res) => {
-    res.status(200).json({ status: 'healthy' });
+  app.get(['/health', '/api/health'], async (_req, res, next) => {
+    try {
+      const health = await app.locals.healthService.check();
+      res.setHeader('Cache-Control', 'no-store');
+      res.status(health.ready ? 200 : 503).json(health);
+    } catch (error) {
+      next(error);
+    }
   });
   app.get('/status', (_req, res) => {
     res.status(200).json({ status: 'ok' });

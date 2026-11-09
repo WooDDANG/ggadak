@@ -150,8 +150,8 @@ export class AuthService {
         fetchedGuilds = await this.discord.guilds(tokens.access_token);
       } catch (error) {
         if (error instanceof AppError && error.statusCode === 429) {
-          const details = (error.details as { retryAfterSeconds?: number; global?: boolean }) ?? {};
-          await this.recordCooldown(user.id, details.retryAfterSeconds, details.global);
+          const details = (error.details as { retryAfterMs?: number; global?: boolean }) ?? {};
+          await this.recordCooldown(user.id, details.retryAfterMs, details.global);
         } else {
           throw error;
         }
@@ -358,16 +358,12 @@ export class AuthService {
     }
     return latest ? { retryUntil: latest.retryUntil, isGlobal: latest.isGlobal } : null;
   }
-  async recordCooldown(
-    userId: string,
-    retryAfterSeconds?: number,
-    isGlobal = false,
-  ): Promise<string> {
-    const seconds =
-      Number.isFinite(retryAfterSeconds) && (retryAfterSeconds as number) > 0
-        ? Math.ceil(retryAfterSeconds as number)
-        : 30;
-    const retryUntil = new Date(this.now() + seconds * 1000);
+  async recordCooldown(userId: string, retryAfterMs?: number, isGlobal = false): Promise<string> {
+    const delay =
+      Number.isFinite(retryAfterMs) && (retryAfterMs as number) > 0
+        ? Math.ceil(retryAfterMs as number)
+        : 30000;
+    const retryUntil = new Date(this.now() + delay);
     const scopeId = isGlobal ? 'global' : `user:${userId}`;
     await this.prisma.storageArchive.upsert({
       where: { kind_id: { kind: 'guild_verification_cooldown', id: scopeId } },
@@ -504,16 +500,14 @@ export class AuthService {
     const promise = this.revalidate(user)
       .catch(async error => {
         if (error instanceof AppError && error.statusCode === 429) {
-          const details = (error.details as { retryAfterSeconds?: number; global?: boolean }) ?? {};
+          const details = (error.details as { retryAfterMs?: number; global?: boolean }) ?? {};
           const retryAt = await this.recordCooldown(
             user.userId,
-            details.retryAfterSeconds,
+            details.retryAfterMs,
             details.global,
           );
           throw new GuildAccessError('Discord rate limit reached; retry shortly', 429, {
-            retryAfterMs: details.retryAfterSeconds
-              ? Math.ceil(details.retryAfterSeconds * 1000)
-              : 30000,
+            retryAfterMs: Math.max(0, new Date(retryAt).getTime() - this.now()),
             retryAt,
             global: details.global,
           });

@@ -45,6 +45,7 @@ import { assertStorageReady } from '../repositories/storage-readiness.js';
 import { GuildAccessService } from '../services/guild-access.service.js';
 import { GuildAccessRepository } from '../repositories/guild-access.repository.js';
 import { GuildAccessController } from '../api/controllers/guild-access.controller.js';
+import { HealthService } from '../services/health.service.js';
 
 export interface LoaderOptions {
   expressApp: Express;
@@ -106,6 +107,7 @@ export async function initLoaders({
     new SearchController(new SearchService(repo, embeddingProvider), authService),
   );
   expressApp.locals.authService = authService;
+  expressApp.locals.healthService = new HealthService(prisma, authOptions?.now);
 
   const channelsService = new ChannelsService(prisma, authOptions?.channelAdapter);
   container.set(ChannelsService, channelsService);

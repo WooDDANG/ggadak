@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { PrismaClient } from '@prisma/client';
 import { DecisionRepository } from './decision.repository.js';
+import { sqliteConnectionUrl } from '../loaders/prisma.js';
 
 export async function isolatedRepository() {
   const dir = await mkdtemp(join(tmpdir(), 'ggaddak-db-'));
@@ -25,7 +26,7 @@ export async function isolatedRepository() {
       stdio: 'pipe',
     },
   );
-  const client = new PrismaClient({ datasources: { db: { url } } });
+  const client = new PrismaClient({ datasources: { db: { url: sqliteConnectionUrl(url) } } });
   return {
     dir,
     url,
