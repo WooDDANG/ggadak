@@ -4,7 +4,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends python3 make g+
 COPY package.json package-lock.json ./
 COPY apps/bot/package.json apps/bot/package.json
 COPY apps/be/package.json apps/be/package.json
-COPY apps/frontend-main/package.json apps/frontend-main/package.json
 COPY packages/shared/package.json packages/shared/package.json
 RUN HUSKY=0 npm ci
 COPY packages/shared packages/shared
@@ -21,7 +20,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends python3 ca-cert
 COPY package.json package-lock.json ./
 COPY apps/bot/package.json apps/bot/package.json
 COPY apps/be/package.json apps/be/package.json
-COPY apps/frontend-main/package.json apps/frontend-main/package.json
 COPY packages/shared/package.json packages/shared/package.json
 COPY --from=build /app/node_modules node_modules
 COPY --from=build /app/packages/shared/dist packages/shared/dist
