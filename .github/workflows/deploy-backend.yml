@@ -32,8 +32,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run db:generate --workspace=@ggaddak/be
-      - run: npm run typecheck --workspace=@ggaddak/be
       - run: npm run build --workspace=@ggaddak/shared
+      - run: npm run typecheck --workspace=@ggaddak/be
       - run: npm run build --workspace=@ggaddak/be
       - run: npm run build --workspace=@ggaddak/bot
       - run: npm test --workspace=@ggaddak/be
