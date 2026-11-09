@@ -1,4 +1,4 @@
-name: Deploy backend
+name: Check backend
 
 on:
   push:
@@ -15,11 +15,11 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: flyio-backend-deploy
+  group: backend-checks
   cancel-in-progress: false
 
 jobs:
-  deploy:
+  check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -35,7 +35,3 @@ jobs:
       - run: npm run build --workspace=@ggaddak/shared
       - run: npm run build --workspace=@ggaddak/be
       - run: npm test --workspace=@ggaddak/be
-      - uses: superfly/flyctl-actions/setup-flyctl@master
-      - run: flyctl deploy --remote-only
-        env:
-          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
