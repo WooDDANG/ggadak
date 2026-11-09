@@ -47,24 +47,24 @@
         {
           "datasource": { "type": "loki", "uid": "Loki" },
           "editorMode": "code",
-          "expr": "sum(count_over_time({job=\"ggaddak-ai\"} | json | durationMs >= 10000 | durationMs < 18000 [$__range]))",
-          "legendFormat": "10s-18s (Slow)",
+          "expr": "sum by (tier) (count_over_time({job=\"ggaddak-ai\"} | json | label_format tier=\"10s-18s (Slow)\" | durationMs >= 10000 | durationMs < 18000 | model !~ \".*fixture.*\" | model !~ \".*test.*\" [$__range]))",
+          "legendFormat": "{{tier}}",
           "queryType": "range",
           "refId": "A"
         },
         {
           "datasource": { "type": "loki", "uid": "Loki" },
           "editorMode": "code",
-          "expr": "sum(count_over_time({job=\"ggaddak-ai\"} | json | durationMs >= 18000 | durationMs < 20000 [$__range]))",
-          "legendFormat": "18s-20s (Critical)",
+          "expr": "sum by (tier) (count_over_time({job=\"ggaddak-ai\"} | json | label_format tier=\"18s-20s (Critical)\" | durationMs >= 18000 | durationMs < 20000 | model !~ \".*fixture.*\" | model !~ \".*test.*\" [$__range]))",
+          "legendFormat": "{{tier}}",
           "queryType": "range",
           "refId": "B"
         },
         {
           "datasource": { "type": "loki", "uid": "Loki" },
           "editorMode": "code",
-          "expr": "sum(count_over_time({job=\"ggaddak-ai\"} | json | durationMs >= 20000 [$__range]))",
-          "legendFormat": "20s+ (Timeout)",
+          "expr": "sum by (tier) (count_over_time({job=\"ggaddak-ai\"} | json | label_format tier=\"20s+ (Timeout)\" | durationMs >= 20000 | model !~ \".*fixture.*\" | model !~ \".*test.*\" [$__range]))",
+          "legendFormat": "{{tier}}",
           "queryType": "range",
           "refId": "C"
         }
@@ -120,7 +120,7 @@
         {
           "datasource": { "type": "loki", "uid": "Loki" },
           "editorMode": "code",
-          "expr": "sum(count_over_time({job=\"ggaddak-ai\"} | json | durationMs > 0 | model !~ \"fixture.*\" | success = true [$__range])) / sum(count_over_time({job=\"ggaddak-ai\"} | json | durationMs > 0 | model !~ \"fixture.*\" [$__range])) * 100",
+          "expr": "sum(count_over_time({job=\"ggaddak-ai\", success=\"true\"} | json | durationMs > 0 | model !~ \".*fixture.*\" | model !~ \".*test.*\" [$__range])) / sum(count_over_time({job=\"ggaddak-ai\"} | json | durationMs > 0 | model !~ \".*fixture.*\" | model !~ \".*test.*\" [$__range])) * 100",
           "queryType": "range",
           "refId": "A"
         }
@@ -176,6 +176,8 @@
       "fieldConfig": {
         "defaults": {
           "unit": "ms",
+          "min": 0,
+          "max": null,
           "custom": {
             "drawStyle": "points",
             "pointSize": 6,
@@ -184,7 +186,10 @@
             "fillOpacity": 0,
             "lineWidth": 0,
             "spanNulls": false,
-            "thresholdsStyle": { "mode": "line" }
+            "thresholdsStyle": { "mode": "off" },
+            "axisPlacement": "auto",
+            "axisSoftMax": null,
+            "axisSoftMin": 0
           },
           "thresholds": {
             "mode": "absolute",
