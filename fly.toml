@@ -1,4 +1,4 @@
-app = "ggaddak-backend"
+app = "ggadak"
 primary_region = "nrt"
 
 [build]
