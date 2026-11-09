@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'apps/be/**'
+      - 'apps/bot/**'
       - 'packages/shared/**'
       - 'Dockerfile'
       - 'docker/**'
@@ -34,4 +35,6 @@ jobs:
       - run: npm run typecheck --workspace=@ggaddak/be
       - run: npm run build --workspace=@ggaddak/shared
       - run: npm run build --workspace=@ggaddak/be
+      - run: npm run build --workspace=@ggaddak/bot
       - run: npm test --workspace=@ggaddak/be
+      - run: npm test --workspace=@ggaddak/bot
