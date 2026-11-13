@@ -62,6 +62,7 @@ export class GuildAccessPublisher {
   private closed = false;
   private queuedChanges = 0;
   private timer?: ReturnType<typeof setInterval>;
+  private lastHeartbeatAt = 0;
   private tail: Promise<void> = Promise.resolve();
 
   constructor(private readonly options: GuildAccessPublisherOptions) {
@@ -165,10 +166,16 @@ export class GuildAccessPublisher {
   private startTimer(): void {
     if (this.timer || this.closed) return;
     this.timer = setInterval(() => {
+      if (
+        !this.needsReset &&
+        this.pending.length === 0 &&
+        Date.now() - this.lastHeartbeatAt < GuildAccessPolicy.heartbeatMs
+      )
+        return;
       void this.flush().catch(error =>
         logger.warn(`Guild access synchronization unavailable: ${error.message}`),
       );
-    }, GuildAccessPolicy.heartbeatMs);
+    }, 5_000);
     this.timer.unref();
   }
 
@@ -273,6 +280,7 @@ export class GuildAccessPublisher {
           sequence: this.acknowledged,
           connected: true,
         });
+        this.lastHeartbeatAt = Date.now();
       }
     } catch (error) {
       if (error instanceof GuildAccessDeliveryError && error.status === 409) {

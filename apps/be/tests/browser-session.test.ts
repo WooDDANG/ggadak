@@ -131,10 +131,12 @@ test('browser logout revokes only its session, concurrent restores share refresh
     const otherCookie = await login();
     const restore = (value = cookie, source = origin) =>
       fetch(`${base}/session`, { method: 'POST', headers: { Cookie: value, Origin: source } });
+    now += 300001;
     const concurrent = await Promise.all([restore(), restore()]);
     expect(concurrent.map(result => result.status)).toEqual([200, 200]);
     expect(refreshCalls).toBe(1);
     guildFailure = true;
+    now += 300001;
     expect((await restore()).status).toBe(502);
     guildFailure = false;
     discord.availableGuilds = [discord.availableGuilds[1]];

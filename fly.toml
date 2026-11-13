@@ -34,7 +34,7 @@ primary_region = 'nrt'
     timeout = '5s'
     grace_period = '30s'
     method = 'GET'
-    path = '/health'
+    path = '/status'
 
 [[vm]]
   memory = '1gb'

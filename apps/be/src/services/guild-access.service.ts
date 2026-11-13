@@ -14,6 +14,12 @@ import {
 
 /** Gateway observations revoke cached proofs; OAuth remains the authority for grants. */
 export class GuildAccessService {
+  private lease?: { streamId: string; until: number };
+  private epoch = 0;
+  private invalidStream?: string;
+  cacheEpoch() {
+    return this.epoch;
+  }
   constructor(
     private repo: GuildAccessRepository,
     private now: () => number = Date.now,
@@ -25,7 +31,9 @@ export class GuildAccessService {
 
   private live(control: GuildAccessControl) {
     return Boolean(
-      control.connected && control.leaseUntil && control.leaseUntil.getTime() > this.now(),
+      control.connected &&
+      this.lease?.streamId === control.streamId &&
+      this.lease.until > this.now(),
     );
   }
 
@@ -47,7 +55,7 @@ export class GuildAccessService {
   > {
     const control = await this.repo.control();
     if (!control.connected || control.streamId === null) return 'disconnected';
-    if (control.leaseUntil === null || control.leaseUntil.getTime() <= this.now()) return 'expired';
+    if (!this.live(control)) return 'expired';
     if (!control.membersIntent) return 'members_intent_disabled';
     return 'trusted';
   }
@@ -124,9 +132,28 @@ export class GuildAccessService {
 
   async observe(event: GuildAccessEvent) {
     const leaseUntil = new Date(this.now() + GuildAccessPolicy.leaseMs);
-    return this.repo.withTransaction(async tx => {
+    if (event.kind === 'heartbeat') {
+      const control = await this.repo.control();
+      if (control.streamId !== event.streamId || this.invalidStream === event.streamId)
+        throw new AppError('Gateway stream must reset before delivering events', 409);
+      if (event.sequence !== control.lastSequence) {
+        this.lease = undefined;
+        this.epoch++;
+        this.invalidStream = event.streamId;
+        return { sequence: control.lastSequence, resetRequired: true };
+      }
+      if (event.connected !== true) this.epoch++;
+      this.lease =
+        event.connected === true
+          ? { streamId: event.streamId, until: leaseUntil.getTime() }
+          : undefined;
+      return { sequence: control.lastSequence };
+    }
+    const result = await this.repo.withTransaction(async tx => {
       const control = await this.repo.control(tx);
       if (event.kind === 'reset') {
+        if (this.invalidStream === event.streamId)
+          throw new AppError('Gateway stream must use a new identifier', 409);
         if (
           event.sequence !== 0 ||
           !event.guildIds ||
@@ -169,23 +196,6 @@ export class GuildAccessService {
       }
       if (control.streamId !== event.streamId)
         throw new AppError('Gateway stream must reset before delivering events', 409);
-      if (event.kind === 'heartbeat') {
-        if (event.sequence !== control.lastSequence) {
-          await this.repo.updateControl(
-            { streamId: null, connected: false, leaseUntil: null, advanceRevision: true },
-            tx,
-          );
-          return { sequence: control.lastSequence, resetRequired: true };
-        }
-        await this.repo.updateControl(
-          {
-            connected: event.connected === true,
-            leaseUntil: event.connected === true ? leaseUntil : null,
-          },
-          tx,
-        );
-        return { sequence: control.lastSequence };
-      }
       if (event.sequence <= control.lastSequence) return { sequence: control.lastSequence };
       if (event.sequence !== control.lastSequence + 1) {
         await this.repo.updateControl(
@@ -232,6 +242,17 @@ export class GuildAccessService {
       await this.repo.updateControl({ lastSequence: event.sequence, advanceRevision: true }, tx);
       return { sequence: event.sequence };
     });
+    if (event.kind === 'reset' && !('resetRequired' in result)) {
+      this.lease = { streamId: event.streamId, until: leaseUntil.getTime() };
+      this.invalidStream = undefined;
+    }
+    if (event.kind === 'disconnect' || ('resetRequired' in result && result.resetRequired))
+      this.lease = undefined;
+    if (event.kind === 'disconnect' || ('resetRequired' in result && result.resetRequired)) {
+      this.epoch++;
+      this.invalidStream = event.streamId;
+    }
+    return result;
   }
 
   async installation(guildId: string) {

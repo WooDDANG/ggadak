@@ -55,8 +55,14 @@ export function initExpress({ app }: { app: Express }): void {
   }
 
   // 7. Health & Status Check
-  app.get('/health', (_req, res) => {
-    res.status(200).json({ status: 'healthy' });
+  app.get('/health', async (_req, res, next) => {
+    try {
+      const health = await app.locals.healthService.check();
+      res.setHeader('Cache-Control', 'no-store');
+      res.status(health.ready ? 200 : 503).json(health);
+    } catch (error) {
+      next(error);
+    }
   });
   app.get('/status', (_req, res) => {
     res.status(200).json({ status: 'ok' });
