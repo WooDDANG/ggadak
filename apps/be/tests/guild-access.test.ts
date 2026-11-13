@@ -129,6 +129,73 @@ test('selection trusts installed guild coverage without refreshing noninstalled 
   expect(discord.guildCalls).toBe(calls);
 });
 
+test('heartbeat renews memory liveness without changing the durable control record', async () => {
+  const { db, event, advance } = await fixture();
+  expect(
+    (
+      await event({
+        kind: 'reset',
+        sequence: 0,
+        guildIds: ['guild-1'],
+        membersIntent: true,
+        connected: true,
+      })
+    ).status,
+  ).toBe(200);
+  const before = await db.client.guildAccessControl.findUniqueOrThrow({ where: { id: 'discord' } });
+  advance(1000);
+  expect((await event({ kind: 'heartbeat', sequence: 0, connected: true })).status).toBe(200);
+  expect(
+    await db.client.guildAccessControl.findUniqueOrThrow({ where: { id: 'discord' } }),
+  ).toEqual(before);
+});
+
+test('heartbeat sequence gap invalidates cached permissions until a new stream resets', async () => {
+  const { base, event, discord } = await fixture();
+  await event({
+    kind: 'reset',
+    sequence: 0,
+    guildIds: ['guild-1'],
+    membersIntent: true,
+    connected: true,
+  });
+  const { token } = await loginAsTestUser(base);
+  const request = () =>
+    fetch(`${base}/api/v1/decisions?guildId=guild-1`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  expect((await request()).status).toBe(200);
+  expect((await event({ kind: 'heartbeat', sequence: 1, connected: true })).status).toBe(409);
+  expect((await event({ kind: 'heartbeat', sequence: 0, connected: true })).status).toBe(409);
+  discord.unavailable = true;
+  expect((await request()).status).toBe(502);
+});
+
+test('verified guild cache expires after five minutes and member removal invalidates it', async () => {
+  const { base, event, discord, advance } = await fixture();
+  await event({
+    kind: 'reset',
+    sequence: 0,
+    guildIds: ['guild-1'],
+    membersIntent: true,
+    connected: true,
+  });
+  const { token } = await loginAsTestUser(base);
+  const request = () =>
+    fetch(`${base}/api/v1/decisions?guildId=guild-1`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  const initial = discord.guildCalls;
+  expect((await request()).status).toBe(200);
+  expect(discord.guildCalls).toBe(initial);
+  advance(300001);
+  await event({ kind: 'heartbeat', sequence: 0, connected: true });
+  expect((await request()).status).toBe(200);
+  expect(discord.guildCalls).toBe(initial + 1);
+  await event({ kind: 'member_remove', sequence: 1, guildId: 'guild-1', userId: 'user-1' });
+  expect((await request()).status).toBe(403);
+});
+
 test('member removal immediately denies existing sessions without changing another guild', async () => {
   const { base, event } = await fixture();
   const first = await loginAsTestUser(base);
@@ -165,7 +232,7 @@ test('member removal immediately denies existing sessions without changing anoth
   }
 });
 
-test('live Gateway permissions survive elapsed time while JWT renewal never queries Discord', async () => {
+test('expired guild cache requires Discord verification while JWT renewal never queries Discord', async () => {
   const { base, event, discord, advance } = await fixture();
   await event({
     kind: 'reset',
@@ -209,8 +276,8 @@ test('live Gateway permissions survive elapsed time while JWT renewal never quer
         headers: { Authorization: `Bearer ${token}` },
       })
     ).status,
-  ).toBe(200);
-  expect(discord.guildCalls).toBe(calls);
+  ).toBe(502);
+  expect(discord.guildCalls).toBe(calls + 1);
   const deniedOrigin = await fetch(`${base}/api/v1/auth/token`, {
     method: 'POST',
     headers: { Cookie: cookie, Origin: 'https://attacker.example' },
@@ -230,6 +297,7 @@ test('intent absence and connection lease loss revalidate on demand, sharing con
   const { token } = await loginAsTestUser(base);
   const headers = { Authorization: `Bearer ${token}` };
   const calls = discord.guildCalls;
+  advance(300001);
   let release!: () => void;
   let started!: () => void;
   const began = new Promise<void>(resolve => {
@@ -249,7 +317,7 @@ test('intent absence and connection lease loss revalidate on demand, sharing con
   release();
   expect((await Promise.all([first, second])).map(response => response.status)).toEqual([200, 200]);
   expect(discord.guildCalls).toBe(calls + 1);
-  advance(GuildAccessPolicy.leaseMs + 1);
+  advance(300001);
   discord.availableGuilds = [discord.availableGuilds[1]];
   expect((await fetch(`${base}/api/v1/decisions?guildId=guild-1`, { headers })).status).toBe(403);
 });

@@ -47,6 +47,40 @@ export class AuthService {
   private access: GuildAccessService;
   private installed: InstalledGuildsService;
   private verifications = new Map<string, Promise<void>>();
+  private guildCache = new Map<
+    string,
+    {
+      revision: number;
+      epoch: number;
+      expiresAt: number;
+      guilds: Map<string, { canManage: boolean }>;
+    }
+  >();
+  private readonly guildCacheTtlMs = 5 * 60_000;
+  private async rememberGuilds(userId: string, revision: number, epoch: number) {
+    const memberships = await this.prisma.membership.findMany({ where: { userId } });
+    if ((await this.access.revision()) !== revision || this.access.cacheEpoch() !== epoch) return;
+    this.guildCache.delete(userId);
+    if (this.guildCache.size >= 1000) {
+      const oldest = this.guildCache.keys().next().value;
+      if (oldest !== undefined) this.guildCache.delete(oldest);
+    }
+    this.guildCache.set(userId, {
+      revision,
+      epoch,
+      expiresAt: this.now() + this.guildCacheTtlMs,
+      guilds: new Map(
+        memberships.map(m => [
+          m.guildId,
+          {
+            canManage:
+              Boolean(m.owner) ||
+              (/^\d+$/.test(m.permissions) && (BigInt(m.permissions) & 32n) !== 0n),
+          },
+        ]),
+      ),
+    });
+  }
   constructor(
     private prisma: PrismaClient,
     options: AuthOptions = {},
@@ -141,6 +175,7 @@ export class AuthService {
     });
     if (consumed.count !== 1) throw new AuthError('Expired or previously used OAuth state');
     const revision = await this.access.revision();
+    const epoch = this.access.cacheEpoch();
     const tokens = await this.discord.exchange(code, this.config.redirectUri);
     const user = await this.discord.identity(tokens.access_token);
     const cooldown = await this.activeCooldown(user.id);
@@ -180,6 +215,7 @@ export class AuthService {
         },
       });
     });
+    if (fetchedGuilds !== null) await this.rememberGuilds(user.id, revision, epoch);
     const coverage = await this.access.eventCoverage();
     const currentCooldown = await this.activeCooldown(user.id);
     if (currentCooldown) {
@@ -272,19 +308,30 @@ export class AuthService {
   }
   async checkGuildAccess(user: AuthPrincipal, guildId: string): Promise<{ canManage: boolean }> {
     const revision = await this.access.revision();
-    let membership = await this.prisma.membership.findUnique({
-      where: { userId_guildId: { userId: user.userId, guildId } },
-    });
     const session = await this.prisma.authSession.findUnique({ where: { id: user.sessionId } });
     if (!session || session.userId !== user.userId || session.expiresAt.getTime() <= this.now())
       throw new AuthError('Guild access denied; refresh login', 403);
     if (await this.access.removed(user.userId, guildId)) throw new GuildAccessError();
-    if (!membership || !(await this.access.trusted(membership))) {
-      await this.verifyGuilds(user);
-      membership = await this.prisma.membership.findUnique({
-        where: { userId_guildId: { userId: user.userId, guildId } },
-      });
+    const cached = this.guildCache.get(user.userId);
+    if (
+      cached &&
+      cached.revision === revision &&
+      cached.epoch === this.access.cacheEpoch() &&
+      cached.expiresAt > this.now()
+    ) {
+      const access = cached.guilds.get(guildId);
+      if (!access) throw new GuildAccessError();
+      if ((await this.access.revision()) !== revision || cached.epoch !== this.access.cacheEpoch())
+        throw new GuildAccessError(
+          'Discord permissions changed during authorization; retry shortly',
+          503,
+        );
+      return access;
     }
+    await this.verifyGuilds(user);
+    const membership = await this.prisma.membership.findUnique({
+      where: { userId_guildId: { userId: user.userId, guildId } },
+    });
     if (!membership || (await this.access.removed(user.userId, guildId)))
       throw new GuildAccessError();
     if ((await this.access.revision()) !== revision)
@@ -393,7 +440,13 @@ export class AuthService {
       };
     }
     const revision = await this.access.revision();
-    if (!(await this.access.snapshotTrusted(user.userId))) {
+    const cached = this.guildCache.get(user.userId);
+    if (!(
+      cached &&
+      cached.revision === revision &&
+      cached.epoch === this.access.cacheEpoch() &&
+      cached.expiresAt > this.now()
+    )) {
       try {
         await this.verifyGuilds(user);
       } catch (error) {
@@ -497,7 +550,13 @@ export class AuthService {
     }
     const existing = this.verifications.get(user.userId);
     if (existing) return existing;
-    const promise = this.revalidate(user)
+    const promise = Promise.resolve()
+      .then(async () => {
+        const revision = await this.access.revision();
+        const epoch = this.access.cacheEpoch();
+        await this.revalidate(user);
+        await this.rememberGuilds(user.userId, revision, epoch);
+      })
       .catch(async error => {
         if (error instanceof AppError && error.statusCode === 429) {
           const details = (error.details as { retryAfterMs?: number; global?: boolean }) ?? {};

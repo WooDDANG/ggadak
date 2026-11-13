@@ -1,5 +1,6 @@
 import type { PrismaClient } from '@prisma/client';
 import { DeliveryPolicy } from '@ggaddak/shared';
+import type { GuildAccessService } from './guild-access.service.js';
 
 /** Read-only readiness observations; never call Discord from a health probe. */
 export class HealthService {
@@ -7,11 +8,13 @@ export class HealthService {
     [
       Awaited<ReturnType<PrismaClient['analysisDeliveryHeartbeat']['findUnique']>>,
       Awaited<ReturnType<PrismaClient['guildAccessControl']['findUnique']>>,
+      Awaited<ReturnType<GuildAccessService['eventCoverage']>>,
     ]
   >;
   constructor(
     private prisma: PrismaClient,
     private now: () => number = Date.now,
+    private access?: GuildAccessService,
   ) {}
 
   async check() {
@@ -22,6 +25,7 @@ export class HealthService {
         const pending = Promise.all([
           this.prisma.analysisDeliveryHeartbeat.findUnique({ where: { id: 'bot' } }),
           this.prisma.guildAccessControl.findUnique({ where: { id: 'discord' } }),
+          this.access ? this.access.eventCoverage() : Promise.resolve('disconnected' as const),
         ]);
         this.pending = pending;
         void pending
@@ -30,7 +34,7 @@ export class HealthService {
           })
           .catch(() => {});
       }
-      const [heartbeat, gateway] = await Promise.race([
+      const [heartbeat, gateway, coverage] = await Promise.race([
         this.pending,
         new Promise<never>((_, reject) => {
           timer = setTimeout(() => reject(new Error('Health query timed out')), 2000);
@@ -40,12 +44,7 @@ export class HealthService {
         heartbeat &&
         this.now() - heartbeat.synchronizedAt.getTime() < DeliveryPolicy.statusFreshnessMs,
       );
-      const discord = Boolean(
-        gateway?.streamId &&
-        gateway.connected &&
-        gateway.leaseUntil &&
-        gateway.leaseUntil.getTime() > this.now(),
-      );
+      const discord = coverage === 'trusted' || coverage === 'members_intent_disabled';
       return {
         status: bot && discord ? 'healthy' : 'degraded',
         ready: bot && discord,

@@ -60,6 +60,22 @@ test('bot heartbeat transactions do not block authentication session writes', as
     const results = await Promise.allSettled([heartbeat, sessionWrite]);
     const failures = results.filter(result => result.status === 'rejected');
     expect(failures).toEqual([]);
+    accessRepo.control = control;
+    const before = await client.guildAccessControl.findUniqueOrThrow({ where: { id: 'discord' } });
+    for (let index = 0; index < 100; index++) {
+      const [ack, written] = await Promise.all([
+        access.observe({ kind: 'heartbeat', streamId: 'probe', sequence: 0, connected: true }),
+        client.authSession.updateMany({
+          where: { id: 'probe' },
+          data: { refreshOwner: `owner-${index}` },
+        }),
+      ]);
+      expect(ack).toEqual({ sequence: 0 });
+      expect(written.count).toBe(1);
+    }
+    expect(await client.guildAccessControl.findUniqueOrThrow({ where: { id: 'discord' } })).toEqual(
+      before,
+    );
   } finally {
     await client.$disconnect();
     await db.cleanup();

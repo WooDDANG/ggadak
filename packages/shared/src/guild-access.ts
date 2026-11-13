@@ -49,6 +49,6 @@ export const GuildAccessEventSchema = z
   .strict();
 
 export const GuildAccessPolicy = {
-  heartbeatMs: 10_000,
-  leaseMs: 35_000,
+  heartbeatMs: 30_000,
+  leaseMs: 40_000,
 } as const;

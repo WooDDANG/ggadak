@@ -107,7 +107,7 @@ export async function initLoaders({
     new SearchController(new SearchService(repo, embeddingProvider), authService),
   );
   expressApp.locals.authService = authService;
-  expressApp.locals.healthService = new HealthService(prisma, authOptions?.now);
+  expressApp.locals.healthService = new HealthService(prisma, authOptions?.now, guildAccess);
 
   const channelsService = new ChannelsService(prisma, authOptions?.channelAdapter);
   container.set(ChannelsService, channelsService);
