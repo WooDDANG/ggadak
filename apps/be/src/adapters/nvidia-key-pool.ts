@@ -1,25 +1,31 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { Prisma, type PrismaClient } from '@prisma/client';
 import { AppError } from '../errors/AppError.js';
 import { AnalysisBusyError } from '../errors/analysis-error.js';
-import { createLogger } from '@ggaddak/shared';
 import type { NvidiaCredential } from '../config/nvidia-credentials.js';
 
-const logger = createLogger('BE-NVIDIA');
+const LEASE_MS = 60_000;
+const HEARTBEAT_MS = 20_000;
+const WINDOW_MS = 60_000;
 
 function credentialId(credential: NvidiaCredential): string {
   return createHash('sha256').update(credential.apiKey).digest('hex');
 }
 
-/** 키 원문 없이 계정별 예약과 장애 상태를 SQLite에서 공유한다. */
+export interface NvidiaReservation extends NvidiaCredential {
+  owner: string;
+  signal: AbortSignal;
+  release(): Promise<void>;
+}
+
+/** 공유 저장소에서 키 잠금과 최근 60초 호출 예산을 원자적으로 예약한다. */
 export class NvidiaKeyPool {
   private readonly keys: Map<string, NvidiaCredential>;
-  private readonly intervalMs: number;
 
   constructor(
     private readonly prisma: PrismaClient,
     credentials: NvidiaCredential[],
-    requestsPerMinute = 40,
+    private readonly requestsPerMinute = 40,
     private readonly now: () => number = Date.now,
   ) {
     if (
@@ -30,53 +36,122 @@ export class NvidiaKeyPool {
       throw new AppError('Invalid NVIDIA_REQUESTS_PER_MINUTE; expected integer 1..60000', 422);
     this.keys = new Map(credentials.map(key => [credentialId(key), key]));
     if (!this.keys.size) throw new AppError('NVIDIA API keys are not configured', 422);
-    this.intervalMs = Math.ceil(60_000 / requestsPerMinute);
   }
 
-  async reserve(signal: AbortSignal): Promise<NvidiaCredential> {
+  async reserve(signal: AbortSignal): Promise<NvidiaReservation> {
     if (signal.aborted) throw new AppError('NVIDIA reservation cancelled', 503);
     const ids = [...this.keys.keys()];
-    await this.prisma.$executeRaw`
-      INSERT OR IGNORE INTO "NvidiaAccountBudget"
-        ("id", "nextRequestAt", "cooldownUntil", "disabled", "lastSelectedAt")
-      VALUES ${Prisma.join(ids.map(id => Prisma.sql`(${id}, 0, 0, 0, 0)`))}
-    `;
-    if (signal.aborted) throw new AppError('NVIDIA reservation cancelled', 503);
-    const now = this.now();
-    // 선택과 예약을 단일 UPDATE로 확정해 프로세스 간 경합을 막는다.
-    const selected = await this.prisma.$queryRaw<{ id: string }[]>`
-      UPDATE "NvidiaAccountBudget"
-      SET "nextRequestAt" = ${now + this.intervalMs}, "lastSelectedAt" = ${now}
-      WHERE "id" = (
-        SELECT "id" FROM "NvidiaAccountBudget"
+    const owner = randomUUID();
+    let now = this.now();
+    const selected = await this.prisma.$transaction(async tx => {
+      await tx.$executeRaw`
+        INSERT OR IGNORE INTO "NvidiaAccountBudget"
+          ("id", "nextRequestAt", "cooldownUntil", "disabled", "lastSelectedAt", "leaseUntil")
+        VALUES ${Prisma.join(ids.map(id => Prisma.sql`(${id}, 0, 0, 0, 0, 0)`))}
+      `;
+      // 쓰기 잠금을 얻기까지 기다린 시간은 예약의 유효 기간에서 제외한다.
+      now = this.now();
+      await tx.$executeRaw`DELETE FROM "NvidiaAccountRequest" WHERE "startedAt" <= ${now - WINDOW_MS}`;
+      if (signal.aborted) throw new AppError('NVIDIA reservation cancelled', 503);
+      const rows = await tx.$queryRaw<{ id: string }[]>`
+        UPDATE "NvidiaAccountBudget"
+        SET "leaseOwner" = ${owner}, "leaseUntil" = ${now + LEASE_MS}, "lastSelectedAt" = ${now}
+        WHERE "id" = (
+          SELECT b."id" FROM "NvidiaAccountBudget" b
+          WHERE b."id" IN (${Prisma.join(ids)}) AND b."disabled" = 0
+            AND b."nextRequestAt" <= ${now} AND b."cooldownUntil" <= ${now}
+            AND b."leaseUntil" <= ${now}
+            AND (SELECT COUNT(*) FROM "NvidiaAccountRequest" r
+                 WHERE r."accountId" = b."id" AND r."startedAt" > ${now - WINDOW_MS}) < ${this.requestsPerMinute}
+          ORDER BY b."lastSelectedAt", b."id" LIMIT 1
+        ) RETURNING "id"
+      `;
+      if (rows[0]) {
+        await tx.$executeRaw`INSERT INTO "NvidiaAccountRequest" ("id", "accountId", "startedAt") VALUES (${owner}, ${rows[0].id}, ${now})`;
+      }
+      return rows[0]?.id;
+    });
+    if (!selected) {
+      const rows = await this.prisma.$queryRaw<
+        { id: string; cooldownUntil: number; nextRequestAt: number; leaseUntil: number }[]
+      >`
+        SELECT "id", "cooldownUntil", "nextRequestAt", "leaseUntil" FROM "NvidiaAccountBudget"
         WHERE "id" IN (${Prisma.join(ids)}) AND "disabled" = 0
-          AND "nextRequestAt" <= ${now} AND "cooldownUntil" <= ${now}
-        ORDER BY "lastSelectedAt", "id" LIMIT 1
-      ) RETURNING "id"
-    `;
-    if (selected[0]) return this.keys.get(selected[0].id)!;
-    const rows = await this.prisma.$queryRaw<{ nextAt: number | null }[]>`
-      SELECT MIN(MAX("nextRequestAt", "cooldownUntil")) AS "nextAt"
-      FROM "NvidiaAccountBudget"
-      WHERE "id" IN (${Prisma.join(ids)}) AND "disabled" = 0
-    `;
-    if (rows[0]?.nextAt == null)
-      throw new AppError('All NVIDIA API keys failed authentication', 401);
-    const retryAfterMs = Math.max(1, rows[0].nextAt - now);
-    logger.info('nvidia.key.waiting', { retryAfterMs });
-    throw new AnalysisBusyError('NVIDIA account budgets are waiting', retryAfterMs);
+      `;
+      if (!rows.length) throw new AppError('All NVIDIA API keys failed authentication', 401);
+      const waits = await Promise.all(
+        rows.map(async row => {
+          const requests = await this.prisma.$queryRaw<{ startedAt: number }[]>`
+          SELECT "startedAt" FROM "NvidiaAccountRequest"
+          WHERE "accountId" = ${row.id} AND "startedAt" > ${now - WINDOW_MS}
+          ORDER BY "startedAt" ASC LIMIT 1
+        `;
+          const counts = await this.prisma.$queryRaw<{ count: bigint }[]>`
+          SELECT COUNT(*) AS "count" FROM "NvidiaAccountRequest"
+          WHERE "accountId" = ${row.id} AND "startedAt" > ${now - WINDOW_MS}
+        `;
+          const quota =
+            Number(counts[0].count) >= this.requestsPerMinute
+              ? requests[0].startedAt + WINDOW_MS
+              : now;
+          const lease = row.leaseUntil > now ? now + 500 : now;
+          return Math.max(row.cooldownUntil, row.nextRequestAt, quota, lease) - now;
+        }),
+      );
+      throw new AnalysisBusyError(
+        'NVIDIA account budgets are waiting',
+        Math.max(1, Math.min(...waits)),
+      );
+    }
+    const lost = new AbortController();
+    let renewal = Promise.resolve();
+    const timer = setInterval(() => {
+      renewal = renewal
+        .then(async () => {
+          const changed = await this.prisma.$executeRaw`
+          UPDATE "NvidiaAccountBudget" SET "leaseUntil" = ${this.now() + LEASE_MS}
+          WHERE "id" = ${selected} AND "leaseOwner" = ${owner} AND "leaseUntil" > ${this.now()}
+        `;
+          if (!changed) lost.abort();
+        })
+        .catch(() => lost.abort());
+    }, HEARTBEAT_MS);
+    timer.unref();
+    let released = false;
+    const release = async () => {
+      if (released) return;
+      released = true;
+      clearInterval(timer);
+      await renewal;
+      await this.prisma.$executeRaw`
+        UPDATE "NvidiaAccountBudget" SET "leaseOwner" = NULL, "leaseUntil" = 0
+        WHERE "id" = ${selected} AND "leaseOwner" = ${owner}
+      `;
+    };
+    if (signal.aborted) {
+      await release();
+      throw new AppError('NVIDIA reservation cancelled', 503);
+    }
+    return {
+      ...this.keys.get(selected)!,
+      owner,
+      signal: AbortSignal.any([signal, lost.signal]),
+      release,
+    };
   }
 
-  async recordFailure(key: NvidiaCredential, status: number, retryAfterMs = 60_000): Promise<void> {
+  async recordFailure(
+    key: NvidiaReservation,
+    status: number,
+    retryAfterMs = 60_000,
+  ): Promise<void> {
     if (status === 401 || status === 403) {
-      await this.prisma.$executeRaw`
-        UPDATE "NvidiaAccountBudget" SET "disabled" = 1 WHERE "id" = ${credentialId(key)}
-      `;
+      await this.prisma
+        .$executeRaw`UPDATE "NvidiaAccountBudget" SET "disabled" = 1 WHERE "id" = ${credentialId(key)} AND "leaseOwner" = ${key.owner}`;
     } else if (status === 429) {
       await this.prisma.$executeRaw`
-        UPDATE "NvidiaAccountBudget"
-        SET "cooldownUntil" = MAX("cooldownUntil", ${this.now() + retryAfterMs})
-        WHERE "id" = ${credentialId(key)}
+        UPDATE "NvidiaAccountBudget" SET "cooldownUntil" = MAX("cooldownUntil", ${this.now() + retryAfterMs})
+        WHERE "id" = ${credentialId(key)} AND "leaseOwner" = ${key.owner}
       `;
     }
   }

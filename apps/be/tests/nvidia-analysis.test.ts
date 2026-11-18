@@ -32,7 +32,7 @@ test('계정 예산 대기는 시도를 소모하지 않고 저장된 Extract �
     keyPool: new NvidiaKeyPool(
       db.client,
       [{ name: 'NVIDIA_API_KEY_1', apiKey: 'secret' }],
-      40,
+      1,
       () => now,
     ),
     clientFactory: () => client,
@@ -61,13 +61,13 @@ test('계정 예산 대기는 시도를 소모하지 않고 저장된 Extract �
       attempts: 0,
       errorCategory: 'analysis-capacity',
     });
-    expect(Date.parse(waiting.nextAttemptAt)).toBe(now + 1500);
+    expect(Date.parse(waiting.nextAttemptAt)).toBe(now + 60000);
     const state = await db.client.analysisSessionState.findFirstOrThrow();
     expect(JSON.parse(state.stateJson)).toMatchObject({ phase: 'verify', calls: ['extract'] });
     expect(JSON.parse(state.stateJson).attempts).toHaveLength(1);
     await queue.runOnce();
     expect(calls).toBe(1);
-    now += 1500;
+    now += 60000;
     await queue.runOnce();
     expect(calls).toBe(2);
     expect((await queue.results([input.requestId]))[0].state).toBe('completed');

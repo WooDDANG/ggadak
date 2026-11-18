@@ -66,6 +66,10 @@ export class AiAdapter implements IAiAdapter {
     return new AiAdapter(this.options, this.environment, reserved, this.metricRecorder);
   }
 
+  async releaseCall(): Promise<void> {
+    await this.provider.release?.();
+  }
+
   verifyGraph(transcript: string, graph: unknown, context: AiCallContext) {
     return this.call(
       AiStage.Verify,

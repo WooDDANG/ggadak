@@ -5,7 +5,7 @@ import config from '../config/index.js';
 import { AppError } from '../errors/AppError.js';
 import type { AiResult } from '../domain/ai-call.js';
 import type { AiProvider, AiProviderRequest } from './ai-provider.js';
-import { NvidiaKeyPool } from './nvidia-key-pool.js';
+import { NvidiaKeyPool, type NvidiaReservation } from './nvidia-key-pool.js';
 import { nvidiaCredentials, type NvidiaCredential } from '../config/nvidia-credentials.js';
 import { initPrisma } from '../loaders/prisma.js';
 import { createLogger } from '@ggaddak/shared';
@@ -86,27 +86,44 @@ export class NvidiaProvider implements AiProvider {
   async generate(request: AiProviderRequest): Promise<AiResult> {
     if (this.client) return this.generateWithClient(request, this.client);
     const reserved = await this.reserve(request.signal);
-    return reserved.generate(request);
+    try {
+      return await reserved.generate(request);
+    } finally {
+      await reserved.release?.();
+    }
   }
 
   async reserve(signal: AbortSignal): Promise<AiProvider> {
     if (signal.aborted) throw new AppError('NVIDIA reservation cancelled', 503);
     if (!this.pool) return this;
     const key = await this.pool.reserve(signal);
-    let client = this.clients.get(key.apiKey);
-    if (!client) {
-      client = this.clientFactory(key.apiKey);
-      this.clients.set(key.apiKey, client);
+    try {
+      let client = this.clients.get(key.apiKey);
+      if (!client) {
+        client = this.clientFactory(key.apiKey);
+        this.clients.set(key.apiKey, client);
+      }
+      logger.info('nvidia.key.selected', { keyName: key.name });
+      const selectedClient = client;
+      return {
+        generate: request =>
+          this.generateWithClient(
+            { ...request, signal: AbortSignal.any([request.signal, key.signal]) },
+            selectedClient,
+            key,
+          ),
+        release: key.release,
+      };
+    } catch (error) {
+      await key.release();
+      throw error;
     }
-    logger.info('nvidia.key.selected', { keyName: key.name });
-    const selectedClient = client;
-    return { generate: request => this.generateWithClient(request, selectedClient, key) };
   }
 
   private async generateWithClient(
     request: AiProviderRequest,
     client: OpenAI,
-    key?: NvidiaCredential,
+    key?: NvidiaReservation,
   ): Promise<AiResult> {
     if (!Number.isSafeInteger(request.maxOutputTokens) || request.maxOutputTokens <= 0)
       throw new AppError('Invalid AI limits', 422);
