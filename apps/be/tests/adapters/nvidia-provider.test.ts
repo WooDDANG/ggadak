@@ -1,6 +1,22 @@
 import { test, expect } from 'vitest';
-import { NvidiaProvider, extractAndParseJson } from '../../src/adapters/nvidia-provider.js';
+import {
+  NvidiaProvider,
+  extractAndParseJson,
+  nvidiaRetryAfterMs,
+} from '../../src/adapters/nvidia-provider.js';
 import { GraphSchema } from '../../src/domain/decision-graph.js';
+
+test('Retry-After의 초와 HTTP 날짜를 해석하고 잘못된 헤더는 기본 대기를 적용한다', () => {
+  const now = Date.parse('2026-11-18T00:00:00Z');
+  expect(nvidiaRetryAfterMs({ headers: { 'retry-after': '2.5' } }, now)).toBe(2500);
+  expect(
+    nvidiaRetryAfterMs(
+      { headers: new Headers({ 'retry-after': 'Wed, 18 Nov 2026 00:00:10 GMT' }) },
+      now,
+    ),
+  ).toBe(10000);
+  expect(nvidiaRetryAfterMs({ headers: { 'retry-after': 'invalid' } }, now)).toBe(60000);
+});
 
 test('extractAndParseJson parses direct json, markdown code block, and inner objects', () => {
   expect(extractAndParseJson('{"summary":"Direct"}')).toEqual({ summary: 'Direct' });

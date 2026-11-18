@@ -291,6 +291,14 @@ model AiCallLease {
   @@index([state, createdAt])
 }
 
+model NvidiaAccountBudget {
+  id             String  @id
+  nextRequestAt  Float   @default(0)
+  cooldownUntil  Float   @default(0)
+  disabled       Boolean @default(false)
+  lastSelectedAt Float   @default(0)
+}
+
 model MonitoredChannel {
   id        String   @id
   guildId   String

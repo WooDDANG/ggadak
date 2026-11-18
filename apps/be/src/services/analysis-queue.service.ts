@@ -458,10 +458,10 @@ export class AnalysisQueueService {
           attempts,
           owner: null,
           leaseUntil: null,
-          nextAttemptAt: new Date(this.now() + (busy ? 500 : delay)),
+          nextAttemptAt: new Date(this.now() + (busy ? Math.max(500, retryAfterMs) : delay)),
           errorCategory: failure.category,
         });
-        if (retryable && !busy)
+        if (retryable && !busy && !failure.accountScoped)
           await this.storage.patchControl({ pauseUntil: new Date(this.now() + delay) });
       } finally {
         clearInterval(heartbeat);

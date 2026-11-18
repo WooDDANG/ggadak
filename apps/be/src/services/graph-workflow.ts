@@ -90,6 +90,8 @@ export class GraphWorkflow {
       try {
         const callSignal = permit.signal;
         if (callSignal.aborted) throw new AppError('Analysis cancelled before AI call', 503);
+        // 계정 예산 대기는 논리 호출·시도·실행 시간 예산을 소비하지 않는다.
+        const ai = (await this.ai.prepareCall?.(callSignal)) ?? this.ai;
         const phase = session.phase;
         if (!session.calls.includes(phase)) {
           session.calls.push(phase);
@@ -143,10 +145,10 @@ export class GraphWorkflow {
           };
           operation =
             phase === AnalysisPhase.Extract
-              ? this.ai.extractGraph(session.transcript, context)
+              ? ai.extractGraph(session.transcript, context)
               : phase === AnalysisPhase.Repair
-                ? this.ai.repairGraph(session.transcript, session.value, session.feedback, context)
-                : this.ai.verifyGraph(session.transcript, session.value, context);
+                ? ai.repairGraph(session.transcript, session.value, session.feedback, context)
+                : ai.verifyGraph(session.transcript, session.value, context);
           const interrupted = new Promise<never>((_, reject) => {
             controller.signal.addEventListener(
               'abort',
