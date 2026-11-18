@@ -93,6 +93,46 @@ export interface DecisionGraph {
   edges: GraphEdge[];
   discussionProblems: { summary: string; nodeIds: string[]; edgeIds: string[] }[];
 }
+
+/** 추론 없이 관계로부터 계산할 수 있는 속성과 참조만 정리한다. */
+export function normalizeGraph(graph: DecisionGraph): DecisionGraph {
+  const nodes = new Set(graph.nodes.map(node => node.id));
+  const conflicts = new Set<string>();
+  const edges = graph.edges.filter(edge => {
+    if (edge.type !== GraphEdgeType.ConflictsWith) return true;
+    const key = JSON.stringify([edge.sourceId, edge.targetId].sort());
+    if (conflicts.has(key)) return false;
+    conflicts.add(key);
+    return true;
+  });
+  const edgeIds = new Set(edges.map(edge => edge.id));
+  return {
+    ...graph,
+    edges,
+    nodes: graph.nodes.map(node => {
+      if (node.type !== GraphNodeType.DecisionCandidate) return node;
+      const alternatives = new Set(
+        edges
+          .filter(edge => edge.type === GraphEdgeType.HasAlternative && edge.sourceId === node.id)
+          .map(edge => edge.targetId),
+      );
+      const hasRationale = edges.some(
+        edge =>
+          includesValue([GraphEdgeType.Supports, GraphEdgeType.Opposes], edge.type) &&
+          (edge.targetId === node.id || alternatives.has(edge.targetId)),
+      );
+      return {
+        ...node,
+        rationaleStatus: hasRationale ? RationaleStatus.Stated : RationaleStatus.NotStated,
+      };
+    }),
+    discussionProblems: graph.discussionProblems.map(problem => ({
+      ...problem,
+      nodeIds: problem.nodeIds.filter(id => nodes.has(id)),
+      edgeIds: problem.edgeIds.filter(id => edgeIds.has(id)),
+    })),
+  };
+}
 export type Verification = z.infer<typeof VerificationSchema>;
 export type LinkedGraphNode = GraphNode & {
   decisionId?: string;
@@ -157,7 +197,9 @@ export function graphIssues(graph: DecisionGraph): string[] {
       source === target ||
       !allowed[edge.type].some(([a, b]) => a.includes(source.type) && b.includes(target.type))
     )
-      issues.push(`Invalid endpoints: ${edge.id}`);
+      issues.push(
+        `Invalid endpoints: ${edge.id}; type=${edge.type}; source=${source?.type ?? 'missing'}; target=${target?.type ?? 'missing'}; allowed=${allowed[edge.type].map(([a, b]) => `${a.join('|')} -> ${b.join('|')}`).join(', ')}`,
+      );
     const endpoints =
       edge.type === GraphEdgeType.ConflictsWith
         ? [edge.sourceId, edge.targetId].sort()
@@ -174,7 +216,9 @@ export function graphIssues(graph: DecisionGraph): string[] {
         !node.category ||
         !node.history?.length
       )
-        issues.push(`Incomplete candidate: ${node.id}`);
+        issues.push(
+          `Incomplete candidate: ${node.id}; required observation=${Object.values(DecisionObservation).join('|')}, rationaleStatus=${Object.values(RationaleStatus).join('|')}, category and nonempty history`,
+        );
       const alternatives = new Set(
         graph.edges
           .filter(e => e.type === GraphEdgeType.HasAlternative && e.sourceId === node.id)

@@ -52,6 +52,7 @@ export interface AnalysisSession {
   feedback: string[];
   verification?: unknown;
   repairs: number;
+  repairBudgets?: { structure: number; semantic: number };
   elapsedMs: number;
   waitMs?: number;
   calls: AnalysisPhase[];

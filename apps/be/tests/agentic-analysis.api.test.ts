@@ -30,6 +30,97 @@ const graph = {
   discussionProblems: [],
 };
 
+test('파생 그래프 불일치는 repair 호출 없이 정규화하고 후보를 발행한다', async () => {
+  const calls: string[] = [];
+  const input = structuredClone(graph);
+  input.nodes.push({
+    id: 'second',
+    type: 'DecisionCandidate',
+    summary: '대안',
+    observation: 'proposed',
+    rationaleStatus: 'stated',
+    category: '기술',
+    history: [{ observation: 'proposed', summary: '대안 검토', at: null }],
+  } as any);
+  input.edges.push(
+    { id: 'conflict1', type: 'conflicts_with', sourceId: 'candidate', targetId: 'second' },
+    { id: 'conflict2', type: 'conflicts_with', sourceId: 'second', targetId: 'candidate' },
+  );
+  input.discussionProblems.push({
+    summary: '검토',
+    nodeIds: ['candidate', 'missing'],
+    edgeIds: ['conflict1', 'missing'],
+  } as never);
+  await withApi(
+    {
+      extractGraph: async () => ({ value: input }),
+      verifyGraph: async () => {
+        calls.push('verify');
+        return { value: { valid: true, issues: [] } };
+      },
+      repairGraph: async () => {
+        calls.push('repair');
+        throw new Error('unexpected repair');
+      },
+    },
+    async (_base, send) => {
+      const response = await send('normalize-derived');
+      expect(response.status).toBe(200);
+      expect(((await response.json()) as any).decisions.length).toBeGreaterThan(0);
+      expect(calls).toEqual(['verify']);
+    },
+  );
+});
+
+test('잘못된 관계 복구에 실제 타입과 허용 조합을 제공한다', async () => {
+  const input = structuredClone(graph);
+  input.edges.push({ id: 'bad', type: 'supports', sourceId: 'topic', targetId: 'candidate' });
+  let feedback: string[] = [];
+  await withApi(
+    {
+      extractGraph: async () => ({ value: input }),
+      repairGraph: async (_transcript, _value, issues) => {
+        feedback = issues;
+        return { value: structuredClone(graph) };
+      },
+      verifyGraph: async () => ({ value: { valid: true, issues: [] } }),
+    },
+    async (_base, send) => {
+      expect((await send('repair-hints')).status).toBe(200);
+      expect(feedback.join(' ')).toContain('Topic');
+      expect(feedback.join(' ')).toContain('Rationale');
+      expect(feedback.join(' ')).toContain('DecisionCandidate');
+    },
+  );
+});
+
+test('구조 복구 후 의미 검증 오류도 별도로 복구한다', async () => {
+  const input = structuredClone(graph);
+  input.edges.push({ id: 'bad', type: 'supports', sourceId: 'topic', targetId: 'candidate' });
+  let repairs = 0,
+    verifies = 0;
+  await withApi(
+    {
+      extractGraph: async () => ({ value: input }),
+      repairGraph: async () => {
+        repairs++;
+        return { value: structuredClone(graph) };
+      },
+      verifyGraph: async () => ({
+        value:
+          ++verifies === 1
+            ? { valid: false, issues: [{ message: '의미 수정', nodeIds: [], edgeIds: [] }] }
+            : { valid: true, issues: [] },
+      }),
+    },
+    async (_base, send) => {
+      expect((await send('two-repairs')).status).toBe(200);
+      expect(repairs).toBe(2);
+      expect(verifies).toBe(2);
+    },
+  );
+});
+
 test('unagreed proposal without rationale is verified, persisted, and read as a guild-scoped graph', async () => {
   const db = await isolatedRepository();
   const calls: string[] = [];
@@ -220,7 +311,7 @@ test('meaning errors are repaired once and reverified before a candidate becomes
   );
 });
 
-test('structure repair consumes the same repair budget; remaining meaning error is terminal and never publishes', async () => {
+test('의미 복구 이후에도 검증이 실패하면 터미널 상태로 남고 발행하지 않는다', async () => {
   const calls: string[] = [];
   await withApi(
     {
@@ -247,7 +338,7 @@ test('structure repair consumes the same repair budget; remaining meaning error 
     async (base, send, token) => {
       expect((await send('terminal')).status).toBe(422);
       expect((await send('terminal')).status).toBe(422);
-      expect(calls).toEqual(['extract', 'repair', 'verify']);
+      expect(calls).toEqual(['extract', 'repair', 'verify', 'repair', 'verify']);
       const headers = { Authorization: `Bearer ${token}` };
       const status = (
         (await (
