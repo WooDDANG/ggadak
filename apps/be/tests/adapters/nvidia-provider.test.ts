@@ -172,6 +172,7 @@ test('NvidiaProvider does not log reasoning content, respects thinking toggle, a
   const providerThinkingDisabled = new NvidiaProvider({
     client: mockClient,
     enableThinking: false,
+    jsonMode: false,
   });
 
   await providerThinkingDisabled.generate({
@@ -184,6 +185,7 @@ test('NvidiaProvider does not log reasoning content, respects thinking toggle, a
   });
 
   expect(capturedBody.chat_template_kwargs).toEqual({ enable_thinking: false });
+  expect(capturedBody).not.toHaveProperty('response_format');
 
   // Test timeout abort error classification
   const abortController = new AbortController();

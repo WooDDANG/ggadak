@@ -74,6 +74,8 @@ export interface ScanRange {
   endMessageId: string;
 }
 export interface SyncScanManifest {
+  scanMode?: 'full' | 'incremental';
+  startBoundary?: string | null;
   scannedCount: number;
   entries: Array<{
     payload: Parameters<BackendApiService['analyzeDiscussion']>[0];

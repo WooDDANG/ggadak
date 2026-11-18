@@ -1,4 +1,5 @@
-import { test, expect } from 'vitest';
+import { test, expect, vi } from 'vitest';
+import winston from 'winston';
 import { createServer } from '../src/server.js';
 import { isolatedRepository } from '../src/repositories/test-database.js';
 import { fakeAuthOptions, loginAsTestUser } from '../src/test-support/auth.js';
@@ -49,13 +50,16 @@ test('파생 그래프 불일치는 repair 호출 없이 정규화하고 후보�
   input.discussionProblems.push({
     summary: '검토',
     nodeIds: ['candidate', 'missing'],
-    edgeIds: ['conflict1', 'missing'],
+    edgeIds: ['conflict2', 'missing'],
   } as never);
   await withApi(
     {
       extractGraph: async () => ({ value: input }),
-      verifyGraph: async () => {
+      verifyGraph: async (_transcript, normalized) => {
         calls.push('verify');
+        expect(normalized).toMatchObject({
+          discussionProblems: [{ nodeIds: ['candidate'], edgeIds: ['conflict1'] }],
+        });
         return { value: { valid: true, issues: [] } };
       },
       repairGraph: async () => {
@@ -113,13 +117,66 @@ test('구조 복구 후 의미 검증 오류도 별도로 복구한다', async (
             : { valid: true, issues: [] },
       }),
     },
-    async (_base, send) => {
+    async (base, send, token) => {
       expect((await send('two-repairs')).status).toBe(200);
       expect(repairs).toBe(2);
       expect(verifies).toBe(2);
+      const status = await fetch(`${base}/api/v1/analysis-requests/two-repairs?guildId=guild-1`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      expect(((await status.json()) as any).data.sessions[0]).toMatchObject({
+        repairs: 2,
+        logicalCalls: 5,
+      });
     },
   );
 });
+
+test.each(['structure', 'semantic'] as const)(
+  '%s 검증 종료 로그에는 규칙 코드만 기록하고 실패 데이터는 저장한다',
+  async kind => {
+    const marker = 'private-output-for-validation-test';
+    const invalidGraph = {
+      ...structuredClone(graph),
+      summary: marker,
+      edges: [
+        ...graph.edges,
+        { id: 'invalid', type: 'supports', sourceId: 'topic', targetId: 'candidate' },
+      ],
+    };
+    const output = vi.spyOn(winston.transports.Console.prototype, 'log');
+    try {
+      await withApi(
+        {
+          extractGraph: async () => ({ value: kind === 'structure' ? invalidGraph : graph }),
+          repairGraph: async () => ({ value: kind === 'structure' ? invalidGraph : graph }),
+          verifyGraph: async () => ({
+            value: { valid: false, issues: [{ message: marker, nodeIds: [], edgeIds: [] }] },
+          }),
+        },
+        async (_base, send, _token, _restart, db) => {
+          const requestId = `validation-log-${kind}`;
+          expect((await send(requestId)).status).toBe(422);
+          const logs = output.mock.calls.map(([info]) => JSON.stringify(info)).join('\n');
+          expect(logs).not.toContain(marker);
+          const terminal = logs
+            .split('\n')
+            .find(line => line.includes('analysis.validation.failed') && line.includes(requestId));
+          expect(terminal).toBeDefined();
+          expect(terminal).toContain(kind === 'structure' ? 'recheck' : 'reverify');
+          expect(terminal).toContain(
+            kind === 'structure' ? 'invalid-endpoints' : 'semantic-verification',
+          );
+          expect(terminal).toContain('"issuesCount":1');
+          const row = await new AnalysisRequestRepository(db.repo).get(requestId);
+          expect(row?.workflowJson).toContain(marker);
+        },
+      );
+    } finally {
+      output.mockRestore();
+    }
+  },
+);
 
 test('unagreed proposal without rationale is verified, persisted, and read as a guild-scoped graph', async () => {
   const db = await isolatedRepository();
