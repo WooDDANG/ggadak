@@ -15,8 +15,8 @@ export const GraphPolicy = {
   maxVerificationIssues: 500,
   sessionBudgetMs: 180_000,
   callTimeoutMs: 20_000,
-  maxLogicalCalls: 4,
-  maxRepairs: 1,
+  maxLogicalCalls: 5,
+  maxRepairs: 2,
 } as const;
 export const AiDefaults = {
   provider: 'nvidia',

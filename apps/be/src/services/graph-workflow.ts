@@ -13,11 +13,11 @@ import {
   GraphSchema,
   VerificationSchema,
   graphIssues,
+  normalizeGraph,
   type DecisionGraph,
 } from '../domain/decision-graph.js';
 import { AppError } from '../errors/AppError.js';
 import {
-  boundedProviderResponse,
   classifyAiFailure,
   providerResponseFrom,
   safeAiErrorCode,
@@ -62,9 +62,17 @@ export class GraphWorkflow {
       if (includesValue([AnalysisPhase.Check, AnalysisPhase.Recheck], session.phase)) {
         const checkStarted = Date.now();
         const checked = GraphSchema.safeParse(session.value);
-        const issues = checked.success
-          ? graphIssues(checked.data)
-          : checked.error.issues.map(issue => `${issue.path.join('.')}: ${issue.message}`);
+        let issues: string[];
+        if (checked.success) {
+          const normalized = normalizeGraph(checked.data);
+          session.value = normalized;
+          issues = graphIssues(normalized);
+        } else {
+          issues = checked.error.issues.map(
+            issue =>
+              `${issue.path.join('.')}: ${issue.message}${issue.code === 'invalid_enum_value' ? `; allowed=${issue.options.join('|')}` : ''}`,
+          );
+        }
         if (issues.length) {
           // 오류 위치에는 모델이 생성한 임의 필드명을 포함하지 않는다.
           const allowedFields = new Set([
@@ -87,9 +95,23 @@ export class GraphWorkflow {
             'edgeIds',
           ]);
           const issueDetails = checked.success
-            ? issues.slice(0, 20).map(issue => ({ code: issue.split(':', 1)[0] }))
+            ? issues.slice(0, 20).map(issue => ({
+                code:
+                  (
+                    {
+                      'Invalid endpoints': 'invalid-endpoints',
+                      'Inconsistent rationale status': 'rationale-status',
+                      'Incomplete candidate': 'incomplete-candidate',
+                      'Duplicate node ID': 'duplicate-node',
+                      'Duplicate edge ID': 'duplicate-edge',
+                      'Duplicate relation': 'duplicate-relation',
+                      'Unlinked node': 'unlinked-node',
+                      'Invalid problem references': 'invalid-problem-references',
+                    } as Record<string, string>
+                  )[issue.split(':', 1)[0]] ?? 'other',
+              }))
             : checked.error.issues.slice(0, 20).map(issue => ({
-                code: issue.code,
+                code: issue.code === 'invalid_enum_value' ? 'enum-mismatch' : issue.code,
                 path: issue.path
                   .map(part =>
                     typeof part === 'number' ? '*' : allowedFields.has(part) ? part : '<other>',
@@ -104,7 +126,6 @@ export class GraphWorkflow {
             issuesCount: issues.length,
             issueDetails,
             truncated: issues.length > issueDetails.length,
-            graphData: boundedProviderResponse(session.value),
           });
           try {
             this.requestRepair(session, issues, 'graph-structure');
@@ -116,6 +137,7 @@ export class GraphWorkflow {
               failureKind: 'graph-structure',
               errorSummary: 'AI graph structure was invalid',
               issuesCount: issues.length,
+              issueDetails,
               status: 422,
               retryable: false,
             });
@@ -123,8 +145,11 @@ export class GraphWorkflow {
             throw error;
           }
         } else {
-          session.value = checked.success ? checked.data : session.value;
-          session.phase = session.repairs ? AnalysisPhase.Reverify : AnalysisPhase.Verify;
+          session.phase =
+            session.calls.includes(AnalysisPhase.Verify) ||
+            session.calls.includes(AnalysisPhase.Reverify)
+              ? AnalysisPhase.Reverify
+              : AnalysisPhase.Verify;
         }
         session.elapsedMs += Math.max(0, Date.now() - checkStarted);
         await save(session);
@@ -142,7 +167,6 @@ export class GraphWorkflow {
         const phase = session.phase;
         if (!session.calls.includes(phase)) {
           session.calls.push(phase);
-          if (phase === AnalysisPhase.Repair) session.repairs++;
         }
         if (
           session.calls.length > GraphPolicy.maxLogicalCalls ||
@@ -223,8 +247,31 @@ export class GraphWorkflow {
             session.verification = result.value;
             attempt.verification = result.value;
             const verified = VerificationSchema.safeParse(result.value);
-            if (!verified.success) throw new AppError('Invalid AI verification response', 422);
-            if (!verified.data.valid)
+            if (!verified.success) {
+              logger.warn('analysis.validation.failed', {
+                ...identity,
+                callId: attempt.callId,
+                failureStage: phase,
+                failureKind: 'semantic-verification',
+                issuesCount: verified.error.issues.length,
+                issueDetails: verified.error.issues
+                  .slice(0, 20)
+                  .map(issue => ({ code: issue.code })),
+              });
+              throw new AppError('Invalid AI verification response', 422, {
+                failureKind: 'semantic-verification',
+              });
+            }
+            if (!verified.data.valid) {
+              if (this.repairBudgets(session).semantic >= 1)
+                logger.warn('analysis.validation.failed', {
+                  ...identity,
+                  callId: attempt.callId,
+                  failureStage: phase,
+                  failureKind: 'semantic-verification',
+                  issuesCount: verified.data.issues.length,
+                  issueDetails: [{ code: 'semantic-verification' }],
+                });
               this.requestRepair(
                 session,
                 verified.data.issues.map(issue =>
@@ -237,7 +284,7 @@ export class GraphWorkflow {
                     .join(' | '),
                 ),
               );
-            else {
+            } else {
               const graph = GraphSchema.parse(session.value);
               session.graph = this.link(graph, session);
               session.phase = AnalysisPhase.Done;
@@ -259,7 +306,6 @@ export class GraphWorkflow {
             failureStage: phase,
             errorCode: safeAiErrorCode(error),
             durationMs: Math.max(0, Date.now() - attempt.startedAt),
-            providerResponse: providerResponseFrom(error),
             ...diagnostic,
           });
           throw error;
@@ -292,9 +338,21 @@ export class GraphWorkflow {
     failureKind: 'graph-structure' | 'semantic-verification' = 'semantic-verification',
   ): void {
     session.feedback = feedback;
-    if (session.repairs || session.calls.includes(AnalysisPhase.Repair))
+    const budgets = this.repairBudgets(session);
+    const key = failureKind === 'graph-structure' ? 'structure' : 'semantic';
+    if (budgets[key] >= 1)
       throw new AppError('Analysis validation failed after repair', 422, { failureKind });
+    budgets[key]++;
+    session.repairs++;
+    if (session.calls.includes(AnalysisPhase.Repair)) session.calls.push(AnalysisPhase.Repair);
     session.phase = AnalysisPhase.Repair;
+  }
+
+  private repairBudgets(session: AnalysisSession) {
+    return (session.repairBudgets ??= {
+      structure: session.repairs && session.calls[1] === AnalysisPhase.Repair ? 1 : 0,
+      semantic: session.repairs && session.calls[1] === AnalysisPhase.Verify ? 1 : 0,
+    });
   }
 
   private link(graph: DecisionGraph, session: AnalysisSession) {

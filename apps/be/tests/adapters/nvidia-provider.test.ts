@@ -86,6 +86,8 @@ test('NvidiaProvider streams chunks, aggregates reasoning/content, and returns p
   expect(capturedBody.model).toBe('nvidia/nemotron-3.5-super-vl-120b-a12b');
   expect(capturedBody.chat_template_kwargs).toEqual({ enable_thinking: false });
   expect(capturedBody.stream).toBe(true);
+  expect(capturedBody.temperature).toBe(0.2);
+  expect(capturedBody.response_format).toEqual({ type: 'json_object' });
   expect(capturedOptions.signal).toBe(signal);
 });
 
@@ -170,6 +172,7 @@ test('NvidiaProvider does not log reasoning content, respects thinking toggle, a
   const providerThinkingDisabled = new NvidiaProvider({
     client: mockClient,
     enableThinking: false,
+    jsonMode: false,
   });
 
   await providerThinkingDisabled.generate({
@@ -182,6 +185,7 @@ test('NvidiaProvider does not log reasoning content, respects thinking toggle, a
   });
 
   expect(capturedBody.chat_template_kwargs).toEqual({ enable_thinking: false });
+  expect(capturedBody).not.toHaveProperty('response_format');
 
   // Test timeout abort error classification
   const abortController = new AbortController();

@@ -3,6 +3,7 @@ import {
   DurationMs,
   DiscordHistoryPolicy,
   positiveIntegerSetting,
+  createLogger,
 } from '@ggaddak/shared';
 import { randomUUID } from 'node:crypto';
 import { statfs } from 'node:fs/promises';
@@ -10,6 +11,7 @@ import type { Message, TextChannel } from 'discord.js';
 import { BackendApiService, BackendRequestError } from './backend-api.service.js';
 import type { ScanOptions } from './harvester.service.js';
 import { analysisScheduler } from './channel-scheduler.js';
+const logger = createLogger('BOT-CHANNEL-TRANSFER');
 
 interface Transfer {
   id: string;
@@ -29,6 +31,10 @@ interface Transfer {
   cutoff: number | null;
   limit?: number;
   uploadedAt?: number;
+  scanMode?: 'full' | 'incremental';
+  startBoundary?: string | null;
+  firstMessageId?: string;
+  lastMessageId?: string;
 }
 /** Disk-backed, fixed-range producer. A receipt, rather than an AI result, permits progress. */
 export class ChannelTransfer {
@@ -58,6 +64,7 @@ export class ChannelTransfer {
   private async transfer(channel: TextChannel, options: ScanOptions) {
     const id = `${options.requestId ?? randomUUID()}:${channel.guild.id}:${channel.id}`;
     let saved: Transfer | null = await this.backend.readTransfer(id, 'manifest.json');
+    const resumed = Boolean(saved);
     if (!saved) {
       const checkpoint = await this.backend.getCheckpoint(channel.id);
       if (options.initialOnly && checkpoint)
@@ -67,6 +74,8 @@ export class ChannelTransfer {
         id,
         upper: '0',
         lower: incremental ? (checkpoint ?? '0') : '0',
+        scanMode: incremental ? 'incremental' : 'full',
+        startBoundary: incremental ? checkpoint : null,
         pages: 0,
         ranges: 0,
         messages: 0,
@@ -87,8 +96,25 @@ export class ChannelTransfer {
       await this.backend.writeTransfer(id, 'manifest.json', saved);
     }
     const state = saved;
-    if (state.uploaded)
+    logger.info('sync.scan.started', {
+      jobId: options.jobId,
+      guildId: channel.guild.id,
+      channelId: channel.id,
+      resumed,
+      mode: state.scanMode ?? 'unknown',
+      startBoundary: state.startBoundary,
+    });
+    if (state.uploaded) {
+      logger.info('sync.scan.collected', {
+        jobId: options.jobId,
+        guildId: channel.guild.id,
+        channelId: channel.id,
+        firstMessageId: state.firstMessageId ?? null,
+        lastMessageId: state.lastMessageId ?? null,
+        messagesScanned: state.messages,
+      });
       return { scannedCount: state.messages, decisionsCount: 0, pendingAnalysis: true };
+    }
 
     const maxBytes = positiveIntegerSetting(
       process.env,
@@ -136,6 +162,18 @@ export class ChannelTransfer {
       if (disk.bavail * disk.bsize < bytes + DeliveryPolicy.minFreeBytes)
         throw new Error('Bot receive disk capacity unavailable');
       if (parts.length) {
+        const firstId = selected[0].id;
+        const lastId = selected.at(-1)!.id;
+        if (
+          (!state.firstMessageId && !state.pages) ||
+          (state.firstMessageId && BigInt(firstId) < BigInt(state.firstMessageId))
+        )
+          state.firstMessageId = firstId;
+        if (
+          (!state.lastMessageId && !state.pages) ||
+          (state.lastMessageId && BigInt(lastId) > BigInt(state.lastMessageId))
+        )
+          state.lastMessageId = lastId;
         await this.backend.writeTransfer(id, `page-${state.pages}.json`, parts);
         state.pages++;
         state.ranges += parts.length;
@@ -168,6 +206,14 @@ export class ChannelTransfer {
       }
       await this.backend.writeTransfer(id, 'manifest.json', state);
     }
+    logger.info('sync.scan.collected', {
+      jobId: options.jobId,
+      guildId: channel.guild.id,
+      channelId: channel.id,
+      firstMessageId: state.firstMessageId ?? null,
+      lastMessageId: state.lastMessageId ?? null,
+      messagesScanned: state.messages,
+    });
     await this.backend.queueRequest('/scans', 'POST', {
       id,
       guildId: channel.guild.id,
