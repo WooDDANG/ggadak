@@ -1,5 +1,5 @@
 import {
-  type CategoryTag,
+  CategoryTag,
   CategoryTagSchema,
   DecisionObservation,
   GraphEdgeType,
@@ -97,12 +97,23 @@ export interface DecisionGraph {
 /** 추론 없이 관계로부터 계산할 수 있는 속성과 참조만 정리한다. */
 export function normalizeGraph(graph: DecisionGraph): DecisionGraph {
   const nodes = new Set(graph.nodes.map(node => node.id));
-  const conflicts = new Set<string>();
+  const conflicts = new Map<string, string>();
+  const aliases = new Map<string, string>();
+  const seenEdgeIds = new Set<string>();
+  const duplicateEdgeIds = new Set<string>();
+  for (const edge of graph.edges) {
+    if (seenEdgeIds.has(edge.id)) duplicateEdgeIds.add(edge.id);
+    seenEdgeIds.add(edge.id);
+  }
   const edges = graph.edges.filter(edge => {
-    if (edge.type !== GraphEdgeType.ConflictsWith) return true;
+    if (edge.type !== GraphEdgeType.ConflictsWith || duplicateEdgeIds.has(edge.id)) return true;
     const key = JSON.stringify([edge.sourceId, edge.targetId].sort());
-    if (conflicts.has(key)) return false;
-    conflicts.add(key);
+    const retainedId = conflicts.get(key);
+    if (retainedId !== undefined) {
+      aliases.set(edge.id, retainedId);
+      return false;
+    }
+    conflicts.set(key, edge.id);
     return true;
   });
   const edgeIds = new Set(edges.map(edge => edge.id));
@@ -129,7 +140,9 @@ export function normalizeGraph(graph: DecisionGraph): DecisionGraph {
     discussionProblems: graph.discussionProblems.map(problem => ({
       ...problem,
       nodeIds: problem.nodeIds.filter(id => nodes.has(id)),
-      edgeIds: problem.edgeIds.filter(id => edgeIds.has(id)),
+      edgeIds: [...new Set(problem.edgeIds.map(id => aliases.get(id) ?? id))].filter(id =>
+        edgeIds.has(id),
+      ),
     })),
   };
 }
@@ -210,15 +223,15 @@ export function graphIssues(graph: DecisionGraph): string[] {
   }
   for (const node of graph.nodes) {
     if (node.type === GraphNodeType.DecisionCandidate) {
-      if (
-        !ObservationSchema.safeParse(node.observation).success ||
-        !node.rationaleStatus ||
-        !node.category ||
-        !node.history?.length
-      )
-        issues.push(
-          `Incomplete candidate: ${node.id}; required observation=${Object.values(DecisionObservation).join('|')}, rationaleStatus=${Object.values(RationaleStatus).join('|')}, category and nonempty history`,
-        );
+      const missing = [];
+      if (!ObservationSchema.safeParse(node.observation).success)
+        missing.push(`observation=${Object.values(DecisionObservation).join('|')}`);
+      if (!node.rationaleStatus)
+        missing.push(`rationaleStatus=${Object.values(RationaleStatus).join('|')}`);
+      if (!node.category) missing.push(`category=${Object.values(CategoryTag).join('|')}`);
+      if (!node.history?.length) missing.push('nonempty history');
+      if (missing.length)
+        issues.push(`Incomplete candidate: ${node.id}; required ${missing.join(', ')}`);
       const alternatives = new Set(
         graph.edges
           .filter(e => e.type === GraphEdgeType.HasAlternative && e.sourceId === node.id)

@@ -343,8 +343,8 @@ export class DiscussionHarvester {
           jobId: options.jobId,
           guildId: channel.guild.id,
           channelId: channel.id,
-          mode: 'unknown',
-          startBoundary: null,
+          mode: saved.scanMode ?? 'unknown',
+          startBoundary: saved.startBoundary,
           firstMessageId: saved.entries[0]?.scanRange.startMessageId ?? null,
           lastMessageId: saved.entries.at(-1)?.scanRange.endMessageId ?? null,
           messagesScanned: saved.scannedCount,
@@ -431,7 +431,12 @@ export class DiscussionHarvester {
     }
 
     let afterMessageId = boundary || (BigInt(fetchedMessages[0].id) - 1n).toString();
-    const manifest: SyncScanManifest = { scannedCount: fetchedMessages.length, entries: [] };
+    const manifest: SyncScanManifest = {
+      scanMode: incremental ? 'incremental' : 'full',
+      startBoundary: boundary,
+      scannedCount: fetchedMessages.length,
+      entries: [],
+    };
     for (let offset = 0; offset < fetchedMessages.length; offset += DiscordHistoryPolicy.pageSize) {
       const messages = fetchedMessages.slice(offset, offset + DiscordHistoryPolicy.pageSize);
       const newest = messages[messages.length - 1];

@@ -82,6 +82,7 @@ test('a Sync Job replays its original range totals after checkpoint completion b
 
 test('동기화 시작 경계와 실제 수집 범위를 로그로 구분한다', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'scan-log-'));
+  let checkpoint: string | null = '100';
   const output: string[] = [];
   const original = process.stdout.write;
   process.stdout.write = function (this: typeof process.stdout, chunk: any, ...args: any[]) {
@@ -106,9 +107,8 @@ test('동기화 시작 경계와 실제 수집 범위를 로그로 구분한다'
     directory,
     async url => {
       if (String(url).includes('/monitoring'))
-        return Response.json({ data: { channelIds: ['channel'] } });
-      if (String(url).endsWith('/checkpoint')) return Response.json({ lastMessageId: '100' });
-      if (String(url).endsWith('/seal')) return Response.json({ data: { sealed: true } });
+        return Response.json({ data: { channelIds: ['channel', 'new-channel'] } });
+      if (String(url).endsWith('/checkpoint')) return Response.json({ lastMessageId: checkpoint });
       return Response.json({ found: false, decisions: [] });
     },
     undefined,
@@ -127,6 +127,36 @@ test('동기화 시작 경계와 실제 수집 범위를 로그로 구분한다'
     assert.match(
       logs,
       /sync\.scan\.collected.*"firstMessageId":"101".*"lastMessageId":"102".*"messagesScanned":2/,
+    );
+    const harvester = new DiscussionHarvester(api);
+    output.length = 0;
+    await harvester.scanChannel(channel, DEFAULT_HARVESTING_POLICY, {
+      jobId: 'job',
+      requestId: 'scan',
+    });
+    assert.match(
+      output.join(''),
+      /sync\.scan\.resumed.*"mode":"incremental".*"startBoundary":"100"/,
+    );
+    output.length = 0;
+    messages.length = 0;
+    await harvester.scanChannel(channel, DEFAULT_HARVESTING_POLICY, {
+      jobId: 'full-job',
+      forceFullSync: true,
+    });
+    assert.match(output.join(''), /sync\.scan\.started.*"mode":"full".*"startBoundary":null/);
+    assert.match(
+      output.join(''),
+      /sync\.scan\.collected.*"firstMessageId":null.*"messagesScanned":0/,
+    );
+    output.length = 0;
+    checkpoint = null;
+    await harvester.scanChannel({ ...channel, id: 'new-channel' }, DEFAULT_HARVESTING_POLICY, {
+      jobId: 'new-job',
+    });
+    assert.match(
+      output.join(''),
+      /sync\.scan\.started.*"mode":"incremental".*"startBoundary":null/,
     );
     assert.doesNotMatch(logs, /private context/);
   } finally {

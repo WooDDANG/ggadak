@@ -102,7 +102,7 @@ export class ChannelTransfer {
       channelId: channel.id,
       resumed,
       mode: state.scanMode ?? 'unknown',
-      startBoundary: state.startBoundary ?? null,
+      startBoundary: state.startBoundary,
     });
     if (state.uploaded) {
       logger.info('sync.scan.collected', {
@@ -164,9 +164,15 @@ export class ChannelTransfer {
       if (parts.length) {
         const firstId = selected[0].id;
         const lastId = selected.at(-1)!.id;
-        if (!state.firstMessageId || BigInt(firstId) < BigInt(state.firstMessageId))
+        if (
+          (!state.firstMessageId && !state.pages) ||
+          (state.firstMessageId && BigInt(firstId) < BigInt(state.firstMessageId))
+        )
           state.firstMessageId = firstId;
-        if (!state.lastMessageId || BigInt(lastId) > BigInt(state.lastMessageId))
+        if (
+          (!state.lastMessageId && !state.pages) ||
+          (state.lastMessageId && BigInt(lastId) > BigInt(state.lastMessageId))
+        )
           state.lastMessageId = lastId;
         await this.backend.writeTransfer(id, `page-${state.pages}.json`, parts);
         state.pages++;

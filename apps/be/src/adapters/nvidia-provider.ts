@@ -22,6 +22,7 @@ export interface NvidiaProviderOptions {
   baseURL?: string;
   client?: OpenAI;
   enableThinking?: boolean;
+  jsonMode?: boolean;
 }
 
 export function extractAndParseJson(text: string): unknown {
@@ -56,6 +57,7 @@ export class NvidiaProvider implements AiProvider {
   private readonly clients = new Map<string, OpenAI>();
   private readonly clientFactory: (apiKey: string) => OpenAI;
   private readonly enableThinking: boolean;
+  private readonly jsonMode: boolean;
 
   constructor(options: NvidiaProviderOptions = {}) {
     this.client = options.client;
@@ -81,6 +83,7 @@ export class NvidiaProvider implements AiProvider {
     }
     this.enableThinking =
       options.enableThinking ?? config.ai.nvidiaEnableThinking ?? AiDefaults.nvidiaEnableThinking;
+    this.jsonMode = options.jsonMode ?? process.env.NVIDIA_JSON_MODE !== 'false';
   }
 
   async generate(request: AiProviderRequest): Promise<AiResult> {
@@ -148,7 +151,7 @@ export class NvidiaProvider implements AiProvider {
             },
           ],
           temperature: 0.2,
-          response_format: { type: 'json_object' },
+          ...(this.jsonMode ? { response_format: { type: 'json_object' } } : {}),
           top_p: 0.95,
           max_tokens: request.maxOutputTokens,
           seed: 42,
