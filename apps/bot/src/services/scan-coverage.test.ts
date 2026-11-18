@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { BackendApiService } from './backend-api.service.js';
 import { DecisionHarvestingEngine } from './decision-harvesting-engine.js';
 import { DiscussionHarvester } from './harvester.service.js';
+import { ChannelTransfer } from './channel-transfer.js';
 import { DEFAULT_HARVESTING_POLICY } from '@ggaddak/shared';
 
 test('a Sync Job replays its original range totals after checkpoint completion but before progress acknowledgement', async () => {
@@ -75,6 +76,116 @@ test('a Sync Job replays its original range totals after checkpoint completion b
     );
     assert.equal(aiCalls, 2);
   } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test('동기화 시작 경계와 실제 수집 범위를 로그로 구분한다', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'scan-log-'));
+  const output: string[] = [];
+  const original = process.stdout.write;
+  process.stdout.write = function (this: typeof process.stdout, chunk: any, ...args: any[]) {
+    output.push(String(chunk));
+    return (original as any).call(this, chunk, ...args);
+  } as typeof process.stdout.write;
+  const messages = ['101', '102'].map(id => ({
+    id,
+    author: { username: 'Lee' },
+    content: 'private context',
+    createdAt: new Date(),
+    createdTimestamp: Date.now(),
+  }));
+  const channel: any = {
+    id: 'channel',
+    name: 'general',
+    guild: { id: 'guild' },
+    messages: { fetch: async () => new Map(messages.map(m => [m.id, m])) },
+  };
+  const api = new BackendApiService(
+    'http://fixture',
+    directory,
+    async url => {
+      if (String(url).includes('/monitoring'))
+        return Response.json({ data: { channelIds: ['channel'] } });
+      if (String(url).endsWith('/checkpoint')) return Response.json({ lastMessageId: '100' });
+      if (String(url).endsWith('/seal')) return Response.json({ data: { sealed: true } });
+      return Response.json({ found: false, decisions: [] });
+    },
+    undefined,
+    'service',
+    undefined,
+    undefined,
+    false,
+  );
+  try {
+    await new DiscussionHarvester(api).scanChannel(channel, DEFAULT_HARVESTING_POLICY, {
+      jobId: 'job',
+      requestId: 'scan',
+    });
+    const logs = output.join('');
+    assert.match(logs, /sync\.scan\.started.*"startBoundary":"100"/);
+    assert.match(
+      logs,
+      /sync\.scan\.collected.*"firstMessageId":"101".*"lastMessageId":"102".*"messagesScanned":2/,
+    );
+    assert.doesNotMatch(logs, /private context/);
+  } finally {
+    process.stdout.write = original;
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test('비동기 전송의 checkpoint와 실제 범위를 재개 시에도 기록한다', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'transfer-log-'));
+  const output: string[] = [];
+  const original = process.stdout.write;
+  process.stdout.write = function (this: typeof process.stdout, chunk: any, ...args: any[]) {
+    output.push(String(chunk));
+    return (original as any).call(this, chunk, ...args);
+  } as typeof process.stdout.write;
+  const stored = new Map<string, any>();
+  const backend: any = {
+    transferDirectory: () => directory,
+    readTransfer: async (_id: string, file: string) => stored.get(file) ?? null,
+    writeTransfer: async (_id: string, file: string, value: any) => {
+      stored.set(file, structuredClone(value));
+    },
+    getCheckpoint: async () => '100',
+    queueRequest: async (path: string) => (path.endsWith('/seal') ? { sealed: true } : {}),
+    deliverScanSegment: async () => {},
+  };
+  const channel: any = {
+    id: 'channel',
+    guild: { id: 'guild' },
+    name: 'test',
+    messages: {
+      fetch: async () =>
+        new Map(
+          ['101', '102'].map(id => [
+            id,
+            {
+              id,
+              author: { username: 'Lee' },
+              content: 'private context',
+              createdAt: new Date(),
+              createdTimestamp: Date.now(),
+            },
+          ]),
+        ),
+    },
+  };
+  try {
+    const transfer = new ChannelTransfer(backend);
+    const options = { jobId: 'job', requestId: 'scan' };
+    await transfer.run(channel, options);
+    await transfer.run(channel, options);
+    const logs = output.join('');
+    assert.match(logs, /"resumed":false.*"mode":"incremental".*"startBoundary":"100"/);
+    assert.match(logs, /"resumed":true.*"mode":"incremental".*"startBoundary":"100"/);
+    assert.match(logs, /"firstMessageId":"101".*"lastMessageId":"102".*"messagesScanned":2/);
+    assert.doesNotMatch(logs, /private context/);
+  } finally {
+    process.stdout.write = original;
     await rm(directory, { recursive: true, force: true });
   }
 });

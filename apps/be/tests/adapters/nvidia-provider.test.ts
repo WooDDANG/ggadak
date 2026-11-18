@@ -86,6 +86,8 @@ test('NvidiaProvider streams chunks, aggregates reasoning/content, and returns p
   expect(capturedBody.model).toBe('nvidia/nemotron-3.5-super-vl-120b-a12b');
   expect(capturedBody.chat_template_kwargs).toEqual({ enable_thinking: false });
   expect(capturedBody.stream).toBe(true);
+  expect(capturedBody.temperature).toBe(0.2);
+  expect(capturedBody.response_format).toEqual({ type: 'json_object' });
   expect(capturedOptions.signal).toBe(signal);
 });
 

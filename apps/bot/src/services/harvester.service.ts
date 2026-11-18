@@ -338,7 +338,19 @@ export class DiscussionHarvester {
       : undefined;
     if (scanId) {
       const saved = await this.backendApi.loadSyncScan(scanId);
-      if (saved) return this.executeScan(saved);
+      if (saved) {
+        logger.info('sync.scan.resumed', {
+          jobId: options.jobId,
+          guildId: channel.guild.id,
+          channelId: channel.id,
+          mode: 'unknown',
+          startBoundary: null,
+          firstMessageId: saved.entries[0]?.scanRange.startMessageId ?? null,
+          lastMessageId: saved.entries.at(-1)?.scanRange.endMessageId ?? null,
+          messagesScanned: saved.scannedCount,
+        });
+        return this.executeScan(saved);
+      }
     }
     const channelName = channel.name;
     await this.backendApi
@@ -357,6 +369,13 @@ export class DiscussionHarvester {
     const pendingBoundary = await this.backendApi.getScanBoundary(channel.id, lastCheckpoint);
     const incremental = !options.full && !options.hours && !options.forceFullSync;
     const boundary = incremental ? pendingBoundary || lastCheckpoint : null;
+    logger.info('sync.scan.started', {
+      jobId: options.jobId,
+      guildId: channel.guild.id,
+      channelId: channel.id,
+      mode: incremental ? 'incremental' : 'full',
+      startBoundary: boundary,
+    });
     const timeCutoff = options.hours
       ? Date.now() - options.hours * DurationMs.Hour
       : options.initialOnly
@@ -398,6 +417,14 @@ export class DiscussionHarvester {
     if (limit)
       fetchedMessages = boundary ? fetchedMessages.slice(0, limit) : fetchedMessages.slice(-limit);
 
+    logger.info('sync.scan.collected', {
+      jobId: options.jobId,
+      guildId: channel.guild.id,
+      channelId: channel.id,
+      firstMessageId: fetchedMessages[0]?.id ?? null,
+      lastMessageId: fetchedMessages.at(-1)?.id ?? null,
+      messagesScanned: fetchedMessages.length,
+    });
     if (fetchedMessages.length === 0) {
       await this.backendApi.recoverScanCheckpoints();
       return { scannedCount: 0, decisionsCount: 0 };
