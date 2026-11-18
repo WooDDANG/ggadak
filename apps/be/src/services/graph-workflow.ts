@@ -16,7 +16,12 @@ import {
   type DecisionGraph,
 } from '../domain/decision-graph.js';
 import { AppError } from '../errors/AppError.js';
-import { classifyAiFailure, providerResponseFrom } from '../errors/ai-diagnostics.js';
+import {
+  boundedProviderResponse,
+  classifyAiFailure,
+  providerResponseFrom,
+  safeAiErrorCode,
+} from '../errors/ai-diagnostics.js';
 import { createLogger } from '@ggaddak/shared';
 import type { AiCallScheduler } from './ai-call-scheduler.js';
 import { modelForStage } from '../domain/ai-call.js';
@@ -61,6 +66,46 @@ export class GraphWorkflow {
           ? graphIssues(checked.data)
           : checked.error.issues.map(issue => `${issue.path.join('.')}: ${issue.message}`);
         if (issues.length) {
+          // 오류 위치에는 모델이 생성한 임의 필드명을 포함하지 않는다.
+          const allowedFields = new Set([
+            'summary',
+            'nodes',
+            'edges',
+            'discussionProblems',
+            'id',
+            'type',
+            'observation',
+            'rationaleStatus',
+            'category',
+            'history',
+            'at',
+            'assignee',
+            'dueDate',
+            'sourceId',
+            'targetId',
+            'nodeIds',
+            'edgeIds',
+          ]);
+          const issueDetails = checked.success
+            ? issues.slice(0, 20).map(issue => ({ code: issue.split(':', 1)[0] }))
+            : checked.error.issues.slice(0, 20).map(issue => ({
+                code: issue.code,
+                path: issue.path
+                  .map(part =>
+                    typeof part === 'number' ? '*' : allowedFields.has(part) ? part : '<other>',
+                  )
+                  .join('.'),
+              }));
+          logger.warn('analysis.validation.issues', {
+            ...identity,
+            callId: session.attempts.at(-1)?.callId,
+            failureStage: session.phase,
+            validationType: checked.success ? 'graph_relations' : 'schema',
+            issuesCount: issues.length,
+            issueDetails,
+            truncated: issues.length > issueDetails.length,
+            graphData: boundedProviderResponse(session.value),
+          });
           try {
             this.requestRepair(session, issues, 'graph-structure');
           } catch (error) {
@@ -212,6 +257,9 @@ export class GraphWorkflow {
             ...identity,
             callId: attempt.callId,
             failureStage: phase,
+            errorCode: safeAiErrorCode(error),
+            durationMs: Math.max(0, Date.now() - attempt.startedAt),
+            providerResponse: providerResponseFrom(error),
             ...diagnostic,
           });
           throw error;

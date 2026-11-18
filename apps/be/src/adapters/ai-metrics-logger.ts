@@ -74,6 +74,15 @@ export function recordAiMetric(metric: AiMetricRecord): void {
       : '';
 
   const summary = `[${metric.stage.toUpperCase()}] ${durationSec}s | ${metric.model}${tokenStr} | ${statusStr}`;
-  if (metric.success) consoleLogger.info(summary);
-  else consoleLogger.warn(summary);
+  const context = {
+    requestId: metric.requestId,
+    callId: metric.callId,
+    traceId: metric.traceId,
+    stage: metric.stage,
+    failureKind: metric.failureKind,
+    status: metric.status,
+    retryable: metric.retryable,
+  };
+  if (metric.success) consoleLogger.info(summary, context);
+  else consoleLogger.warn(summary, context);
 }

@@ -1,4 +1,5 @@
 import {
+  createLogger,
   SyncChannelStatus,
   type SyncJobClaim,
   SyncJobPolicy,
@@ -8,6 +9,7 @@ import {
 
 import { ScanIncompleteError } from './harvester.service.js';
 import { AnalysisDeliveryError, BackendRequestError } from './backend-api.service.js';
+const logger = createLogger('BOT-SYNC-WORKER');
 export type { SyncJobClaim, SyncJobUpdate as SyncWorkerUpdate } from '@ggaddak/shared';
 
 interface SyncWorkerBackend {
@@ -37,6 +39,11 @@ export class SyncJobWorker {
     try {
       const job = await this.backend.claimSyncJob();
       if (!job) return;
+      logger.info('sync.job.claimed', {
+        jobId: job.jobId,
+        channels: job.channelIds.length,
+        deliveryOnly: job.deliveryOnly,
+      });
       let leaseFailure: unknown;
       let heartbeat: Promise<void> | undefined;
       const renew = () => {
@@ -58,6 +65,7 @@ export class SyncJobWorker {
       };
       try {
         for (const channelId of job.channelIds) {
+          logger.info('sync.channel.started', { jobId: job.jobId, channelId });
           await checkLease();
           // Verify ownership before starting another Discord scan.
           await this.backend.updateSyncJob(job.jobId, { owner: job.owner });
@@ -77,6 +85,7 @@ export class SyncJobWorker {
                 (error instanceof BackendRequestError &&
                   [429, 503, 507].includes(error.statusCode)))
             ) {
+              logger.warn('sync.job.retry_pending', { jobId: job.jobId, channelId });
               await this.backend.updateSyncJob(job.jobId, { owner: job.owner, release: true });
               return;
             }
@@ -90,9 +99,22 @@ export class SyncJobWorker {
               decisionsFound: 0,
               errorMessage: error instanceof Error ? error.message : String(error),
             };
+            logger.warn('sync.channel.failed', {
+              jobId: job.jobId,
+              channelId,
+              errorType: error instanceof Error ? error.name : 'unknown',
+            });
           }
           await checkLease();
           await this.backend.updateSyncJob(job.jobId, { owner: job.owner, channelResult });
+          if (channelResult.status !== SyncJobStatus.Failed)
+            logger.info('sync.channel.reported', {
+              jobId: job.jobId,
+              channelId,
+              status: channelResult.status,
+              messagesScanned: channelResult.messagesScanned,
+              decisionsFound: channelResult.decisionsFound,
+            });
         }
         clearInterval(timer);
         await checkLease();
@@ -103,6 +125,7 @@ export class SyncJobWorker {
             ? { owner: job.owner, release: true }
             : { owner: job.owner, status: SyncJobStatus.Completed },
         );
+        logger.info('sync.job.reported', { jobId: job.jobId, deliveryOnly: job.deliveryOnly });
       } finally {
         clearInterval(timer);
         await heartbeat;

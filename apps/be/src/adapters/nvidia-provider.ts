@@ -203,6 +203,7 @@ export class NvidiaProvider implements AiProvider {
         logger.warn('nvidia.key.failed', {
           keyName: key.name,
           status,
+          errorType: error instanceof Error ? error.name : 'unknown',
           retryAfterMs: status === 429 ? retryAfterMs : undefined,
         });
         if (status === 401 || status === 403)

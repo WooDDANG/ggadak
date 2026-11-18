@@ -17,6 +17,23 @@ const summaries: Record<AiFailureKind, string> = {
   configuration: 'AI configuration was invalid',
 };
 
+/** 원문과 provider 메시지 없이 로그에 남길 수 있는 오류 원인만 분류한다. */
+export function safeAiErrorCode(error: unknown): string {
+  if (!(error instanceof AppError)) return 'unexpected_error';
+  const codes: Record<string, string> = {
+    'AI returned invalid JSON': 'invalid_json',
+    'AI returned no content': 'empty_response',
+    'AI call timed out after configured deadline': 'timeout',
+    'AI call timeout': 'timeout',
+    'Analysis ownership lost': 'ownership_lost',
+    'Invalid AI verification response': 'invalid_verification',
+    'Analysis validation failed after repair': 'validation_after_repair',
+    'NVIDIA AI analysis failed': 'provider_error',
+    'NVIDIA key authentication failed; retry with another key': 'provider_authentication',
+  };
+  return codes[error.message] ?? 'other';
+}
+
 export function classifyAiFailure(error: unknown, stage: string) {
   const status =
     error instanceof AppError
@@ -50,7 +67,7 @@ export function classifyAiFailure(error: unknown, stage: string) {
   };
 }
 
-/** Provider diagnostics are kept in the database, never in Loki. */
+/** 진단 데이터의 인증 정보를 제거하고 크기를 제한한다. */
 export function boundedProviderResponse(value: unknown): string | undefined {
   if (value == null) return undefined;
   let raw: string;
@@ -59,12 +76,16 @@ export function boundedProviderResponse(value: unknown): string | undefined {
   } catch {
     raw = String(value);
   }
-  const redacted = raw
+  let redacted = raw
     .replace(/Bearer\s+[^\s"']+/gi, 'Bearer [REDACTED]')
     .replace(
       /((?:api[_-]?key|authorization|token|password)["']?\s*[:=]\s*["']?)[^\s,"'}]+/gi,
       '$1[REDACTED]',
     );
+  for (const [name, value] of Object.entries(process.env)) {
+    if (/(?:KEY|TOKEN|SECRET|PASSWORD)/i.test(name) && value && value.length >= 8)
+      redacted = redacted.replaceAll(value, '[REDACTED]');
+  }
   const bytes = Buffer.from(redacted, 'utf8');
   if (bytes.length <= 8192) return redacted;
   let clipped = bytes.subarray(0, 8192).toString('utf8');

@@ -29,3 +29,17 @@ test('stored provider response redacts secrets and has a byte limit', () => {
   expect(stored).not.toContain('other-secret');
   expect(Buffer.byteLength(stored)).toBeLessThanOrEqual(8192);
 });
+
+test('진단 데이터에서 환경 변수의 인증 값을 제거한다', () => {
+  const previous = process.env.NVIDIA_API_KEY_1;
+  process.env.NVIDIA_API_KEY_1 = 'test-secret-value';
+  try {
+    expect(boundedProviderResponse({ response: '출력 test-secret-value' })).toContain('[REDACTED]');
+    expect(boundedProviderResponse({ response: '출력 test-secret-value' })).not.toContain(
+      'test-secret-value',
+    );
+  } finally {
+    if (previous === undefined) delete process.env.NVIDIA_API_KEY_1;
+    else process.env.NVIDIA_API_KEY_1 = previous;
+  }
+});
