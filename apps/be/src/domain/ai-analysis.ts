@@ -1,6 +1,8 @@
 import type { AiSettings, AiCallContext, AiResult } from './ai-call.js';
 
 export interface IAiAdapter {
+  prepareCall?(signal: AbortSignal): Promise<IAiAdapter>;
+  releaseCall?(): Promise<void>;
   readonly settings?: AiSettings;
   extractGraph(transcript: string, context: AiCallContext): Promise<AiResult>;
   verifyGraph(transcript: string, graph: unknown, context: AiCallContext): Promise<AiResult>;

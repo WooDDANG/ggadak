@@ -87,9 +87,13 @@ export class GraphWorkflow {
       }
       const permit = await this.scheduler.acquire(signal);
       session.waitMs = (session.waitMs ?? 0) + permit.waitMs;
+      let prepared: IAiAdapter | undefined;
       try {
         const callSignal = permit.signal;
         if (callSignal.aborted) throw new AppError('Analysis cancelled before AI call', 503);
+        // 계정 예산 대기는 논리 호출·시도·실행 시간 예산을 소비하지 않는다.
+        const ai = (await this.ai.prepareCall?.(callSignal)) ?? this.ai;
+        prepared = ai;
         const phase = session.phase;
         if (!session.calls.includes(phase)) {
           session.calls.push(phase);
@@ -143,10 +147,10 @@ export class GraphWorkflow {
           };
           operation =
             phase === AnalysisPhase.Extract
-              ? this.ai.extractGraph(session.transcript, context)
+              ? ai.extractGraph(session.transcript, context)
               : phase === AnalysisPhase.Repair
-                ? this.ai.repairGraph(session.transcript, session.value, session.feedback, context)
-                : this.ai.verifyGraph(session.transcript, session.value, context);
+                ? ai.repairGraph(session.transcript, session.value, session.feedback, context)
+                : ai.verifyGraph(session.transcript, session.value, context);
           const interrupted = new Promise<never>((_, reject) => {
             controller.signal.addEventListener(
               'abort',
@@ -225,7 +229,11 @@ export class GraphWorkflow {
         if (session.elapsedMs >= GraphPolicy.sessionBudgetMs)
           throw new AppError('Analysis time budget exhausted', 422);
       } finally {
-        await permit.release();
+        try {
+          await prepared?.releaseCall?.();
+        } finally {
+          await permit.release();
+        }
       }
     }
   }

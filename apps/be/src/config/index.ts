@@ -10,6 +10,7 @@ import { z } from 'zod';
 import { AuthConfigurationError } from '../errors/AuthConfigurationError.js';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'node:url';
+import { nvidiaCredentials, type NvidiaCredential } from './nvidia-credentials.js';
 
 dotenv.config({ path: fileURLToPath(new URL('../../../../.env', import.meta.url)) });
 
@@ -66,6 +67,8 @@ export interface AppConfig {
     stageModels?: Partial<Record<AiStage, string>>;
     agyExecutable?: string;
     nvidiaApiKey?: string;
+    nvidiaApiKeys?: NvidiaCredential[];
+    nvidiaRequestsPerMinute?: number;
     nvidiaBaseUrl?: string;
     nvidiaEnableThinking?: boolean;
     callTimeoutMs?: number;
@@ -98,6 +101,8 @@ export const config: AppConfig = {
       ),
       agyExecutable: process.env.AGY_EXECUTABLE || AiDefaults.agyExecutable,
       nvidiaApiKey: process.env.NVIDIA_API_KEY,
+      nvidiaApiKeys: nvidiaCredentials(process.env),
+      nvidiaRequestsPerMinute: Number(process.env.NVIDIA_REQUESTS_PER_MINUTE ?? 40),
       nvidiaBaseUrl: process.env.NVIDIA_BASE_URL || AiDefaults.nvidiaBaseUrl,
       nvidiaEnableThinking:
         process.env.NVIDIA_ENABLE_THINKING !== undefined

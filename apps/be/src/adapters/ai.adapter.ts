@@ -60,6 +60,16 @@ export class AiAdapter implements IAiAdapter {
     );
   }
 
+  async prepareCall(signal: AbortSignal): Promise<IAiAdapter> {
+    if (!this.provider.reserve) return this;
+    const reserved = await this.provider.reserve(signal);
+    return new AiAdapter(this.options, this.environment, reserved, this.metricRecorder);
+  }
+
+  async releaseCall(): Promise<void> {
+    await this.provider.release?.();
+  }
+
   verifyGraph(transcript: string, graph: unknown, context: AiCallContext) {
     return this.call(
       AiStage.Verify,

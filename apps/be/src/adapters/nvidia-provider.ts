@@ -5,9 +5,20 @@ import config from '../config/index.js';
 import { AppError } from '../errors/AppError.js';
 import type { AiResult } from '../domain/ai-call.js';
 import type { AiProvider, AiProviderRequest } from './ai-provider.js';
+import { NvidiaKeyPool, type NvidiaReservation } from './nvidia-key-pool.js';
+import { nvidiaCredentials, type NvidiaCredential } from '../config/nvidia-credentials.js';
+import { initPrisma } from '../loaders/prisma.js';
+import { createLogger } from '@ggaddak/shared';
+import { boundedProviderResponse } from '../errors/ai-diagnostics.js';
+
+const logger = createLogger('BE-NVIDIA');
 
 export interface NvidiaProviderOptions {
   apiKey?: string;
+  apiKeys?: NvidiaCredential[];
+  requestsPerMinute?: number;
+  keyPool?: NvidiaKeyPool;
+  clientFactory?: (apiKey: string) => OpenAI;
   baseURL?: string;
   client?: OpenAI;
   enableThinking?: boolean;
@@ -40,21 +51,80 @@ export function extractAndParseJson(text: string): unknown {
 }
 
 export class NvidiaProvider implements AiProvider {
-  private readonly client: OpenAI;
+  private readonly client?: OpenAI;
+  private readonly pool?: NvidiaKeyPool;
+  private readonly clients = new Map<string, OpenAI>();
+  private readonly clientFactory: (apiKey: string) => OpenAI;
   private readonly enableThinking: boolean;
 
   constructor(options: NvidiaProviderOptions = {}) {
-    this.client =
-      options.client ??
-      new OpenAI({
-        apiKey: options.apiKey || process.env.NVIDIA_API_KEY || '',
-        baseURL: options.baseURL || process.env.NVIDIA_BASE_URL || AiDefaults.nvidiaBaseUrl,
-      });
+    this.client = options.client;
+    this.clientFactory =
+      options.clientFactory ??
+      (apiKey =>
+        new OpenAI({
+          apiKey,
+          baseURL: options.baseURL || process.env.NVIDIA_BASE_URL || AiDefaults.nvidiaBaseUrl,
+          maxRetries: 0,
+        }));
+    if (!this.client) {
+      this.pool =
+        options.keyPool ??
+        new NvidiaKeyPool(
+          initPrisma(),
+          options.apiKeys ??
+            (options.apiKey?.trim()
+              ? [{ name: 'NVIDIA_API_KEY', apiKey: options.apiKey.trim() }]
+              : nvidiaCredentials(process.env)),
+          options.requestsPerMinute ?? config.ai.nvidiaRequestsPerMinute,
+        );
+    }
     this.enableThinking =
       options.enableThinking ?? config.ai.nvidiaEnableThinking ?? AiDefaults.nvidiaEnableThinking;
   }
 
   async generate(request: AiProviderRequest): Promise<AiResult> {
+    if (this.client) return this.generateWithClient(request, this.client);
+    const reserved = await this.reserve(request.signal);
+    try {
+      return await reserved.generate(request);
+    } finally {
+      await reserved.release?.();
+    }
+  }
+
+  async reserve(signal: AbortSignal): Promise<AiProvider> {
+    if (signal.aborted) throw new AppError('NVIDIA reservation cancelled', 503);
+    if (!this.pool) return this;
+    const key = await this.pool.reserve(signal);
+    try {
+      let client = this.clients.get(key.apiKey);
+      if (!client) {
+        client = this.clientFactory(key.apiKey);
+        this.clients.set(key.apiKey, client);
+      }
+      logger.info('nvidia.key.selected', { keyName: key.name });
+      const selectedClient = client;
+      return {
+        generate: request =>
+          this.generateWithClient(
+            { ...request, signal: AbortSignal.any([request.signal, key.signal]) },
+            selectedClient,
+            key,
+          ),
+        release: key.release,
+      };
+    } catch (error) {
+      await key.release();
+      throw error;
+    }
+  }
+
+  private async generateWithClient(
+    request: AiProviderRequest,
+    client: OpenAI,
+    key?: NvidiaReservation,
+  ): Promise<AiResult> {
     if (!Number.isSafeInteger(request.maxOutputTokens) || request.maxOutputTokens <= 0)
       throw new AppError('Invalid AI limits', 422);
 
@@ -67,7 +137,8 @@ export class NvidiaProvider implements AiProvider {
     const startedAt = performance.now();
     let ttftMs: number | undefined;
     try {
-      const stream = (await this.client.chat.completions.create(
+      if (request.signal.aborted) throw new AppError('NVIDIA call cancelled', 503);
+      const stream = (await client.chat.completions.create(
         {
           model: request.model,
           messages: [
@@ -87,6 +158,7 @@ export class NvidiaProvider implements AiProvider {
         },
         {
           signal: request.signal,
+          maxRetries: 0,
         },
       )) as unknown as AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>;
 
@@ -118,8 +190,26 @@ export class NvidiaProvider implements AiProvider {
       }
 
       const parsedValue = extractAndParseJson(content);
+      if (key) logger.info('nvidia.key.completed', { keyName: key.name });
       return { value: parsedValue, usage, ttftMs };
     } catch (error) {
+      const status =
+        error instanceof AppError
+          ? error.statusCode
+          : ((error as { status?: number })?.status ?? 503);
+      if (key && this.pool) {
+        const retryAfterMs = nvidiaRetryAfterMs(error);
+        await this.pool.recordFailure(key, status, retryAfterMs);
+        logger.warn('nvidia.key.failed', {
+          keyName: key.name,
+          status,
+          retryAfterMs: status === 429 ? retryAfterMs : undefined,
+        });
+        if (status === 401 || status === 403)
+          throw new AppError('NVIDIA key authentication failed; retry with another key', 503, {
+            nvidiaAccountFailure: true,
+          });
+      }
       if (
         request.signal.aborted ||
         (typeof error === 'object' &&
@@ -135,9 +225,36 @@ export class NvidiaProvider implements AiProvider {
       if (error instanceof SyntaxError)
         throw new AppError('AI returned invalid JSON', 422, { providerResponse: content });
       const providerError = error as { status?: number; error?: unknown; message?: string };
+      let diagnostic: string;
+      try {
+        const value = providerError.error ?? providerError.message ?? String(error);
+        diagnostic = typeof value === 'string' ? value : JSON.stringify(value);
+      } catch {
+        diagnostic = 'NVIDIA provider error';
+      }
+      for (const apiKey of this.clients.keys())
+        diagnostic = diagnostic.replaceAll(apiKey, '[REDACTED]');
       throw new AppError('NVIDIA AI analysis failed', providerError.status ?? 503, {
-        providerResponse: providerError.error ?? providerError.message ?? String(error),
+        providerResponse: boundedProviderResponse(diagnostic),
+        nvidiaAccountFailure: key !== undefined && providerError.status === 429,
       });
     }
   }
+}
+
+export function nvidiaRetryAfterMs(error: unknown, now = Date.now()): number {
+  const headers = (error as { headers?: Headers | Record<string, string> } | null)?.headers;
+  const value =
+    headers &&
+    ('get' in headers && typeof headers.get === 'function'
+      ? headers.get('retry-after')
+      : (headers as Record<string, string>)['retry-after']);
+  if (!value?.trim()) return 60_000;
+  const seconds = Number(value);
+  if (Number.isFinite(seconds))
+    return seconds >= 0 && Number.isSafeInteger(Math.ceil(seconds * 1000))
+      ? Math.ceil(seconds * 1000)
+      : 60_000;
+  const date = Date.parse(value);
+  return Number.isFinite(date) ? Math.max(0, date - now) : 60_000;
 }

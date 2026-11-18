@@ -11,5 +11,7 @@ export interface AiProviderRequest {
 }
 
 export interface AiProvider {
+  reserve?(signal: AbortSignal): Promise<AiProvider>;
+  release?(): Promise<void>;
   generate(request: AiProviderRequest): Promise<AiResult>;
 }

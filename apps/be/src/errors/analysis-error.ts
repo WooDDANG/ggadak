@@ -6,8 +6,8 @@ import { AppError } from './AppError.js';
 export class AnalysisBusyError extends AppError {
   readonly status = 503;
 
-  constructor(message = 'Analysis capacity busy') {
-    super(message, 503);
+  constructor(message = 'Analysis capacity busy', retryAfterMs = 0) {
+    super(message, 503, { retryAfterMs });
   }
 }
 
@@ -24,6 +24,7 @@ export function classifyAnalysisError(error: unknown) {
     status,
     retryable,
     busy,
+    accountScoped: error instanceof AppError && error.details?.nvidiaAccountFailure === true,
     retryAfterMs: Number.isFinite(retryAfter) ? Math.max(0, retryAfter) : 0,
     category: busy
       ? DeliveryErrorCategory.AnalysisCapacity

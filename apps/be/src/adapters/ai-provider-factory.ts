@@ -7,6 +7,8 @@ export function createDefaultProvider(options: AppConfig['ai']): AiProvider {
   if (options.provider === 'nvidia') {
     return new NvidiaProvider({
       apiKey: options.nvidiaApiKey,
+      apiKeys: options.nvidiaApiKeys,
+      requestsPerMinute: options.nvidiaRequestsPerMinute,
       baseURL: options.nvidiaBaseUrl,
       enableThinking: options.nvidiaEnableThinking,
     });

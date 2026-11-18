@@ -6,6 +6,8 @@ The repository supplies the Dockerfile and `fly.toml`. Configure the app name to
 
 In the app dashboard, configure the secrets required by your setup: `NVIDIA_API_KEY`, `DISCORD_BOT_TOKEN`, `BOT_SERVICE_TOKEN`, `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET`, `DISCORD_REDIRECT_URI`, and `AUTH_SECRET`. Use a random `AUTH_SECRET` of at least 32 characters and a separate strong service token. OAuth credentials are needed for Discord web login; the NVIDIA key is needed when using NVIDIA. Set the redirect URI to the actual configured callback URL.
 
+NVIDIA 다중 계정을 사용할 때는 단일 키 대신 `NVIDIA_API_KEY_1`부터 `NVIDIA_API_KEY_4`까지 secrets에 등록한다. 계정별 예산은 `NVIDIA_REQUESTS_PER_MINUTE`로 지정하며 기본값은 40이다. 로컬 `.env` 설정은 배포 secrets에 자동 반영되지 않는다. 자세한 동작과 오류 복구는 [NVIDIA 다중 계정 키 운영](nvidia-key-pool.md)을 따른다.
+
 The container applies Prisma migrations before starting the BE and Discord Bot. The Bot connects to `http://127.0.0.1:3001`; the BE and Bot share `BOT_SERVICE_TOKEN`. Bot analysis delivery and guild-access journals are stored under `/data` beside SQLite and survive Machine restarts. Existing volume data is retained; do not replace or format the volume during deployment.
 
 Auto-stop is disabled so the Bot can keep its Discord connection and the BE can process queued analysis without incoming HTTP requests. The Machine therefore runs continuously and may consume the trial allowance or incur charges; check the organization's Billing / Trial Status. Check Machine health and logs in the dashboard; `/health` returns `{"status":"healthy"}` once the BE starts, but does not confirm Discord connectivity. Confirm the Bot's ready log and Discord status separately. If either process exits, the container exits so Fly can restart it.
