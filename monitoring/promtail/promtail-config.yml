@@ -9,6 +9,25 @@ clients:
   - url: http://loki:3100/loki/api/v1/push
 
 scrape_configs:
+  - job_name: ggaddak-ai-verification
+    static_configs:
+      - targets: [localhost]
+        labels:
+          job: ggaddak-ai-verification
+          app: backend
+          __path__: /var/log/be/ai-verification-metrics.log
+    pipeline_stages:
+      - json:
+          expressions:
+            timestamp: timestamp
+            stage: stage
+            outcome: outcome
+      - timestamp:
+          source: timestamp
+          format: RFC3339Nano
+      - labels:
+          stage:
+          outcome:
   - job_name: ggaddak-ai-metrics
     static_configs:
       - targets:

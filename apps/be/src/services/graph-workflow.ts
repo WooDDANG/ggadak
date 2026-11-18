@@ -18,12 +18,14 @@ import {
 } from '../domain/decision-graph.js';
 import { AppError } from '../errors/AppError.js';
 import {
+  boundedProviderResponse,
   classifyAiFailure,
   providerResponseFrom,
   safeAiErrorCode,
 } from '../errors/ai-diagnostics.js';
 import { createLogger } from '@ggaddak/shared';
 import type { AiCallScheduler } from './ai-call-scheduler.js';
+import { recordVerificationMetric } from '../adapters/ai-metrics-logger.js';
 import { modelForStage } from '../domain/ai-call.js';
 
 const logger = createLogger('BE-GRAPH-WORKFLOW');
@@ -138,6 +140,7 @@ export class GraphWorkflow {
               errorSummary: 'AI graph structure was invalid',
               issuesCount: issues.length,
               issueDetails,
+              graphResult: boundedProviderResponse(session.value),
               status: 422,
               retryable: false,
             });
@@ -247,6 +250,20 @@ export class GraphWorkflow {
             session.verification = result.value;
             attempt.verification = result.value;
             const verified = VerificationSchema.safeParse(result.value);
+            recordVerificationMetric({
+              requestId: identity?.requestId,
+              callId: attempt.callId,
+              traceId: identity?.traceId,
+              stage: phase,
+              outcome: verified.success ? 'valid' : 'invalid',
+            });
+            logger.info('analysis.verification.schema', {
+              ...identity,
+              callId: attempt.callId,
+              failureStage: phase,
+              outcome: verified.success ? 'valid' : 'invalid',
+              issuesCount: verified.success ? 0 : verified.error.issues.length,
+            });
             if (!verified.success) {
               logger.warn('analysis.validation.failed', {
                 ...identity,
@@ -254,6 +271,7 @@ export class GraphWorkflow {
                 failureStage: phase,
                 failureKind: 'semantic-verification',
                 issuesCount: verified.error.issues.length,
+                verificationResult: boundedProviderResponse(result.value),
                 issueDetails: verified.error.issues
                   .slice(0, 20)
                   .map(issue => ({ code: issue.code })),
@@ -270,6 +288,7 @@ export class GraphWorkflow {
                   failureStage: phase,
                   failureKind: 'semantic-verification',
                   issuesCount: verified.data.issues.length,
+                  verificationResult: boundedProviderResponse(result.value),
                   issueDetails: [{ code: 'semantic-verification' }],
                 });
               this.requestRepair(
@@ -306,6 +325,7 @@ export class GraphWorkflow {
             failureStage: phase,
             errorCode: safeAiErrorCode(error),
             durationMs: Math.max(0, Date.now() - attempt.startedAt),
+            providerResponse: providerResponseFrom(error),
             ...diagnostic,
           });
           throw error;

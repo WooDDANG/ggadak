@@ -6,6 +6,7 @@ export interface AiProviderRequest {
   system: string;
   input: string;
   outputSchema: ZodTypeAny;
+  structuredOutput?: boolean;
   maxOutputTokens: number;
   signal: AbortSignal;
 }

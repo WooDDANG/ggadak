@@ -1,5 +1,10 @@
 import { test, expect, vi } from 'vitest';
 import winston from 'winston';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { AiAdapter } from '../src/adapters/ai.adapter.js';
+import { VerificationSchema } from '../src/domain/decision-graph.js';
 import { createServer } from '../src/server.js';
 import { isolatedRepository } from '../src/repositories/test-database.js';
 import { fakeAuthOptions, loginAsTestUser } from '../src/test-support/auth.js';
@@ -133,7 +138,7 @@ test('구조 복구 후 의미 검증 오류도 별도로 복구한다', async (
 });
 
 test.each(['structure', 'semantic'] as const)(
-  '%s 검증 종료 로그에는 규칙 코드만 기록하고 실패 데이터는 저장한다',
+  '%s 검증 종료 로그에 실패 결과를 기록하고 인증 정보는 가린다',
   async kind => {
     const marker = 'private-output-for-validation-test';
     const invalidGraph = {
@@ -158,11 +163,11 @@ test.each(['structure', 'semantic'] as const)(
           const requestId = `validation-log-${kind}`;
           expect((await send(requestId)).status).toBe(422);
           const logs = output.mock.calls.map(([info]) => JSON.stringify(info)).join('\n');
-          expect(logs).not.toContain(marker);
           const terminal = logs
             .split('\n')
             .find(line => line.includes('analysis.validation.failed') && line.includes(requestId));
           expect(terminal).toBeDefined();
+          expect(terminal).toContain(marker);
           expect(terminal).toContain(kind === 'structure' ? 'recheck' : 'reverify');
           expect(terminal).toContain(
             kind === 'structure' ? 'invalid-endpoints' : 'semantic-verification',
@@ -177,6 +182,74 @@ test.each(['structure', 'semantic'] as const)(
     }
   },
 );
+
+test('잘못된 검증 응답을 터미널에 기록하면서 인증 정보를 제거한다', async () => {
+  const output = vi.spyOn(winston.transports.Console.prototype, 'log');
+  try {
+    await withApi(
+      {
+        extractGraph: async () => ({ value: structuredClone(graph) }),
+        repairGraph: async () => ({ value: structuredClone(graph) }),
+        verifyGraph: async () => ({
+          value: { valid: 'wrong-type', issues: [], token: 'secret-test-token' },
+        }),
+      },
+      async (_base, send) => {
+        expect((await send('invalid-verification-output')).status).toBe(422);
+        const logs = output.mock.calls.map(([info]) => JSON.stringify(info)).join('\n');
+        expect(logs).toContain('wrong-type');
+        expect(logs).toContain('analysis.verification.schema');
+        expect(logs).toContain('"outcome":"invalid"');
+        expect(logs).not.toContain('secret-test-token');
+        expect(logs).toContain('[REDACTED]');
+      },
+    );
+  } finally {
+    output.mockRestore();
+  }
+});
+
+test('Provider 호출 성공과 Verify 스키마 실패를 같은 callId로 별도 기록한다', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-metrics-'));
+  const calls = path.join(dir, 'calls.jsonl');
+  const validations = path.join(dir, 'validations.jsonl');
+  const oldCalls = process.env.AI_METRICS_LOG_PATH;
+  const oldValidations = process.env.AI_VERIFICATION_METRICS_LOG_PATH;
+  process.env.AI_METRICS_LOG_PATH = calls;
+  process.env.AI_VERIFICATION_METRICS_LOG_PATH = validations;
+  try {
+    const adapter = new AiAdapter({ provider: 'nvidia' }, 'production', {
+      generate: async request => ({
+        value:
+          request.outputSchema === VerificationSchema
+            ? { valid: 'invalid', issues: [] }
+            : structuredClone(graph),
+      }),
+    });
+    await withApi(adapter, async (_base, send) => {
+      expect((await send('correlated-metrics')).status).toBe(422);
+      const callRecords = fs
+        .readFileSync(calls, 'utf8')
+        .trim()
+        .split('\n')
+        .map(line => JSON.parse(line));
+      const verification = JSON.parse(fs.readFileSync(validations, 'utf8').trim());
+      const verifyCall = callRecords.find(record => record.stage === 'verify');
+      expect(verifyCall).toMatchObject({ requestId: 'correlated-metrics', success: true });
+      expect(verification).toMatchObject({
+        requestId: 'correlated-metrics',
+        callId: verifyCall.callId,
+        outcome: 'invalid',
+      });
+    });
+  } finally {
+    if (oldCalls === undefined) delete process.env.AI_METRICS_LOG_PATH;
+    else process.env.AI_METRICS_LOG_PATH = oldCalls;
+    if (oldValidations === undefined) delete process.env.AI_VERIFICATION_METRICS_LOG_PATH;
+    else process.env.AI_VERIFICATION_METRICS_LOG_PATH = oldValidations;
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
 
 test('unagreed proposal without rationale is verified, persisted, and read as a guild-scoped graph', async () => {
   const db = await isolatedRepository();
