@@ -11,6 +11,7 @@ import {
   GRAPH_PROMPT_VERSION,
   LEGACY_GRAPH_SYSTEM_PROMPT,
   LEGACY_VERIFICATION_PROMPT,
+  VERIFY_ONLY_PROMPT,
 } from '../extractor/graph-prompt.js';
 import type { AiSettings, AiCallContext } from '../domain/ai-call.js';
 import { modelForStage } from '../domain/ai-call.js';
@@ -75,7 +76,9 @@ export class AiAdapter implements IAiAdapter {
       AiStage.Verify,
       context.settings.promptVersion === 'agentic-1'
         ? LEGACY_VERIFICATION_PROMPT
-        : VERIFICATION_PROMPT,
+        : context.settings.promptVersion === 'agentic-2'
+          ? VERIFICATION_PROMPT
+          : VERIFY_ONLY_PROMPT,
       { transcript, graph },
       context,
     );
@@ -125,7 +128,11 @@ export class AiAdapter implements IAiAdapter {
     try {
       if (typeof model !== 'string' || !model.trim())
         throw new AppError('Invalid AI model selection', 422);
-      if (promptVersion !== GRAPH_PROMPT_VERSION && promptVersion !== 'agentic-1')
+      if (
+        promptVersion !== GRAPH_PROMPT_VERSION &&
+        promptVersion !== 'agentic-1' &&
+        promptVersion !== 'agentic-2'
+      )
         throw new AppError('Unsupported saved prompt version', 422);
       if (
         !Number.isSafeInteger(maxOutputTokens) ||
@@ -170,6 +177,7 @@ export class AiAdapter implements IAiAdapter {
         system,
         input: serializedInput,
         outputSchema: stage === AiStage.Verify ? VerificationSchema : GraphSchema,
+        structuredOutput: promptVersion !== 'agentic-1' && promptVersion !== 'agentic-2',
         maxOutputTokens,
         signal: context.signal,
       });

@@ -60,6 +60,26 @@ test('a saved analysis cannot run through a different configured provider', asyn
   expect(calls).toBe(0);
 });
 
+test('새 Verify 프롬프트는 생성 출력 지시를 제외하고 저장된 이전 버전은 유지한다', async () => {
+  const requests: AiProviderRequest[] = [];
+  const adapter = new AiAdapter({ provider: 'agy' }, 'production', {
+    async generate(request) {
+      requests.push(request);
+      return { value: { valid: true, issues: [] } };
+    },
+  });
+  await adapter.verifyGraph('대화', graph, context(adapter));
+  await adapter.verifyGraph('대화', graph, {
+    ...context(adapter),
+    settings: { ...adapter.settings, promptVersion: 'agentic-2' },
+  });
+  expect(requests[0].system).toContain('Return only the verification object');
+  expect(requests[0].system).not.toContain('Return summary,nodes,edges,discussionProblems');
+  expect(requests[1].system).toContain('Return summary,nodes,edges,discussionProblems');
+  expect(requests[0].structuredOutput).toBe(true);
+  expect(requests[1].structuredOutput).toBe(false);
+});
+
 test('AiAdapter chooses the stage model and schema, then delegates a normalized request', async () => {
   const requests: AiProviderRequest[] = [];
   const provider: AiProvider = {

@@ -25,6 +25,7 @@ import {
 } from '../errors/ai-diagnostics.js';
 import { createLogger } from '@ggaddak/shared';
 import type { AiCallScheduler } from './ai-call-scheduler.js';
+import { recordVerificationMetric } from '../adapters/ai-metrics-logger.js';
 import { modelForStage } from '../domain/ai-call.js';
 
 const logger = createLogger('BE-GRAPH-WORKFLOW');
@@ -249,6 +250,20 @@ export class GraphWorkflow {
             session.verification = result.value;
             attempt.verification = result.value;
             const verified = VerificationSchema.safeParse(result.value);
+            recordVerificationMetric({
+              requestId: identity?.requestId,
+              callId: attempt.callId,
+              traceId: identity?.traceId,
+              stage: phase,
+              outcome: verified.success ? 'valid' : 'invalid',
+            });
+            logger.info('analysis.verification.schema', {
+              ...identity,
+              callId: attempt.callId,
+              failureStage: phase,
+              outcome: verified.success ? 'valid' : 'invalid',
+              issuesCount: verified.success ? 0 : verified.error.issues.length,
+            });
             if (!verified.success) {
               logger.warn('analysis.validation.failed', {
                 ...identity,
