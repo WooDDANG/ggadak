@@ -133,7 +133,7 @@ test('구조 복구 후 의미 검증 오류도 별도로 복구한다', async (
 });
 
 test.each(['structure', 'semantic'] as const)(
-  '%s 검증 종료 로그에는 규칙 코드만 기록하고 실패 데이터는 저장한다',
+  '%s 검증 종료 로그에 실패 결과를 기록하고 인증 정보는 가린다',
   async kind => {
     const marker = 'private-output-for-validation-test';
     const invalidGraph = {
@@ -158,11 +158,11 @@ test.each(['structure', 'semantic'] as const)(
           const requestId = `validation-log-${kind}`;
           expect((await send(requestId)).status).toBe(422);
           const logs = output.mock.calls.map(([info]) => JSON.stringify(info)).join('\n');
-          expect(logs).not.toContain(marker);
           const terminal = logs
             .split('\n')
             .find(line => line.includes('analysis.validation.failed') && line.includes(requestId));
           expect(terminal).toBeDefined();
+          expect(terminal).toContain(marker);
           expect(terminal).toContain(kind === 'structure' ? 'recheck' : 'reverify');
           expect(terminal).toContain(
             kind === 'structure' ? 'invalid-endpoints' : 'semantic-verification',
@@ -177,6 +177,30 @@ test.each(['structure', 'semantic'] as const)(
     }
   },
 );
+
+test('잘못된 검증 응답을 터미널에 기록하면서 인증 정보를 제거한다', async () => {
+  const output = vi.spyOn(winston.transports.Console.prototype, 'log');
+  try {
+    await withApi(
+      {
+        extractGraph: async () => ({ value: structuredClone(graph) }),
+        repairGraph: async () => ({ value: structuredClone(graph) }),
+        verifyGraph: async () => ({
+          value: { valid: 'wrong-type', issues: [], token: 'secret-test-token' },
+        }),
+      },
+      async (_base, send) => {
+        expect((await send('invalid-verification-output')).status).toBe(422);
+        const logs = output.mock.calls.map(([info]) => JSON.stringify(info)).join('\n');
+        expect(logs).toContain('wrong-type');
+        expect(logs).not.toContain('secret-test-token');
+        expect(logs).toContain('[REDACTED]');
+      },
+    );
+  } finally {
+    output.mockRestore();
+  }
+});
 
 test('unagreed proposal without rationale is verified, persisted, and read as a guild-scoped graph', async () => {
   const db = await isolatedRepository();

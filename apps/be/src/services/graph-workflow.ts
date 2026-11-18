@@ -18,6 +18,7 @@ import {
 } from '../domain/decision-graph.js';
 import { AppError } from '../errors/AppError.js';
 import {
+  boundedProviderResponse,
   classifyAiFailure,
   providerResponseFrom,
   safeAiErrorCode,
@@ -138,6 +139,7 @@ export class GraphWorkflow {
               errorSummary: 'AI graph structure was invalid',
               issuesCount: issues.length,
               issueDetails,
+              graphResult: boundedProviderResponse(session.value),
               status: 422,
               retryable: false,
             });
@@ -254,6 +256,7 @@ export class GraphWorkflow {
                 failureStage: phase,
                 failureKind: 'semantic-verification',
                 issuesCount: verified.error.issues.length,
+                verificationResult: boundedProviderResponse(result.value),
                 issueDetails: verified.error.issues
                   .slice(0, 20)
                   .map(issue => ({ code: issue.code })),
@@ -270,6 +273,7 @@ export class GraphWorkflow {
                   failureStage: phase,
                   failureKind: 'semantic-verification',
                   issuesCount: verified.data.issues.length,
+                  verificationResult: boundedProviderResponse(result.value),
                   issueDetails: [{ code: 'semantic-verification' }],
                 });
               this.requestRepair(
@@ -306,6 +310,7 @@ export class GraphWorkflow {
             failureStage: phase,
             errorCode: safeAiErrorCode(error),
             durationMs: Math.max(0, Date.now() - attempt.startedAt),
+            providerResponse: providerResponseFrom(error),
             ...diagnostic,
           });
           throw error;
