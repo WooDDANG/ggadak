@@ -12,6 +12,7 @@ import {
   LEGACY_GRAPH_SYSTEM_PROMPT,
   LEGACY_VERIFICATION_PROMPT,
   VERIFY_ONLY_PROMPT,
+  LEGACY_VERIFY_ONLY_PROMPT,
 } from '../extractor/graph-prompt.js';
 import type { AiSettings, AiCallContext } from '../domain/ai-call.js';
 import { modelForStage } from '../domain/ai-call.js';
@@ -78,7 +79,9 @@ export class AiAdapter implements IAiAdapter {
         ? LEGACY_VERIFICATION_PROMPT
         : context.settings.promptVersion === 'agentic-2'
           ? VERIFICATION_PROMPT
-          : VERIFY_ONLY_PROMPT,
+          : context.settings.promptVersion === GRAPH_PROMPT_VERSION
+            ? VERIFY_ONLY_PROMPT
+            : LEGACY_VERIFY_ONLY_PROMPT,
       { transcript, graph },
       context,
     );
@@ -130,6 +133,7 @@ export class AiAdapter implements IAiAdapter {
         throw new AppError('Invalid AI model selection', 422);
       if (
         promptVersion !== GRAPH_PROMPT_VERSION &&
+        promptVersion !== 'agentic-4' &&
         promptVersion !== 'agentic-3' &&
         promptVersion !== 'agentic-1' &&
         promptVersion !== 'agentic-2'
@@ -180,7 +184,8 @@ export class AiAdapter implements IAiAdapter {
         outputSchema:
           stage === AiStage.Verify
             ? VerificationSchema
-            : stage === AiStage.Extract && promptVersion === GRAPH_PROMPT_VERSION
+            : stage === AiStage.Extract &&
+                (promptVersion === GRAPH_PROMPT_VERSION || promptVersion === 'agentic-4')
               ? ExtractGraphSchema
               : GraphSchema,
         structuredOutput: promptVersion !== 'agentic-1' && promptVersion !== 'agentic-2',

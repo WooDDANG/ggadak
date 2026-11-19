@@ -80,6 +80,30 @@ test('새 Verify 프롬프트는 생성 출력 지시를 제외하고 저장된 
   expect(requests[1].structuredOutput).toBe(false);
 });
 
+test('현재 Verify는 서버가 검증한 구조 규칙을 다시 검사하지 않고, agentic-4 요청은 이전 프롬프트로 재현한다', async () => {
+  const requests: AiProviderRequest[] = [];
+  const adapter = new AiAdapter({ provider: 'agy' }, 'production', {
+    async generate(request) {
+      requests.push(request);
+      return {
+        value: request.outputSchema === VerificationSchema ? { valid: true, issues: [] } : graph,
+      };
+    },
+  });
+  const saved = {
+    ...context(adapter),
+    settings: { ...adapter.settings, promptVersion: 'agentic-4' },
+  };
+  await adapter.verifyGraph('대화', graph, context(adapter));
+  await adapter.verifyGraph('대화', graph, saved);
+  await adapter.extractGraph('대화', saved);
+  const structureRule = 'Every edge sourceId and targetId must reference existing nodes';
+  expect(requests[0].system).not.toContain(structureRule);
+  expect(requests[0].system).toContain('Do NOT report structural');
+  expect(requests[1].system).toContain(structureRule);
+  expect(requests[2].outputSchema).not.toBe(GraphSchema);
+});
+
 test('AiAdapter chooses the stage model and schema, then delegates a normalized request', async () => {
   const requests: AiProviderRequest[] = [];
   const provider: AiProvider = {
