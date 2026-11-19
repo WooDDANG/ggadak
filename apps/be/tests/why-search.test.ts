@@ -177,3 +177,50 @@ test('review confirmation indexes a candidate, document-provider failure survive
     await db.cleanup();
   }
 });
+
+test('첫 검색은 아직 벡터가 없는 확정 결정을 문서 임베딩 한 번으로 묶고, 질문은 질문용으로 임베딩한다', async () => {
+  const db = await isolatedRepository();
+  const calls: { kind: string; count: number; input?: string }[] = [];
+  const batching: EmbeddingProvider = {
+    model: 'fixture-batch',
+    async embed(text, input) {
+      calls.push({ kind: 'single', count: 1, input });
+      return provider.embed(text);
+    },
+    async embedBatch(texts, input) {
+      calls.push({ kind: 'batch', count: texts.length, input });
+      return Promise.all(texts.map(text => provider.embed(text)));
+    },
+  };
+  try {
+    for (const [id, decision] of [
+      ['cache', 'Redis'],
+      ['mail', 'Email'],
+      ['queue', 'Kafka'],
+    ])
+      await db.repo.saveDecision(
+        DecisionSchema.parse({
+          id,
+          topic: decision,
+          decision,
+          rationale: 'Reason',
+          state: 'Decided',
+          source: { guildId: 'guild-1', channelId: 'c', triggerMessageId: 'm', participants: [] },
+          createdAt: '2026-01-01T00:00:00.000Z',
+        }),
+      );
+    const service = new SearchService(db.repo, batching);
+    expect((await service.search('guild-1', '빠르게 응답하는 이유?', 1)).items[0].decision.id).toBe(
+      'cache',
+    );
+    expect(calls).toEqual([
+      { kind: 'single', count: 1, input: 'query' },
+      { kind: 'batch', count: 3, input: 'passage' },
+    ]);
+    calls.length = 0;
+    await service.search('guild-1', '빠르게', 1);
+    expect(calls).toEqual([{ kind: 'single', count: 1, input: 'query' }]);
+  } finally {
+    await db.cleanup();
+  }
+});
