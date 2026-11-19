@@ -24,10 +24,19 @@ test('graph generation requests specify references and candidate history constra
     expect(request.system).toContain(
       'Every edge sourceId and targetId must reference existing nodes',
     );
+    // 상태 변화 이력은 쓰는 곳이 없어 agentic-5부터 요청하지 않는다.
+    expect(request.system).not.toMatch(/history/i);
+  }
+  const saved = {
+    ...context(adapter),
+    settings: { ...adapter.settings, promptVersion: 'agentic-4' },
+  };
+  await adapter.extractGraph('input', saved);
+  await adapter.repairGraph('input', graph, ['Invalid endpoints: e1'], saved);
+  for (const request of requests.splice(2, 2))
     expect(request.system).toContain(
       'Candidate history observations use proposed/agreed/withdrawn/unclear',
     );
-  }
   await adapter.extractGraph('input', {
     ...context(adapter),
     settings: { ...adapter.settings, promptVersion: 'agentic-1' },

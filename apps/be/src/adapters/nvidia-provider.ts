@@ -10,7 +10,11 @@ import { nvidiaCredentials, type NvidiaCredential } from '../config/nvidia-crede
 import { initPrisma } from '../loaders/prisma.js';
 import { createLogger } from '@ggaddak/shared';
 import { boundedProviderResponse } from '../errors/ai-diagnostics.js';
-import { ExtractGraphSchema, VerificationSchema } from '../domain/decision-graph.js';
+import {
+  ExtractGraphSchema,
+  HistoryExtractGraphSchema,
+  VerificationSchema,
+} from '../domain/decision-graph.js';
 
 const logger = createLogger('BE-NVIDIA');
 
@@ -141,7 +145,8 @@ export class NvidiaProvider implements AiProvider {
         : request.outputSchema === VerificationSchema &&
             process.env.NVIDIA_VERIFY_JSON_SCHEMA !== 'false'
           ? 'verification'
-          : request.outputSchema === ExtractGraphSchema &&
+          : (request.outputSchema === ExtractGraphSchema ||
+                request.outputSchema === HistoryExtractGraphSchema) &&
               process.env.NVIDIA_EXTRACT_JSON_SCHEMA !== 'false'
             ? 'extract_graph'
             : undefined;

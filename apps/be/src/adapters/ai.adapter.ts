@@ -4,7 +4,12 @@ import { AiDefaults } from '../config/policies.js';
 import { Service } from 'typedi';
 import { AppError } from '../errors/AppError.js';
 import config, { AppConfig } from '../config/index.js';
-import { ExtractGraphSchema, GraphSchema, VerificationSchema } from '../domain/decision-graph.js';
+import {
+  ExtractGraphSchema,
+  GraphSchema,
+  HistoryExtractGraphSchema,
+  VerificationSchema,
+} from '../domain/decision-graph.js';
 import {
   GRAPH_SYSTEM_PROMPT,
   VERIFICATION_PROMPT,
@@ -13,6 +18,7 @@ import {
   LEGACY_VERIFICATION_PROMPT,
   VERIFY_ONLY_PROMPT,
   LEGACY_VERIFY_ONLY_PROMPT,
+  AGENTIC_4_GRAPH_SYSTEM_PROMPT,
 } from '../extractor/graph-prompt.js';
 import type { AiSettings, AiCallContext } from '../domain/ai-call.js';
 import { modelForStage } from '../domain/ai-call.js';
@@ -21,6 +27,14 @@ import { recordAiMetric, type AiMetricRecord } from './ai-metrics-logger.js';
 import { classifyAiFailure } from '../errors/ai-diagnostics.js';
 import type { AiProvider } from './ai-provider.js';
 import type { IAiAdapter } from '../domain/ai-analysis.js';
+/** 저장된 프롬프트 버전의 Extract·Repair 지시. 이전 버전 요청은 그때 지시로 재현한다. */
+function graphSystemPrompt(promptVersion: string | undefined) {
+  if (promptVersion === 'agentic-1') return LEGACY_GRAPH_SYSTEM_PROMPT;
+  return promptVersion === GRAPH_PROMPT_VERSION
+    ? GRAPH_SYSTEM_PROMPT
+    : AGENTIC_4_GRAPH_SYSTEM_PROMPT;
+}
+
 export type { IAiAdapter } from '../domain/ai-analysis.js';
 export type { AiSettings, AiCallContext, AiResult } from '../domain/ai-call.js';
 
@@ -54,9 +68,7 @@ export class AiAdapter implements IAiAdapter {
   extractGraph(transcript: string, context: AiCallContext) {
     return this.call(
       AiStage.Extract,
-      context.settings.promptVersion === 'agentic-1'
-        ? LEGACY_GRAPH_SYSTEM_PROMPT
-        : GRAPH_SYSTEM_PROMPT,
+      graphSystemPrompt(context.settings.promptVersion),
       { transcript },
       context,
     );
@@ -90,9 +102,7 @@ export class AiAdapter implements IAiAdapter {
   repairGraph(transcript: string, graph: unknown, issues: string[], context: AiCallContext) {
     return this.call(
       AiStage.Repair,
-      (context.settings.promptVersion === 'agentic-1'
-        ? LEGACY_GRAPH_SYSTEM_PROMPT
-        : GRAPH_SYSTEM_PROMPT) +
+      graphSystemPrompt(context.settings.promptVersion) +
         '\nCorrect only reported errors; preserve IDs of existing elements.',
       { transcript, graph, issues },
       context,
@@ -184,10 +194,11 @@ export class AiAdapter implements IAiAdapter {
         outputSchema:
           stage === AiStage.Verify
             ? VerificationSchema
-            : stage === AiStage.Extract &&
-                (promptVersion === GRAPH_PROMPT_VERSION || promptVersion === 'agentic-4')
+            : stage === AiStage.Extract && promptVersion === GRAPH_PROMPT_VERSION
               ? ExtractGraphSchema
-              : GraphSchema,
+              : stage === AiStage.Extract && promptVersion === 'agentic-4'
+                ? HistoryExtractGraphSchema
+                : GraphSchema,
         structuredOutput: promptVersion !== 'agentic-1' && promptVersion !== 'agentic-2',
         maxOutputTokens,
         ...(context.settings.seed === undefined ? {} : { seed: context.settings.seed }),
