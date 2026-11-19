@@ -21,10 +21,8 @@ import { AnalysisRunner } from './analysis-runner.js';
 import { AnalysisQueryService } from './analysis-query.service.js';
 import { projectCandidates } from './candidate-projection.js';
 import { CandidatePublicationService } from './candidate-publication.service.js';
-import {
-  CandidatePublicationRepository,
-  type RecoveryOwner,
-} from '../repositories/candidate-publication.repository.js';
+import { CandidatePublicationRepository } from '../repositories/candidate-publication.repository.js';
+import type { RecoveryOwner } from '../domain/session-recovery.js';
 
 @Service()
 export class DiscussionService {

@@ -7,6 +7,14 @@ export const AuthPolicy = {
   refreshLeaseMs: 45_000,
   sessionTtlMs: 7 * DurationMs.Day,
 } as const;
+/** 건너뛴 세션의 자동 재시도와 입력 보관(ADR-0028). */
+export const RecoveryPolicy = {
+  firstRetryDelayMs: DurationMs.Minute,
+  retryDelayMs: 5 * DurationMs.Minute,
+  busyRetryDelayMs: DurationMs.Second,
+  maxAutomaticAttempts: 2,
+  inputRetentionMs: 30 * DurationMs.Day,
+} as const;
 export const GraphPolicy = {
   maxTextChars: 10_000,
   maxNodes: 500,

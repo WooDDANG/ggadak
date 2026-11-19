@@ -20,6 +20,8 @@ import type { SyncJob } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import { Service } from 'typedi';
 import { DecisionRepository } from '../repositories/decision.repository.js';
+import { AnalysisSessionRecoveryRepository } from '../repositories/analysis-session-recovery.repository.js';
+import { effectiveRecoveryState } from '../domain/session-recovery.js';
 import { ConflictError, NotFoundError, BadRequestError } from '../errors/AppError.js';
 import type { AnalyzeDiscussionResult } from '../domain/analysis.js';
 
@@ -140,14 +142,10 @@ export class SyncJobService {
       where: { scanId: { in: scans.map(scan => scan.id) }, guildId },
       select: { id: true },
     });
-    const recoveries = await db.analysisSessionRecovery.findMany({
-      where: {
-        requestId: {
-          in: [...receipts.map(receipt => receipt.id), ...legacy.map(request => request.id)],
-        },
-        guildId,
-      },
-    });
+    const recoveries = await new AnalysisSessionRecoveryRepository(db).forRequests(
+      [...receipts.map(receipt => receipt.id), ...legacy.map(request => request.id)],
+      guildId,
+    );
     const requests = await db.analysisRequest.findMany({
       where: { id: { in: [...new Set(recoveries.map(recovery => recovery.requestId))] }, guildId },
       select: { id: true, resultJson: true },
@@ -164,14 +162,7 @@ export class SyncJobService {
         .get(recovery.requestId)
         ?.find(item => item.sessionId === recovery.sessionId);
       if (!session) return [];
-      const recoveryState =
-        recovery.state === 'recovered'
-          ? 'recovered'
-          : recovery.expiresAt.getTime() <= now
-            ? 'expired'
-            : recovery.owner && (recovery.leaseUntil?.getTime() ?? 0) > now
-              ? 'running'
-              : recovery.state;
+      const recoveryState = effectiveRecoveryState(recovery, now);
       return [
         {
           ...session,

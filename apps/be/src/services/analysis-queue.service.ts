@@ -66,6 +66,7 @@ export class AnalysisQueueService {
   private running = false;
   private cleanupCursor?: string;
   private storage: AnalysisQueueRepository;
+  private readonly recovery: AnalysisSessionRecovery;
   constructor(
     private repo: DecisionRepository,
     private discussion: DiscussionService,
@@ -73,6 +74,7 @@ export class AnalysisQueueService {
     private now = Date.now,
   ) {
     this.storage = new AnalysisQueueRepository(repo.prisma);
+    this.recovery = new AnalysisSessionRecovery(repo, discussion, now);
     this.options = {
       maxBytes: positive('ANALYSIS_QUEUE_MAX_BYTES', AnalysisPolicy.maxBytes),
       maxRequestBytes: positive('ANALYSIS_QUEUE_REQUEST_BYTES', AnalysisPolicy.maxRequestBytes),
@@ -344,7 +346,7 @@ export class AnalysisQueueService {
     await this.storage.acknowledge(ids, new Date(this.now()));
   }
   async cleanup() {
-    await new AnalysisSessionRecovery(this.repo, this.discussion, this.now).expireInputs();
+    await this.recovery.expireInputs();
     return this.storage.withTransaction(async tx => {
       await this.lock(tx);
       const cutoff = new Date(this.now() - this.options.retentionMs);
@@ -501,7 +503,7 @@ export class AnalysisQueueService {
     }
   }
   async recoverOnce(): Promise<void> {
-    await new AnalysisSessionRecovery(this.repo, this.discussion, this.now).runOnce();
+    await this.recovery.runOnce();
   }
   async advanceCoverage(channelId: string) {
     await this.storage.withTransaction(async tx => {

@@ -1,3 +1,9 @@
+import { AnalysisSessionRecoveryRepository } from '../repositories/analysis-session-recovery.repository.js';
+import {
+  RecoveryState,
+  effectiveRecoveryState,
+  isRecoveryRunning,
+} from '../domain/session-recovery.js';
 import type {
   AnalysisSession,
   AnalysisStatus,
@@ -45,6 +51,7 @@ export class AnalysisQueryService {
   constructor(
     private readonly repo: DecisionRepository,
     private readonly requests = new AnalysisRequestRepository(repo),
+    private readonly recoveries = new AnalysisSessionRecoveryRepository(repo.prisma),
   ) {}
 
   getCandidateHistory(decisionId: string) {
@@ -64,21 +71,13 @@ export class AnalysisQueryService {
       ? JSON.parse(row.workflowJson)
       : null;
     const error = row.errorJson ? JSON.parse(row.errorJson) : null;
-    const recoveries = await this.repo.prisma.analysisSessionRecovery.findMany({
-      where: { requestId },
-    });
+    const recoveries = await this.recoveries.forRequest(requestId);
+    const now = Date.now();
     const bySession = new Map(
       recoveries.map(recovery => [
         recovery.sessionId,
         {
-          state:
-            recovery.state === 'recovered'
-              ? recovery.state
-              : recovery.expiresAt.getTime() <= Date.now()
-                ? 'expired'
-                : recovery.owner && (recovery.leaseUntil?.getTime() ?? 0) > Date.now()
-                  ? 'running'
-                  : recovery.state,
+          state: effectiveRecoveryState(recovery, now),
           attempts: recovery.attempts,
           nextAttemptAt: recovery.nextAttemptAt.toISOString(),
           expiresAt: recovery.expiresAt.toISOString(),
@@ -113,38 +112,30 @@ export class AnalysisQueryService {
 
   async scheduleRecovery(requestId: string, sessionId: string, guildId: string) {
     await this.scoped(requestId, guildId);
-    const now = new Date();
-    const recovery = await this.repo.prisma.analysisSessionRecovery.updateMany({
-      where: {
-        requestId,
-        sessionId,
-        guildId,
-        state: 'exhausted',
-        owner: null,
-        expiresAt: { gt: now },
-      },
-      data: { state: 'scheduled', nextAttemptAt: now },
-    });
-    if (!recovery.count) throw new ConflictError('이 세션은 현재 원본으로 재분석할 수 없습니다.');
+    const rescheduled = await this.recoveries.rescheduleExhausted(
+      { requestId, sessionId },
+      guildId,
+      new Date(),
+    );
+    if (!rescheduled) throw new ConflictError('이 세션은 현재 원본으로 재분석할 수 없습니다.');
     return this.getStatus(requestId, guildId);
   }
 
   async expiredSessionSource(requestId: string, sessionId: string, guildId: string) {
     const row = await this.scoped(requestId, guildId);
-    const recovery = await this.repo.prisma.analysisSessionRecovery.findUnique({
-      where: { requestId_sessionId: { requestId, sessionId } },
-    });
+    const recovery = await this.recoveries.get({ requestId, sessionId });
     const workflow: AnalysisWorkflow | null = row.workflowJson
       ? JSON.parse(row.workflowJson)
       : null;
     const failure = workflow?.sessions.find(session => session.id === sessionId)?.skippedFailure;
+    // 원본으로 재분석할 수 없게 만료된 세션만 현재 메시지로 새 분석을 시작한다.
+    // 만료 직전에 시작한 복구가 아직 실행 중이면 끝날 때까지 기다린다.
     const now = Date.now();
     if (
       !failure ||
       !recovery ||
-      recovery.state === 'recovered' ||
-      recovery.expiresAt.getTime() > now ||
-      (recovery.owner && (recovery.leaseUntil?.getTime() ?? 0) > now)
+      effectiveRecoveryState(recovery, now) !== RecoveryState.Expired ||
+      isRecoveryRunning(recovery, now)
     )
       throw new ConflictError(
         '원본 입력이 만료된 세션만 현재 메시지로 새 분석을 시작할 수 있습니다.',

@@ -4,10 +4,9 @@ import { hash, stableJson } from '../domain/analysis-identity.js';
 import type { CandidateDraft } from '../domain/candidate-publication.js';
 import type { AnalyzeDiscussionParams, AnalyzeDiscussionResult } from '../domain/analysis.js';
 import type { GraphSnapshot } from '../domain/decision-graph.js';
-import {
-  CandidatePublicationRepository,
-  type RecoveryOwner,
-} from '../repositories/candidate-publication.repository.js';
+import { CandidatePublicationRepository } from '../repositories/candidate-publication.repository.js';
+import { initialRecovery, type RecoveryOwner } from '../domain/session-recovery.js';
+import { RecoveryPolicy } from '../config/policies.js';
 
 const normalizeContent = (value: string) => value.normalize('NFKC').trim().replace(/\s+/g, ' ');
 const matchesContent = (decision: Decision, content: string) =>
@@ -28,6 +27,14 @@ export class CandidatePublicationService {
     graph?: GraphSnapshot,
     recovery?: RecoveryOwner,
   ): Promise<AnalyzeDiscussionResult> {
+    // 건너뛴 세션은 발행과 함께 첫 복구 기록을 남긴다(ADR-0028).
+    const recoveryChanges = {
+      owner: recovery,
+      created: (result.skippedSessions ?? []).map(session =>
+        initialRecovery(session, RecoveryPolicy.firstRetryDelayMs),
+      ),
+      inputRetentionMs: RecoveryPolicy.inputRetentionMs,
+    };
     return this.repository.commit(
       params.requestId,
       owner,
@@ -132,7 +139,7 @@ export class CandidatePublicationService {
           graph,
         };
       },
-      recovery,
+      recoveryChanges,
     );
   }
 }
