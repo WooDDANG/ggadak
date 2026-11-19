@@ -1,8 +1,32 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { tmpdir } from 'node:os';
 import { test, expect } from 'vitest';
-import { recordAiMetric } from '../../src/adapters/ai-metrics-logger.js';
+import { recordAiMetric, recordVerificationMetric } from '../../src/adapters/ai-metrics-logger.js';
+
+test('검증 지표는 호출 지표와 분리해 상관관계와 결과를 기록한다', () => {
+  const directory = fs.mkdtempSync(path.join(tmpdir(), 'verify-metric-'));
+  const filename = path.join(directory, 'verification.jsonl');
+  process.env.AI_VERIFICATION_METRICS_LOG_PATH = filename;
+  try {
+    recordVerificationMetric({
+      requestId: 'request',
+      callId: 'call',
+      stage: 'reverify',
+      outcome: 'invalid',
+    });
+    expect(JSON.parse(fs.readFileSync(filename, 'utf8'))).toMatchObject({
+      requestId: 'request',
+      callId: 'call',
+      stage: 'reverify',
+      outcome: 'invalid',
+    });
+  } finally {
+    delete process.env.AI_VERIFICATION_METRICS_LOG_PATH;
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});
 
 test('recordAiMetric appends a valid JSON-line to ai-metrics.log when path is configured', () => {
   const currentDir = path.dirname(fileURLToPath(import.meta.url));

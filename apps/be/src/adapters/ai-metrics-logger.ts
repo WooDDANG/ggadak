@@ -37,6 +37,33 @@ const defaultLogFilePath = path.join(defaultLogDir, 'ai-metrics.log');
 
 const consoleLogger = createLogger('AI-METRIC');
 
+/** Provider 호출 횟수와 분리된 Verify 스키마 검증 지표다. */
+export function recordVerificationMetric(metric: {
+  requestId?: string;
+  callId?: string;
+  traceId?: string;
+  stage: string;
+  outcome: 'valid' | 'invalid';
+}): void {
+  if (
+    (process.env.NODE_ENV === 'test' || process.env.VITEST === 'true') &&
+    !process.env.AI_VERIFICATION_METRICS_LOG_PATH
+  )
+    return;
+  try {
+    const filename =
+      process.env.AI_VERIFICATION_METRICS_LOG_PATH ||
+      path.join(defaultLogDir, 'ai-verification-metrics.log');
+    fs.mkdirSync(path.dirname(filename), { recursive: true });
+    fs.appendFileSync(
+      filename,
+      JSON.stringify({ timestamp: new Date().toISOString(), ...metric }) + '\n',
+    );
+  } catch {
+    consoleLogger.warn('Failed to append verification metric');
+  }
+}
+
 export function recordAiMetric(metric: AiMetricRecord): void {
   try {
     const isExplicitTestPath = Boolean(process.env.AI_METRICS_LOG_PATH);

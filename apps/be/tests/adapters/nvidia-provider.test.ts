@@ -4,7 +4,7 @@ import {
   extractAndParseJson,
   nvidiaRetryAfterMs,
 } from '../../src/adapters/nvidia-provider.js';
-import { GraphSchema } from '../../src/domain/decision-graph.js';
+import { GraphSchema, VerificationSchema } from '../../src/domain/decision-graph.js';
 
 test('Retry-After의 초와 HTTP 날짜를 해석하고 잘못된 헤더는 기본 대기를 적용한다', () => {
   const now = Date.parse('2026-11-18T00:00:00Z');
@@ -89,6 +89,100 @@ test('NvidiaProvider streams chunks, aggregates reasoning/content, and returns p
   expect(capturedBody.temperature).toBe(0.2);
   expect(capturedBody.response_format).toEqual({ type: 'json_object' });
   expect(capturedOptions.signal).toBe(signal);
+});
+
+test('Verify 요청은 필수 필드 JSON Schema를 전달한다', async () => {
+  let body: any;
+  const client: any = {
+    chat: {
+      completions: {
+        create: async (request: any) => {
+          body = request;
+          async function* chunks() {
+            yield { choices: [{ delta: { content: '{"valid":true,"issues":[]}' } }] };
+          }
+          return chunks();
+        },
+      },
+    },
+  };
+  const result = await new NvidiaProvider({ client }).generate({
+    model: 'model',
+    system: 'verify',
+    input: '{}',
+    outputSchema: VerificationSchema,
+    maxOutputTokens: 100,
+    signal: new AbortController().signal,
+  });
+  expect(result.value).toEqual({ valid: true, issues: [] });
+  expect(body.response_format.type).toBe('json_schema');
+  expect(body.response_format.json_schema.schema.required).toEqual(
+    expect.arrayContaining(['valid', 'issues']),
+  );
+  expect(
+    VerificationSchema.safeParse({
+      valid: true,
+      issues: [{ message: 'x', nodeIds: [], edgeIds: [] }],
+    }).success,
+  ).toBe(false);
+});
+
+test('Verify JSON Schema를 끄면 JSON 객체 모드로 요청한다', async () => {
+  const previous = process.env.NVIDIA_VERIFY_JSON_SCHEMA;
+  process.env.NVIDIA_VERIFY_JSON_SCHEMA = 'false';
+  let body: any;
+  const client: any = {
+    chat: {
+      completions: {
+        create: async (request: any) => {
+          body = request;
+          async function* chunks() {
+            yield { choices: [{ delta: { content: '{"valid":true,"issues":[]}' } }] };
+          }
+          return chunks();
+        },
+      },
+    },
+  };
+  try {
+    await new NvidiaProvider({ client }).generate({
+      model: 'model',
+      system: 'verify',
+      input: '{}',
+      outputSchema: VerificationSchema,
+      maxOutputTokens: 100,
+      signal: new AbortController().signal,
+    });
+    expect(body.response_format).toEqual({ type: 'json_object' });
+  } finally {
+    if (previous === undefined) delete process.env.NVIDIA_VERIFY_JSON_SCHEMA;
+    else process.env.NVIDIA_VERIFY_JSON_SCHEMA = previous;
+  }
+});
+
+test('JSON Schema를 지원하지 않는 엔드포인트 오류는 숨은 재시도 없이 전달한다', async () => {
+  let calls = 0;
+  const client: any = {
+    chat: {
+      completions: {
+        create: async () => {
+          calls++;
+          throw Object.assign(new Error('Unsupported response_format'), { status: 400 });
+        },
+      },
+    },
+  };
+  await expect(
+    new NvidiaProvider({ client }).generate({
+      model: 'model',
+      system: 'verify',
+      input: '{}',
+      outputSchema: VerificationSchema,
+      maxOutputTokens: 100,
+      signal: new AbortController().signal,
+    }),
+  ).rejects.toMatchObject({ statusCode: 400 });
+  expect(calls).toBe(1);
 });
 
 test('NvidiaProvider enforces max output tokens and handles empty responses', async () => {
