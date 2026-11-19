@@ -5,6 +5,7 @@ import { DiscussionService } from '../src/services/discussion.service.js';
 import { DecisionExtractorCore } from '../src/engine/extractor-core.js';
 import type { IAiAdapter } from '../src/adapters/ai.adapter.js';
 import { AppError } from '../src/errors/AppError.js';
+import { AnalysisBusyError } from '../src/errors/analysis-error.js';
 
 const input = (id: string) => ({
   requestId: id,
@@ -63,23 +64,29 @@ test('N session workers overlap while the global call cap and original session o
   }
 });
 
-test('a failed sibling cancels and drains others, publishes nothing, and retry reuses completed sessions', async () => {
+test('요청 전체 실패가 나도 처리 중인 형제 세션은 끊지 않고 마무리하며, 재시도는 끝난 세션을 다시 분석하지 않는다', async () => {
   vi.stubEnv('AI_SESSION_CONCURRENCY', '2');
   vi.stubEnv('AI_CALL_CONCURRENCY', '2');
   const db = await isolatedRepository();
   const extracts: string[] = [];
+  const interrupted: string[] = [];
   let fail = true,
     active = 0;
+  const ids = (transcript: string) =>
+    ['1', '2', '3', '4'].find(id => transcript.includes(`"id":"${id}"`))!;
   const ai: IAiAdapter = {
     async extractGraph(transcript, context) {
-      extracts.push(transcript);
+      const id = ids(transcript);
+      extracts.push(id);
       active++;
       try {
-        const first = transcript.includes('"id":"1"');
-        const second = transcript.includes('"id":"2"');
-        await delay(first ? 1 : second ? 80 : 200, undefined, { signal: context.signal });
-        if (second && fail) throw new AppError('Temporary analysis failure', 503);
+        // 작업자 A: 1(즉시) → 3(200ms), 작업자 B: 2(80ms에 실패). 3은 2가 실패할 때 처리 중이다.
+        await delay(id === '1' ? 1 : id === '2' ? 80 : 200, undefined, { signal: context.signal });
+        if (id === '2' && fail) throw new AppError('Temporary analysis failure', 503);
         return { value: graph };
+      } catch (error) {
+        if (context.signal.aborted) interrupted.push(id);
+        throw error;
       } finally {
         active--;
       }
@@ -93,15 +100,73 @@ test('a failed sibling cancels and drains others, publishes nothing, and retry r
   };
   try {
     const service = new DiscussionService(db.repo, ai, new DecisionExtractorCore());
-    await expect(service.analyzeDiscussion(input('recover-parallel'))).rejects.toThrow();
+    await expect(service.analyzeDiscussion(input('recover-parallel'))).rejects.toThrow(
+      'Temporary analysis failure',
+    );
     expect(active).toBe(0);
+    expect(interrupted).toEqual([]);
+    expect(extracts).not.toContain('4');
     expect(await db.client.decision.count()).toBe(0);
     expect(await db.client.aiCallLease.count()).toBe(0);
-    expect((await service.getStatus('recover-parallel', 'g')).sessions[0].phase).toBe('done');
+    const failed = await service.getStatus('recover-parallel', 'g');
+    expect(failed.sessions.map(session => session.phase)).toEqual([
+      'done',
+      'extract',
+      'done',
+      'extract',
+    ]);
     fail = false;
     await service.analyzeDiscussion(input('recover-parallel'));
-    expect(extracts.filter(text => text.includes('"id":"1"'))).toHaveLength(1);
+    expect(extracts.filter(id => id === '1')).toHaveLength(1);
+    expect(extracts.filter(id => id === '3')).toHaveLength(1);
     expect((await service.getStatus('recover-parallel', 'g')).state).toBe('completed');
+  } finally {
+    vi.unstubAllEnvs();
+    await db.cleanup();
+  }
+});
+
+test('빈 NVIDIA 키가 잠깐 없으면 호출 차례를 쥔 채 기다렸다 진행하고, 오래 쉬면 큐 대기로 넘긴다', async () => {
+  vi.stubEnv('AI_SESSION_CONCURRENCY', '3');
+  vi.stubEnv('AI_CALL_CONCURRENCY', '3');
+  const db = await isolatedRepository();
+  let busy = 2;
+  let retryAfterMs = 30;
+  const ai: IAiAdapter = {
+    async prepareCall() {
+      // 키 두 개가 잠깐 쉬는 중: 처음 두 예약은 빈 키가 없다.
+      if (busy > 0) {
+        busy--;
+        throw new AnalysisBusyError('NVIDIA account budgets are waiting', retryAfterMs);
+      }
+      return ai;
+    },
+    async extractGraph() {
+      return { value: graph };
+    },
+    async verifyGraph() {
+      return { value: { valid: true, issues: [] } };
+    },
+    async repairGraph() {
+      throw new Error('No repairs expected');
+    },
+  };
+  try {
+    const service = new DiscussionService(db.repo, ai, new DecisionExtractorCore());
+    await service.analyzeDiscussion(input('key-wait'));
+    const status = await service.getStatus('key-wait', 'g');
+    expect(status.state).toBe('completed');
+    expect(busy).toBe(0);
+    // 키를 기다린 시간은 세션 시간 예산이 아니라 대기 시간으로 남는다.
+    const waited = status.sessions.filter(session => (session.waitMs ?? 0) >= 25);
+    expect(waited.length).toBeGreaterThan(0);
+    expect(waited.every(session => session.elapsedMs < 25)).toBe(true);
+
+    busy = 1;
+    retryAfterMs = 60 * 60 * 1000;
+    await expect(service.analyzeDiscussion(input('key-long-wait'))).rejects.toBeInstanceOf(
+      AnalysisBusyError,
+    );
   } finally {
     vi.unstubAllEnvs();
     await db.cleanup();

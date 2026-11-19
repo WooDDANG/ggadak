@@ -26,6 +26,10 @@ export const GraphPolicy = {
   callTimeoutMs: 60_000,
   maxLogicalCalls: 5,
   maxRepairs: 2,
+  // 호출 차례를 받은 뒤 빈 NVIDIA 키를 기다리는 최대 시간. 다른 호출이 쥔 키는 그 호출이 끝나면
+  // 풀리므로(호출 제한 시간 안) 이만큼 기다린다. 분당 예산 소진·429·403 cooldown처럼 더 오래 걸리면
+  // 차례를 반납하고 큐 대기로 넘겨, 차례를 쥔 채 오래 붙잡지 않는다.
+  maxKeyWaitMs: 30 * DurationMs.Second,
 } as const;
 export const AiDefaults = {
   provider: 'nvidia',

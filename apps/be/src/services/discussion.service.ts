@@ -72,19 +72,20 @@ export class DiscussionService {
           return task;
         };
         await save();
-        const siblings = new AbortController();
-        const workerSignal = AbortSignal.any([signal, siblings.signal]);
         const algorithm = new GraphWorkflow(this.extractor, this.scheduler);
         let cursor = 0;
         let failed = false;
         let failure: unknown;
         await Promise.all(
           Array.from({ length: Math.min(sessionWorkers, workflow.sessions.length) }, async () => {
-            while (!workerSignal.aborted && cursor < workflow.sessions.length) {
+            // 요청 전체 실패가 나면 새 세션만 멈추고, 처리 중인 형제 세션은 끊지 않고 마무리해 저장한다.
+            // 끊으면 결과와 토큰이 버려지고 끊긴 시간이 형제 세션의 시간 예산에서 빠진다.
+            // 소유권 상실과 종료(signal)만 처리 중인 호출을 즉시 끊는다.
+            while (!signal.aborted && !failed && cursor < workflow.sessions.length) {
               const session = workflow.sessions[cursor++];
               if (session.skippedFailure) continue;
               try {
-                await algorithm.run(session, workflow, save, workerSignal, owner, {
+                await algorithm.run(session, workflow, save, signal, owner, {
                   requestId: params.requestId,
                   traceId: params.traceId,
                   guildId: params.guildId,
@@ -95,7 +96,7 @@ export class DiscussionService {
                 // 세션에 국한된 실패만 건너뛴다. 소유권 상실은 실패가 아니므로 건너뛰지 않는다.
                 if (
                   options.scanRange &&
-                  !workerSignal.aborted &&
+                  !signal.aborted &&
                   kind &&
                   SESSION_SCOPED_FAILURES.includes(kind)
                 ) {
@@ -117,7 +118,6 @@ export class DiscussionService {
                   failed = true;
                   failure = error;
                 }
-                siblings.abort(error);
               }
             }
           }),
