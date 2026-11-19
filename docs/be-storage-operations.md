@@ -32,7 +32,7 @@ Candidate relationships are indexed rows with reverse lookup; prior request IDs 
 
 Defaults are 1 and supported values are integers 1 through 32. This ceiling is a validation bound, not an optimal operating value. Each session preserves extract/check/verify/repair order. Global AI admission is FIFO, cancellable and leased; CLI termination is awaited before returning a permit. Slot waiting is measured separately from active AI time and is not charged as a generation attempt. All BE instances sharing a provider quota should use the same DB/admission boundary. If configurations differ during rollout, admission uses the smallest active/waiting caller limit.
 
-Completed sessions remain reusable after a sibling fails. On failure, queued sibling work stops, running siblings are cancelled and drained, and partial candidates are not published. The current queue worker still admits one queued request at a time per BE instance; session parallelism works inside that request.
+Completed sessions remain reusable after a sibling fails. On a request-level failure, queued sibling work stops, running siblings finish their session and checkpoint it instead of being cancelled (so their results, tokens and session time budget are kept), and partial candidates are not published. Only ownership loss and shutdown cancel running calls. The current queue worker still admits one queued request at a time per BE instance; session parallelism works inside that request.
 
 ## Measuring N
 

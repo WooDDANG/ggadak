@@ -18,6 +18,8 @@ import {
   type DecisionGraph,
 } from '../domain/decision-graph.js';
 import { AppError } from '../errors/AppError.js';
+import { AnalysisBusyError } from '../errors/analysis-error.js';
+import { setTimeout as delay } from 'node:timers/promises';
 import {
   classifyAiFailure,
   providerResponseFrom,
@@ -193,7 +195,8 @@ export class GraphWorkflow {
         const callSignal = permit.signal;
         if (callSignal.aborted) throw ownershipLost('Analysis cancelled before AI call');
         // 계정 예산 대기는 논리 호출·시도·실행 시간 예산을 소비하지 않는다.
-        const ai = (await this.ai.prepareCall?.(callSignal)) ?? this.ai;
+        const reserved = await this.reserveKey(callSignal, session);
+        const ai = reserved.ai;
         prepared = ai;
         const timeoutMs = Math.min(
           callTimeoutMs(),
@@ -203,7 +206,7 @@ export class GraphWorkflow {
         const attempt: StageAttempt = {
           callId: randomUUID(),
           phase,
-          waitMs: permit.waitMs,
+          waitMs: permit.waitMs + reserved.waitMs,
           provider: workflow.settings.provider,
           model: modelForStage(
             workflow.settings,
@@ -375,6 +378,36 @@ export class GraphWorkflow {
           await permit.release();
         }
       }
+    }
+  }
+
+  /**
+   * 호출 차례를 쥔 채 빈 키를 예약한다. 빈 키가 잠깐 없으면 형제 세션까지 멈추는 요청 실패로
+   * 올리지 않고 기다렸다 다시 예약한다. 기다린 시간은 세션 대기 시간에만 더한다.
+   * 기다릴 시간이 정책 상한을 넘으면 AnalysisBusyError를 그대로 던진다. 요청은 새 세션을 멈추고
+   * 처리 중인 세션을 마무리한 뒤, 시도를 소모하지 않고 Analysis Queue에서 다시 실행된다.
+   */
+  private async reserveKey(
+    signal: AbortSignal,
+    session: AnalysisSession,
+  ): Promise<{ ai: IAiAdapter; waitMs: number }> {
+    const started = Date.now();
+    const waited = () => Date.now() - started;
+    try {
+      for (;;) {
+        try {
+          return { ai: (await this.ai.prepareCall?.(signal)) ?? this.ai, waitMs: waited() };
+        } catch (error) {
+          if (!(error instanceof AnalysisBusyError)) throw error;
+          const retryAfterMs = Math.max(1, error.retryAfterMs);
+          if (waited() + retryAfterMs > GraphPolicy.maxKeyWaitMs) throw error;
+          await delay(retryAfterMs, undefined, { signal }).catch(() => {
+            throw ownershipLost('Analysis cancelled while waiting for an NVIDIA key');
+          });
+        }
+      }
+    } finally {
+      session.waitMs = (session.waitMs ?? 0) + waited();
     }
   }
 

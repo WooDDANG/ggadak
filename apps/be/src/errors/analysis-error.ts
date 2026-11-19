@@ -7,7 +7,10 @@ import { explicitFailureKind } from './ai-diagnostics.js';
 export class AnalysisBusyError extends AppError {
   readonly status = 503;
 
-  constructor(message = 'Analysis capacity busy', retryAfterMs = 0) {
+  constructor(
+    message = 'Analysis capacity busy',
+    readonly retryAfterMs = 0,
+  ) {
     super(message, 503, { retryAfterMs });
   }
 }
