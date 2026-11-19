@@ -21,9 +21,9 @@ export const GraphPolicy = {
   maxEdges: 2_000,
   maxProblems: 500,
   maxVerificationIssues: 500,
-  // 논리 호출 상한 5회 × 호출 제한 60초.
-  sessionBudgetMs: 300_000,
-  callTimeoutMs: 60_000,
+  // 논리 호출 상한 5회 × 호출 제한 30초.
+  sessionBudgetMs: 150_000,
+  callTimeoutMs: 30_000,
   maxLogicalCalls: 5,
   maxRepairs: 2,
   // 호출 차례를 받은 뒤 빈 NVIDIA 키를 기다리는 최대 시간. 다른 호출이 쥔 키는 그 호출이 끝나면

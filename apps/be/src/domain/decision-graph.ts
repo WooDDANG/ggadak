@@ -60,7 +60,15 @@ export const GraphSchema = z.object({
     )
     .max(GraphPolicy.maxProblems),
 });
-export const ExtractGraphSchema = GraphSchema.extend({
+const contextNodeType = z.nativeEnum({
+  Topic: GraphNodeType.Topic,
+  Issue: GraphNodeType.Issue,
+  Alternative: GraphNodeType.Alternative,
+  Rationale: GraphNodeType.Rationale,
+  ActionItem: GraphNodeType.ActionItem,
+});
+/** agentic-3·4 Extract: 결정 후보마다 상태 변화 이력을 요구했다. 저장된 요청 재현용. */
+export const HistoryExtractGraphSchema = GraphSchema.extend({
   nodes: z
     .array(
       z.union([
@@ -70,15 +78,26 @@ export const ExtractGraphSchema = GraphSchema.extend({
           category: CategoryTagSchema,
           history: GraphNodeSchema.shape.history.unwrap().unwrap().min(1),
         }),
-        GraphNodeSchema.extend({
-          type: z.nativeEnum({
-            Topic: GraphNodeType.Topic,
-            Issue: GraphNodeType.Issue,
-            Alternative: GraphNodeType.Alternative,
-            Rationale: GraphNodeType.Rationale,
-            ActionItem: GraphNodeType.ActionItem,
-          }),
+        GraphNodeSchema.extend({ type: contextNodeType }),
+      ]),
+    )
+    .max(GraphPolicy.maxNodes),
+});
+/**
+ * agentic-5 Extract: 상태 변화 이력은 발행·화면 어디에서도 쓰지 않으면서 출력의 큰 몫을 차지해
+ * 요청하지 않는다. 모델이 그래도 내보내면 파싱에서 버려진다.
+ */
+const ExtractNodeSchema = GraphNodeSchema.omit({ history: true });
+export const ExtractGraphSchema = GraphSchema.extend({
+  nodes: z
+    .array(
+      z.union([
+        ExtractNodeSchema.extend({
+          type: z.literal(GraphNodeType.DecisionCandidate),
+          observation: ObservationSchema,
+          category: CategoryTagSchema,
         }),
+        ExtractNodeSchema.extend({ type: contextNodeType }),
       ]),
     )
     .max(GraphPolicy.maxNodes),
@@ -297,7 +316,6 @@ export function graphIssues(graph: DecisionGraph): string[] {
       if (!node.rationaleStatus)
         missing.push(`rationaleStatus=${Object.values(RationaleStatus).join('|')}`);
       if (!node.category) missing.push(`category=${Object.values(CategoryTag).join('|')}`);
-      if (!node.history?.length) missing.push('nonempty history');
       if (missing.length)
         issues.push(`Incomplete candidate: ${node.id}; required ${missing.join(', ')}`);
       const alternatives = new Set(
