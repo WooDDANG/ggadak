@@ -24,7 +24,8 @@ export class AnalysisRunner {
     ) => Promise<AnalyzeDiscussionResult>,
     signal?: AbortSignal,
   ): Promise<AnalyzeDiscussionResult> {
-    if (signal?.aborted) throw new AppError('Analysis cancelled', 503);
+    if (signal?.aborted)
+      throw new AppError('Analysis cancelled', 503, { failureKind: 'lease-lost' });
     const claim = await this.requests.claim(params);
     if (claim.result) return claim.result;
     let slot: Awaited<ReturnType<AnalysisExecutionRepository['acquire']>> | undefined;
@@ -48,14 +49,20 @@ export class AnalysisRunner {
           .catch(error => controller.abort(error));
       }, AnalysisPolicy.leaseHeartbeatMs);
       heartbeat.unref();
-      if (controller.signal.aborted) throw new AppError('Analysis cancelled', 503);
+      if (controller.signal.aborted)
+        throw new AppError('Analysis cancelled', 503, { failureKind: 'lease-lost' });
       const result = await work(claim.owner, controller.signal, () => this.execution.renew(lease));
       logger.info('analysis.completed', {
         requestId: params.requestId,
         traceId: params.traceId,
         guildId: params.guildId,
         channelId: params.channelId,
-        outcome: result.found ? 'candidates' : 'no-candidates',
+        outcome: result.skippedSessions?.length
+          ? 'sessions-skipped'
+          : result.found
+            ? 'candidates'
+            : 'no-candidates',
+        skippedSessions: result.skippedSessions?.length,
       });
       return result;
     } catch (error) {

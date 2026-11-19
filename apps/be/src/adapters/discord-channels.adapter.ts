@@ -1,5 +1,6 @@
 import { DeliveryPolicy } from '@ggaddak/shared';
 import { AppError } from '../errors/AppError.js';
+import type { DiscussionMessage } from '../domain/analysis.js';
 
 export interface DiscordChannel {
   id: string;
@@ -18,12 +19,13 @@ export class HttpDiscordChannelsAdapter implements DiscordChannelsAdapter {
     private token = process.env.DISCORD_BOT_TOKEN ?? '',
     private transport: typeof fetch = fetch,
   ) {}
-  private async get(path: string): Promise<any> {
+  private async get(path: string, allowMissing = false): Promise<any> {
     if (!this.token) throw new AppError('Discord bot is not configured', 503);
     const response = await this.transport(`https://discord.com/api/v10${path}`, {
       headers: { Authorization: `Bot ${this.token}` },
       signal: AbortSignal.timeout(DeliveryPolicy.serviceTimeoutMs),
     });
+    if (allowMissing && response.status === 404) return null;
     if (!response.ok)
       throw new AppError(
         response.status === 404
@@ -32,6 +34,32 @@ export class HttpDiscordChannelsAdapter implements DiscordChannelsAdapter {
         response.status === 403 || response.status === 404 ? 409 : 503,
       );
     return response.json();
+  }
+  async readMessages(
+    guildId: string,
+    channelId: string,
+    ids: string[],
+  ): Promise<DiscussionMessage[]> {
+    const path = '/channels/' + encodeURIComponent(channelId);
+    const channel = await this.get(path);
+    if (channel.guild_id !== guildId || channel.type !== 0)
+      throw new AppError('Discord channel is unavailable in this server', 409);
+    const messages: DiscussionMessage[] = [];
+    for (const id of new Set(ids)) {
+      const message = await this.get(path + '/messages/' + encodeURIComponent(id), true);
+      if (!message || message.channel_id !== channelId) continue;
+      messages.push({
+        id: message.id,
+        author: message.author.global_name ?? message.author.username,
+        isBot: Boolean(message.author.bot),
+        content: message.content,
+        createdAt: message.timestamp,
+        ...(message.message_reference?.message_id
+          ? { replyingTo: message.message_reference.message_id }
+          : {}),
+      });
+    }
+    return messages;
   }
   async list(guildId: string): Promise<DiscordChannel[]> {
     const guild = encodeURIComponent(guildId);

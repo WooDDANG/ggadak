@@ -1,25 +1,41 @@
 import { AppError } from './AppError.js';
+import { NOT_RETRYABLE_FAILURES, isAiFailureKind, type AiFailureKind } from '../domain/ai-call.js';
 
-export type AiFailureKind =
-  | 'timeout'
-  | 'rate-limit'
-  | 'provider'
-  | 'graph-structure'
-  | 'semantic-verification'
-  | 'configuration';
+export {
+  NON_RETRYABLE_SESSION_FAILURES,
+  OUTPUT_FORMAT_FAILURES,
+  SESSION_SCOPED_FAILURES,
+  type AiFailureKind,
+} from '../domain/ai-call.js';
+
+/** 던지는 쪽이 지정한 실패 코드. 없으면 undefined. */
+export function explicitFailureKind(error: unknown): AiFailureKind | undefined {
+  const kind = error instanceof AppError ? error.details?.failureKind : undefined;
+  return isAiFailureKind(kind) ? kind : undefined;
+}
 
 const summaries: Record<AiFailureKind, string> = {
   timeout: 'AI call timed out',
   'rate-limit': 'AI provider rate limit reached',
   provider: 'AI provider failed',
+  auth: 'AI provider authentication failed',
   'graph-structure': 'AI graph structure was invalid',
   'semantic-verification': 'AI verification failed',
   configuration: 'AI configuration was invalid',
+  'output-empty': 'AI returned no content',
+  'output-unparseable': 'AI output was not valid JSON',
+  'output-truncated': 'AI output reached the token limit',
+  'verify-format': 'AI verification response violated its schema',
+  'lease-lost': 'Analysis ownership was lost',
+  'budget-exhausted': 'Analysis call budget was exhausted',
 };
 
 /** 원문과 provider 메시지 없이 로그에 남길 수 있는 오류 원인만 분류한다. */
 export function safeAiErrorCode(error: unknown): string {
   if (!(error instanceof AppError)) return 'unexpected_error';
+  const kind = explicitFailureKind(error);
+  if (kind) return kind.replaceAll('-', '_');
+  // 코드 없이 던지는 기존 오류만 메시지로 찾는다.
   const codes: Record<string, string> = {
     'AI returned invalid JSON': 'invalid_json',
     'AI returned no content': 'empty_response',
@@ -42,10 +58,11 @@ export function classifyAiFailure(error: unknown, stage: string) {
         ? (error as { status: number }).status
         : 500;
   const message = error instanceof Error ? error.message : String(error);
-  const explicitKind = error instanceof AppError ? error.details?.failureKind : undefined;
+  const explicitKind = explicitFailureKind(error);
   let kind: AiFailureKind = 'provider';
-  if (explicitKind === 'graph-structure' || explicitKind === 'semantic-verification')
-    kind = explicitKind;
+  // 정규식은 코드 없이 들어온 외부 provider 오류에만 쓴다.
+  if (explicitKind) kind = explicitKind;
+  else if (status === 401 || status === 403) kind = 'auth';
   else if (status === 429 || /quota|rate.?limit|resource_exhausted/i.test(message))
     kind = 'rate-limit';
   else if (/timed?\s*out|timeout|deadline|cancel|abort/i.test(message)) kind = 'timeout';
@@ -63,7 +80,10 @@ export function classifyAiFailure(error: unknown, stage: string) {
     failureKind: kind,
     errorSummary: summaries[kind],
     status,
-    retryable: status === 408 || status === 429 || status >= 500,
+    // 지정한 코드가 있으면 코드표로, 없으면 HTTP 상태로 판정한다.
+    retryable: explicitKind
+      ? !NOT_RETRYABLE_FAILURES.includes(explicitKind)
+      : status === 408 || status === 429 || status >= 500,
   };
 }
 

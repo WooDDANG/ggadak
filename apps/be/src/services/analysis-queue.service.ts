@@ -31,6 +31,7 @@ import type {
 } from '../dto/analysis-queue.dto.js';
 import { DiscussionService } from './discussion.service.js';
 import { SyncJobService } from './sync-job.service.js';
+import { AnalysisSessionRecovery } from './analysis-session-recovery.js';
 
 export interface QueueOptions {
   maxBytes: number;
@@ -343,6 +344,7 @@ export class AnalysisQueueService {
     await this.storage.acknowledge(ids, new Date(this.now()));
   }
   async cleanup() {
+    await new AnalysisSessionRecovery(this.repo, this.discussion, this.now).expireInputs();
     return this.storage.withTransaction(async tx => {
       await this.lock(tx);
       const cutoff = new Date(this.now() - this.options.retentionMs);
@@ -433,17 +435,31 @@ export class AnalysisQueueService {
       heartbeat.unref();
       try {
         if (!r.inputJson) throw new Error('Retained analysis input missing');
-        await this.discussion.analyzeDiscussion(JSON.parse(r.inputJson));
-        await this.storage.patchOwned(r.id, owner, {
-          state: AnalysisReceiptState.Completed,
-          owner: null,
-          leaseUntil: null,
-          completedAt: new Date(this.now()),
-          errorCategory: null,
+        await this.discussion.analyzeDiscussion(JSON.parse(r.inputJson), {
+          scanRange: r.scanId && r.rangeJson ? JSON.parse(r.rangeJson) : undefined,
+        });
+        await this.storage.withTransaction(async tx => {
+          await this.lock(tx);
+          const completed = await this.storage.patchOwned(
+            r.id,
+            owner,
+            {
+              state: AnalysisReceiptState.Completed,
+              owner: null,
+              leaseUntil: null,
+              completedAt: new Date(this.now()),
+              errorCategory: null,
+            },
+            tx,
+          );
+          if (completed.count && r.scanId) await this.advanceCoverageInTransaction(r.channelId, tx);
         });
       } catch (error) {
         const failure = classifyAnalysisError(error);
-        const { busy, retryable, retryAfterMs } = failure;
+        const { retryable, retryAfterMs } = failure;
+        // 소유권 상실은 분석 실패가 아니다. 용량 대기처럼 시도로 세지 않는다.
+        const busy = failure.busy || failure.failureKind === 'lease-lost';
+        const authenticationBlocked = r.scanId !== null && [401, 403].includes(failure.status);
         const attempts = r.attempts + (busy ? 0 : 1);
         const base = Math.min(
           DeliveryPolicy.maxRetryMs,
@@ -451,18 +467,27 @@ export class AnalysisQueueService {
         );
         const delay = Math.max(Math.round(base * (0.8 + Math.random() * 0.4)), retryAfterMs);
         await this.storage.patchOwned(r.id, owner, {
-          state:
-            retryable && attempts < this.options.maxAttempts
+          state: authenticationBlocked
+            ? AnalysisReceiptState.Retry
+            : retryable && attempts < this.options.maxAttempts
               ? AnalysisReceiptState.Retry
               : AnalysisReceiptState.Failed,
-          attempts,
+          attempts: authenticationBlocked ? r.attempts : attempts,
           owner: null,
           leaseUntil: null,
-          nextAttemptAt: new Date(this.now() + (busy ? Math.max(500, retryAfterMs) : delay)),
-          errorCategory: failure.category,
+          nextAttemptAt: new Date(
+            this.now() +
+              (authenticationBlocked ? 300_000 : busy ? Math.max(500, retryAfterMs) : delay),
+          ),
+          errorCategory: authenticationBlocked ? 'configuration-or-payload' : failure.category,
         });
-        if (retryable && !busy && !failure.accountScoped)
-          await this.storage.patchControl({ pauseUntil: new Date(this.now() + delay) });
+        // 타임아웃은 그 요청의 문제다. provider 전체 과부하로 보고 큐를 멈추지 않는다.
+        const queueWide =
+          retryable && !busy && !failure.accountScoped && failure.failureKind !== 'timeout';
+        if (authenticationBlocked || queueWide)
+          await this.storage.patchControl({
+            pauseUntil: new Date(this.now() + (authenticationBlocked ? 300_000 : delay)),
+          });
       } finally {
         clearInterval(heartbeat);
       }
@@ -475,38 +500,44 @@ export class AnalysisQueueService {
       this.running = false;
     }
   }
+  async recoverOnce(): Promise<void> {
+    await new AnalysisSessionRecovery(this.repo, this.discussion, this.now).runOnce();
+  }
   async advanceCoverage(channelId: string) {
     await this.storage.withTransaction(async tx => {
       await this.lock(tx);
-      const rows = await this.storage.coverage(channelId, tx);
-      const ranges = rows
-        .filter(r => r.rangeJson)
-        .map(r => ({
-          ...(JSON.parse(r.rangeJson!) as ScanRangeDto),
-          completed: r.state === AnalysisReceiptState.Completed,
-        }));
-      if (!ranges.length) return;
-      const previous = await this.storage.checkpoint(channelId, tx);
-      let end = previous
-        ? BigInt(previous.lastMessageId)
-        : ranges.reduce(
-            (n, r) => (BigInt(r.afterMessageId) < n ? BigInt(r.afterMessageId) : n),
-            BigInt(ranges[0].afterMessageId),
-          );
-      let changed = true;
-      while (changed) {
-        changed = false;
-        for (const r of ranges)
-          if (r.completed && BigInt(r.afterMessageId) <= end && BigInt(r.endMessageId) > end) {
-            end = BigInt(r.endMessageId);
-            changed = true;
-          }
-      }
-      if (
-        (!previous || end > BigInt(previous.lastMessageId)) &&
-        ranges.some(r => r.completed && BigInt(r.endMessageId) <= end)
-      )
-        await this.storage.saveCheckpoint(channelId, String(end), new Date(this.now()), tx);
+      await this.advanceCoverageInTransaction(channelId, tx);
     });
+  }
+  private async advanceCoverageInTransaction(channelId: string, tx: QueueTransaction) {
+    const rows = await this.storage.coverage(channelId, tx);
+    const ranges = rows
+      .filter(r => r.rangeJson)
+      .map(r => ({
+        ...(JSON.parse(r.rangeJson!) as ScanRangeDto),
+        completed: r.state === AnalysisReceiptState.Completed,
+      }));
+    if (!ranges.length) return;
+    const previous = await this.storage.checkpoint(channelId, tx);
+    let end = previous
+      ? BigInt(previous.lastMessageId)
+      : ranges.reduce(
+          (n, r) => (BigInt(r.afterMessageId) < n ? BigInt(r.afterMessageId) : n),
+          BigInt(ranges[0].afterMessageId),
+        );
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const r of ranges)
+        if (r.completed && BigInt(r.afterMessageId) <= end && BigInt(r.endMessageId) > end) {
+          end = BigInt(r.endMessageId);
+          changed = true;
+        }
+    }
+    if (
+      (!previous || end > BigInt(previous.lastMessageId)) &&
+      ranges.some(r => r.completed && BigInt(r.endMessageId) <= end)
+    )
+      await this.storage.saveCheckpoint(channelId, String(end), new Date(this.now()), tx);
   }
 }

@@ -3,14 +3,14 @@ import { zodToJsonSchema } from 'zod-to-json-schema';
 import { AiDefaults } from '../config/policies.js';
 import config from '../config/index.js';
 import { AppError } from '../errors/AppError.js';
-import type { AiResult } from '../domain/ai-call.js';
+import { DEFAULT_SEED, LEASE_LOST, type AiResult } from '../domain/ai-call.js';
 import type { AiProvider, AiProviderRequest } from './ai-provider.js';
 import { NvidiaKeyPool, type NvidiaReservation } from './nvidia-key-pool.js';
 import { nvidiaCredentials, type NvidiaCredential } from '../config/nvidia-credentials.js';
 import { initPrisma } from '../loaders/prisma.js';
 import { createLogger } from '@ggaddak/shared';
 import { boundedProviderResponse } from '../errors/ai-diagnostics.js';
-import { VerificationSchema } from '../domain/decision-graph.js';
+import { ExtractGraphSchema, VerificationSchema } from '../domain/decision-graph.js';
 
 const logger = createLogger('BE-NVIDIA');
 
@@ -135,6 +135,16 @@ export class NvidiaProvider implements AiProvider {
     const schemaJson = JSON.stringify(
       zodToJsonSchema(request.outputSchema, { $refStrategy: 'none' }),
     );
+    const schemaName =
+      request.structuredOutput === false
+        ? undefined
+        : request.outputSchema === VerificationSchema &&
+            process.env.NVIDIA_VERIFY_JSON_SCHEMA !== 'false'
+          ? 'verification'
+          : request.outputSchema === ExtractGraphSchema &&
+              process.env.NVIDIA_EXTRACT_JSON_SCHEMA !== 'false'
+            ? 'extract_graph'
+            : undefined;
     const prompt = `${request.system}\n\nExpected JSON Schema:\n${schemaJson}\n\nSupplied conversation data:\n${request.input}\n\nRespond ONLY with valid JSON conforming strictly to the expected schema without any markdown formatting.`;
 
     let content = '';
@@ -154,20 +164,17 @@ export class NvidiaProvider implements AiProvider {
           temperature: 0.2,
           ...(this.jsonMode
             ? {
-                response_format:
-                  request.outputSchema === VerificationSchema &&
-                  request.structuredOutput !== false &&
-                  process.env.NVIDIA_VERIFY_JSON_SCHEMA !== 'false'
-                    ? {
-                        type: 'json_schema' as const,
-                        json_schema: { name: 'verification', schema: JSON.parse(schemaJson) },
-                      }
-                    : { type: 'json_object' as const },
+                response_format: schemaName
+                  ? {
+                      type: 'json_schema' as const,
+                      json_schema: { name: schemaName, schema: JSON.parse(schemaJson) },
+                    }
+                  : { type: 'json_object' as const },
               }
             : {}),
           top_p: 0.95,
           max_tokens: request.maxOutputTokens,
-          seed: 42,
+          seed: request.seed ?? DEFAULT_SEED,
           // chat_template_kwargs passes enable_thinking explicitly to override model default
           ...({ chat_template_kwargs: { enable_thinking: this.enableThinking } } as any),
           stream: true,
@@ -180,9 +187,11 @@ export class NvidiaProvider implements AiProvider {
       )) as unknown as AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>;
 
       let usage: { inputTokens: number; outputTokens: number } | undefined;
+      let finishReason: string | null | undefined;
 
       for await (const chunk of stream) {
         const delta = chunk.choices[0]?.delta as any;
+        finishReason = chunk.choices[0]?.finish_reason ?? finishReason;
         if (ttftMs === undefined && (delta?.content || delta?.reasoning_content))
           ttftMs = Math.round(performance.now() - startedAt);
         if (delta?.content) {
@@ -196,13 +205,21 @@ export class NvidiaProvider implements AiProvider {
         }
       }
 
-      if (!content.trim()) {
-        throw new AppError('AI returned no content', 422, { providerResponse: content });
-      }
-
-      if (usage && usage.outputTokens > request.maxOutputTokens) {
+      // 잘림은 빈 응답·형식 오류보다 먼저 판정한다. 같은 상한으로 다시 보내도 결과가 같다.
+      if (
+        finishReason === 'length' ||
+        (usage !== undefined && usage.outputTokens > request.maxOutputTokens)
+      ) {
         throw new AppError('NVIDIA AI output exceeds application token limit', 422, {
           providerResponse: content,
+          failureKind: 'output-truncated',
+        });
+      }
+
+      if (!content.trim()) {
+        throw new AppError('AI returned no content', 422, {
+          providerResponse: content,
+          failureKind: 'output-empty',
         });
       }
 
@@ -226,6 +243,7 @@ export class NvidiaProvider implements AiProvider {
         if (status === 401 || status === 403)
           throw new AppError('NVIDIA key authentication failed; retry with another key', 503, {
             nvidiaAccountFailure: true,
+            failureKind: 'auth',
           });
       }
       if (
@@ -235,13 +253,20 @@ export class NvidiaProvider implements AiProvider {
           'name' in error &&
           (error as any).name === 'AbortError')
       ) {
-        throw new AppError('AI call timed out after configured deadline', 503, {
-          providerResponse: content,
-        });
+        // 중단 원인(타임아웃·소유권 상실)은 호출 신호를 소유한 워크플로가 판정한다.
+        const leaseLost = request.signal.reason === LEASE_LOST;
+        throw new AppError(
+          leaseLost ? 'Analysis ownership lost' : 'AI call timed out after configured deadline',
+          503,
+          { providerResponse: content, failureKind: leaseLost ? 'lease-lost' : 'timeout' },
+        );
       }
       if (error instanceof AppError) throw error;
       if (error instanceof SyntaxError)
-        throw new AppError('AI returned invalid JSON', 422, { providerResponse: content });
+        throw new AppError('AI returned invalid JSON', 422, {
+          providerResponse: content,
+          failureKind: 'output-unparseable',
+        });
       const providerError = error as { status?: number; error?: unknown; message?: string };
       let diagnostic: string;
       try {
@@ -255,6 +280,7 @@ export class NvidiaProvider implements AiProvider {
       throw new AppError('NVIDIA AI analysis failed', providerError.status ?? 503, {
         providerResponse: boundedProviderResponse(diagnostic),
         nvidiaAccountFailure: key !== undefined && providerError.status === 429,
+        retryAfterMs: providerError.status === 429 ? nvidiaRetryAfterMs(error) : undefined,
       });
     }
   }

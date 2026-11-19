@@ -1,6 +1,7 @@
 import type { AnalyzeDiscussionParams, DiscussionMessage } from '../domain/analysis.js';
 import { z } from 'zod';
 import { DecisionItemDto } from './decision.dto.js';
+import type { SkippedAnalysisSession } from '../domain/analysis-workflow.js';
 
 export type RawMessageItemDto = DiscussionMessage;
 
@@ -54,4 +55,6 @@ export interface AnalyzeDiscussionResponseDto {
   decisions: DecisionItemDto[];
   hasConflict?: boolean;
   conflictingDecision?: DecisionItemDto;
+  skippedSessions?: SkippedAnalysisSession[];
+  damagedSessionCount?: number;
 }

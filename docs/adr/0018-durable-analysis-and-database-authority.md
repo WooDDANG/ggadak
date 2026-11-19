@@ -2,6 +2,8 @@
 
 Status: accepted (design agreed; implementation pending)
 
+세션 실패를 정상 분석과 구별하면서 동기화를 진행하는 범위는 [ADR-0028](./0028-degraded-analysis-and-scan-progress.md)에 정의한다.
+
 SQLite with Prisma remains the storage technology. The backend database is authoritative for decisions, review changes, feedback, rejected evidence, and channel checkpoints. Reads must survive restarts. Writes must complete before the API reports success; memory-only operation after database failure is not a production fallback.
 
 The Bot durably retains analysis requests and retries failures across backend outages and process restarts. Only completed analysis, including a normal no-decision result, counts as processed. This extends [ADR-0007](./0007-sqlite-persistent-egress-queue.md)'s reliable delivery principle to analysis requests following centralized backend extraction. The queue described there is not currently implemented.

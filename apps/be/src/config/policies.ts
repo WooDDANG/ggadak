@@ -13,8 +13,9 @@ export const GraphPolicy = {
   maxEdges: 2_000,
   maxProblems: 500,
   maxVerificationIssues: 500,
-  sessionBudgetMs: 180_000,
-  callTimeoutMs: 20_000,
+  // 논리 호출 상한 5회 × 호출 제한 60초.
+  sessionBudgetMs: 300_000,
+  callTimeoutMs: 60_000,
   maxLogicalCalls: 5,
   maxRepairs: 2,
 } as const;
@@ -23,7 +24,7 @@ export const AiDefaults = {
   agyExecutable: 'agy',
   nvidiaBaseUrl: 'https://integrate.api.nvidia.com/v1',
   nvidiaEnableThinking: false,
-  maxOutputTokens: 16384,
+  maxOutputTokens: 8192,
   models: {
     agy: 'gemini-3.8-flash-low',
     nvidia: 'nvidia/nemotron-3.5-super-vl-120b-a12b',

@@ -64,6 +64,28 @@ export class AnalysisQueryService {
       ? JSON.parse(row.workflowJson)
       : null;
     const error = row.errorJson ? JSON.parse(row.errorJson) : null;
+    const recoveries = await this.repo.prisma.analysisSessionRecovery.findMany({
+      where: { requestId },
+    });
+    const bySession = new Map(
+      recoveries.map(recovery => [
+        recovery.sessionId,
+        {
+          state:
+            recovery.state === 'recovered'
+              ? recovery.state
+              : recovery.expiresAt.getTime() <= Date.now()
+                ? 'expired'
+                : recovery.owner && (recovery.leaseUntil?.getTime() ?? 0) > Date.now()
+                  ? 'running'
+                  : recovery.state,
+          attempts: recovery.attempts,
+          nextAttemptAt: recovery.nextAttemptAt.toISOString(),
+          expiresAt: recovery.expiresAt.toISOString(),
+          ...(recovery.failureKind ? { failureKind: recovery.failureKind } : {}),
+        },
+      ]),
+    );
     return {
       requestId,
       state: row.state,
@@ -81,9 +103,53 @@ export class AnalysisQueryService {
           attempts: s.attempts.length,
           inputTokens: s.attempts.reduce((n, a) => n + (a.inputTokens ?? 0), 0),
           outputTokens: s.attempts.reduce((n, a) => n + (a.outputTokens ?? 0), 0),
+          ...(s.damage?.length ? { damageCount: s.damage.length } : {}),
+          ...(s.skippedFailure ? { skippedFailure: s.skippedFailure } : {}),
+          ...(bySession.has(s.id) ? { recovery: bySession.get(s.id) } : {}),
           ...(sessionFailure(s) ? { failure: sessionFailure(s) } : {}),
         })) ?? [],
     };
+  }
+
+  async scheduleRecovery(requestId: string, sessionId: string, guildId: string) {
+    await this.scoped(requestId, guildId);
+    const now = new Date();
+    const recovery = await this.repo.prisma.analysisSessionRecovery.updateMany({
+      where: {
+        requestId,
+        sessionId,
+        guildId,
+        state: 'exhausted',
+        owner: null,
+        expiresAt: { gt: now },
+      },
+      data: { state: 'scheduled', nextAttemptAt: now },
+    });
+    if (!recovery.count) throw new ConflictError('이 세션은 현재 원본으로 재분석할 수 없습니다.');
+    return this.getStatus(requestId, guildId);
+  }
+
+  async expiredSessionSource(requestId: string, sessionId: string, guildId: string) {
+    const row = await this.scoped(requestId, guildId);
+    const recovery = await this.repo.prisma.analysisSessionRecovery.findUnique({
+      where: { requestId_sessionId: { requestId, sessionId } },
+    });
+    const workflow: AnalysisWorkflow | null = row.workflowJson
+      ? JSON.parse(row.workflowJson)
+      : null;
+    const failure = workflow?.sessions.find(session => session.id === sessionId)?.skippedFailure;
+    const now = Date.now();
+    if (
+      !failure ||
+      !recovery ||
+      recovery.state === 'recovered' ||
+      recovery.expiresAt.getTime() > now ||
+      (recovery.owner && (recovery.leaseUntil?.getTime() ?? 0) > now)
+    )
+      throw new ConflictError(
+        '원본 입력이 만료된 세션만 현재 메시지로 새 분석을 시작할 수 있습니다.',
+      );
+    return { channelId: row.channelId, messageIds: failure.messageIds };
   }
 
   async getGraph(requestId: string, guildId: string): Promise<GraphSnapshot> {

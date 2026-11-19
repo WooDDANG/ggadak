@@ -730,6 +730,8 @@ export class BackendApiService {
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (this.serviceToken) headers.Authorization = `Bearer ${this.serviceToken}`;
       if (payload.traceId) headers['X-Trace-Id'] = payload.traceId;
+      if (!this.asyncDelivery && record.scanRange)
+        headers['X-Scan-Range'] = JSON.stringify(record.scanRange);
       const { response, result } = await this.boundedTransport(
         `${this.backendUrl}${this.asyncDelivery ? '/api/v1/internal/analysis-queue/receipts' : '/api/discussions/analyze'}`,
         {

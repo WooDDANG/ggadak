@@ -4,6 +4,13 @@ import {
   type SyncJobStatus,
   type SyncJobUpdate,
 } from '@ggaddak/shared';
+import type { SkippedAnalysisSession } from '../domain/analysis-workflow.js';
+
+export interface SyncSkippedSession extends SkippedAnalysisSession {
+  requestId: string;
+  recoveryState: string;
+  nextAttemptAt?: string;
+}
 
 export type SyncJobView = {
   jobId: string;
@@ -14,6 +21,9 @@ export type SyncJobView = {
   completedChannels: number;
   failedChannels: number;
   decisionsFound: number;
+  skippedSessionCount?: number;
+  damagedSessionCount?: number;
+  skippedSessions?: SyncSkippedSession[];
   messagesScanned: number;
   receivedChannels?: number;
   analysisPendingChannels?: number;

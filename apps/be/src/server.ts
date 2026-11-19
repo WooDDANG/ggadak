@@ -32,9 +32,10 @@ export async function createServer(
   server.on('listening', () => {
     if (process.env.NODE_ENV === 'test') return;
     const tick = () =>
-      void app.locals.analysisQueue
-        .runOnce()
-        .catch((error: Error) => (app.locals.queueError = error.message));
+      void Promise.all([
+        app.locals.analysisQueue.runOnce(),
+        app.locals.analysisQueue.recoverOnce(),
+      ]).catch((error: Error) => (app.locals.queueError = error.message));
     timer = setInterval(tick, AnalysisPolicy.workerIntervalMs);
     timer.unref();
     tick();

@@ -389,6 +389,9 @@
 					},
 					"ticketId": {
 						"type": "string"
+					},
+					"graphDamaged": {
+						"type": "boolean"
 					}
 				},
 				"required": [
@@ -1285,6 +1288,81 @@
 					"FAILED"
 				]
 			},
+			"AiFailureKind": {
+				"type": "string",
+				"enum": [
+					"timeout",
+					"rate-limit",
+					"provider",
+					"auth",
+					"graph-structure",
+					"semantic-verification",
+					"configuration",
+					"output-empty",
+					"output-unparseable",
+					"output-truncated",
+					"verify-format",
+					"lease-lost",
+					"budget-exhausted"
+				]
+			},
+			"SyncSkippedSession": {
+				"properties": {
+					"sessionId": {
+						"type": "string"
+					},
+					"messageIds": {
+						"items": {
+							"type": "string"
+						},
+						"type": "array"
+					},
+					"failedAt": {
+						"type": "string"
+					},
+					"kind": {
+						"$ref": "#/components/schemas/AiFailureKind"
+					},
+					"scanRange": {
+						"properties": {
+							"endMessageId": {
+								"type": "string"
+							},
+							"startMessageId": {
+								"type": "string"
+							},
+							"afterMessageId": {
+								"type": "string"
+							}
+						},
+						"required": [
+							"endMessageId",
+							"startMessageId",
+							"afterMessageId"
+						],
+						"type": "object"
+					},
+					"requestId": {
+						"type": "string"
+					},
+					"recoveryState": {
+						"type": "string"
+					},
+					"nextAttemptAt": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"sessionId",
+					"messageIds",
+					"failedAt",
+					"kind",
+					"requestId",
+					"recoveryState"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
 			"SyncChannelStatus": {
 				"type": "string",
 				"enum": [
@@ -1338,6 +1416,20 @@
 						"format": "double"
 					},
 					"messagesScanned": {
+						"type": "number",
+						"format": "double"
+					},
+					"skippedSessions": {
+						"items": {
+							"$ref": "#/components/schemas/SyncSkippedSession"
+						},
+						"type": "array"
+					},
+					"damagedSessionCount": {
+						"type": "number",
+						"format": "double"
+					},
+					"skippedSessionCount": {
 						"type": "number",
 						"format": "double"
 					},
@@ -1456,6 +1548,20 @@
 						"format": "double"
 					},
 					"messagesScanned": {
+						"type": "number",
+						"format": "double"
+					},
+					"skippedSessions": {
+						"items": {
+							"$ref": "#/components/schemas/SyncSkippedSession"
+						},
+						"type": "array"
+					},
+					"damagedSessionCount": {
+						"type": "number",
+						"format": "double"
+					},
+					"skippedSessionCount": {
 						"type": "number",
 						"format": "double"
 					},
@@ -1601,6 +1707,14 @@
 						"format": "double"
 					},
 					"decisionsFound": {
+						"type": "number",
+						"format": "double"
+					},
+					"skippedSessionCount": {
+						"type": "number",
+						"format": "double"
+					},
+					"damagedSessionCount": {
 						"type": "number",
 						"format": "double"
 					},
@@ -1949,6 +2063,52 @@
 				"type": "object",
 				"additionalProperties": false
 			},
+			"SkippedAnalysisSession": {
+				"properties": {
+					"sessionId": {
+						"type": "string"
+					},
+					"messageIds": {
+						"items": {
+							"type": "string"
+						},
+						"type": "array"
+					},
+					"failedAt": {
+						"type": "string"
+					},
+					"kind": {
+						"$ref": "#/components/schemas/AiFailureKind"
+					},
+					"scanRange": {
+						"properties": {
+							"endMessageId": {
+								"type": "string"
+							},
+							"startMessageId": {
+								"type": "string"
+							},
+							"afterMessageId": {
+								"type": "string"
+							}
+						},
+						"required": [
+							"endMessageId",
+							"startMessageId",
+							"afterMessageId"
+						],
+						"type": "object"
+					}
+				},
+				"required": [
+					"sessionId",
+					"messageIds",
+					"failedAt",
+					"kind"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
 			"AnalyzeDiscussionResponseDto": {
 				"properties": {
 					"requestId": {
@@ -1977,6 +2137,16 @@
 					},
 					"conflictingDecision": {
 						"$ref": "#/components/schemas/DecisionItemDto"
+					},
+					"skippedSessions": {
+						"items": {
+							"$ref": "#/components/schemas/SkippedAnalysisSession"
+						},
+						"type": "array"
+					},
+					"damagedSessionCount": {
+						"type": "number",
+						"format": "double"
 					}
 				},
 				"required": [
@@ -2787,6 +2957,310 @@
 				"type": "object",
 				"additionalProperties": false
 			},
+			"AnalysisReceiptState": {
+				"description": "Durable input receipt lifecycle shared by the backend and bot.",
+				"enum": [
+					"receiving",
+					"pending",
+					"processing",
+					"retry",
+					"completed",
+					"failed"
+				],
+				"type": "string"
+			},
+			"ReceiptView": {
+				"properties": {
+					"requestId": {
+						"type": "string"
+					},
+					"state": {
+						"$ref": "#/components/schemas/AnalysisReceiptState"
+					},
+					"attempts": {
+						"type": "number",
+						"format": "double"
+					},
+					"nextAttemptAt": {
+						"type": "string"
+					},
+					"errorCategory": {
+						"type": "string",
+						"nullable": true
+					},
+					"inputRetained": {
+						"type": "boolean"
+					},
+					"result": {
+						"$ref": "#/components/schemas/AnalyzeDiscussionResponseDto"
+					},
+					"receivedAt": {
+						"type": "string"
+					},
+					"startedAt": {
+						"type": "string",
+						"nullable": true
+					},
+					"completedAt": {
+						"type": "string",
+						"nullable": true
+					}
+				},
+				"required": [
+					"requestId",
+					"state",
+					"attempts",
+					"nextAttemptAt",
+					"errorCategory",
+					"inputRetained",
+					"receivedAt",
+					"startedAt",
+					"completedAt"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"ApiResponse_ReceiptView_": {
+				"description": "Shared v1 response contract. Domain payloads remain typed by each endpoint.",
+				"properties": {
+					"success": {
+						"type": "boolean"
+					},
+					"code": {
+						"type": "string"
+					},
+					"message": {
+						"type": "string"
+					},
+					"data": {
+						"$ref": "#/components/schemas/ReceiptView"
+					}
+				},
+				"required": [
+					"success",
+					"code",
+					"message",
+					"data"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"AnalysisFailure": {
+				"properties": {
+					"category": {
+						"type": "string"
+					},
+					"message": {
+						"type": "string"
+					},
+					"status": {
+						"type": "number",
+						"format": "double"
+					},
+					"retryable": {
+						"type": "boolean"
+					}
+				},
+				"required": [
+					"category",
+					"message",
+					"status",
+					"retryable"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"AnalysisPhase": {
+				"type": "string",
+				"enum": [
+					"extract",
+					"check",
+					"verify",
+					"repair",
+					"recheck",
+					"reverify",
+					"done"
+				]
+			},
+			"AnalysisStatus": {
+				"properties": {
+					"requestId": {
+						"type": "string"
+					},
+					"state": {
+						"type": "string"
+					},
+					"graphAvailable": {
+						"type": "boolean"
+					},
+					"retryable": {
+						"type": "boolean"
+					},
+					"error": {
+						"allOf": [
+							{
+								"$ref": "#/components/schemas/AnalysisFailure"
+							}
+						],
+						"nullable": true
+					},
+					"sessions": {
+						"items": {
+							"properties": {
+								"failure": {
+									"properties": {
+										"summary": {
+											"type": "string"
+										},
+										"action": {
+											"type": "string",
+											"enum": [
+												"retry",
+												"new-analysis"
+											]
+										},
+										"kind": {
+											"type": "string",
+											"enum": [
+												"timeout",
+												"configuration",
+												"validation",
+												"provider"
+											]
+										},
+										"stage": {
+											"$ref": "#/components/schemas/AnalysisPhase"
+										}
+									},
+									"required": [
+										"summary",
+										"action",
+										"kind",
+										"stage"
+									],
+									"type": "object"
+								},
+								"recovery": {
+									"properties": {
+										"failureKind": {
+											"type": "string",
+											"description": "가장 최근 실패의 종류. 최초 건너뜀 또는 마지막 자동 재시도의 실패다."
+										},
+										"expiresAt": {
+											"type": "string"
+										},
+										"nextAttemptAt": {
+											"type": "string"
+										},
+										"attempts": {
+											"type": "number",
+											"format": "double"
+										},
+										"state": {
+											"type": "string"
+										}
+									},
+									"required": [
+										"expiresAt",
+										"nextAttemptAt",
+										"attempts",
+										"state"
+									],
+									"type": "object"
+								},
+								"skippedFailure": {
+									"$ref": "#/components/schemas/SkippedAnalysisSession"
+								},
+								"damageCount": {
+									"type": "number",
+									"format": "double"
+								},
+								"outputTokens": {
+									"type": "number",
+									"format": "double"
+								},
+								"inputTokens": {
+									"type": "number",
+									"format": "double"
+								},
+								"attempts": {
+									"type": "number",
+									"format": "double"
+								},
+								"logicalCalls": {
+									"type": "number",
+									"format": "double"
+								},
+								"waitMs": {
+									"type": "number",
+									"format": "double"
+								},
+								"elapsedMs": {
+									"type": "number",
+									"format": "double"
+								},
+								"repairs": {
+									"type": "number",
+									"format": "double"
+								},
+								"phase": {
+									"$ref": "#/components/schemas/AnalysisPhase"
+								},
+								"sessionId": {
+									"type": "string"
+								}
+							},
+							"required": [
+								"outputTokens",
+								"inputTokens",
+								"attempts",
+								"logicalCalls",
+								"elapsedMs",
+								"repairs",
+								"phase",
+								"sessionId"
+							],
+							"type": "object"
+						},
+						"type": "array"
+					}
+				},
+				"required": [
+					"requestId",
+					"state",
+					"graphAvailable",
+					"retryable",
+					"error",
+					"sessions"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"ApiResponse_AnalysisStatus_": {
+				"description": "Shared v1 response contract. Domain payloads remain typed by each endpoint.",
+				"properties": {
+					"success": {
+						"type": "boolean"
+					},
+					"code": {
+						"type": "string"
+					},
+					"message": {
+						"type": "string"
+					},
+					"data": {
+						"$ref": "#/components/schemas/AnalysisStatus"
+					}
+				},
+				"required": [
+					"success",
+					"code",
+					"message",
+					"data"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
 			"GraphNodeType": {
 				"type": "string",
 				"enum": [
@@ -2950,6 +3424,53 @@
 				"type": "object",
 				"additionalProperties": false
 			},
+			"GraphDamage": {
+				"properties": {
+					"requestId": {
+						"type": "string"
+					},
+					"sessionId": {
+						"type": "string"
+					},
+					"edge": {
+						"$ref": "#/components/schemas/GraphEdge"
+					},
+					"sourceType": {
+						"allOf": [
+							{
+								"$ref": "#/components/schemas/GraphNodeType"
+							}
+						],
+						"nullable": true
+					},
+					"targetType": {
+						"allOf": [
+							{
+								"$ref": "#/components/schemas/GraphNodeType"
+							}
+						],
+						"nullable": true
+					},
+					"reason": {
+						"type": "string",
+						"enum": [
+							"missing-node",
+							"invalid-type",
+							"self-reference"
+						]
+					}
+				},
+				"required": [
+					"requestId",
+					"sessionId",
+					"edge",
+					"sourceType",
+					"targetType",
+					"reason"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
 			"GraphSession": {
 				"properties": {
 					"summary": {
@@ -3001,6 +3522,12 @@
 					"inputMessageIds": {
 						"items": {
 							"type": "string"
+						},
+						"type": "array"
+					},
+					"damage": {
+						"items": {
+							"$ref": "#/components/schemas/GraphDamage"
 						},
 						"type": "array"
 					}
@@ -3065,275 +3592,6 @@
 					},
 					"data": {
 						"$ref": "#/components/schemas/GraphSnapshot"
-					}
-				},
-				"required": [
-					"success",
-					"code",
-					"message",
-					"data"
-				],
-				"type": "object",
-				"additionalProperties": false
-			},
-			"AnalysisFailure": {
-				"properties": {
-					"category": {
-						"type": "string"
-					},
-					"message": {
-						"type": "string"
-					},
-					"status": {
-						"type": "number",
-						"format": "double"
-					},
-					"retryable": {
-						"type": "boolean"
-					}
-				},
-				"required": [
-					"category",
-					"message",
-					"status",
-					"retryable"
-				],
-				"type": "object",
-				"additionalProperties": false
-			},
-			"AnalysisPhase": {
-				"type": "string",
-				"enum": [
-					"extract",
-					"check",
-					"verify",
-					"repair",
-					"recheck",
-					"reverify",
-					"done"
-				]
-			},
-			"AnalysisStatus": {
-				"properties": {
-					"requestId": {
-						"type": "string"
-					},
-					"state": {
-						"type": "string"
-					},
-					"graphAvailable": {
-						"type": "boolean"
-					},
-					"retryable": {
-						"type": "boolean"
-					},
-					"error": {
-						"allOf": [
-							{
-								"$ref": "#/components/schemas/AnalysisFailure"
-							}
-						],
-						"nullable": true
-					},
-					"sessions": {
-						"items": {
-							"properties": {
-								"failure": {
-									"properties": {
-										"summary": {
-											"type": "string"
-										},
-										"action": {
-											"type": "string",
-											"enum": [
-												"retry",
-												"new-analysis"
-											]
-										},
-										"kind": {
-											"type": "string",
-											"enum": [
-												"timeout",
-												"configuration",
-												"validation",
-												"provider"
-											]
-										},
-										"stage": {
-											"$ref": "#/components/schemas/AnalysisPhase"
-										}
-									},
-									"required": [
-										"summary",
-										"action",
-										"kind",
-										"stage"
-									],
-									"type": "object"
-								},
-								"outputTokens": {
-									"type": "number",
-									"format": "double"
-								},
-								"inputTokens": {
-									"type": "number",
-									"format": "double"
-								},
-								"attempts": {
-									"type": "number",
-									"format": "double"
-								},
-								"logicalCalls": {
-									"type": "number",
-									"format": "double"
-								},
-								"waitMs": {
-									"type": "number",
-									"format": "double"
-								},
-								"elapsedMs": {
-									"type": "number",
-									"format": "double"
-								},
-								"repairs": {
-									"type": "number",
-									"format": "double"
-								},
-								"phase": {
-									"$ref": "#/components/schemas/AnalysisPhase"
-								},
-								"sessionId": {
-									"type": "string"
-								}
-							},
-							"required": [
-								"outputTokens",
-								"inputTokens",
-								"attempts",
-								"logicalCalls",
-								"elapsedMs",
-								"repairs",
-								"phase",
-								"sessionId"
-							],
-							"type": "object"
-						},
-						"type": "array"
-					}
-				},
-				"required": [
-					"requestId",
-					"state",
-					"graphAvailable",
-					"retryable",
-					"error",
-					"sessions"
-				],
-				"type": "object",
-				"additionalProperties": false
-			},
-			"ApiResponse_AnalysisStatus_": {
-				"description": "Shared v1 response contract. Domain payloads remain typed by each endpoint.",
-				"properties": {
-					"success": {
-						"type": "boolean"
-					},
-					"code": {
-						"type": "string"
-					},
-					"message": {
-						"type": "string"
-					},
-					"data": {
-						"$ref": "#/components/schemas/AnalysisStatus"
-					}
-				},
-				"required": [
-					"success",
-					"code",
-					"message",
-					"data"
-				],
-				"type": "object",
-				"additionalProperties": false
-			},
-			"AnalysisReceiptState": {
-				"description": "Durable input receipt lifecycle shared by the backend and bot.",
-				"enum": [
-					"receiving",
-					"pending",
-					"processing",
-					"retry",
-					"completed",
-					"failed"
-				],
-				"type": "string"
-			},
-			"ReceiptView": {
-				"properties": {
-					"requestId": {
-						"type": "string"
-					},
-					"state": {
-						"$ref": "#/components/schemas/AnalysisReceiptState"
-					},
-					"attempts": {
-						"type": "number",
-						"format": "double"
-					},
-					"nextAttemptAt": {
-						"type": "string"
-					},
-					"errorCategory": {
-						"type": "string",
-						"nullable": true
-					},
-					"inputRetained": {
-						"type": "boolean"
-					},
-					"result": {
-						"$ref": "#/components/schemas/AnalyzeDiscussionResponseDto"
-					},
-					"receivedAt": {
-						"type": "string"
-					},
-					"startedAt": {
-						"type": "string",
-						"nullable": true
-					},
-					"completedAt": {
-						"type": "string",
-						"nullable": true
-					}
-				},
-				"required": [
-					"requestId",
-					"state",
-					"attempts",
-					"nextAttemptAt",
-					"errorCategory",
-					"inputRetained",
-					"receivedAt",
-					"startedAt",
-					"completedAt"
-				],
-				"type": "object",
-				"additionalProperties": false
-			},
-			"ApiResponse_ReceiptView_": {
-				"description": "Shared v1 response contract. Domain payloads remain typed by each endpoint.",
-				"properties": {
-					"success": {
-						"type": "boolean"
-					},
-					"code": {
-						"type": "string"
-					},
-					"message": {
-						"type": "string"
-					},
-					"data": {
-						"$ref": "#/components/schemas/ReceiptView"
 					}
 				},
 				"required": [
@@ -4966,6 +5224,14 @@
 						"schema": {
 							"type": "string"
 						}
+					},
+					{
+						"in": "header",
+						"name": "X-Scan-Range",
+						"required": false,
+						"schema": {
+							"type": "string"
+						}
 					}
 				],
 				"requestBody": {
@@ -5506,6 +5772,108 @@
 				],
 				"security": [],
 				"parameters": []
+			}
+		},
+		"/api/v1/analysis-requests/{requestId}/sessions/{sessionId}/reanalyze-current": {
+			"post": {
+				"operationId": "ReanalyzeCurrent",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiResponse_ReceiptView_"
+								}
+							}
+						}
+					}
+				},
+				"tags": [
+					"Analysis Requests"
+				],
+				"security": [
+					{
+						"jwt": []
+					}
+				],
+				"parameters": [
+					{
+						"in": "path",
+						"name": "requestId",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"in": "path",
+						"name": "sessionId",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"in": "query",
+						"name": "guildId",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				]
+			}
+		},
+		"/api/v1/analysis-requests/{requestId}/sessions/{sessionId}/retry": {
+			"post": {
+				"operationId": "RetrySession",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiResponse_AnalysisStatus_"
+								}
+							}
+						}
+					}
+				},
+				"tags": [
+					"Analysis Requests"
+				],
+				"security": [
+					{
+						"jwt": []
+					}
+				],
+				"parameters": [
+					{
+						"in": "path",
+						"name": "requestId",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"in": "path",
+						"name": "sessionId",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"in": "query",
+						"name": "guildId",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				]
 			}
 		},
 		"/api/v1/analysis-requests/{requestId}/graph": {

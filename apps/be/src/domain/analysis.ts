@@ -1,4 +1,5 @@
 import type { Decision } from '@ggaddak/shared';
+import type { SkippedAnalysisSession } from './analysis-workflow.js';
 
 export interface DiscussionMessage {
   isBot?: boolean;
@@ -36,4 +37,6 @@ export interface AnalyzeDiscussionResult {
   decisions: Decision[];
   hasConflict?: boolean;
   conflictingDecision?: Decision;
+  skippedSessions?: SkippedAnalysisSession[];
+  damagedSessionCount?: number;
 }

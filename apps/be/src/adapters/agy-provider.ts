@@ -33,7 +33,9 @@ export class AgyProvider implements AiProvider {
         signal: request.signal,
       });
       if ((result.usage?.outputTokens ?? 0) > request.maxOutputTokens)
-        throw new AppError('AGY output exceeds application token limit', 422);
+        throw new AppError('AGY output exceeds application token limit', 422, {
+          failureKind: 'output-truncated',
+        });
       return result;
     } catch (error) {
       if (error instanceof AppError) throw error;

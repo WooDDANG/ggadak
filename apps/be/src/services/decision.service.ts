@@ -70,6 +70,29 @@ export class DecisionService {
     return this.repo.browseDecisions(filter);
   }
 
+  async damagedCandidates(guildId: string, decisionIds: string[]): Promise<Set<string>> {
+    const links = await this.repo.prisma.candidateAnalysis.findMany({
+      where: { decisionId: { in: decisionIds }, request: { guildId, graphJson: { not: null } } },
+      select: { decisionId: true, request: { select: { graphJson: true } } },
+      orderBy: { request: { createdAt: 'desc' } },
+    });
+    const checked = new Set<string>();
+    const damaged = new Set<string>();
+    for (const link of links) {
+      if (checked.has(link.decisionId)) continue;
+      const snapshot: import('../domain/decision-graph.js').GraphSnapshot = JSON.parse(
+        link.request.graphJson!,
+      );
+      const sessions = snapshot.sessions.filter(session =>
+        session.nodes.some(node => node.decisionId === link.decisionId),
+      );
+      if (!sessions.length) continue;
+      checked.add(link.decisionId);
+      if (sessions.some(session => session.damage?.length)) damaged.add(link.decisionId);
+    }
+    return damaged;
+  }
+
   async getConfirmedTimeline(filter: Parameters<DecisionRepository['getConfirmedTimeline']>[0]) {
     return this.repo.getConfirmedTimeline(filter);
   }

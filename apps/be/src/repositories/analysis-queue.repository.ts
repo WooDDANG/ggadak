@@ -153,8 +153,13 @@ export class AnalysisQueueRepository extends BaseRepository {
       },
     });
   }
-  patchOwned(id: string, owner: string, data: Prisma.AnalysisReceiptUpdateManyMutationInput) {
-    return this.prisma.analysisReceipt.updateMany({
+  patchOwned(
+    id: string,
+    owner: string,
+    data: Prisma.AnalysisReceiptUpdateManyMutationInput,
+    tx: QueueTransaction = this.prisma,
+  ) {
+    return tx.analysisReceipt.updateMany({
       where: { id, owner, state: AnalysisReceiptState.Processing },
       data,
     });

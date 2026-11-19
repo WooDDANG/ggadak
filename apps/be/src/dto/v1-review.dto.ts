@@ -3,6 +3,7 @@ import type { V1DecisionDto } from './v1-decision.dto.js';
 /** A Review Queue ticket is the Decision Candidate itself. Both IDs are identical strings. */
 export interface V1ReviewTicketDto extends V1DecisionDto {
   ticketId: string;
+  graphDamaged?: boolean;
 }
 export interface V1ReviewQueueDto {
   items: V1ReviewTicketDto[];
