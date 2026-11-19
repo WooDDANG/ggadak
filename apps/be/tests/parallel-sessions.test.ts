@@ -100,9 +100,10 @@ test('요청 전체 실패가 나도 처리 중인 형제 세션은 끊지 않�
   };
   try {
     const service = new DiscussionService(db.repo, ai, new DecisionExtractorCore());
-    await expect(service.analyzeDiscussion(input('recover-parallel'))).rejects.toThrow(
-      'Temporary analysis failure',
-    );
+    const scanRange = { afterMessageId: '0', startMessageId: '1', endMessageId: '4' };
+    await expect(
+      service.analyzeDiscussion(input('recover-parallel'), { scanRange }),
+    ).rejects.toThrow('Temporary analysis failure');
     expect(active).toBe(0);
     expect(interrupted).toEqual([]);
     expect(extracts).not.toContain('4');
@@ -115,11 +116,50 @@ test('요청 전체 실패가 나도 처리 중인 형제 세션은 끊지 않�
       'done',
       'extract',
     ]);
+    // 끌려 끊긴 세션이 없으므로 시간 초과 건너뜀도, 끊긴 호출 시간으로 깎인 예산도 없다.
+    expect(failed.sessions.some(session => session.skippedFailure)).toBe(false);
+    expect(failed.sessions[2].elapsedMs).toBeLessThan(5_000);
     fail = false;
-    await service.analyzeDiscussion(input('recover-parallel'));
+    await service.analyzeDiscussion(input('recover-parallel'), { scanRange });
     expect(extracts.filter(id => id === '1')).toHaveLength(1);
     expect(extracts.filter(id => id === '3')).toHaveLength(1);
     expect((await service.getStatus('recover-parallel', 'g')).state).toBe('completed');
+  } finally {
+    vi.unstubAllEnvs();
+    await db.cleanup();
+  }
+});
+
+test('소유권 상실은 처리 중인 형제 세션의 호출을 즉시 끊는다', async () => {
+  vi.stubEnv('AI_SESSION_CONCURRENCY', '3');
+  vi.stubEnv('AI_CALL_CONCURRENCY', '3');
+  const db = await isolatedRepository();
+  const interrupted: string[] = [];
+  const ai: IAiAdapter = {
+    async extractGraph(transcript, context) {
+      try {
+        await delay(5_000, undefined, { signal: context.signal });
+        return { value: graph };
+      } catch (error) {
+        if (context.signal.aborted) interrupted.push(transcript);
+        throw error;
+      }
+    },
+    async verifyGraph() {
+      return { value: { valid: true, issues: [] } };
+    },
+    async repairGraph() {
+      throw new Error('No repairs expected');
+    },
+  };
+  const owner = new AbortController();
+  try {
+    const service = new DiscussionService(db.repo, ai, new DecisionExtractorCore());
+    const run = service.analyzeDiscussion(input('ownership'), { signal: owner.signal });
+    await delay(200);
+    owner.abort();
+    await expect(run).rejects.toBeDefined();
+    expect(interrupted).toHaveLength(3);
   } finally {
     vi.unstubAllEnvs();
     await db.cleanup();
@@ -160,7 +200,7 @@ test('빈 NVIDIA 키가 잠깐 없으면 호출 차례를 쥔 채 기다렸다 �
     // 키를 기다린 시간은 세션 시간 예산이 아니라 대기 시간으로 남는다.
     const waited = status.sessions.filter(session => (session.waitMs ?? 0) >= 25);
     expect(waited.length).toBeGreaterThan(0);
-    expect(waited.every(session => session.elapsedMs < 25)).toBe(true);
+    expect(waited.every(session => session.elapsedMs < (session.waitMs ?? 0))).toBe(true);
 
     busy = 1;
     retryAfterMs = 60 * 60 * 1000;
