@@ -26,8 +26,8 @@ export const DeliveryPolicy = {
   maxAttempts: 5,
   initialRetryMs: 5 * DurationMs.Second,
   maxRetryMs: 5 * DurationMs.Minute,
-  // BE 세션 시간 예산 100초보다 길어야 동기 전달에서 Bot이 먼저 포기하지 않는다.
-  analysisTimeoutMs: 110 * DurationMs.Second,
+  // BE 세션 시간 예산 150초보다 길어야 동기 전달에서 Bot이 먼저 포기하지 않는다.
+  analysisTimeoutMs: 160 * DurationMs.Second,
   retryJitter: 0.2,
   failedResultPollMs: 30 * DurationMs.Second,
   maxRetryAfterMs: DurationMs.Day,

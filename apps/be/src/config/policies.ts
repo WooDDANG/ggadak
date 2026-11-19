@@ -21,9 +21,9 @@ export const GraphPolicy = {
   maxEdges: 2_000,
   maxProblems: 500,
   maxVerificationIssues: 500,
-  // 논리 호출 상한 5회 × 호출 제한 20초.
-  sessionBudgetMs: 100_000,
-  callTimeoutMs: 20_000,
+  // 논리 호출 상한 5회 × 호출 제한 30초.
+  sessionBudgetMs: 150_000,
+  callTimeoutMs: 30_000,
   maxLogicalCalls: 5,
   maxRepairs: 2,
 } as const;
