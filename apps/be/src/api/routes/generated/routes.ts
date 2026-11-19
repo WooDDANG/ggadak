@@ -149,6 +149,7 @@ const models: TsoaRoute.Models = {
             "dates": {"dataType":"nestedObjectLiteral","nestedProperties":{"feedbackDate":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},"confirmedDate":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},"createdDate":{"dataType":"string","required":true}},"required":true},
             "alternatives": {"dataType":"array","array":{"dataType":"nestedObjectLiteral","nestedProperties":{"reason":{"dataType":"string","required":true},"name":{"dataType":"string","required":true},"id":{"dataType":"string","required":true}}},"required":true},
             "ticketId": {"dataType":"string","required":true},
+            "graphDamaged": {"dataType":"boolean"},
         },
         "additionalProperties": false,
     },
@@ -401,6 +402,26 @@ const models: TsoaRoute.Models = {
         "type": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["COMPLETED"]},{"dataType":"enum","enums":["QUEUED"]},{"dataType":"enum","enums":["PROCESSING"]},{"dataType":"enum","enums":["FAILED"]}],"validators":{}},
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "AiFailureKind": {
+        "dataType": "refAlias",
+        "type": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["timeout"]},{"dataType":"enum","enums":["rate-limit"]},{"dataType":"enum","enums":["provider"]},{"dataType":"enum","enums":["auth"]},{"dataType":"enum","enums":["graph-structure"]},{"dataType":"enum","enums":["semantic-verification"]},{"dataType":"enum","enums":["configuration"]},{"dataType":"enum","enums":["output-empty"]},{"dataType":"enum","enums":["output-unparseable"]},{"dataType":"enum","enums":["output-truncated"]},{"dataType":"enum","enums":["verify-format"]},{"dataType":"enum","enums":["lease-lost"]},{"dataType":"enum","enums":["budget-exhausted"]}],"validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "SyncSkippedSession": {
+        "dataType": "refObject",
+        "properties": {
+            "sessionId": {"dataType":"string","required":true},
+            "messageIds": {"dataType":"array","array":{"dataType":"string"},"required":true},
+            "failedAt": {"dataType":"string","required":true},
+            "kind": {"ref":"AiFailureKind","required":true},
+            "scanRange": {"dataType":"nestedObjectLiteral","nestedProperties":{"endMessageId":{"dataType":"string","required":true},"startMessageId":{"dataType":"string","required":true},"afterMessageId":{"dataType":"string","required":true}}},
+            "requestId": {"dataType":"string","required":true},
+            "recoveryState": {"dataType":"string","required":true},
+            "nextAttemptAt": {"dataType":"string"},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "SyncChannelStatus": {
         "dataType": "refAlias",
         "type": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["COMPLETED"]},{"dataType":"enum","enums":["FAILED"]},{"dataType":"enum","enums":["WAITING"]},{"dataType":"enum","enums":["RECEIVED"]}],"validators":{}},
@@ -408,7 +429,7 @@ const models: TsoaRoute.Models = {
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "SyncJobView": {
         "dataType": "refAlias",
-        "type": {"dataType":"nestedObjectLiteral","nestedProperties":{"completedAt":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},"startedAt":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},"createdAt":{"dataType":"string","required":true},"errorMessage":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},"channels":{"dataType":"array","array":{"dataType":"nestedObjectLiteral","nestedProperties":{"status":{"ref":"SyncChannelStatus","required":true},"id":{"dataType":"string","required":true}}}},"analysisPendingChannels":{"dataType":"double"},"receivedChannels":{"dataType":"double"},"messagesScanned":{"dataType":"double","required":true},"decisionsFound":{"dataType":"double","required":true},"failedChannels":{"dataType":"double","required":true},"completedChannels":{"dataType":"double","required":true},"totalChannels":{"dataType":"double","required":true},"status":{"ref":"SyncJobStatus","required":true},"forceFullSync":{"dataType":"boolean","required":true},"guildId":{"dataType":"string","required":true},"jobId":{"dataType":"string","required":true}},"validators":{}},
+        "type": {"dataType":"nestedObjectLiteral","nestedProperties":{"completedAt":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},"startedAt":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},"createdAt":{"dataType":"string","required":true},"errorMessage":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},"channels":{"dataType":"array","array":{"dataType":"nestedObjectLiteral","nestedProperties":{"status":{"ref":"SyncChannelStatus","required":true},"id":{"dataType":"string","required":true}}}},"analysisPendingChannels":{"dataType":"double"},"receivedChannels":{"dataType":"double"},"messagesScanned":{"dataType":"double","required":true},"skippedSessions":{"dataType":"array","array":{"dataType":"refObject","ref":"SyncSkippedSession"}},"damagedSessionCount":{"dataType":"double"},"skippedSessionCount":{"dataType":"double"},"decisionsFound":{"dataType":"double","required":true},"failedChannels":{"dataType":"double","required":true},"completedChannels":{"dataType":"double","required":true},"totalChannels":{"dataType":"double","required":true},"status":{"ref":"SyncJobStatus","required":true},"forceFullSync":{"dataType":"boolean","required":true},"guildId":{"dataType":"string","required":true},"jobId":{"dataType":"string","required":true}},"validators":{}},
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "ApiResponse_SyncJobView_": {
@@ -433,6 +454,9 @@ const models: TsoaRoute.Models = {
             "analysisPendingChannels": {"dataType":"double"},
             "receivedChannels": {"dataType":"double"},
             "messagesScanned": {"dataType":"double","required":true},
+            "skippedSessions": {"dataType":"array","array":{"dataType":"refObject","ref":"SyncSkippedSession"}},
+            "damagedSessionCount": {"dataType":"double"},
+            "skippedSessionCount": {"dataType":"double"},
             "decisionsFound": {"dataType":"double","required":true},
             "failedChannels": {"dataType":"double","required":true},
             "completedChannels": {"dataType":"double","required":true},
@@ -482,6 +506,8 @@ const models: TsoaRoute.Models = {
             "status": {"ref":"Exclude_SyncChannelStatus.WAITING_","required":true},
             "messagesScanned": {"dataType":"double","required":true},
             "decisionsFound": {"dataType":"double","required":true},
+            "skippedSessionCount": {"dataType":"double"},
+            "damagedSessionCount": {"dataType":"double"},
             "errorMessage": {"dataType":"string"},
         },
         "additionalProperties": false,
@@ -620,6 +646,18 @@ const models: TsoaRoute.Models = {
         "additionalProperties": false,
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "SkippedAnalysisSession": {
+        "dataType": "refObject",
+        "properties": {
+            "sessionId": {"dataType":"string","required":true},
+            "messageIds": {"dataType":"array","array":{"dataType":"string"},"required":true},
+            "failedAt": {"dataType":"string","required":true},
+            "kind": {"ref":"AiFailureKind","required":true},
+            "scanRange": {"dataType":"nestedObjectLiteral","nestedProperties":{"endMessageId":{"dataType":"string","required":true},"startMessageId":{"dataType":"string","required":true},"afterMessageId":{"dataType":"string","required":true}}},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "AnalyzeDiscussionResponseDto": {
         "dataType": "refObject",
         "properties": {
@@ -631,6 +669,8 @@ const models: TsoaRoute.Models = {
             "decisions": {"dataType":"array","array":{"dataType":"refObject","ref":"DecisionItemDto"},"required":true},
             "hasConflict": {"dataType":"boolean"},
             "conflictingDecision": {"ref":"DecisionItemDto"},
+            "skippedSessions": {"dataType":"array","array":{"dataType":"refObject","ref":"SkippedAnalysisSession"}},
+            "damagedSessionCount": {"dataType":"double"},
         },
         "additionalProperties": false,
     },
@@ -893,6 +933,79 @@ const models: TsoaRoute.Models = {
         "additionalProperties": false,
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "AnalysisReceiptState": {
+        "dataType": "refEnum",
+        "enums": ["receiving","pending","processing","retry","completed","failed"],
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "ReceiptView": {
+        "dataType": "refObject",
+        "properties": {
+            "requestId": {"dataType":"string","required":true},
+            "state": {"ref":"AnalysisReceiptState","required":true},
+            "attempts": {"dataType":"double","required":true},
+            "nextAttemptAt": {"dataType":"string","required":true},
+            "errorCategory": {"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},
+            "inputRetained": {"dataType":"boolean","required":true},
+            "result": {"ref":"AnalyzeDiscussionResponseDto"},
+            "receivedAt": {"dataType":"string","required":true},
+            "startedAt": {"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},
+            "completedAt": {"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "ApiResponse_ReceiptView_": {
+        "dataType": "refObject",
+        "properties": {
+            "success": {"dataType":"boolean","required":true},
+            "code": {"dataType":"string","required":true},
+            "message": {"dataType":"string","required":true},
+            "data": {"ref":"ReceiptView","required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "AnalysisFailure": {
+        "dataType": "refObject",
+        "properties": {
+            "category": {"dataType":"string","required":true},
+            "message": {"dataType":"string","required":true},
+            "status": {"dataType":"double","required":true},
+            "retryable": {"dataType":"boolean","required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "AnalysisPhase": {
+        "dataType": "refAlias",
+        "type": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["extract"]},{"dataType":"enum","enums":["check"]},{"dataType":"enum","enums":["verify"]},{"dataType":"enum","enums":["repair"]},{"dataType":"enum","enums":["recheck"]},{"dataType":"enum","enums":["reverify"]},{"dataType":"enum","enums":["done"]}],"validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "AnalysisStatus": {
+        "dataType": "refObject",
+        "properties": {
+            "requestId": {"dataType":"string","required":true},
+            "state": {"dataType":"string","required":true},
+            "graphAvailable": {"dataType":"boolean","required":true},
+            "retryable": {"dataType":"boolean","required":true},
+            "error": {"dataType":"union","subSchemas":[{"ref":"AnalysisFailure"},{"dataType":"enum","enums":[null]}],"required":true},
+            "sessions": {"dataType":"array","array":{"dataType":"nestedObjectLiteral","nestedProperties":{"failure":{"dataType":"nestedObjectLiteral","nestedProperties":{"summary":{"dataType":"string","required":true},"action":{"dataType":"union","subSchemas":[{"dataType":"enum","enums":["retry"]},{"dataType":"enum","enums":["new-analysis"]}],"required":true},"kind":{"dataType":"union","subSchemas":[{"dataType":"enum","enums":["timeout"]},{"dataType":"enum","enums":["configuration"]},{"dataType":"enum","enums":["validation"]},{"dataType":"enum","enums":["provider"]}],"required":true},"stage":{"ref":"AnalysisPhase","required":true}}},"recovery":{"dataType":"nestedObjectLiteral","nestedProperties":{"failureKind":{"dataType":"string"},"expiresAt":{"dataType":"string","required":true},"nextAttemptAt":{"dataType":"string","required":true},"attempts":{"dataType":"double","required":true},"state":{"dataType":"string","required":true}}},"skippedFailure":{"ref":"SkippedAnalysisSession"},"damageCount":{"dataType":"double"},"outputTokens":{"dataType":"double","required":true},"inputTokens":{"dataType":"double","required":true},"attempts":{"dataType":"double","required":true},"logicalCalls":{"dataType":"double","required":true},"waitMs":{"dataType":"double"},"elapsedMs":{"dataType":"double","required":true},"repairs":{"dataType":"double","required":true},"phase":{"ref":"AnalysisPhase","required":true},"sessionId":{"dataType":"string","required":true}}},"required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "ApiResponse_AnalysisStatus_": {
+        "dataType": "refObject",
+        "properties": {
+            "success": {"dataType":"boolean","required":true},
+            "code": {"dataType":"string","required":true},
+            "message": {"dataType":"string","required":true},
+            "data": {"ref":"AnalysisStatus","required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "GraphNodeType": {
         "dataType": "refAlias",
         "type": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["Topic"]},{"dataType":"enum","enums":["Issue"]},{"dataType":"enum","enums":["DecisionCandidate"]},{"dataType":"enum","enums":["Alternative"]},{"dataType":"enum","enums":["Rationale"]},{"dataType":"enum","enums":["ActionItem"]}],"validators":{}},
@@ -940,6 +1053,19 @@ const models: TsoaRoute.Models = {
         "additionalProperties": false,
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "GraphDamage": {
+        "dataType": "refObject",
+        "properties": {
+            "requestId": {"dataType":"string","required":true},
+            "sessionId": {"dataType":"string","required":true},
+            "edge": {"ref":"GraphEdge","required":true},
+            "sourceType": {"dataType":"union","subSchemas":[{"ref":"GraphNodeType"},{"dataType":"enum","enums":[null]}],"required":true},
+            "targetType": {"dataType":"union","subSchemas":[{"ref":"GraphNodeType"},{"dataType":"enum","enums":[null]}],"required":true},
+            "reason": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["missing-node"]},{"dataType":"enum","enums":["invalid-type"]},{"dataType":"enum","enums":["self-reference"]}],"required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "GraphSession": {
         "dataType": "refObject",
         "properties": {
@@ -949,6 +1075,7 @@ const models: TsoaRoute.Models = {
             "discussionProblems": {"dataType":"array","array":{"dataType":"nestedObjectLiteral","nestedProperties":{"edgeIds":{"dataType":"array","array":{"dataType":"string"},"required":true},"nodeIds":{"dataType":"array","array":{"dataType":"string"},"required":true},"summary":{"dataType":"string","required":true}}},"required":true},
             "sessionId": {"dataType":"string","required":true},
             "inputMessageIds": {"dataType":"array","array":{"dataType":"string"},"required":true},
+            "damage": {"dataType":"array","array":{"dataType":"refObject","ref":"GraphDamage"}},
         },
         "additionalProperties": false,
     },
@@ -972,79 +1099,6 @@ const models: TsoaRoute.Models = {
             "code": {"dataType":"string","required":true},
             "message": {"dataType":"string","required":true},
             "data": {"ref":"GraphSnapshot","required":true},
-        },
-        "additionalProperties": false,
-    },
-    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
-    "AnalysisFailure": {
-        "dataType": "refObject",
-        "properties": {
-            "category": {"dataType":"string","required":true},
-            "message": {"dataType":"string","required":true},
-            "status": {"dataType":"double","required":true},
-            "retryable": {"dataType":"boolean","required":true},
-        },
-        "additionalProperties": false,
-    },
-    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
-    "AnalysisPhase": {
-        "dataType": "refAlias",
-        "type": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["extract"]},{"dataType":"enum","enums":["check"]},{"dataType":"enum","enums":["verify"]},{"dataType":"enum","enums":["repair"]},{"dataType":"enum","enums":["recheck"]},{"dataType":"enum","enums":["reverify"]},{"dataType":"enum","enums":["done"]}],"validators":{}},
-    },
-    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
-    "AnalysisStatus": {
-        "dataType": "refObject",
-        "properties": {
-            "requestId": {"dataType":"string","required":true},
-            "state": {"dataType":"string","required":true},
-            "graphAvailable": {"dataType":"boolean","required":true},
-            "retryable": {"dataType":"boolean","required":true},
-            "error": {"dataType":"union","subSchemas":[{"ref":"AnalysisFailure"},{"dataType":"enum","enums":[null]}],"required":true},
-            "sessions": {"dataType":"array","array":{"dataType":"nestedObjectLiteral","nestedProperties":{"failure":{"dataType":"nestedObjectLiteral","nestedProperties":{"summary":{"dataType":"string","required":true},"action":{"dataType":"union","subSchemas":[{"dataType":"enum","enums":["retry"]},{"dataType":"enum","enums":["new-analysis"]}],"required":true},"kind":{"dataType":"union","subSchemas":[{"dataType":"enum","enums":["timeout"]},{"dataType":"enum","enums":["configuration"]},{"dataType":"enum","enums":["validation"]},{"dataType":"enum","enums":["provider"]}],"required":true},"stage":{"ref":"AnalysisPhase","required":true}}},"outputTokens":{"dataType":"double","required":true},"inputTokens":{"dataType":"double","required":true},"attempts":{"dataType":"double","required":true},"logicalCalls":{"dataType":"double","required":true},"waitMs":{"dataType":"double"},"elapsedMs":{"dataType":"double","required":true},"repairs":{"dataType":"double","required":true},"phase":{"ref":"AnalysisPhase","required":true},"sessionId":{"dataType":"string","required":true}}},"required":true},
-        },
-        "additionalProperties": false,
-    },
-    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
-    "ApiResponse_AnalysisStatus_": {
-        "dataType": "refObject",
-        "properties": {
-            "success": {"dataType":"boolean","required":true},
-            "code": {"dataType":"string","required":true},
-            "message": {"dataType":"string","required":true},
-            "data": {"ref":"AnalysisStatus","required":true},
-        },
-        "additionalProperties": false,
-    },
-    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
-    "AnalysisReceiptState": {
-        "dataType": "refEnum",
-        "enums": ["receiving","pending","processing","retry","completed","failed"],
-    },
-    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
-    "ReceiptView": {
-        "dataType": "refObject",
-        "properties": {
-            "requestId": {"dataType":"string","required":true},
-            "state": {"ref":"AnalysisReceiptState","required":true},
-            "attempts": {"dataType":"double","required":true},
-            "nextAttemptAt": {"dataType":"string","required":true},
-            "errorCategory": {"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},
-            "inputRetained": {"dataType":"boolean","required":true},
-            "result": {"ref":"AnalyzeDiscussionResponseDto"},
-            "receivedAt": {"dataType":"string","required":true},
-            "startedAt": {"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},
-            "completedAt": {"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},
-        },
-        "additionalProperties": false,
-    },
-    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
-    "ApiResponse_ReceiptView_": {
-        "dataType": "refObject",
-        "properties": {
-            "success": {"dataType":"boolean","required":true},
-            "code": {"dataType":"string","required":true},
-            "message": {"dataType":"string","required":true},
-            "data": {"ref":"ReceiptView","required":true},
         },
         "additionalProperties": false,
     },
@@ -2020,6 +2074,7 @@ export function RegisterRoutes(app: Router) {
         const argsDiscussionController_analyze: Record<string, TsoaRoute.ParameterSchema> = {
                 body: {"in":"body","name":"body","required":true,"ref":"AnalyzeDiscussionRequestDto"},
                 traceIdHeader: {"in":"header","name":"X-Trace-Id","dataType":"string"},
+                scanRangeHeader: {"in":"header","name":"X-Scan-Range","dataType":"string"},
         };
         app.post('/api/discussions/analyze',
             authenticateMiddleware([{"service":[]}]),
@@ -2584,6 +2639,84 @@ export function RegisterRoutes(app: Router) {
 
               await templateService.apiHandler({
                 methodName: 'logoutSession',
+                controller,
+                response,
+                next,
+                validatedArgs,
+                successStatus: undefined,
+              });
+            } catch (err) {
+                return next(err);
+            }
+        });
+        // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+        const argsAnalysisRequestController_reanalyzeCurrent: Record<string, TsoaRoute.ParameterSchema> = {
+                request: {"in":"request","name":"request","required":true,"dataType":"object"},
+                requestId: {"in":"path","name":"requestId","required":true,"dataType":"string"},
+                sessionId: {"in":"path","name":"sessionId","required":true,"dataType":"string"},
+                guildId: {"in":"query","name":"guildId","required":true,"dataType":"string"},
+        };
+        app.post('/api/v1/analysis-requests/:requestId/sessions/:sessionId/reanalyze-current',
+            authenticateMiddleware([{"jwt":[]}]),
+            ...(fetchMiddlewares<RequestHandler>(AnalysisRequestController)),
+            ...(fetchMiddlewares<RequestHandler>(AnalysisRequestController.prototype.reanalyzeCurrent)),
+
+            async function AnalysisRequestController_reanalyzeCurrent(request: ExRequest, response: ExResponse, next: any) {
+
+            // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+
+            let validatedArgs: any[] = [];
+            try {
+                validatedArgs = templateService.getValidatedArgs({ args: argsAnalysisRequestController_reanalyzeCurrent, request, response });
+
+                const container: IocContainer = typeof iocContainer === 'function' ? (iocContainer as IocContainerFactory)(request) : iocContainer;
+
+                const controller: any = await container.get<AnalysisRequestController>(AnalysisRequestController);
+                if (typeof controller['setStatus'] === 'function') {
+                controller.setStatus(undefined);
+                }
+
+              await templateService.apiHandler({
+                methodName: 'reanalyzeCurrent',
+                controller,
+                response,
+                next,
+                validatedArgs,
+                successStatus: undefined,
+              });
+            } catch (err) {
+                return next(err);
+            }
+        });
+        // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+        const argsAnalysisRequestController_retrySession: Record<string, TsoaRoute.ParameterSchema> = {
+                request: {"in":"request","name":"request","required":true,"dataType":"object"},
+                requestId: {"in":"path","name":"requestId","required":true,"dataType":"string"},
+                sessionId: {"in":"path","name":"sessionId","required":true,"dataType":"string"},
+                guildId: {"in":"query","name":"guildId","required":true,"dataType":"string"},
+        };
+        app.post('/api/v1/analysis-requests/:requestId/sessions/:sessionId/retry',
+            authenticateMiddleware([{"jwt":[]}]),
+            ...(fetchMiddlewares<RequestHandler>(AnalysisRequestController)),
+            ...(fetchMiddlewares<RequestHandler>(AnalysisRequestController.prototype.retrySession)),
+
+            async function AnalysisRequestController_retrySession(request: ExRequest, response: ExResponse, next: any) {
+
+            // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+
+            let validatedArgs: any[] = [];
+            try {
+                validatedArgs = templateService.getValidatedArgs({ args: argsAnalysisRequestController_retrySession, request, response });
+
+                const container: IocContainer = typeof iocContainer === 'function' ? (iocContainer as IocContainerFactory)(request) : iocContainer;
+
+                const controller: any = await container.get<AnalysisRequestController>(AnalysisRequestController);
+                if (typeof controller['setStatus'] === 'function') {
+                controller.setStatus(undefined);
+                }
+
+              await templateService.apiHandler({
+                methodName: 'retrySession',
                 controller,
                 response,
                 next,

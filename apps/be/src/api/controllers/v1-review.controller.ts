@@ -33,11 +33,16 @@ export class V1ReviewController extends Controller {
     if (!Number.isInteger(page) || page < 1 || !Number.isInteger(size) || size < 1 || size > 100)
       throw new BadRequestError('page must be positive and size between 1 and 100');
     const result = await this.service.browseDecisions({ guildId, status, page, size });
+    const damaged = await this.service.damagedCandidates(
+      guildId,
+      result.decisions.map(decision => decision.id),
+    );
     return apiSuccess({
       pageInfo: result.pageInfo,
       items: result.decisions.map(decision => ({
         ...toV1Decision(decision),
         ticketId: decision.id,
+        ...(damaged.has(decision.id) ? { graphDamaged: true } : {}),
       })),
     });
   }

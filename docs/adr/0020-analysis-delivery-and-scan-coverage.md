@@ -2,6 +2,8 @@
 
 Status: accepted (design agreed; implementation pending)
 
+범위 변경: 세션 실패의 명시적 건너뜀과 checkpoint 전진은 [ADR-0028](./0028-degraded-analysis-and-scan-progress.md)을 따른다. 이 문서의 실패 구간 차단 규칙은 해당 변경이 구현되기 전의 계약이다.
+
 Channel Checkpoint means the end of a continuously completed channel scan range. Completing an isolated event-triggered Harvesting Window does not establish that earlier channel messages were scanned and must not advance this checkpoint. The Bot advances scan progress only after completed analysis is acknowledged; the backend must persist the checkpoint rather than independently advancing it from an analysis trigger.
 
 Each analysis request receives a stable ID when durably queued. Retries retain that ID, and the backend returns a previously completed result instead of extracting and saving candidates again. Explicit manual reanalysis receives a new request ID, with overlapping-candidate detection handled separately. This separates delivery retries from intentional reanalysis.

@@ -43,16 +43,45 @@ export const GraphNodeSchema = z.object({
 export const GraphEdgeSchema = z.object({
   id: z.string().trim().min(1),
   type: z.nativeEnum(GraphEdgeType),
-  sourceId: z.string().min(1),
-  targetId: z.string().min(1),
+  sourceId: z.string().trim().min(1),
+  targetId: z.string().trim().min(1),
 });
 export const GraphSchema = z.object({
   summary: text,
   nodes: z.array(GraphNodeSchema).max(GraphPolicy.maxNodes),
   edges: z.array(GraphEdgeSchema).max(GraphPolicy.maxEdges),
   discussionProblems: z
-    .array(z.object({ summary: text, nodeIds: z.array(z.string()), edgeIds: z.array(z.string()) }))
+    .array(
+      z.object({
+        summary: text,
+        nodeIds: z.array(z.string().trim()),
+        edgeIds: z.array(z.string().trim()),
+      }),
+    )
     .max(GraphPolicy.maxProblems),
+});
+export const ExtractGraphSchema = GraphSchema.extend({
+  nodes: z
+    .array(
+      z.union([
+        GraphNodeSchema.extend({
+          type: z.literal(GraphNodeType.DecisionCandidate),
+          observation: ObservationSchema,
+          category: CategoryTagSchema,
+          history: GraphNodeSchema.shape.history.unwrap().unwrap().min(1),
+        }),
+        GraphNodeSchema.extend({
+          type: z.nativeEnum({
+            Topic: GraphNodeType.Topic,
+            Issue: GraphNodeType.Issue,
+            Alternative: GraphNodeType.Alternative,
+            Rationale: GraphNodeType.Rationale,
+            ActionItem: GraphNodeType.ActionItem,
+          }),
+        }),
+      ]),
+    )
+    .max(GraphPolicy.maxNodes),
 });
 export const VerificationSchema = z
   .object({
@@ -158,6 +187,15 @@ export interface GraphSession extends DecisionGraph {
   sessionId: string;
   inputMessageIds: string[];
   nodes: LinkedGraphNode[];
+  damage?: GraphDamage[];
+}
+export interface GraphDamage {
+  requestId: string;
+  sessionId: string;
+  edge: GraphEdge;
+  sourceType: GraphNode['type'] | null;
+  targetType: GraphNode['type'] | null;
+  reason: 'missing-node' | 'invalid-type' | 'self-reference';
 }
 export interface GraphSnapshot {
   id: string;
@@ -193,6 +231,36 @@ const allowed: Record<GraphEdgeType, Array<[GraphNode['type'][], GraphNode['type
     ],
   ],
 };
+
+export function removeInvalidEdges(graph: DecisionGraph, requestId: string, sessionId: string) {
+  const nodes = new Map(graph.nodes.map(node => [node.id, node]));
+  // 중복 ID는 끝점의 실제 타입을 결정할 수 없으므로 기존 Repair에 맡긴다.
+  if (nodes.size !== graph.nodes.length) return { graph, damage: [] as GraphDamage[] };
+  const damage: GraphDamage[] = [];
+  const edges = graph.edges.filter(edge => {
+    const source = nodes.get(edge.sourceId),
+      target = nodes.get(edge.targetId);
+    const reason =
+      !source || !target
+        ? 'missing-node'
+        : source === target
+          ? 'self-reference'
+          : !allowed[edge.type].some(([a, b]) => a.includes(source.type) && b.includes(target.type))
+            ? 'invalid-type'
+            : undefined;
+    if (!reason) return true;
+    damage.push({
+      requestId,
+      sessionId,
+      edge: { ...edge },
+      sourceType: source?.type ?? null,
+      targetType: target?.type ?? null,
+      reason,
+    });
+    return false;
+  });
+  return { graph: { ...graph, edges }, damage };
+}
 
 export function graphIssues(graph: DecisionGraph): string[] {
   const issues: string[] = [];

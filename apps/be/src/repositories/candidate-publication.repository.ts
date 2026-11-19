@@ -5,6 +5,18 @@ import type { AnalyzeDiscussionResult } from '../domain/analysis.js';
 import type { GraphSnapshot } from '../domain/decision-graph.js';
 import { AnalysisRequestError } from './analysis-request.repository.js';
 import { DecisionRepository } from './decision.repository.js';
+import { AnalysisSessionRecoveryRepository } from './analysis-session-recovery.repository.js';
+import type { NewSessionRecovery, RecoveryOwner } from '../domain/session-recovery.js';
+
+/** 발행과 같은 트랜잭션에서 확정할 세션 복구 변경. 값은 서비스가 정책으로 계산한다. */
+export interface PublicationRecovery {
+  /** 이 발행이 복구 시도라면 그 소유권. */
+  owner?: RecoveryOwner;
+  /** 이번 분석에서 건너뛴 세션의 첫 복구 기록. */
+  created: NewSessionRecovery[];
+  /** 입력 보관 기한: 최초 요청 생성 시점부터의 시간. */
+  inputRetentionMs: number;
+}
 
 /** All candidate reads and writes use the same fenced publication transaction. */
 export class CandidatePublicationRepository {
@@ -20,6 +32,7 @@ export class CandidatePublicationRepository {
       result: AnalyzeDiscussionResult;
       graph?: GraphSnapshot;
     }>,
+    recovery?: PublicationRecovery,
   ): Promise<AnalyzeDiscussionResult> {
     return this.repo.prisma.$transaction(async tx => {
       const fenced = await tx.analysisRequest.updateMany({
@@ -34,6 +47,18 @@ export class CandidatePublicationRepository {
       if (!fenced.count)
         throw new AnalysisRequestError('Analysis ownership expired; retry this request', 503);
       const { result, graph } = await publish(new CandidatePublicationRepository(this.repo, tx));
+      const recoveries = new AnalysisSessionRecoveryRepository(tx);
+      if (recovery?.owner && !(await recoveries.confirmRecovered(recovery.owner, new Date())))
+        throw new AnalysisRequestError('Recovery ownership expired', 503);
+      if (recovery?.created.length) {
+        const source = await tx.analysisRequest.findUniqueOrThrow({ where: { id: requestId } });
+        await recoveries.createForRequest(
+          requestId,
+          source.guildId,
+          new Date(source.createdAt.getTime() + recovery.inputRetentionMs),
+          recovery.created,
+        );
+      }
       await tx.analysisRequest.update({
         where: { id: requestId },
         data: {

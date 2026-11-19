@@ -2,6 +2,8 @@
 
 Status: accepted, implementation under verification
 
+범위 변경: 실패 세션을 영속적으로 기록한 뒤 checkpoint를 전진시키는 목표 계약은 [ADR-0028](./0028-degraded-analysis-and-scan-progress.md)을 따른다.
+
 Bot delivery ends when BE durably stores the input and processing intent, rather than when AI finishes. BE owns the durable Analysis Queue, bounded retry, execution capacity and result replay. Bot delivery and result feedback run independently, so slow AI does not block receipt of another allowed channel. Channel transfers remain sequential; BE may permit B after receiving A while A's analysis is running, subject to byte and work limits.
 
 Full-channel scans are stored in bounded segments and analyzed only after their immutable coverage declaration is complete. Missing input is selectively retransmitted; AI failure uses already received input. Oversized incomplete scans remain explicit capacity failures rather than waiting for analysis that cannot start. Failed channels remain recoverable while other channels may progress.

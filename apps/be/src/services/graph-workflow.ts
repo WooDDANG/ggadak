@@ -14,11 +14,11 @@ import {
   VerificationSchema,
   graphIssues,
   normalizeGraph,
+  removeInvalidEdges,
   type DecisionGraph,
 } from '../domain/decision-graph.js';
 import { AppError } from '../errors/AppError.js';
 import {
-  boundedProviderResponse,
   classifyAiFailure,
   providerResponseFrom,
   safeAiErrorCode,
@@ -26,9 +26,23 @@ import {
 import { createLogger } from '@ggaddak/shared';
 import type { AiCallScheduler } from './ai-call-scheduler.js';
 import { recordVerificationMetric } from '../adapters/ai-metrics-logger.js';
-import { modelForStage } from '../domain/ai-call.js';
+import { LEASE_LOST, modelForStage } from '../domain/ai-call.js';
+import config from '../config/index.js';
 
 const logger = createLogger('BE-GRAPH-WORKFLOW');
+
+const ownershipLost = (message = 'Analysis ownership lost') =>
+  new AppError(message, 503, { failureKind: 'lease-lost' });
+/** AI_CALL_TIMEOUT_MS가 양수가 아니면 정책 기본값을 쓴다. */
+const callTimeoutMs = () => {
+  const configured = config.ai.callTimeoutMs;
+  return configured !== undefined && Number.isFinite(configured) && configured > 0
+    ? configured
+    : GraphPolicy.callTimeoutMs;
+};
+// 세션 시간 예산 소진은 호출 타임아웃과 같은 세션 단위 실패다(ADR-0028).
+const timeBudgetExhausted = () =>
+  new AppError('Analysis time budget exhausted', 422, { failureKind: 'timeout' });
 
 /** Bounded session algorithm; checkpoint callback owns persistence and owner fencing. */
 export class GraphWorkflow {
@@ -42,8 +56,8 @@ export class GraphWorkflow {
     workflow: AnalysisWorkflow,
     save: (session?: AnalysisSession) => Promise<void>,
     signal: AbortSignal,
-    owner?: string,
-    identity?: { requestId: string; traceId?: string; guildId?: string; channelId?: string },
+    owner: string | undefined,
+    identity: { requestId: string; traceId?: string; guildId?: string; channelId?: string },
   ): Promise<void> {
     if (session.active !== undefined) {
       const interrupted = session.attempts[session.active];
@@ -58,17 +72,22 @@ export class GraphWorkflow {
       await save(session);
     }
     while (session.phase !== AnalysisPhase.Done) {
-      if (signal.aborted) throw new AppError('Analysis ownership lost', 503);
-      if (session.elapsedMs >= GraphPolicy.sessionBudgetMs)
-        throw new AppError('Analysis time budget exhausted', 422);
+      if (signal.aborted) throw ownershipLost();
+      if (session.elapsedMs >= GraphPolicy.sessionBudgetMs) throw timeBudgetExhausted();
       if (includesValue([AnalysisPhase.Check, AnalysisPhase.Recheck], session.phase)) {
         const checkStarted = Date.now();
         const checked = GraphSchema.safeParse(session.value);
         let issues: string[];
         if (checked.success) {
-          const normalized = normalizeGraph(checked.data);
+          const cleaned = removeInvalidEdges(checked.data, identity.requestId, session.id);
+          if (cleaned.damage.length) (session.damage ??= []).push(...cleaned.damage);
+          const normalized = normalizeGraph(cleaned.graph);
           session.value = normalized;
           issues = graphIssues(normalized);
+          if (issues.some(issue => issue.startsWith('Unlinked node:')))
+            issues.push(
+              ...graphIssues(checked.data).filter(issue => issue.startsWith('Invalid endpoints:')),
+            );
         } else {
           issues = checked.error.issues.map(
             issue =>
@@ -140,7 +159,6 @@ export class GraphWorkflow {
               errorSummary: 'AI graph structure was invalid',
               issuesCount: issues.length,
               issueDetails,
-              graphResult: boundedProviderResponse(session.value),
               status: 422,
               retryable: false,
             });
@@ -158,26 +176,27 @@ export class GraphWorkflow {
         await save(session);
         continue;
       }
+      // 예산을 넘길 호출은 AI 슬롯·키·분당 호출 수를 예약하기 전에 거절한다.
+      const phase = session.phase;
+      if (!session.calls.includes(phase)) session.calls.push(phase);
+      if (
+        session.calls.length > GraphPolicy.maxLogicalCalls ||
+        session.repairs > GraphPolicy.maxRepairs
+      )
+        throw new AppError('Analysis call budget exhausted', 422, {
+          failureKind: 'budget-exhausted',
+        });
       const permit = await this.scheduler.acquire(signal);
       session.waitMs = (session.waitMs ?? 0) + permit.waitMs;
       let prepared: IAiAdapter | undefined;
       try {
         const callSignal = permit.signal;
-        if (callSignal.aborted) throw new AppError('Analysis cancelled before AI call', 503);
+        if (callSignal.aborted) throw ownershipLost('Analysis cancelled before AI call');
         // 계정 예산 대기는 논리 호출·시도·실행 시간 예산을 소비하지 않는다.
         const ai = (await this.ai.prepareCall?.(callSignal)) ?? this.ai;
         prepared = ai;
-        const phase = session.phase;
-        if (!session.calls.includes(phase)) {
-          session.calls.push(phase);
-        }
-        if (
-          session.calls.length > GraphPolicy.maxLogicalCalls ||
-          session.repairs > GraphPolicy.maxRepairs
-        )
-          throw new AppError('Analysis call budget exhausted', 422);
         const timeoutMs = Math.min(
-          GraphPolicy.callTimeoutMs,
+          callTimeoutMs(),
           GraphPolicy.sessionBudgetMs - session.elapsedMs,
         );
         const startedAt = Date.now();
@@ -203,10 +222,11 @@ export class GraphWorkflow {
         session.active = session.attempts.length - 1;
         await save(session);
         const controller = new AbortController();
-        const abort = () => controller.abort(callSignal.reason);
+        const abort = () => controller.abort(LEASE_LOST);
         callSignal.addEventListener('abort', abort, { once: true });
         if (callSignal.aborted) abort();
         let timer: ReturnType<typeof setTimeout> | undefined;
+        let timedOut = false;
         let operation: Promise<AiResult> | undefined;
         try {
           const context = {
@@ -228,15 +248,20 @@ export class GraphWorkflow {
               'abort',
               () =>
                 reject(
-                  new AppError(signal.aborted ? 'Analysis ownership lost' : 'AI call timeout', 503),
+                  signal.aborted || controller.signal.reason === LEASE_LOST
+                    ? ownershipLost()
+                    : new AppError('AI call timeout', 503, { failureKind: 'timeout' }),
                 ),
               { once: true },
             );
-            if (controller.signal.aborted) reject(new AppError('Analysis ownership lost', 503));
-            timer = setTimeout(() => controller.abort(), timeoutMs);
+            if (controller.signal.aborted) reject(ownershipLost());
+            timer = setTimeout(() => {
+              timedOut = true;
+              controller.abort();
+            }, timeoutMs);
           });
           const result: AiResult = await Promise.race([operation, interrupted]);
-          if (signal.aborted) throw new AppError('Analysis ownership lost', 503);
+          if (signal.aborted) throw ownershipLost();
           Object.assign(attempt, {
             outcome: 'completed',
             inputTokens: result.usage?.inputTokens ?? 0,
@@ -269,15 +294,14 @@ export class GraphWorkflow {
                 ...identity,
                 callId: attempt.callId,
                 failureStage: phase,
-                failureKind: 'semantic-verification',
+                failureKind: 'verify-format',
                 issuesCount: verified.error.issues.length,
-                verificationResult: boundedProviderResponse(result.value),
                 issueDetails: verified.error.issues
                   .slice(0, 20)
                   .map(issue => ({ code: issue.code })),
               });
               throw new AppError('Invalid AI verification response', 422, {
-                failureKind: 'semantic-verification',
+                failureKind: 'verify-format',
               });
             }
             if (!verified.data.valid) {
@@ -288,7 +312,6 @@ export class GraphWorkflow {
                   failureStage: phase,
                   failureKind: 'semantic-verification',
                   issuesCount: verified.data.issues.length,
-                  verificationResult: boundedProviderResponse(result.value),
                   issueDetails: [{ code: 'semantic-verification' }],
                 });
               this.requestRepair(
@@ -309,7 +332,12 @@ export class GraphWorkflow {
               session.phase = AnalysisPhase.Done;
             }
           }
-        } catch (error) {
+        } catch (caught) {
+          // 워크플로가 끊은 호출은 provider가 어떤 오류를 내든 타임아웃이다.
+          const error =
+            timedOut && !signal.aborted
+              ? new AppError('AI call timeout', 503, { failureKind: 'timeout' })
+              : caught;
           const diagnostic = classifyAiFailure(error, phase);
           attempt.outcome = 'failed';
           attempt.error = {
@@ -325,7 +353,6 @@ export class GraphWorkflow {
             failureStage: phase,
             errorCode: safeAiErrorCode(error),
             durationMs: Math.max(0, Date.now() - attempt.startedAt),
-            providerResponse: providerResponseFrom(error),
             ...diagnostic,
           });
           throw error;
@@ -340,8 +367,7 @@ export class GraphWorkflow {
           delete session.active;
           await save(session);
         }
-        if (session.elapsedMs >= GraphPolicy.sessionBudgetMs)
-          throw new AppError('Analysis time budget exhausted', 422);
+        if (session.elapsedMs >= GraphPolicy.sessionBudgetMs) throw timeBudgetExhausted();
       } finally {
         try {
           await prepared?.releaseCall?.();
@@ -381,6 +407,7 @@ export class GraphWorkflow {
       ...graph,
       sessionId: session.id,
       inputMessageIds: session.messages.map(m => m.id),
+      ...(session.damage?.length ? { damage: session.damage } : {}),
       nodes: graph.nodes.map(node => ({ ...node, id: id('node:' + node.id) })),
       edges: graph.edges.map(edge => ({
         ...edge,

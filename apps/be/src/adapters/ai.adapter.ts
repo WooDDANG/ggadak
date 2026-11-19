@@ -4,7 +4,7 @@ import { AiDefaults } from '../config/policies.js';
 import { Service } from 'typedi';
 import { AppError } from '../errors/AppError.js';
 import config, { AppConfig } from '../config/index.js';
-import { GraphSchema, VerificationSchema } from '../domain/decision-graph.js';
+import { ExtractGraphSchema, GraphSchema, VerificationSchema } from '../domain/decision-graph.js';
 import {
   GRAPH_SYSTEM_PROMPT,
   VERIFICATION_PROMPT,
@@ -130,6 +130,7 @@ export class AiAdapter implements IAiAdapter {
         throw new AppError('Invalid AI model selection', 422);
       if (
         promptVersion !== GRAPH_PROMPT_VERSION &&
+        promptVersion !== 'agentic-3' &&
         promptVersion !== 'agentic-1' &&
         promptVersion !== 'agentic-2'
       )
@@ -176,9 +177,15 @@ export class AiAdapter implements IAiAdapter {
         model,
         system,
         input: serializedInput,
-        outputSchema: stage === AiStage.Verify ? VerificationSchema : GraphSchema,
+        outputSchema:
+          stage === AiStage.Verify
+            ? VerificationSchema
+            : stage === AiStage.Extract && promptVersion === GRAPH_PROMPT_VERSION
+              ? ExtractGraphSchema
+              : GraphSchema,
         structuredOutput: promptVersion !== 'agentic-1' && promptVersion !== 'agentic-2',
         maxOutputTokens,
+        ...(context.settings.seed === undefined ? {} : { seed: context.settings.seed }),
         signal: context.signal,
       });
       const durationMs = Math.round(performance.now() - startTime);

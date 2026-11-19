@@ -101,9 +101,31 @@ test('429과 인증 실패는 해당 키에만 적용하고 만료된 잠금의 
   await expect(pool.reserve(signal)).rejects.toMatchObject({ details: { retryAfterMs: 500 } });
   await replacement.release();
   const available = await pool.reserve(signal);
-  await pool.recordFailure(available, 403);
+  await pool.recordFailure(available, 401);
   await available.release();
   await expect(pool.reserve(signal)).rejects.toMatchObject({ statusCode: 401 });
+});
+
+test('403은 키를 1시간 쉬게 한 뒤 다시 쓰고, 401은 영구히 끈다', async () => {
+  const db = await isolatedRepository();
+  cleanups.push(db.cleanup);
+  let now = 1_000_000;
+  const keys = nvidiaCredentials({ NVIDIA_API_KEY_1: 'first', NVIDIA_API_KEY_2: 'second' });
+  const pool = new NvidiaKeyPool(db.client, keys, 40, () => now);
+  const signal = new AbortController().signal;
+  const forbidden = await pool.reserve(signal);
+  await pool.recordFailure(forbidden, 403);
+  await forbidden.release();
+  const revoked = await pool.reserve(signal);
+  expect(revoked.name).not.toBe(forbidden.name);
+  await pool.recordFailure(revoked, 401);
+  await revoked.release();
+  // 남은 키가 쉬는 동안은 인증 실패가 아니라 대기다.
+  await expect(pool.reserve(signal)).rejects.not.toMatchObject({ statusCode: 401 });
+  now += 60 * 60 * 1000;
+  const restored = await pool.reserve(signal);
+  expect(restored.name).toBe(forbidden.name);
+  await restored.release();
 });
 
 test('취소된 호출은 예산을 예약하지 않는다', async () => {
@@ -217,4 +239,32 @@ test('Provider 응답을 기다리는 동안 같은 키를 막고 실패 후에�
   } finally {
     finish();
   }
+});
+
+test('모든 키가 403으로 쉬면 대기가 아니라 인증 장애로 알린다', async () => {
+  const db = await isolatedRepository();
+  cleanups.push(db.cleanup);
+  let now = 1_000_000;
+  const keys = nvidiaCredentials({ NVIDIA_API_KEY_1: 'first', NVIDIA_API_KEY_2: 'second' });
+  const pool = new NvidiaKeyPool(db.client, keys, 40, () => now);
+  const signal = new AbortController().signal;
+  const first = await pool.reserve(signal);
+  await pool.recordFailure(first, 403);
+  await first.release();
+  const second = await pool.reserve(signal);
+  await pool.recordFailure(second, 429, 10_000);
+  await second.release();
+  // 한 키라도 429로 쉬는 중이면 기다리면 풀리므로 대기다.
+  await expect(pool.reserve(signal)).rejects.toMatchObject({
+    statusCode: 503,
+    details: { retryAfterMs: 10_000 },
+  });
+  now += 10_000;
+  const again = await pool.reserve(signal);
+  await pool.recordFailure(again, 403);
+  await again.release();
+  await expect(pool.reserve(signal)).rejects.toMatchObject({
+    statusCode: 403,
+    details: { failureKind: 'auth' },
+  });
 });

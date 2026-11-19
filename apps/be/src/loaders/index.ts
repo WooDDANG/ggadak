@@ -151,7 +151,7 @@ export async function initLoaders({
   container.set(DiscussionService, discussionService);
   container.set(
     AnalysisRequestController,
-    new AnalysisRequestController(new AnalysisQueryService(repo), authService),
+    new AnalysisRequestController(new AnalysisQueryService(repo), authService, analysisQueue),
   );
 
   // 5. Controller Layer Binding for TSOA IoC Container

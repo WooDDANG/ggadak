@@ -47,5 +47,6 @@ test('AgyProvider enforces the output usage limit and preserves abort signals', 
   ).rejects.toMatchObject({
     statusCode: 422,
     message: 'AGY output exceeds application token limit',
+    details: { failureKind: 'output-truncated' },
   });
 });

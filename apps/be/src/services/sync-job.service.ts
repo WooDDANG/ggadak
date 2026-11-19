@@ -14,13 +14,16 @@ import {
 import { AnalysisQueueRepository } from '../repositories/analysis-queue.repository.js';
 
 import { SyncJobRepository } from '../repositories/sync-job.repository.js';
-import type { SyncJobView, SyncJobClaimDto } from '../dto/sync-job.dto.js';
+import type { SyncJobView, SyncJobClaimDto, SyncSkippedSession } from '../dto/sync-job.dto.js';
 
 import type { SyncJob } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import { Service } from 'typedi';
 import { DecisionRepository } from '../repositories/decision.repository.js';
+import { AnalysisSessionRecoveryRepository } from '../repositories/analysis-session-recovery.repository.js';
+import { effectiveRecoveryState } from '../domain/session-recovery.js';
 import { ConflictError, NotFoundError, BadRequestError } from '../errors/AppError.js';
+import type { AnalyzeDiscussionResult } from '../domain/analysis.js';
 
 const view = (job: SyncJob): SyncJobView => ({
   jobId: job.id,
@@ -31,6 +34,12 @@ const view = (job: SyncJob): SyncJobView => ({
   completedChannels: job.completedChannels,
   failedChannels: job.failedChannels,
   decisionsFound: job.decisionsFound,
+  skippedSessionCount: Object.values(
+    JSON.parse(job.channelResultsJson) as Record<string, SyncChannelResult>,
+  ).reduce((count, channel) => count + (channel.skippedSessionCount ?? 0), 0),
+  damagedSessionCount: Object.values(
+    JSON.parse(job.channelResultsJson) as Record<string, SyncChannelResult>,
+  ).reduce((count, channel) => count + (channel.damagedSessionCount ?? 0), 0),
   messagesScanned: job.messagesScanned,
   receivedChannels: Object.values(
     JSON.parse(job.channelResultsJson) as Record<string, SyncChannelResult>,
@@ -101,7 +110,71 @@ export class SyncJobService {
     await this.reconcile(jobId);
     const job = await this.jobs.getForGuild(jobId, guildId);
     if (!job) throw new NotFoundError('Sync Job not found');
-    return view(job);
+    const result = view(job);
+    const db = this.repo.prisma;
+    const scans = await db.analysisScan.findMany({
+      where: { jobId, guildId },
+      select: { id: true },
+    });
+    const channels = JSON.parse(job.channelIdsJson) as string[];
+    const legacy = scans.length
+      ? []
+      : await db.analysisRequest.findMany({
+          where: {
+            guildId,
+            state: 'completed',
+            OR: channels.map(channelId => ({
+              channelId,
+              id: { startsWith: `sync-${jobId}-${channelId}:` },
+            })),
+          },
+          select: { id: true, resultJson: true },
+        });
+    for (const request of legacy) {
+      const analysis: AnalyzeDiscussionResult = JSON.parse(request.resultJson ?? '{}');
+      result.skippedSessionCount =
+        (result.skippedSessionCount ?? 0) + (analysis.skippedSessions?.length ?? 0);
+      result.damagedSessionCount =
+        (result.damagedSessionCount ?? 0) + (analysis.damagedSessionCount ?? 0);
+    }
+    if (!result.skippedSessionCount) return result;
+    const receipts = await db.analysisReceipt.findMany({
+      where: { scanId: { in: scans.map(scan => scan.id) }, guildId },
+      select: { id: true },
+    });
+    const recoveries = await new AnalysisSessionRecoveryRepository(db).forRequests(
+      [...receipts.map(receipt => receipt.id), ...legacy.map(request => request.id)],
+      guildId,
+    );
+    const requests = await db.analysisRequest.findMany({
+      where: { id: { in: [...new Set(recoveries.map(recovery => recovery.requestId))] }, guildId },
+      select: { id: true, resultJson: true },
+    });
+    const summaries = new Map(
+      requests.map(request => [
+        request.id,
+        (JSON.parse(request.resultJson ?? '{}') as AnalyzeDiscussionResult).skippedSessions ?? [],
+      ]),
+    );
+    const now = Date.now();
+    result.skippedSessions = recoveries.flatMap((recovery): SyncSkippedSession[] => {
+      const session = summaries
+        .get(recovery.requestId)
+        ?.find(item => item.sessionId === recovery.sessionId);
+      if (!session) return [];
+      const recoveryState = effectiveRecoveryState(recovery, now);
+      return [
+        {
+          ...session,
+          requestId: recovery.requestId,
+          recoveryState,
+          ...(recoveryState === 'scheduled'
+            ? { nextAttemptAt: recovery.nextAttemptAt.toISOString() }
+            : {}),
+        },
+      ];
+    });
+    return result;
   }
 
   async claim(deliveryOnly = asyncDeliveryEnabled()): Promise<SyncJobClaimDto | null> {
@@ -251,14 +324,22 @@ export class SyncJobService {
           continue;
         const failed = rows.some(r => r.state === AnalysisReceiptState.Failed);
         let decisions = 0;
+        let skippedSessionCount = 0;
+        let damagedSessionCount = 0;
         for (const row of rows) {
           const a = await this.queue.analysis(row.id, tx);
-          if (a?.resultJson) decisions += JSON.parse(a.resultJson).decisions.length;
+          if (!a?.resultJson) continue;
+          const result: AnalyzeDiscussionResult = JSON.parse(a.resultJson);
+          decisions += result.decisions.length;
+          skippedSessionCount += result.skippedSessions?.length ?? 0;
+          damagedSessionCount += result.damagedSessionCount ?? 0;
         }
         const next: SyncChannelResult = {
           ...results[channelId],
           status: failed ? SyncJobStatus.Failed : SyncJobStatus.Completed,
           decisionsFound: decisions,
+          skippedSessionCount,
+          damagedSessionCount,
           ...(failed ? { errorMessage: 'Analysis failure retained; retry from recovery' } : {}),
         };
         if (!failed) delete next.errorMessage;

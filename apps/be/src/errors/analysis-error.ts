@@ -1,6 +1,7 @@
 import { DeliveryErrorCategory } from '@ggaddak/shared';
 import type { AnalysisFailure } from '../domain/analysis-workflow.js';
 import { AppError } from './AppError.js';
+import { explicitFailureKind } from './ai-diagnostics.js';
 
 /** Capacity contention is retryable without consuming a provider attempt. */
 export class AnalysisBusyError extends AppError {
@@ -25,6 +26,7 @@ export function classifyAnalysisError(error: unknown) {
     retryable,
     busy,
     accountScoped: error instanceof AppError && error.details?.nvidiaAccountFailure === true,
+    failureKind: explicitFailureKind(error),
     retryAfterMs: Number.isFinite(retryAfter) ? Math.max(0, retryAfter) : 0,
     category: busy
       ? DeliveryErrorCategory.AnalysisCapacity

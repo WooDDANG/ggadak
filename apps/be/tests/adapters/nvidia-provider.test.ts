@@ -5,6 +5,7 @@ import {
   nvidiaRetryAfterMs,
 } from '../../src/adapters/nvidia-provider.js';
 import { GraphSchema, VerificationSchema } from '../../src/domain/decision-graph.js';
+import { LEASE_LOST } from '../../src/domain/ai-call.js';
 
 test('Retry-After의 초와 HTTP 날짜를 해석하고 잘못된 헤더는 기본 대기를 적용한다', () => {
   const now = Date.parse('2026-11-18T00:00:00Z');
@@ -311,4 +312,85 @@ test('NvidiaProvider does not log reasoning content, respects thinking toggle, a
     statusCode: 503,
     message: 'AI call timed out after configured deadline',
   });
+});
+
+const streamClient = (chunks: unknown[], capture?: (body: any) => void): any => ({
+  chat: {
+    completions: {
+      create: async (body: any) => {
+        capture?.(body);
+        return (async function* () {
+          yield* chunks;
+        })();
+      },
+    },
+  },
+});
+const request = (signal = new AbortController().signal, seed?: number) => ({
+  model: 'nvidia/nemotron-3.5-super-vl-120b-a12b',
+  system: 'system',
+  input: '{}',
+  outputSchema: GraphSchema,
+  maxOutputTokens: 100,
+  signal,
+  ...(seed === undefined ? {} : { seed }),
+});
+
+test('출력 형식 실패는 종류별 코드로 구분된다', async () => {
+  // 출력 상한에서 끊긴 응답은 JSON이 깨져 있어도 형식 오류가 아니라 잘림이다.
+  await expect(
+    new NvidiaProvider({
+      client: streamClient([
+        { choices: [{ delta: { content: '{"nodes":[' }, finish_reason: 'length' }] },
+      ]),
+    }).generate(request()),
+  ).rejects.toMatchObject({ statusCode: 422, details: { failureKind: 'output-truncated' } });
+  await expect(
+    new NvidiaProvider({ client: streamClient([{ choices: [{ delta: {} }] }]) }).generate(
+      request(),
+    ),
+  ).rejects.toMatchObject({ statusCode: 422, details: { failureKind: 'output-empty' } });
+  await expect(
+    new NvidiaProvider({
+      client: streamClient([
+        { choices: [{ delta: { content: 'not json' }, finish_reason: 'stop' }] },
+      ]),
+    }).generate(request()),
+  ).rejects.toMatchObject({ statusCode: 422, details: { failureKind: 'output-unparseable' } });
+});
+
+test('호출 신호의 중단 사유로 타임아웃과 소유권 상실을 구분한다', async () => {
+  const aborting: any = {
+    chat: {
+      completions: {
+        create: async () => {
+          const err = new Error('Request aborted');
+          err.name = 'AbortError';
+          throw err;
+        },
+      },
+    },
+  };
+  const timedOut = new AbortController();
+  timedOut.abort();
+  await expect(
+    new NvidiaProvider({ client: aborting }).generate(request(timedOut.signal)),
+  ).rejects.toMatchObject({ statusCode: 503, details: { failureKind: 'timeout' } });
+  const leaseLost = new AbortController();
+  leaseLost.abort(LEASE_LOST);
+  await expect(
+    new NvidiaProvider({ client: aborting }).generate(request(leaseLost.signal)),
+  ).rejects.toMatchObject({ statusCode: 503, details: { failureKind: 'lease-lost' } });
+});
+
+test('요청 seed를 전달하고 없으면 기본 seed를 쓴다', async () => {
+  const bodies: any[] = [];
+  const chunks = [{ choices: [{ delta: { content: '{"summary":"s"}' }, finish_reason: 'stop' }] }];
+  await new NvidiaProvider({ client: streamClient(chunks, b => bodies.push(b)) }).generate(
+    request(undefined, 44),
+  );
+  await new NvidiaProvider({ client: streamClient(chunks, b => bodies.push(b)) }).generate(
+    request(),
+  );
+  expect(bodies.map(body => body.seed)).toEqual([44, 42]);
 });

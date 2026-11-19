@@ -17,6 +17,16 @@ The durable collection of received Discussion Contexts awaiting analysis, execut
 A persisted request to analyze one received Discussion Context, tracked through retries to a final outcome.
 _Avoid_: AI Call, Analysis Attempt
 
+**손상된 분석 세션**:
+유효하지 않은 관계가 제거돼 일부 관계 정보가 온전하지 않은 분석 세션이다. 구조 검증과 Verify를 통과한 후보에는 손상 경고가 함께 표시된다.
+
+**분석 실패로 건너뜀**:
+분석을 완료하지 못한 세션을 실패로 기록하면서 동기화는 계속 진행한 상태다. 정상 분석에서 결정이 없다고 확인된 상태와 구분한다.
+
+**출력 형식 실패**:
+AI가 약속된 형식의 응답을 내지 못한 실패다. 빈 응답, 해석할 수 없는 응답, 출력 상한에서 잘린 응답, 형식을 어긴 Verify 응답을 포함한다. 그래프 내용이 잘못된 구조 검증 실패나 의미 검증 실패와 구분한다.
+_Avoid_: 구조 검증 실패, 파싱 오류
+
 **AI Call**:
 One invocation of an AI provider during an Analysis Request. A request can contain multiple AI Calls, and an individual call's result does not determine the request's final outcome.
 _Avoid_: Analysis Request

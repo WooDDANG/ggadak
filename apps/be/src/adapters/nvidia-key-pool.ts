@@ -12,6 +12,8 @@ function credentialId(credential: NvidiaCredential): string {
   return createHash('sha256').update(credential.apiKey).digest('hex');
 }
 
+/** 403 뒤 키를 다시 쓰기까지 기다리는 시간. */
+const FORBIDDEN_COOLDOWN_MS = 60 * 60 * 1000;
 export interface NvidiaReservation extends NvidiaCredential {
   owner: string;
   signal: AbortSignal;
@@ -73,12 +75,27 @@ export class NvidiaKeyPool {
     });
     if (!selected) {
       const rows = await this.prisma.$queryRaw<
-        { id: string; cooldownUntil: number; nextRequestAt: number; leaseUntil: number }[]
+        {
+          id: string;
+          cooldownUntil: number;
+          forbiddenUntil: number;
+          nextRequestAt: number;
+          leaseUntil: number;
+        }[]
       >`
-        SELECT "id", "cooldownUntil", "nextRequestAt", "leaseUntil" FROM "NvidiaAccountBudget"
+        SELECT "id", "cooldownUntil", "forbiddenUntil", "nextRequestAt", "leaseUntil" FROM "NvidiaAccountBudget"
         WHERE "id" IN (${Prisma.join(ids)}) AND "disabled" = 0
       `;
-      if (!rows.length) throw new AppError('All NVIDIA API keys failed authentication', 401);
+      if (!rows.length)
+        throw new AppError('All NVIDIA API keys failed authentication', 401, {
+          failureKind: 'auth',
+        });
+      // 남은 키가 모두 403으로 쉬는 중이면 기다려도 설정을 고치기 전에는 풀리지 않는다.
+      if (rows.every(row => row.forbiddenUntil > now))
+        throw new AppError('All NVIDIA API keys lack permission for the requested model', 403, {
+          failureKind: 'auth',
+          retryAfterMs: Math.min(...rows.map(row => row.forbiddenUntil)) - now,
+        });
       const waits = await Promise.all(
         rows.map(async row => {
           const requests = await this.prisma.$queryRaw<{ startedAt: number }[]>`
@@ -145,9 +162,17 @@ export class NvidiaKeyPool {
     status: number,
     retryAfterMs = 60_000,
   ): Promise<void> {
-    if (status === 401 || status === 403) {
+    if (status === 401) {
       await this.prisma
         .$executeRaw`UPDATE "NvidiaAccountBudget" SET "disabled" = 1 WHERE "id" = ${credentialId(key)} AND "leaseOwner" = ${key.owner}`;
+    } else if (status === 403) {
+      // 403은 모델 권한 부족에도 나온다. 설정을 고치면 키가 저절로 돌아오도록 쉬게만 한다.
+      await this.prisma.$executeRaw`
+        UPDATE "NvidiaAccountBudget"
+        SET "cooldownUntil" = MAX("cooldownUntil", ${this.now() + FORBIDDEN_COOLDOWN_MS}),
+            "forbiddenUntil" = MAX("forbiddenUntil", ${this.now() + FORBIDDEN_COOLDOWN_MS})
+        WHERE "id" = ${credentialId(key)} AND "leaseOwner" = ${key.owner}
+      `;
     } else if (status === 429) {
       await this.prisma.$executeRaw`
         UPDATE "NvidiaAccountBudget" SET "cooldownUntil" = MAX("cooldownUntil", ${this.now() + retryAfterMs})

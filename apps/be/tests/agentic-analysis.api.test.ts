@@ -81,9 +81,38 @@ test('파생 그래프 불일치는 repair 호출 없이 정규화하고 후보�
   );
 });
 
+test('관계의 참조 ID 앞뒤 공백은 노드 ID처럼 정리해 복구 없이 발행한다', async () => {
+  const input = structuredClone(graph);
+  input.nodes[0].id = ' topic ';
+  input.edges[0].sourceId = 'topic ';
+  input.edges[1].targetId = ' candidate';
+  let repaired = false;
+  await withApi(
+    {
+      extractGraph: async () => ({ value: input }),
+      repairGraph: async () => {
+        repaired = true;
+        return { value: structuredClone(graph) };
+      },
+      verifyGraph: async () => ({ value: { valid: true, issues: [] } }),
+    },
+    async (base, send, token) => {
+      expect((await send('trimmed-references')).status).toBe(200);
+      expect(repaired).toBe(false);
+      const status = await fetch(
+        `${base}/api/v1/analysis-requests/trimmed-references?guildId=guild-1`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      // 공백 때문에 관계가 제거돼 손상으로 기록되면 안 된다.
+      expect(((await status.json()) as any).data.sessions[0].damageCount ?? 0).toBe(0);
+    },
+  );
+});
+
 test('잘못된 관계 복구에 실제 타입과 허용 조합을 제공한다', async () => {
   const input = structuredClone(graph);
-  input.edges.push({ id: 'bad', type: 'supports', sourceId: 'topic', targetId: 'candidate' });
+  input.nodes.push({ id: 'reason', type: 'Rationale', summary: '비용 절감' });
+  input.edges.push({ id: 'bad', type: 'contains', sourceId: 'topic', targetId: 'reason' });
   let feedback: string[] = [];
   await withApi(
     {
@@ -98,14 +127,15 @@ test('잘못된 관계 복구에 실제 타입과 허용 조합을 제공한다'
       expect((await send('repair-hints')).status).toBe(200);
       expect(feedback.join(' ')).toContain('Topic');
       expect(feedback.join(' ')).toContain('Rationale');
-      expect(feedback.join(' ')).toContain('DecisionCandidate');
+      expect(feedback.join(' ')).toContain('Unlinked node: reason');
     },
   );
 });
 
 test('구조 복구 후 의미 검증 오류도 별도로 복구한다', async () => {
   const input = structuredClone(graph);
-  input.edges.push({ id: 'bad', type: 'supports', sourceId: 'topic', targetId: 'candidate' });
+  input.nodes.push({ id: 'reason', type: 'Rationale', summary: '비용 절감' });
+  input.edges.push({ id: 'bad', type: 'contains', sourceId: 'topic', targetId: 'reason' });
   let repairs = 0,
     verifies = 0;
   await withApi(
@@ -138,12 +168,13 @@ test('구조 복구 후 의미 검증 오류도 별도로 복구한다', async (
 });
 
 test.each(['structure', 'semantic'] as const)(
-  '%s 검증 종료 로그에 실패 결과를 기록하고 인증 정보는 가린다',
+  '%s 검증 종료 로그는 실패 코드만 남기고 모델 출력 원문은 DB에만 둔다',
   async kind => {
     const marker = 'private-output-for-validation-test';
     const invalidGraph = {
       ...structuredClone(graph),
       summary: marker,
+      nodes: [...graph.nodes, { id: 'reason', type: 'Rationale', summary: '비용 절감' }],
       edges: [
         ...graph.edges,
         { id: 'invalid', type: 'supports', sourceId: 'topic', targetId: 'candidate' },
@@ -167,12 +198,13 @@ test.each(['structure', 'semantic'] as const)(
             .split('\n')
             .find(line => line.includes('analysis.validation.failed') && line.includes(requestId));
           expect(terminal).toBeDefined();
-          expect(terminal).toContain(marker);
+          // ADR-0027: Loki로 가는 로그에는 대화와 모델 출력 원문을 복제하지 않는다.
+          expect(logs).not.toContain(marker);
           expect(terminal).toContain(kind === 'structure' ? 'recheck' : 'reverify');
           expect(terminal).toContain(
-            kind === 'structure' ? 'invalid-endpoints' : 'semantic-verification',
+            kind === 'structure' ? 'unlinked-node' : 'semantic-verification',
           );
-          expect(terminal).toContain('"issuesCount":1');
+          expect(terminal).toContain(kind === 'structure' ? '"issuesCount":2' : '"issuesCount":1');
           const row = await new AnalysisRequestRepository(db.repo).get(requestId);
           expect(row?.workflowJson).toContain(marker);
         },
@@ -183,7 +215,7 @@ test.each(['structure', 'semantic'] as const)(
   },
 );
 
-test('잘못된 검증 응답을 터미널에 기록하면서 인증 정보를 제거한다', async () => {
+test('형식을 어긴 검증 응답은 코드로만 로그에 남긴다', async () => {
   const output = vi.spyOn(winston.transports.Console.prototype, 'log');
   try {
     await withApi(
@@ -197,11 +229,11 @@ test('잘못된 검증 응답을 터미널에 기록하면서 인증 정보를 �
       async (_base, send) => {
         expect((await send('invalid-verification-output')).status).toBe(422);
         const logs = output.mock.calls.map(([info]) => JSON.stringify(info)).join('\n');
-        expect(logs).toContain('wrong-type');
         expect(logs).toContain('analysis.verification.schema');
         expect(logs).toContain('"outcome":"invalid"');
+        expect(logs).toContain('"failureKind":"verify-format"');
+        expect(logs).not.toContain('wrong-type');
         expect(logs).not.toContain('secret-test-token');
-        expect(logs).toContain('[REDACTED]');
       },
     );
   } finally {
@@ -468,7 +500,7 @@ test('의미 복구 이후에도 검증이 실패하면 터미널 상태로 남�
     async (base, send, token) => {
       expect((await send('terminal')).status).toBe(422);
       expect((await send('terminal')).status).toBe(422);
-      expect(calls).toEqual(['extract', 'repair', 'verify', 'repair', 'verify']);
+      expect(calls).toEqual(['extract', 'verify', 'repair', 'verify']);
       const headers = { Authorization: `Bearer ${token}` };
       const status = (
         (await (

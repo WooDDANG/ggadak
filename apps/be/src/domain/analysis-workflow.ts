@@ -7,8 +7,9 @@ export const AnalysisRequestState = {
 } as const;
 export type AnalysisRequestState = (typeof AnalysisRequestState)[keyof typeof AnalysisRequestState];
 import type { AiSettings } from './ai-call.js';
+import type { AiFailureKind } from './ai-call.js';
 import type { DiscussionMessage } from './analysis.js';
-import type { GraphSession } from './decision-graph.js';
+import type { GraphDamage, GraphSession } from './decision-graph.js';
 
 export const AnalysisPhase = {
   Extract: 'extract',
@@ -60,6 +61,15 @@ export interface AnalysisSession {
   active?: number;
   idMap: Record<string, string>;
   graph?: GraphSession;
+  damage?: GraphDamage[];
+  skippedFailure?: SkippedAnalysisSession;
+}
+export interface SkippedAnalysisSession {
+  sessionId: string;
+  messageIds: string[];
+  failedAt: string;
+  kind: AiFailureKind;
+  scanRange?: { afterMessageId: string; startMessageId: string; endMessageId: string };
 }
 export interface AnalysisWorkflow {
   version: 1;
@@ -89,6 +99,16 @@ export interface AnalysisStatus {
     attempts: number;
     inputTokens: number;
     outputTokens: number;
+    damageCount?: number;
+    skippedFailure?: SkippedAnalysisSession;
+    recovery?: {
+      state: string;
+      attempts: number;
+      nextAttemptAt: string;
+      expiresAt: string;
+      /** 가장 최근 실패의 종류. 최초 건너뜀 또는 마지막 자동 재시도의 실패다. */
+      failureKind?: string;
+    };
     failure?: {
       stage: AnalysisPhase;
       kind: 'timeout' | 'configuration' | 'validation' | 'provider';

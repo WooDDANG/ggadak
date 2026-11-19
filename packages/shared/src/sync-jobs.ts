@@ -4,6 +4,8 @@ export interface SyncChannelResult {
   status: Exclude<SyncChannelStatus, 'WAITING'>;
   messagesScanned: number;
   decisionsFound: number;
+  skippedSessionCount?: number;
+  damagedSessionCount?: number;
   errorMessage?: string;
 }
 export interface SyncJobUpdate {
