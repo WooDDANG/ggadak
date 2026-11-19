@@ -13,7 +13,7 @@ GGADDAK previously used an Antigravity CLI (`agy`) subprocess as its sole genera
 3. **Model Selection**: The default model across all three workflow stages (`Extract`, `Verify`, `Repair`) is unified to `nvidia/nemotron-3.5-super-vl-120b-a12b`, with stage overrides (`AI_MODEL_EXTRACT`, `AI_MODEL_VERIFY`, `AI_MODEL_REPAIR`) remaining supported.
 4. **Token Limits & Timeout**:
    - `AI_MAX_OUTPUT_TOKENS` defaults to 8,192. Measured output peaked near 3,000 tokens at roughly 150 tokens per second with thinking disabled; raise it explicitly when enabling thinking.
-   - `AI_CALL_TIMEOUT_MS` defaults to 60,000ms so that the default output limit can complete before the call deadline. The 20-second default cut off a quarter of measured calls.
+   - `AI_CALL_TIMEOUT_MS` defaults to 20,000ms. Measured Extract calls on a 40-message session took 12-20 seconds, while provider-side stalls occasionally held a call past 60 seconds with no streamed output to tell a stall from slow generation. A short deadline frees the key and session quickly and lets the one-minute automatic recovery retry ([ADR-0028](0028-degraded-analysis-and-scan-progress.md)); the cost is that an unusually large session can exceed the deadline and be skipped. A 60-second default was used briefly on 2026-11-19 and reverted the same day.
    - Timeout aborts carry the `timeout` failure code. Inside a Scan Range they skip only the affected session ([ADR-0028](0028-degraded-analysis-and-scan-progress.md)); elsewhere the durable queue retries the request without pausing the whole queue. Hidden retries with thinking disabled are explicitly rejected.
 5. **Thinking & Logging**:
    - `NVIDIA_ENABLE_THINKING` (default `true`) passes `chat_template_kwargs: { enable_thinking: true }`.
