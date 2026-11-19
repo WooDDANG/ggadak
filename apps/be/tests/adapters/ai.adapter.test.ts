@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import { test, expect } from 'vitest';
+import { test, expect, vi } from 'vitest';
 import { AiAdapter } from '../../src/adapters/ai.adapter.js';
 import type { AiProvider, AiProviderRequest } from '../../src/adapters/ai-provider.js';
 import { GraphSchema, VerificationSchema } from '../../src/domain/decision-graph.js';
@@ -160,7 +160,10 @@ test('AiAdapter rejects unsupported providers and unsupported exact input-token 
     message: expect.stringContaining('does not support'),
   });
 
+  // 로컬 .env의 AI_MAX_OUTPUT_TOKENS에 기대지 않고 코드 기본값을 확인한다(CI에는 .env가 없다).
+  vi.stubEnv('AI_MAX_OUTPUT_TOKENS', '');
   const nvidia = new AiAdapter({ provider: 'nvidia' }, 'production', provider);
+  vi.unstubAllEnvs();
   await expect(nvidia.extractGraph('input', context(nvidia))).resolves.toEqual({ value: graph });
   await expect(
     nvidia.extractGraph('input', {
@@ -168,7 +171,7 @@ test('AiAdapter rejects unsupported providers and unsupported exact input-token 
       settings: { ...nvidia.settings, maxInputTokens: 100 },
     }),
   ).rejects.toMatchObject({ statusCode: 422, message: expect.stringContaining('preflight') });
-  expect(nvidia.settings.maxOutputTokens).toBe(16384);
+  expect(nvidia.settings.maxOutputTokens).toBe(8192);
   expect(nvidia.settings.model).toBe('nvidia/nemotron-3.5-super-vl-120b-a12b');
 });
 
