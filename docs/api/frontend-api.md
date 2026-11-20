@@ -31,19 +31,19 @@ FE 화면 테스트용 합성 데이터: [목 데이터 사용법](mocks/README.
 
 ### 1.1 개발 환경
 
-| 항목           | 값                                                               |
-| -------------- | ---------------------------------------------------------------- |
-| BE 기본 Origin | `http://localhost:3001`                                          |
-| Swagger UI     | `http://localhost:3001/api-docs/`                                |
-| FE Origin      | 실제 FE 배포·개발 설정값. 이 저장소 데모의 기본값은 `http://localhost:3002` |
-| FE 요청 경로   | `/api/v1/...` — Vite `/api` proxy 또는 동일 Origin reverse proxy |
-| 데이터 형식    | `Content-Type: application/json`                                 |
-| 사용자 API 인증 | `Authorization: Bearer <accessToken>`                           |
-| 브라우저 세션 복원·로그아웃 | HttpOnly 세션 쿠키 + 허용된 FE Origin (`credentials: 'include'`) |
+| 항목                        | 값                                                                          |
+| --------------------------- | --------------------------------------------------------------------------- |
+| BE 기본 Origin              | `http://localhost:3001`                                                     |
+| Swagger UI                  | `http://localhost:3001/api-docs/`                                           |
+| FE Origin                   | 실제 FE 배포·개발 설정값. 이 저장소 데모의 기본값은 `http://localhost:3002` |
+| FE 요청 경로                | `/api/v1/...` — Vite `/api` proxy 또는 동일 Origin reverse proxy            |
+| 데이터 형식                 | `Content-Type: application/json`                                            |
+| 사용자 API 인증             | `Authorization: Bearer <accessToken>`                                       |
+| 브라우저 세션 복원·로그아웃 | HttpOnly 세션 쿠키 + 허용된 FE Origin (`credentials: 'include'`)            |
 
 BE 시작은 루트에서 `npm run dev:be`입니다. `npm run swagger --workspace=@ggaddak/be`는 문서·라우트 생성이며 서버 실행은 아닙니다. BE 빌드에도 Swagger 생성이 포함됩니다.
 
-실제 FE는 별도로 개발되며 이 저장소의 FE는 데모입니다. FE는 자신의 Origin을 선택할 수 있습니다. 이 저장소 데모의 Vite 포트는 `FE_PORT`로 바꿀 수 있고 기본값은 3002입니다. FE의 정확한 콜백 URI는 BE의 `DISCORD_REDIRECT_URI` 및 Discord OAuth 등록값과 같아야 하며, 별도 Origin으로 BE를 호출하면 `CORS_ORIGINS`에도 실제 FE Origin을 등록합니다.
+실제 FE는 별도로 개발되며 이 저장소의 FE는 데모입니다. FE는 자신의 Origin을 선택할 수 있습니다. 이 저장소 데모의 Vite 포트는 `FE_PORT`로 바꿀 수 있고 기본값은 3002입니다. BE는 `WEB_URL`(FE 주소)에서 콜백 URI(`<WEB_URL>/`)와 허용 Origin을 정합니다. 이 콜백 URI를 Discord OAuth Redirects에 똑같이 등록합니다. 콜백이 다르거나 다른 Origin에서도 BE를 직접 호출할 때만 `DISCORD_REDIRECT_URI`·`CORS_ORIGINS`를 추가로 설정합니다. 적용된 값은 `GET /health`의 `web`에서 확인합니다.
 
 쿠키가 필요한 authorize·login·session·logout 호출에는 `credentials: 'include'`를 사용합니다. 현재 쿠키 정책은 same-site 배치를 전제로 합니다. 로컬에서는 `/api` proxy, 배포에서는 같은 Origin의 reverse proxy를 우선 사용합니다. 서로 다른 site에 FE·BE를 배치하는 것은 현재 쿠키 정책으로 지원되지 않습니다.
 
@@ -119,47 +119,47 @@ async function api<T>(path: string, token?: string, init: RequestInit = {}): Pro
 
 ## 2. 화면별 API 요약
 
-| 화면         | 호출 순서·용도                                                                       |
-| ------------ | ------------------------------------------------------------------------------------ |
+| 화면         | 호출 순서·용도                                                                           |
+| ------------ | ---------------------------------------------------------------------------------------- |
 | 랜딩·로그인  | 시작 시 session 복원, 새 로그인은 authorize → Discord 이동 → login → session → 서버 선택 |
-| Discord 설정 | 선택 서버 bot-status 확인 → 필요 시 설치·재확인 → channels 조회 → 전체 channelIds 저장 |
-| Dashboard    | dashboard 조회 → sync-jobs 생성 → job 상태 polling → 요약·Review Queue 갱신          |
-| Review Queue | 대기/보류 목록 조회 → 버전 확인 → confirm/defer/reject → 관련 목록 갱신              |
-| 상세·편집    | 카드 조회 → expectedVersion 포함 전체 PUT → 반환 카드로 갱신                         |
-| 전체 목록    | guildId/status/category/topic + page/size로 조회                                     |
-| Why 검색     | query 전송 → items[].decision 상세 카드 열기                                         |
-| Timeline     | timezone/groupBy/from/to 조회 → groups[].items의 카드 상세 열기                      |
-| 실패 복구    | analysis-deliveries 조회 → retained-failure retry → 명령 수신·실제 분석 상태 polling |
+| Discord 설정 | 선택 서버 bot-status 확인 → 필요 시 설치·재확인 → channels 조회 → 전체 channelIds 저장   |
+| Dashboard    | dashboard 조회 → sync-jobs 생성 → job 상태 polling → 요약·Review Queue 갱신              |
+| Review Queue | 대기/보류 목록 조회 → 버전 확인 → confirm/defer/reject → 관련 목록 갱신                  |
+| 상세·편집    | 카드 조회 → expectedVersion 포함 전체 PUT → 반환 카드로 갱신                             |
+| 전체 목록    | guildId/status/category/topic + page/size로 조회                                         |
+| Why 검색     | query 전송 → items[].decision 상세 카드 열기                                             |
+| Timeline     | timezone/groupBy/from/to 조회 → groups[].items의 카드 상세 열기                          |
+| 실패 복구    | analysis-deliveries 조회 → retained-failure retry → 명령 수신·실제 분석 상태 polling     |
 
-| Method | 경로                                            | 성공 | 인증       |
-| ------ | ----------------------------------------------- | ---- | ---------- |
-| `GET`  | `/api/v1/auth/authorize`                        | 200  | 없음       |
-| `POST` | `/api/v1/auth/login`                            | 200  | 없음       |
-| `POST` | `/api/v1/auth/session`                          | 200  | 세션 쿠키 + FE Origin |
-| `GET`  | `/api/v1/auth/me`                               | 200  | Bearer JWT |
-| `GET`  | `/api/v1/auth/guilds`                           | 200  | Bearer JWT |
-| `POST` | `/api/v1/auth/token` | 200 | 브라우저 세션 쿠키 + Origin |
-| `POST` | `/api/v1/auth/refresh`                          | 200  | Bearer JWT |
-| `POST` | `/api/v1/auth/logout`                           | 200  | 세션 쿠키 + FE Origin 또는 Bearer JWT |
-| `GET`  | `/api/v1/discord/bot-status`                    | 200  | Bearer JWT |
-| `GET`  | `/api/v1/discord/channels`                      | 200  | Bearer JWT |
-| `PUT`  | `/api/v1/discord/channels`                      | 200  | Bearer JWT |
-| `GET`  | `/api/v1/dashboard`                             | 200  | Bearer JWT |
-| `POST` | `/api/v1/sync-jobs`                             | 202  | Bearer JWT |
-| `GET`  | `/api/v1/sync-jobs/{jobId}`                     | 200  | Bearer JWT |
-| `POST` | `/api/v1/sync-jobs/{jobId}/channels/{channelId}/resume` | 200 | Bearer JWT + Manage Server |
-| `GET`  | `/api/v1/review-queue`                          | 200  | Bearer JWT |
-| `POST` | `/api/v1/review-queue/{ticketId}/review`        | 200  | Bearer JWT |
-| `GET`  | `/api/v1/decisions/{id}`                        | 200  | Bearer JWT |
-| `PUT`  | `/api/v1/decisions/{id}`                        | 200  | Bearer JWT |
-| `GET`  | `/api/v1/decisions/{id}/history`                | 200  | Bearer JWT |
-| `GET`  | `/api/v1/decisions`                             | 200  | Bearer JWT |
-| `GET`  | `/api/v1/search`                                | 200  | Bearer JWT |
-| `GET`  | `/api/v1/decisions/timeline`                    | 200  | Bearer JWT |
-| `GET`  | `/api/v1/analysis-deliveries`                   | 200  | Bearer JWT |
-| `POST` | `/api/v1/analysis-deliveries/{requestId}/retry` | 202  | Bearer JWT |
-| `GET`  | `/api/v1/analysis-requests/{requestId}`         | 200  | Bearer JWT |
-| `GET`  | `/api/v1/analysis-requests/{requestId}/graph`   | 200  | Bearer JWT |
+| Method | 경로                                                    | 성공 | 인증                                  |
+| ------ | ------------------------------------------------------- | ---- | ------------------------------------- |
+| `GET`  | `/api/v1/auth/authorize`                                | 200  | 없음                                  |
+| `POST` | `/api/v1/auth/login`                                    | 200  | 없음                                  |
+| `POST` | `/api/v1/auth/session`                                  | 200  | 세션 쿠키 + FE Origin                 |
+| `GET`  | `/api/v1/auth/me`                                       | 200  | Bearer JWT                            |
+| `GET`  | `/api/v1/auth/guilds`                                   | 200  | Bearer JWT                            |
+| `POST` | `/api/v1/auth/token`                                    | 200  | 브라우저 세션 쿠키 + Origin           |
+| `POST` | `/api/v1/auth/refresh`                                  | 200  | Bearer JWT                            |
+| `POST` | `/api/v1/auth/logout`                                   | 200  | 세션 쿠키 + FE Origin 또는 Bearer JWT |
+| `GET`  | `/api/v1/discord/bot-status`                            | 200  | Bearer JWT                            |
+| `GET`  | `/api/v1/discord/channels`                              | 200  | Bearer JWT                            |
+| `PUT`  | `/api/v1/discord/channels`                              | 200  | Bearer JWT                            |
+| `GET`  | `/api/v1/dashboard`                                     | 200  | Bearer JWT                            |
+| `POST` | `/api/v1/sync-jobs`                                     | 202  | Bearer JWT                            |
+| `GET`  | `/api/v1/sync-jobs/{jobId}`                             | 200  | Bearer JWT                            |
+| `POST` | `/api/v1/sync-jobs/{jobId}/channels/{channelId}/resume` | 200  | Bearer JWT + Manage Server            |
+| `GET`  | `/api/v1/review-queue`                                  | 200  | Bearer JWT                            |
+| `POST` | `/api/v1/review-queue/{ticketId}/review`                | 200  | Bearer JWT                            |
+| `GET`  | `/api/v1/decisions/{id}`                                | 200  | Bearer JWT                            |
+| `PUT`  | `/api/v1/decisions/{id}`                                | 200  | Bearer JWT                            |
+| `GET`  | `/api/v1/decisions/{id}/history`                        | 200  | Bearer JWT                            |
+| `GET`  | `/api/v1/decisions`                                     | 200  | Bearer JWT                            |
+| `GET`  | `/api/v1/search`                                        | 200  | Bearer JWT                            |
+| `GET`  | `/api/v1/decisions/timeline`                            | 200  | Bearer JWT                            |
+| `GET`  | `/api/v1/analysis-deliveries`                           | 200  | Bearer JWT                            |
+| `POST` | `/api/v1/analysis-deliveries/{requestId}/retry`         | 202  | Bearer JWT                            |
+| `GET`  | `/api/v1/analysis-requests/{requestId}`                 | 200  | Bearer JWT                            |
+| `GET`  | `/api/v1/analysis-requests/{requestId}/graph`           | 200  | Bearer JWT                            |
 
 <a id="endpoints"></a>
 
@@ -281,10 +281,10 @@ async function api<T>(path: string, token?: string, init: RequestInit = {}): Pro
 
 **Response:** HTTP 200, `ApiResponse<object>`
 
-| 필드     | 타입                  | 필수 | 설명 |
-| -------- | --------------------- | ---- | ---- |
-| `guilds` | `Array<DiscordGuild>` | 예   | —    |
-| `guildSelection` | `{ status: "ready" \| "unavailable", checkedAt: string \| null }` | 예 | 설치 목록 확인 상태 |
+| 필드             | 타입                                                              | 필수 | 설명                |
+| ---------------- | ----------------------------------------------------------------- | ---- | ------------------- |
+| `guilds`         | `Array<DiscordGuild>`                                             | 예   | —                   |
+| `guildSelection` | `{ status: "ready" \| "unavailable", checkedAt: string \| null }` | 예   | 설치 목록 확인 상태 |
 
 **응답 예제**
 
@@ -1245,29 +1245,29 @@ Bot이 동기화한 전달 상태와 BE가 영속 수신한 Analysis Queue 상�
 
 ### AnalysisDeliveryViewDto
 
-| 필드                       | 타입                                                                                                           | 필수              | 설명 |
-| -------------------------- | -------------------------------------------------------------------------------------------------------------- | ----------------- | ---- |
-| `requestId`                | `string`                                                                                                       | 예                | —    |
-| `guildId`                  | `string`                                                                                                       | 예                | —    |
-| `channelId`                | `string`                                                                                                       | 예                | —    |
-| `channelName`              | `string`                                                                                                       | 아니오            | —    |
-| `status`                   | `"pending" \| "retry-pending" \| "retained-failure" \| "completed-with-candidates" \| "completed-no-decision"` | 예                | —    |
-| `attempts`                 | `number`                                                                                                       | 예                | —    |
-| `nextAttemptAt`            | `number`                                                                                                       | 예                | —    |
-| `errorCategory`            | `string`                                                                                                       | 아니오            | —    |
-| `lastError`                | `string`                                                                                                       | 아니오            | —    |
-| `scanRange`                | `object`                                                                                                       | 아니오            | —    |
-| `scanRange.endMessageId`   | `string`                                                                                                       | 부모 제공 시 필수 | —    |
-| `scanRange.startMessageId` | `string`                                                                                                       | 부모 제공 시 필수 | —    |
-| `scanRange.afterMessageId` | `string`                                                                                                       | 부모 제공 시 필수 | —    |
-| `synchronizedAt`           | `string`                                                                                                       | 예                | —    |
-| `managedBy`                | `"bot" \| "backend"` | 아니오 | BE 소유는 backend; 생략된 기존 항목은 Bot 전달 상태 |
-| `phase`                    | `string` | 아니오 | BE Analysis Queue 상태 |
-| `inputRetained`            | `boolean` | 아니오 | 재실행 입력 보존 여부 |
-| `receivedAt`               | `string` | 아니오 | BE 영속 수신 시각 |
-| `startedAt`                | `string \| null` | 아니오 | 분석 시작 시각 |
-| `completedAt`              | `string \| null` | 아니오 | 처리 완료 시각 |
-| `requiresNewAnalysis`      | `boolean` | 아니오 | 같은 요청 재시도 대신 새 수동 분석이 필요한지 |
+| 필드                       | 타입                                                                                                           | 필수              | 설명                                                |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------- | ----------------- | --------------------------------------------------- |
+| `requestId`                | `string`                                                                                                       | 예                | —                                                   |
+| `guildId`                  | `string`                                                                                                       | 예                | —                                                   |
+| `channelId`                | `string`                                                                                                       | 예                | —                                                   |
+| `channelName`              | `string`                                                                                                       | 아니오            | —                                                   |
+| `status`                   | `"pending" \| "retry-pending" \| "retained-failure" \| "completed-with-candidates" \| "completed-no-decision"` | 예                | —                                                   |
+| `attempts`                 | `number`                                                                                                       | 예                | —                                                   |
+| `nextAttemptAt`            | `number`                                                                                                       | 예                | —                                                   |
+| `errorCategory`            | `string`                                                                                                       | 아니오            | —                                                   |
+| `lastError`                | `string`                                                                                                       | 아니오            | —                                                   |
+| `scanRange`                | `object`                                                                                                       | 아니오            | —                                                   |
+| `scanRange.endMessageId`   | `string`                                                                                                       | 부모 제공 시 필수 | —                                                   |
+| `scanRange.startMessageId` | `string`                                                                                                       | 부모 제공 시 필수 | —                                                   |
+| `scanRange.afterMessageId` | `string`                                                                                                       | 부모 제공 시 필수 | —                                                   |
+| `synchronizedAt`           | `string`                                                                                                       | 예                | —                                                   |
+| `managedBy`                | `"bot" \| "backend"`                                                                                           | 아니오            | BE 소유는 backend; 생략된 기존 항목은 Bot 전달 상태 |
+| `phase`                    | `string`                                                                                                       | 아니오            | BE Analysis Queue 상태                              |
+| `inputRetained`            | `boolean`                                                                                                      | 아니오            | 재실행 입력 보존 여부                               |
+| `receivedAt`               | `string`                                                                                                       | 아니오            | BE 영속 수신 시각                                   |
+| `startedAt`                | `string \| null`                                                                                               | 아니오            | 분석 시작 시각                                      |
+| `completedAt`              | `string \| null`                                                                                               | 아니오            | 처리 완료 시각                                      |
+| `requiresNewAnalysis`      | `boolean`                                                                                                      | 아니오            | 같은 요청 재시도 대신 새 수동 분석이 필요한지       |
 
 nextAttemptAt은 구현상 Unix epoch milliseconds입니다. 재시도 일정이 없는 경우 0일 수 있으므로 항상 날짜로 표시하지 않습니다. pending=대기, retry-pending=자동 재시도 대기, retained-failure=사용자 개입 필요, completed-with-candidates=후보 저장 완료, completed-no-decision=후보 없는 정상 완료입니다.
 
@@ -1289,17 +1289,17 @@ nextAttemptAt은 구현상 Unix epoch milliseconds입니다. 재시도 일정이
 
 Swagger에는 대부분 성공 응답만 선언되어 있어 아래 내용은 현재 error handler·Service 기준입니다. 초안의 AUTH_4010·SYNC_4091·DECISION_4041 등 세분화 코드는 현재 반환하지 않습니다. 메시지 문자열에 화면 로직을 결합하지 말고 HTTP 상태와 code를 우선 사용합니다.
 
-| HTTP | code                              | 대표 상황                                                             | FE 처리                                         |
-| ---- | --------------------------------- | --------------------------------------------------------------------- | ----------------------------------------------- |
-| 400  | VALIDATION_ERROR 또는 BAD_REQUEST | 필수 값·enum·형식·범위 오류                                           | 입력 오류 표시; 가능하면 data의 필드 오류 사용  |
-| 401  | UNAUTHORIZED                      | 토큰 누락·만료·삭제된 세션, 잘못된 OAuth state                        | 보호 API는 token 갱신 후 한 번 재시도; 복원 401은 재로그인 |
-| 403  | FORBIDDEN                         | guild 접근 없음, Manage Server 권한 부족, 다른 서버의 카드            | 선택 서버·권한 안내, 다른 서버 데이터 표시 금지 |
-| 404  | NOT_FOUND                         | Decision / Candidate / Job / Analysis Request 없음                    | 해당 항목 미존재 표시                           |
-| 409  | CONFLICT                          | stale version, 이미 처리된 후보, 중복 동기화, stale queue·재시도 불가 | 상황별 재조회·대기·다시 검수                    |
-| 422  | VALIDATION_ERROR                  | 분석 최종 검증·예산 실패 등으로 그래프를 제공할 수 없음                | 같은 terminal 요청을 반복하지 않고 새 수동 분석 안내 |
-| 429  | RATE_LIMITED                      | 요청 제한                                                             | 즉시 반복 요청 중단; Retry-After가 있으면 초 단위 대기 후 재시도 |
-| 503  | SERVICE_UNAVAILABLE               | 외부 공급자·분석 서비스의 일시적 사용 불가                             | 실패 상태 표시, backoff 후 재시도 |
-| 그 외 5xx | INTERNAL_ERROR                | DB·외부 공급자·미처리 오류                                            | 실패 상태 표시, 사용자 재시도 제공 |
+| HTTP      | code                              | 대표 상황                                                             | FE 처리                                                          |
+| --------- | --------------------------------- | --------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| 400       | VALIDATION_ERROR 또는 BAD_REQUEST | 필수 값·enum·형식·범위 오류                                           | 입력 오류 표시; 가능하면 data의 필드 오류 사용                   |
+| 401       | UNAUTHORIZED                      | 토큰 누락·만료·삭제된 세션, 잘못된 OAuth state                        | 보호 API는 token 갱신 후 한 번 재시도; 복원 401은 재로그인       |
+| 403       | FORBIDDEN                         | guild 접근 없음, Manage Server 권한 부족, 다른 서버의 카드            | 선택 서버·권한 안내, 다른 서버 데이터 표시 금지                  |
+| 404       | NOT_FOUND                         | Decision / Candidate / Job / Analysis Request 없음                    | 해당 항목 미존재 표시                                            |
+| 409       | CONFLICT                          | stale version, 이미 처리된 후보, 중복 동기화, stale queue·재시도 불가 | 상황별 재조회·대기·다시 검수                                     |
+| 422       | VALIDATION_ERROR                  | 분석 최종 검증·예산 실패 등으로 그래프를 제공할 수 없음               | 같은 terminal 요청을 반복하지 않고 새 수동 분석 안내             |
+| 429       | RATE_LIMITED                      | 요청 제한                                                             | 즉시 반복 요청 중단; Retry-After가 있으면 초 단위 대기 후 재시도 |
+| 503       | SERVICE_UNAVAILABLE               | 외부 공급자·분석 서비스의 일시적 사용 불가                            | 실패 상태 표시, backoff 후 재시도                                |
+| 그 외 5xx | INTERNAL_ERROR                    | DB·외부 공급자·미처리 오류                                            | 실패 상태 표시, 사용자 재시도 제공                               |
 
 권한 확인의 403은 `GUILD_ACCESS_DENIED`, 재검증 불가의 502/503은 `GUILD_ACCESS_UNAVAILABLE`을 반환할 수 있습니다. 이 코드에서만 서버 목록·선택·캐시를 복구하고 거절된 쓰기는 자동 재전송하지 않습니다. 일반 검색 공급자의 503을 권한 복구로 반복 처리하지 않습니다. 고정 주기 권한 조회는 없으며, 이벤트 수신이 불가능한 서버는 실제 접근 시 재검증합니다.
 
@@ -1311,16 +1311,16 @@ Swagger에는 대부분 성공 응답만 선언되어 있어 아래 내용은 �
 
 ## 6. 화면 갱신 권장 흐름
 
-| 이벤트            | 다시 조회할 데이터                                              |
-| ----------------- | --------------------------------------------------------------- |
-| 서버 변경         | 서버별 목록·Review Queue·Dashboard·Timeline·채널 설정·실패 목록 |
+| 이벤트                        | 다시 조회할 데이터                                                      |
+| ----------------------------- | ----------------------------------------------------------------------- |
+| 서버 변경                     | 서버별 목록·Review Queue·Dashboard·Timeline·채널 설정·실패 목록         |
 | 설치 후 포커스 복귀·수동 확인 | auth/guilds로 적격 서버·현재 선택 갱신, 선택 서버 bot-status와 channels |
-| 검수 성공         | Review Queue, Decision 목록·상세, Dashboard, Timeline           |
-| 카드 편집 성공    | 카드 상세·목록, Dashboard, Timeline, 필요 시 검색 결과          |
-| 채널 설정 저장    | channels의 monitoredChannelIds                                  |
-| Sync Job 접수     | 해당 jobId 상태 및 Dashboard                                    |
-| Sync Job terminal | Dashboard, Review Queue, Decision 목록·Timeline                 |
-| 재시도 명령 접수  | AnalysisDeliveryQueue와 해당 requestId의 상태                   |
+| 검수 성공                     | Review Queue, Decision 목록·상세, Dashboard, Timeline                   |
+| 카드 편집 성공                | 카드 상세·목록, Dashboard, Timeline, 필요 시 검색 결과                  |
+| 채널 설정 저장                | channels의 monitoredChannelIds                                          |
+| Sync Job 접수                 | 해당 jobId 상태 및 Dashboard                                            |
+| Sync Job terminal             | Dashboard, Review Queue, Decision 목록·Timeline                         |
+| 재시도 명령 접수              | AnalysisDeliveryQueue와 해당 requestId의 상태                           |
 
 Job polling은 진행 중에만 수행하고 terminal에서 중단합니다. interval은 화면 요구에 맞게 정하되 HTTP 429와 연결 실패 시 backoff를 둡니다. available=false의 queue를 빈 상태·분석 성공으로 해석하지 않습니다. Bot heartbeat 상태와 BE 관리 항목의 재시도 조건은 [분석 복구](#recovery)에서 구분합니다.
 
