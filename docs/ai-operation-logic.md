@@ -61,7 +61,7 @@ flowchart TD
 
     subgraph SEARCH["5단계: 시맨틱 검색 파이프라인 (Why-Search)"]
         D3 -.-> E1["승인된 결정(CONFIRMED/SUPERSEDED)"]
-        E1 --> E2["OpenAI text-embedding-3-small 벡터 생성"]
+        E1 --> E2["NVIDIA nemotron-3-embed-1b 벡터 생성"]
         E2 --> E3["DecisionEmbedding 저장 (수정 시 트리거로 무효화)"]
         E3 --> E4["사용자 질문과 인메모리 코사인 유사도 랭킹"]
     end
@@ -173,7 +173,7 @@ GGADDAK 백엔드는 `AI_PROVIDER` 설정에 따라 NVIDIA NIM API 및 Antigravi
 
 승인된 결정 카드(CONFIRMED) 및 대체된 과거 결정(SUPERSEDED)에 대해 자연어 의미 기반 검색을 제공합니다.
 
-1. **임베딩 모델**: OpenAI `text-embedding-3-small` (1536차원 벡터) 사용.
+1. **임베딩 모델**: NVIDIA `nvidia/nemotron-3-embed-1b` (2048차원 벡터). 분석과 같은 NVIDIA 키 풀을 빌려 쓰고, 질문은 `query`, 결정 카드는 `passage`로 구분해 임베딩한다. 첫 검색에서 벡터가 없는 확정 카드는 한 요청에 묶어 임베딩하고 DB에 저장한다. `EMBEDDING_PROVIDER=openai`로 바꾸면 OpenAI `text-embedding-3-small`을 쓴다.
 2. **저장 및 캐싱**:
    - SQLite `DecisionEmbedding` 테이블에 `vectorJson`, `contentHash`, `model`을 저장.
    - 결정 카드가 편집되거나 변경되면 DB 트리거 및 리포지토리 로직에 의해 기존 임베딩이 즉시 무효화(삭제)되며, 다음 검색 시점에 지연 재생성(On-demand Refresh)됩니다.
@@ -185,13 +185,14 @@ GGADDAK 백엔드는 `AI_PROVIDER` 설정에 따라 NVIDIA NIM API 및 Antigravi
 
 ## 4. AI 관련 환경 변수 및 설정 정책
 
-| 환경 변수명              | 기본값                   | 설명                                                 |
-| :----------------------- | :----------------------- | :--------------------------------------------------- |
-| `AI_PROVIDER`            | `agy`                    | AI 공급자 엔진 (`agy`, `mock` 지원)                  |
-| `AI_MODEL`               | `gemini-2.5-pro`         | 기본 AI 분석 모델 식별자                             |
-| `AI_CALL_CONCURRENCY`    | `1`                      | 서버 전체에서 허용되는 최대 동시 AI 호출 수 (1 ~ 32) |
-| `AI_SESSION_CONCURRENCY` | `1`                      | 단일 분석 요청 내에서 병렬 처리할 세션 수 (1 ~ 32)   |
-| `AI_MAX_OUTPUT_TOKENS`   | `8192`                   | 모델 생성 최대 출력 토큰 수                          |
-| `AI_MAX_INPUT_CHARS`     | `0` (무제한)             | 단일 호출 시 허용되는 최대 입력 문자 수 가드레일     |
-| `EMBEDDING_PROVIDER`     | `openai`                 | Why-Search 시맨틱 임베딩 제공자                      |
-| `EMBEDDING_MODEL`        | `text-embedding-3-small` | 시맨틱 임베딩 모델명                                 |
+| 환경 변수명              | 기본값                       | 설명                                                     |
+| :----------------------- | :--------------------------- | :------------------------------------------------------- |
+| `AI_PROVIDER`            | `agy`                        | AI 공급자 엔진 (`agy`, `mock` 지원)                      |
+| `AI_MODEL`               | `gemini-2.5-pro`             | 기본 AI 분석 모델 식별자                                 |
+| `AI_CALL_CONCURRENCY`    | `1`                          | 서버 전체에서 허용되는 최대 동시 AI 호출 수 (1 ~ 32)     |
+| `AI_SESSION_CONCURRENCY` | `1`                          | 단일 분석 요청 내에서 병렬 처리할 세션 수 (1 ~ 32)       |
+| `AI_MAX_OUTPUT_TOKENS`   | `8192`                       | 모델 생성 최대 출력 토큰 수                              |
+| `AI_MAX_INPUT_CHARS`     | `0` (무제한)                 | 단일 호출 시 허용되는 최대 입력 문자 수 가드레일         |
+| `EMBEDDING_PROVIDER`     | `nvidia`                     | Why-Search 시맨틱 임베딩 제공자 (`nvidia` 또는 `openai`) |
+| `NVIDIA_EMBEDDING_MODEL` | `nvidia/nemotron-3-embed-1b` | NVIDIA 임베딩 모델명                                     |
+| `EMBEDDING_MODEL`        | `text-embedding-3-small`     | OpenAI 임베딩 모델명 (`EMBEDDING_PROVIDER=openai`일 때)  |

@@ -41,6 +41,8 @@ export const AiDefaults = {
     agy: 'gemini-3.8-flash-low',
     nvidia: 'nvidia/nemotron-3.5-super-vl-120b-a12b',
   },
-  embeddingProvider: 'openai',
+  embeddingProvider: 'nvidia',
   embeddingModel: 'text-embedding-3-small',
+  // 2026-11-19 계정에서 호출 가능한 NVIDIA 임베딩 중 한국어 질문-문서 매칭을 통과한 모델.
+  nvidiaEmbeddingModel: 'nvidia/nemotron-3-embed-1b',
 } as const;
