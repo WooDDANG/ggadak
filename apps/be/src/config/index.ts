@@ -75,6 +75,24 @@ export interface AppConfig {
   };
 }
 
+/**
+ * 브라우저가 보내는 Origin은 `https://host[:port]` 형식이라 끝의 `/`나 경로가 붙은 값은
+ * 그대로 두면 일치하지 않는다. 인증 쿠키를 쓰므로 전체 허용(*)과 잘못된 주소는 버린다.
+ */
+export function parseCorsOrigins(raw: string | undefined): string[] {
+  return (raw || 'http://localhost:5173,http://localhost:3002')
+    .split(',')
+    .map(value => value.trim())
+    .filter(value => value && value !== '*')
+    .flatMap(value => {
+      try {
+        return [new URL(value).origin];
+      } catch {
+        return [];
+      }
+    });
+}
+
 export const config: AppConfig = {
   get auth() {
     return parseAuthConfig(process.env);
@@ -84,10 +102,7 @@ export const config: AppConfig = {
     return process.env.NODE_ENV || 'development';
   },
   cors: {
-    origins: (process.env.CORS_ORIGINS || 'http://localhost:5173,http://localhost:3002')
-      .split(',')
-      .map(s => s.trim())
-      .filter(origin => origin && origin !== '*'),
+    origins: parseCorsOrigins(process.env.CORS_ORIGINS),
   },
   harvestingPolicy: getHarvestingPolicyFromEnv() || DEFAULT_HARVESTING_POLICY,
   get ai() {
