@@ -3,7 +3,7 @@ import { AppError } from './AppError.js';
 const settingNames = {
   clientId: 'DISCORD_CLIENT_ID',
   clientSecret: 'DISCORD_CLIENT_SECRET',
-  redirectUri: 'DISCORD_REDIRECT_URI',
+  redirectUri: 'WEB_URL (웹 화면 주소, 또는 DISCORD_REDIRECT_URI)',
   secret: 'AUTH_SECRET (32자 이상)',
   secureCookie: 'NODE_ENV',
 } as const;

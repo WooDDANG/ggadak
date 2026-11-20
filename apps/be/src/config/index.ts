@@ -47,7 +47,9 @@ export function parseAuthConfig(env: NodeJS.ProcessEnv): AuthConfig {
   return {
     clientId: env.DISCORD_CLIENT_ID ?? '',
     clientSecret: env.DISCORD_CLIENT_SECRET ?? '',
-    redirectUri: env.DISCORD_REDIRECT_URI ?? '',
+    // 웹 화면 주소 하나(WEB_URL)로 로그인 복귀 주소를 정한다. 기존 설정이 있으면 그 값을 쓴다.
+    redirectUri:
+      env.DISCORD_REDIRECT_URI || (webOrigin(env.WEB_URL) ? `${webOrigin(env.WEB_URL)}/` : ''),
     secret: env.AUTH_SECRET ?? '',
     secureCookie: env.NODE_ENV === 'production',
   };
@@ -79,8 +81,8 @@ export interface AppConfig {
  * 브라우저가 보내는 Origin은 `https://host[:port]` 형식이라 끝의 `/`나 경로가 붙은 값은
  * 그대로 두면 일치하지 않는다. 인증 쿠키를 쓰므로 전체 허용(*)과 잘못된 주소는 버린다.
  */
-export function parseCorsOrigins(raw: string | undefined): string[] {
-  return (raw || 'http://localhost:5173,http://localhost:3002')
+export function parseCorsOrigins(raw: string | undefined, webUrl?: string): string[] {
+  const listed = (raw || 'http://localhost:5173,http://localhost:3002')
     .split(',')
     .map(value => value.trim())
     .filter(value => value && value !== '*')
@@ -91,6 +93,18 @@ export function parseCorsOrigins(raw: string | undefined): string[] {
         return [];
       }
     });
+  const web = webOrigin(webUrl);
+  return [...new Set(web ? [...listed, web] : listed)];
+}
+
+/** WEB_URL을 브라우저 Origin(`https://host[:port]`)으로 맞춘다. 비었거나 잘못되면 undefined. */
+export function webOrigin(raw: string | undefined): string | undefined {
+  if (!raw?.trim()) return undefined;
+  try {
+    return new URL(raw.trim()).origin;
+  } catch {
+    return undefined;
+  }
 }
 
 export const config: AppConfig = {
@@ -101,8 +115,8 @@ export const config: AppConfig = {
   get nodeEnv() {
     return process.env.NODE_ENV || 'development';
   },
-  cors: {
-    origins: parseCorsOrigins(process.env.CORS_ORIGINS),
+  get cors() {
+    return { origins: parseCorsOrigins(process.env.CORS_ORIGINS, process.env.WEB_URL) };
   },
   harvestingPolicy: getHarvestingPolicyFromEnv() || DEFAULT_HARVESTING_POLICY,
   get ai() {

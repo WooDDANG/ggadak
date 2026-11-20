@@ -9,7 +9,7 @@ import { createLogger } from '@ggaddak/shared';
 import { RegisterRoutes } from '../api/routes/generated/routes.js';
 import { errorHandler } from '../api/middlewares/errorHandler.js';
 import { apiFailure, isV1Request } from '../dto/api-response.dto.js';
-import { config } from '../config/index.js';
+import { config, webOrigin } from '../config/index.js';
 import { apiLimiter } from '../api/middlewares/rateLimiter.js';
 
 export function initExpress({ app }: { app: Express }): void {
@@ -59,7 +59,15 @@ export function initExpress({ app }: { app: Express }): void {
     try {
       const health = await app.locals.healthService.check();
       res.setHeader('Cache-Control', 'no-store');
-      res.status(health.ready ? 200 : 503).json(health);
+      // 환경 변수 변경이 실제로 반영됐는지 운영자가 바로 확인하도록 공개 가능한 주소만 보여 준다.
+      res.status(health.ready ? 200 : 503).json({
+        ...health,
+        web: {
+          url: webOrigin(process.env.WEB_URL) ?? null,
+          loginRedirect: config.auth.redirectUri || null,
+          allowedOrigins: config.cors.origins,
+        },
+      });
     } catch (error) {
       next(error);
     }
