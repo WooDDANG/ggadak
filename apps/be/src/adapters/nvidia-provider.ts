@@ -5,7 +5,7 @@ import config from '../config/index.js';
 import { AppError } from '../errors/AppError.js';
 import { DEFAULT_SEED, LEASE_LOST, type AiResult } from '../domain/ai-call.js';
 import type { AiProvider, AiProviderRequest } from './ai-provider.js';
-import { NvidiaKeyPool, type NvidiaReservation } from './nvidia-key-pool.js';
+import { NvidiaKeyPool, nvidiaRetryAfterMs, type NvidiaReservation } from './nvidia-key-pool.js';
 import { nvidiaCredentials, type NvidiaCredential } from '../config/nvidia-credentials.js';
 import { initPrisma } from '../loaders/prisma.js';
 import { createLogger } from '@ggaddak/shared';
@@ -291,19 +291,4 @@ export class NvidiaProvider implements AiProvider {
   }
 }
 
-export function nvidiaRetryAfterMs(error: unknown, now = Date.now()): number {
-  const headers = (error as { headers?: Headers | Record<string, string> } | null)?.headers;
-  const value =
-    headers &&
-    ('get' in headers && typeof headers.get === 'function'
-      ? headers.get('retry-after')
-      : (headers as Record<string, string>)['retry-after']);
-  if (!value?.trim()) return 60_000;
-  const seconds = Number(value);
-  if (Number.isFinite(seconds))
-    return seconds >= 0 && Number.isSafeInteger(Math.ceil(seconds * 1000))
-      ? Math.ceil(seconds * 1000)
-      : 60_000;
-  const date = Date.parse(value);
-  return Number.isFinite(date) ? Math.max(0, date - now) : 60_000;
-}
+export { nvidiaRetryAfterMs } from './nvidia-key-pool.js';

@@ -14,6 +14,23 @@ function credentialId(credential: NvidiaCredential): string {
 
 /** 403 뒤 키를 다시 쓰기까지 기다리는 시간. */
 const FORBIDDEN_COOLDOWN_MS = 60 * 60 * 1000;
+export function nvidiaRetryAfterMs(error: unknown, now = Date.now()): number {
+  const headers = (error as { headers?: Headers | Record<string, string> } | null)?.headers;
+  const value =
+    headers &&
+    ('get' in headers && typeof headers.get === 'function'
+      ? headers.get('retry-after')
+      : (headers as Record<string, string>)['retry-after']);
+  if (!value?.trim()) return WINDOW_MS;
+  const seconds = Number(value);
+  if (Number.isFinite(seconds))
+    return seconds >= 0 && Number.isSafeInteger(Math.ceil(seconds * 1000))
+      ? Math.ceil(seconds * 1000)
+      : WINDOW_MS;
+  const date = Date.parse(value);
+  return Number.isFinite(date) ? Math.max(0, date - now) : WINDOW_MS;
+}
+
 export interface NvidiaReservation extends NvidiaCredential {
   owner: string;
   signal: AbortSignal;
